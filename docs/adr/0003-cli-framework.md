@@ -102,7 +102,7 @@ Scale: 1 (poor) → 5 (excellent). Weighted total = sum of (weight × score).
 * Good, because built-in shell completion generation for Bash, Zsh, Fish, and PowerShell gives users a polished experience out of the box.
 * Good, because Cobra is the de facto standard — contributors can add commands and flags without learning a new framework.
 * Good, because auto-generated help output and man pages reduce documentation maintenance.
-* Neutral, because Cobra's `viper` integration is optional — we can use it for configuration (see ADR-0004) or skip it to keep the dependency surface smaller.
+* Neutral, because Cobra's `viper` integration is available but unused — configuration is handled with stdlib + YAML (see ADR-0004).
 * Bad, because Cobra's dependency tree is the largest of the four options, increasing supply chain surface area and binary size by roughly 2–3 MB.
 * Bad, because Cobra's conventional use of `init()` functions and package-level variables can make command testing slightly awkward, requiring deliberate structuring to keep commands testable.
 
@@ -114,4 +114,4 @@ The decision will be confirmed by successfully implementing the core command str
 
 The decision aligns with the weighted scoring matrix. No override was necessary — Cobra leads on weighted total with a 14-point margin over Kong and a 20-point margin over urfave/cli. The dependency footprint concern (D3: 2) is real but is outweighed by Cobra's strengths on higher-weight drivers.
 
-Note: Cobra's `viper` dependency is optional and its use for configuration management will be evaluated separately in ADR-0004.
+Note: Cobra's `viper` dependency is not used. Configuration is handled with stdlib + YAML (see ADR-0004).

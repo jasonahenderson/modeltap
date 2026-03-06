@@ -8,7 +8,7 @@ decision-makers: Jason Henderson
 
 ## Context and Problem Statement
 
-Modeltap captures every request and response flowing between AI/ML clients and API endpoints. This data — including full request bodies, reassembled streamed responses, and usage metadata — must be stored durably and made queryable for analysis, debugging, and cost tracking. The storage format must work within a single-binary deployment model (per ADR-0001) and support a provider interface so users can implement alternative storage backends.
+Modeltap captures every request and response flowing between AI/ML clients and API endpoints. This data — including full request bodies, reassembled streamed responses, and usage metadata — must be stored durably and made queryable for analysis, debugging, and cost tracking. The storage format must work within a single-binary deployment model (per ADR-0001).
 
 ## Decision Drivers
 
@@ -18,7 +18,7 @@ Drivers are weighted 1–5, where 5 = critical.
 * **D2 – Zero-dependency deployment (5):** Consistent with ADR-0001's emphasis on single-binary distribution. The storage engine must not require a separate server process or external installation.
 * **D3 – Write performance under streaming (4):** Every proxied request involves reassembling an SSE stream and writing the result. Writes must not block the proxy or introduce latency in the forwarded response.
 * **D4 – Read performance at scale (4):** Months of heavy LLM usage could produce tens of thousands of records with large response bodies. Listing, filtering, and reading must stay fast as data grows.
-* **D5 – Schema evolution and migration (3):** The schema will change as we add multi-provider support (ADR-0006), new metrics fields (ADR-0007), and capture modes (ADR-0005). Adding columns or fields should not require painful migrations.
+* **D5 – Schema evolution and migration (3):** The schema will change as we add multi-provider support (ADR-0006) and new features. Adding columns or fields should not require painful migrations.
 * **D6 – Export and interoperability (3):** Users will want to pipe data into other tools — `jq`, spreadsheets, custom scripts, LLM cost dashboards. The format should support easy data extraction.
 * **D7 – Human readability of raw storage (2):** Nice if you can inspect logs without the CLI (e.g., on a server, in a script), but the CLI will be the primary interface so this is a tiebreaker, not a driver.
 * **D8 – Ecosystem tooling (2):** Availability of viewers, editors, and third-party tools that can read the format directly without modeltap.
@@ -33,8 +33,6 @@ Drivers are weighted 1–5, where 5 = critical.
 ## Decision Outcome
 
 Chosen option: **SQLite with JSONL export capability**, because it achieves the highest weighted score (123) with a clear margin over all alternatives. It combines full SQL query capability with on-demand interoperability through a built-in export command, while maintaining zero-dependency deployment via a pure Go SQLite driver.
-
-The storage layer will be implemented behind a **provider interface** so that users can implement alternative storage backends (e.g., JSONL flat file, PostgreSQL, cloud storage) as needed. SQLite with JSONL export serves as the default provider.
 
 ### Scoring Matrix
 
@@ -102,10 +100,8 @@ Scale: 1 (poor) → 5 (excellent). Weighted total = sum of (weight × score).
 
 * Good, because full SQL querying enables powerful filtering, aggregation, and analysis of LLM usage patterns without custom code.
 * Good, because the JSONL export command bridges the interoperability gap, letting users pipe data into `jq`, spreadsheets, and external dashboards.
-* Good, because the provider interface allows users to implement alternative storage backends without forking the project.
 * Good, because SQLite's WAL mode handles concurrent reads (CLI queries) and writes (proxy logging) without contention.
 * Good, because `modernc.org/sqlite` maintains the single-binary deployment model established in ADR-0001.
-* Neutral, because the provider interface adds a layer of abstraction, but this is minimal in Go (a small interface) and pays for itself in extensibility.
 * Bad, because the raw storage file is a binary format that cannot be inspected with a text editor — users must use the CLI, the export command, or a SQLite client.
 * Bad, because `modernc.org/sqlite` (pure Go) is slower than CGO-based SQLite bindings, though the difference is negligible for this workload.
 
@@ -113,28 +109,13 @@ Scale: 1 (poor) → 5 (excellent). Weighted total = sum of (weight × score).
 
 The decision will be confirmed by:
 
-1. Successfully implementing the `Store` interface with SQLite as the default provider.
+1. Implementing the SQLite storage layer with `modernc.org/sqlite` and verifying single-binary compilation.
 2. Demonstrating that write latency does not measurably impact proxy response times under normal usage.
 3. Verifying that query performance remains acceptable at 50k+ records with indexed columns.
 4. Shipping a working `modeltap export --format jsonl` command.
-
-If write latency becomes a bottleneck under high-concurrency scenarios, the provider interface allows introducing an alternative backend without architectural changes.
 
 ## More Information
 
 The decision aligns with the weighted scoring matrix. No override was necessary — SQLite with JSONL export leads on weighted total with no disqualifying weaknesses.
 
-The storage provider interface will be defined as a Go interface, enabling alternative implementations:
-
-```go
-type Store interface {
-    SaveRequest(ctx context.Context, record *RequestRecord) error
-    GetRequest(ctx context.Context, id string) (*RequestRecord, error)
-    ListRequests(ctx context.Context, filter *Filter) ([]*RequestRecord, error)
-    GetUsageMetrics(ctx context.Context, filter *MetricsFilter) (*UsageMetrics, error)
-    Export(ctx context.Context, format ExportFormat, w io.Writer) error
-    Close() error
-}
-```
-
-Community-contributed providers (e.g., PostgreSQL, JSONL flat file, S3) can be developed independently and registered at startup.
+If a storage provider interface is needed in the future (e.g., to support PostgreSQL or cloud storage), it can be extracted from the concrete SQLite implementation at that time. Designing the abstraction before a second backend exists risks getting the interface wrong.
