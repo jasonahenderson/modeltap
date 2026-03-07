@@ -1,0 +1,15 @@
+run:
+  go: "1.17"
+
+linters:
+  enable:
+    - govet
+    - errcheck
+    - staticcheck
+    - unused
+    - gosimple
+    - ineffassign
+
+linters-settings:
+  govet:
+    check-shadowing: true
