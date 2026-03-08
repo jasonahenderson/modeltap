@@ -1,9 +1,15 @@
 package cli
 
 import (
+	"context"
 	"fmt"
+	"net/http"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/jasonahenderson/modeltap/internal/config"
+	"github.com/jasonahenderson/modeltap/internal/proxy"
 	"github.com/spf13/cobra"
 )
 
@@ -34,8 +40,46 @@ func newStartCommand() *cobra.Command {
 				}
 			}
 
-			fmt.Fprintf(cmd.OutOrStdout(), "start: not implemented yet (port=%d, upstream=%s)\n", cfg.Port, cfg.Upstream)
-			return nil
+			srv, err := proxy.NewServer(proxy.ServerConfig{
+				Port:        cfg.Port,
+				UpstreamURL: cfg.Upstream,
+			})
+			if err != nil {
+				return fmt.Errorf("creating proxy server: %w", err)
+			}
+
+			// Set up signal handling for graceful shutdown.
+			ctx, stop := signal.NotifyContext(cmd.Context(), syscall.SIGINT, syscall.SIGTERM)
+			defer stop()
+
+			fmt.Fprintf(cmd.OutOrStdout(), "modeltap proxy listening on :%d -> %s\n", srv.Port(), srv.UpstreamURL())
+
+			// Start server in a goroutine.
+			errCh := make(chan error, 1)
+			go func() {
+				if err := srv.Start(); err != nil && err != http.ErrServerClosed {
+					errCh <- err
+				}
+				close(errCh)
+			}()
+
+			// Wait for signal or server error.
+			select {
+			case <-ctx.Done():
+				stop()
+				fmt.Fprintf(cmd.OutOrStdout(), "\nshutting down gracefully...\n")
+				shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+				if err := srv.Shutdown(shutdownCtx); err != nil {
+					return fmt.Errorf("shutdown: %w", err)
+				}
+				return nil
+			case err := <-errCh:
+				if err != nil {
+					return fmt.Errorf("server error: %w", err)
+				}
+				return nil
+			}
 		},
 	}
 
