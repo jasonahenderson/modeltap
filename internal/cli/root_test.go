@@ -134,7 +134,7 @@ func TestStubCommandsOutput(t *testing.T) {
 		{"start", []string{"start"}, "not implemented yet"},
 		{"logs", []string{"logs"}, "not implemented yet"},
 		{"show", []string{"show", "abc123"}, "not implemented yet"},
-		{"export", []string{"export"}, "not implemented yet"},
+		// export is tested separately in export_test.go (requires a store)
 		{"config show", []string{"config", "show"}, "port:"},
 		{"config set", []string{"config", "set", "key", "val"}, "not implemented yet"},
 		{"config path", []string{"config", "path"}, "config.yaml"},
