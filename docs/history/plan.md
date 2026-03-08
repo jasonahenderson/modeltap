@@ -277,12 +277,12 @@ These work units build the web dashboard. They depend on the backend API existin
 
 ## Phase 10: Documentation and Polish
 
-### WU-031: User Documentation
+### WU-031: User Documentation and Usage Guide
 
-- **Description:** Write user-facing documentation: README with installation, quickstart, and feature overview. CLI reference for all commands. Configuration reference with all keys, defaults, and env var mappings. Architecture overview for contributors.
+- **Description:** Write comprehensive user-facing documentation: README with installation, quickstart, and feature overview. Full usage guide with step-by-step tutorials (setting up the proxy, capturing first request, viewing logs, using metrics, configuring providers). CLI reference for all commands with examples and common workflows. Configuration reference with all keys, defaults, and env var mappings. Architecture overview for contributors.
 - **Dependencies:** WU-024, WU-029
 - **Agents:** docs
-- **Definition of Done:** README includes installation instructions, quickstart guide, and feature list. CLI reference covers all commands with examples. Config reference lists all keys. Architecture doc explains package structure.
+- **Definition of Done:** README includes installation instructions, quickstart guide, and feature list. Usage guide walks through all major workflows with examples. CLI reference covers all commands with flags, examples, and tips. Config reference lists all keys. Architecture doc explains package structure.
 
 ### WU-032: Shell Completion Generation
 
@@ -290,6 +290,20 @@ These work units build the web dashboard. They depend on the backend API existin
 - **Dependencies:** WU-005
 - **Agents:** backend, docs
 - **Definition of Done:** `modeltap completion bash/zsh/fish/powershell` generates valid completion scripts. Documentation explains how to install completions.
+
+### WU-033: Comprehensive CLI Help System
+
+- **Description:** Enhance Cobra commands with detailed long descriptions, usage examples, and topic-based help. Add `modeltap help <topic>` support for topics like "providers", "configuration", "capture", "metrics", "dashboard". Each topic provides a focused guide accessible directly from the terminal. Wire Cobra's `Long` and `Example` fields on every command.
+- **Dependencies:** WU-031
+- **Agents:** backend, docs
+- **Definition of Done:** Every command has a detailed `Long` description and at least one `Example`. `modeltap help` lists available topics. `modeltap help providers` (and other topics) prints a focused guide. Tests verify topic commands exist.
+
+### WU-034: Dashboard Help and Documentation Page
+
+- **Description:** Add a searchable help/documentation page to the web dashboard. Serves the usage guide, CLI reference, and configuration reference as browsable HTML. Includes client-side search (filter by keyword across all docs). Accessible from the dashboard navigation. Content sourced from the markdown docs written in WU-031, rendered to HTML at build time or via a Go markdown renderer.
+- **Dependencies:** WU-029, WU-031
+- **Agents:** designer, tester, ui
+- **Definition of Done:** Dashboard has a "Help" or "Docs" page in navigation. All user documentation is browsable. Search box filters content by keyword. Content matches the CLI/config reference. Responsive layout.
 
 ---
 
@@ -371,5 +385,7 @@ WU-001 (Go module init)
 
 WU-016 + WU-018 + WU-020 + WU-021 ---> WU-023 (Integration tests)
 WU-023 ---> WU-024 (Security review)
-WU-024 + WU-029 ---> WU-031 (User documentation)
+WU-024 + WU-029 ---> WU-031 (User documentation + usage guide)
+WU-031 ---> WU-033 (CLI help system)
+WU-029 + WU-031 ---> WU-034 (Dashboard help/docs page)
 ```
