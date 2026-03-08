@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 
+	"github.com/jasonahenderson/modeltap/internal/config"
 	"github.com/spf13/cobra"
 )
 
@@ -27,7 +28,15 @@ func newConfigShowCommand() *cobra.Command {
 		Use:   "show",
 		Short: "Show current configuration",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Fprintln(cmd.OutOrStdout(), "config show: not implemented yet")
+			cfg, err := config.Load("")
+			if err != nil {
+				return fmt.Errorf("loading config: %w", err)
+			}
+			yamlStr, err := cfg.YAML()
+			if err != nil {
+				return fmt.Errorf("formatting config: %w", err)
+			}
+			fmt.Fprint(cmd.OutOrStdout(), yamlStr)
 			return nil
 		},
 	}
@@ -50,7 +59,7 @@ func newConfigPathCommand() *cobra.Command {
 		Use:   "path",
 		Short: "Show configuration file path",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Fprintln(cmd.OutOrStdout(), "config path: not implemented yet")
+			fmt.Fprintln(cmd.OutOrStdout(), config.DefaultConfigPath())
 			return nil
 		},
 	}
