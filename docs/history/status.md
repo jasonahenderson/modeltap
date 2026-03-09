@@ -4,7 +4,7 @@
 2026-03-08
 
 ## Current Phase
-Phase 9-10: Dashboard CLI integration, docs, and polish
+Complete — all 34 work units delivered
 
 ## Completed
 - [x] TPM: Create master plan from accepted ADRs and features (2026-03-06)
@@ -37,21 +37,24 @@ Phase 9-10: Dashboard CLI integration, docs, and polish
 - [x] WU-027: Dashboard Metrics Display (2026-03-08)
 - [x] WU-028: Dashboard Status Page (2026-03-08)
 
+- [x] WU-029: Dashboard CLI Integration and Config (2026-03-08)
+- [x] WU-030: Dashboard Security Review (2026-03-08)
+- [x] WU-031: User Documentation and Usage Guide (2026-03-08)
+- [x] WU-032: Shell Completion Generation (2026-03-08)
+- [x] WU-033: CLI Help System (2026-03-08)
+- [x] WU-034: Dashboard Help Page (2026-03-08)
+
 ## In Progress
 (none)
 
 ## Up Next
-- [ ] WU-029: Dashboard CLI Integration and Config (tester, backend) -- depends on WU-025-028, WU-006
-- [ ] WU-030: Dashboard Security Review (security) -- depends on WU-029
-- [ ] WU-031: User Documentation and Usage Guide (docs) -- depends on WU-024, WU-029
-- [ ] WU-032: Shell Completion Generation (backend, docs) -- depends on WU-005
-- [ ] WU-033: CLI Help System (backend, docs) -- depends on WU-031
-- [ ] WU-034: Dashboard Help Page (designer, tester, ui) -- depends on WU-029, WU-031
+(none — all work units complete)
 
 ## Blocked
 (none)
 
 ## Notes
-- 29 of 34 work units complete
-- Known flaky test: TestCaptureMiddleware_DetectsProviderAndExtractsMetadata (async save race)
-- Security review: 2 High fixed, 4 Medium (2 fixed, 2 documented), 3 Low documented
+- 34 of 34 work units complete
+- Flaky test fix: replaced polling waitForStore with channel-based waitForSave (OnSaved callback)
+- Security reviews: WU-024 (proxy) and WU-030 (dashboard) — XSS, header redaction, body limits, CSP headers
+- All tests passing with `-count=1`
