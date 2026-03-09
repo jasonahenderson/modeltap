@@ -8,24 +8,29 @@ import (
 	"net/http/httputil"
 	"net/url"
 
+	"github.com/jasonahenderson/modeltap/internal/config"
 	"github.com/jasonahenderson/modeltap/internal/provider"
 	"github.com/jasonahenderson/modeltap/internal/storage"
 )
 
 // ServerConfig holds the configuration for a proxy Server.
 type ServerConfig struct {
-	Port        int
-	UpstreamURL string
-	Store       storage.Store
-	Registry    *provider.Registry
+	Port              int
+	UpstreamURL       string
+	Store             storage.Store
+	Registry          *provider.Registry
+	ProviderUpstreams map[string]string // provider name -> upstream URL
+	Pricing           *config.PricingTable
 }
 
 // Server wraps httputil.ReverseProxy with modeltap's configuration.
 type Server struct {
-	proxy    *httputil.ReverseProxy
-	upstream *url.URL
-	port     int
-	server   *http.Server
+	proxy             *httputil.ReverseProxy
+	upstream          *url.URL
+	providerUpstreams map[string]*url.URL
+	registry          *provider.Registry
+	port              int
+	server            *http.Server
 }
 
 // NewServer creates a new proxy Server from the given config.
@@ -46,20 +51,46 @@ func NewServer(cfg ServerConfig) (*Server, error) {
 		return nil, fmt.Errorf("upstream URL must have a scheme and host")
 	}
 
+	// Parse provider-specific upstream URLs.
+	providerUpstreams := make(map[string]*url.URL)
+	for name, rawURL := range cfg.ProviderUpstreams {
+		u, err := url.Parse(rawURL)
+		if err != nil {
+			return nil, fmt.Errorf("parsing upstream URL for provider %q: %w", name, err)
+		}
+		if u.Scheme == "" || u.Host == "" {
+			return nil, fmt.Errorf("upstream URL for provider %q must have a scheme and host", name)
+		}
+		providerUpstreams[name] = u
+	}
+
 	rp := httputil.NewSingleHostReverseProxy(upstream)
 
-	// Customize the Director to preserve path and set the Host header
-	// to the upstream's host.
-	originalDirector := rp.Director
+	// Customize the Director to detect the provider and route to the
+	// correct upstream. Falls back to the default upstream if no
+	// provider-specific upstream is configured.
 	rp.Director = func(req *http.Request) {
-		originalDirector(req)
-		req.Host = upstream.Host
+		target := upstream
+		if cfg.Registry != nil {
+			if p := cfg.Registry.Detect(req); p != nil {
+				if u, ok := providerUpstreams[p.Name()]; ok {
+					target = u
+				}
+			}
+		}
+		req.URL.Scheme = target.Scheme
+		req.URL.Host = target.Host
+		req.Host = target.Host
+		if _, ok := req.Header["User-Agent"]; !ok {
+			// Prevent Go's default User-Agent from being sent.
+			req.Header.Set("User-Agent", "")
+		}
 	}
 
 	// Wrap the proxy with capture middleware if Store and Registry are provided.
 	var handler http.Handler = rp
 	if cfg.Store != nil && cfg.Registry != nil {
-		capture := NewCaptureMiddleware(cfg.Store, cfg.Registry)
+		capture := NewCaptureMiddleware(cfg.Store, cfg.Registry, cfg.Pricing)
 		handler = capture.Wrap(rp)
 	}
 
@@ -70,10 +101,12 @@ func NewServer(cfg ServerConfig) (*Server, error) {
 	}
 
 	return &Server{
-		proxy:    rp,
-		upstream: upstream,
-		port:     cfg.Port,
-		server:   httpServer,
+		proxy:             rp,
+		upstream:          upstream,
+		providerUpstreams: providerUpstreams,
+		registry:          cfg.Registry,
+		port:              cfg.Port,
+		server:            httpServer,
 	}, nil
 }
 

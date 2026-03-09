@@ -54,11 +54,24 @@ func newStartCommand() *cobra.Command {
 			registry.Register(provider.NewAnthropicProvider())
 			registry.Register(provider.NewOpenAIProvider())
 
+			// Build provider-to-upstream mapping from config.
+			providerUpstreams := make(map[string]string)
+			for name, pcfg := range cfg.Providers {
+				if pcfg.Upstream != "" {
+					providerUpstreams[name] = pcfg.Upstream
+				}
+			}
+
+			// Build pricing table from config (defaults + user overrides).
+			pricing := config.NewPricingTableFromConfig(cfg.Pricing)
+
 			srv, err := proxy.NewServer(proxy.ServerConfig{
-				Port:        cfg.Port,
-				UpstreamURL: cfg.Upstream,
-				Store:       store,
-				Registry:    registry,
+				Port:              cfg.Port,
+				UpstreamURL:       cfg.Upstream,
+				Store:             store,
+				Registry:          registry,
+				ProviderUpstreams: providerUpstreams,
+				Pricing:           pricing,
 			})
 			if err != nil {
 				return fmt.Errorf("creating proxy server: %w", err)

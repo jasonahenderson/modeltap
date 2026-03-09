@@ -25,14 +25,21 @@ type DashboardConfig struct {
 	Bind    string `yaml:"bind" mapstructure:"bind"`
 }
 
+// ProviderConfig holds per-provider settings.
+type ProviderConfig struct {
+	Upstream string `yaml:"upstream" mapstructure:"upstream"`
+}
+
 // Config holds all modeltap configuration values.
 type Config struct {
-	Port          int             `yaml:"port" mapstructure:"port"`
-	Upstream      string          `yaml:"upstream" mapstructure:"upstream"`
-	DBPath        string          `yaml:"db_path" mapstructure:"db_path"`
-	RetentionDays int             `yaml:"retention_days" mapstructure:"retention_days"`
-	MaxBodySize   string          `yaml:"max_body_size" mapstructure:"max_body_size"`
-	Dashboard     DashboardConfig `yaml:"dashboard" mapstructure:"dashboard"`
+	Port          int                       `yaml:"port" mapstructure:"port"`
+	Upstream      string                    `yaml:"upstream" mapstructure:"upstream"`
+	DBPath        string                    `yaml:"db_path" mapstructure:"db_path"`
+	RetentionDays int                       `yaml:"retention_days" mapstructure:"retention_days"`
+	MaxBodySize   string                    `yaml:"max_body_size" mapstructure:"max_body_size"`
+	Dashboard     DashboardConfig           `yaml:"dashboard" mapstructure:"dashboard"`
+	Providers     map[string]ProviderConfig `yaml:"providers" mapstructure:"providers"`
+	Pricing       PricingConfig             `yaml:"pricing" mapstructure:"pricing"`
 }
 
 // DefaultConfigDir returns the default configuration directory path.
