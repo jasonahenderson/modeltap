@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jasonahenderson/modeltap/internal/config"
 	"github.com/jasonahenderson/modeltap/internal/provider"
 	"github.com/jasonahenderson/modeltap/internal/storage"
 )
@@ -19,13 +20,15 @@ import (
 type CaptureMiddleware struct {
 	store    storage.Store
 	registry *provider.Registry
+	pricing  *config.PricingTable
 }
 
 // NewCaptureMiddleware creates a new CaptureMiddleware.
-func NewCaptureMiddleware(store storage.Store, registry *provider.Registry) *CaptureMiddleware {
+func NewCaptureMiddleware(store storage.Store, registry *provider.Registry, pricing *config.PricingTable) *CaptureMiddleware {
 	return &CaptureMiddleware{
 		store:    store,
 		registry: registry,
+		pricing:  pricing,
 	}
 }
 
@@ -130,6 +133,14 @@ func (m *CaptureMiddleware) Wrap(next http.Handler) http.Handler {
 					record.OutputTokens = respMeta.OutputTokens
 				}
 			}
+		}
+
+		// Estimate cost using the pricing table.
+		if m.pricing != nil && record.Provider != "" && record.Model != "" {
+			record.EstimatedCostUSD = m.pricing.EstimateCost(
+				record.Provider, record.Model,
+				record.InputTokens, record.OutputTokens,
+			)
 		}
 
 		// Fire and forget — save asynchronously to avoid blocking the response.
