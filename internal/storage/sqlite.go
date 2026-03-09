@@ -103,6 +103,32 @@ CREATE TABLE IF NOT EXISTS requests (
 CREATE INDEX IF NOT EXISTS idx_requests_timestamp ON requests(timestamp);
 CREATE INDEX IF NOT EXISTS idx_requests_provider  ON requests(provider);
 CREATE INDEX IF NOT EXISTS idx_requests_model     ON requests(model);
+
+CREATE TABLE IF NOT EXISTS hourly_usage (
+	hour TEXT NOT NULL,
+	provider TEXT NOT NULL,
+	model TEXT NOT NULL,
+	request_count INTEGER NOT NULL DEFAULT 0,
+	input_tokens INTEGER NOT NULL DEFAULT 0,
+	output_tokens INTEGER NOT NULL DEFAULT 0,
+	estimated_cost_usd REAL NOT NULL DEFAULT 0,
+	total_latency_ms INTEGER NOT NULL DEFAULT 0,
+	error_count INTEGER NOT NULL DEFAULT 0,
+	PRIMARY KEY (hour, provider, model)
+);
+
+CREATE TABLE IF NOT EXISTS daily_usage (
+	day TEXT NOT NULL,
+	provider TEXT NOT NULL,
+	model TEXT NOT NULL,
+	request_count INTEGER NOT NULL DEFAULT 0,
+	input_tokens INTEGER NOT NULL DEFAULT 0,
+	output_tokens INTEGER NOT NULL DEFAULT 0,
+	estimated_cost_usd REAL NOT NULL DEFAULT 0,
+	total_latency_ms INTEGER NOT NULL DEFAULT 0,
+	error_count INTEGER NOT NULL DEFAULT 0,
+	PRIMARY KEY (day, provider, model)
+);
 `
 	_, err := s.db.Exec(schema)
 	if err != nil {
@@ -111,8 +137,8 @@ CREATE INDEX IF NOT EXISTS idx_requests_model     ON requests(model);
 	return nil
 }
 
-// SaveRequest inserts a request record. If req.ID is empty, a new UUID is
-// generated.
+// SaveRequest inserts a request record and atomically updates the hourly and
+// daily aggregation tables. If req.ID is empty, a new UUID is generated.
 func (s *SQLiteStore) SaveRequest(ctx context.Context, req *Request) error {
 	if req.ID == "" {
 		req.ID = uuid.New().String()
@@ -121,7 +147,13 @@ func (s *SQLiteStore) SaveRequest(ctx context.Context, req *Request) error {
 		req.Timestamp = time.Now().UTC()
 	}
 
-	const query = `
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("beginning transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	const insertRequest = `
 INSERT INTO requests (
 	id, timestamp, provider, model, method, url,
 	request_headers, request_body,
@@ -129,7 +161,7 @@ INSERT INTO requests (
 	input_tokens, output_tokens, latency_ms, estimated_cost_usd
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
-	_, err := s.db.ExecContext(ctx, query,
+	_, err = tx.ExecContext(ctx, insertRequest,
 		req.ID,
 		req.Timestamp.Format(time.RFC3339Nano),
 		req.Provider,
@@ -148,6 +180,58 @@ INSERT INTO requests (
 	)
 	if err != nil {
 		return fmt.Errorf("inserting request: %w", err)
+	}
+
+	// Determine if this is an error response.
+	var errorIncrement int64
+	if req.ResponseStatus >= 400 {
+		errorIncrement = 1
+	}
+
+	// Upsert hourly aggregation.
+	hour := req.Timestamp.UTC().Truncate(time.Hour).Format(time.RFC3339)
+	const upsertHourly = `
+INSERT INTO hourly_usage (hour, provider, model, request_count, input_tokens, output_tokens, estimated_cost_usd, total_latency_ms, error_count)
+VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?)
+ON CONFLICT (hour, provider, model) DO UPDATE SET
+	request_count = request_count + 1,
+	input_tokens = input_tokens + excluded.input_tokens,
+	output_tokens = output_tokens + excluded.output_tokens,
+	estimated_cost_usd = estimated_cost_usd + excluded.estimated_cost_usd,
+	total_latency_ms = total_latency_ms + excluded.total_latency_ms,
+	error_count = error_count + excluded.error_count`
+
+	_, err = tx.ExecContext(ctx, upsertHourly,
+		hour, req.Provider, req.Model,
+		req.InputTokens, req.OutputTokens, req.EstimatedCostUSD, req.LatencyMs, errorIncrement,
+	)
+	if err != nil {
+		return fmt.Errorf("upserting hourly usage: %w", err)
+	}
+
+	// Upsert daily aggregation.
+	day := req.Timestamp.UTC().Format("2006-01-02")
+	const upsertDaily = `
+INSERT INTO daily_usage (day, provider, model, request_count, input_tokens, output_tokens, estimated_cost_usd, total_latency_ms, error_count)
+VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?)
+ON CONFLICT (day, provider, model) DO UPDATE SET
+	request_count = request_count + 1,
+	input_tokens = input_tokens + excluded.input_tokens,
+	output_tokens = output_tokens + excluded.output_tokens,
+	estimated_cost_usd = estimated_cost_usd + excluded.estimated_cost_usd,
+	total_latency_ms = total_latency_ms + excluded.total_latency_ms,
+	error_count = error_count + excluded.error_count`
+
+	_, err = tx.ExecContext(ctx, upsertDaily,
+		day, req.Provider, req.Model,
+		req.InputTokens, req.OutputTokens, req.EstimatedCostUSD, req.LatencyMs, errorIncrement,
+	)
+	if err != nil {
+		return fmt.Errorf("upserting daily usage: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("committing transaction: %w", err)
 	}
 	return nil
 }
@@ -290,6 +374,148 @@ func (s *SQLiteStore) DeleteBefore(ctx context.Context, before time.Time) (int64
 		return 0, fmt.Errorf("deleting old requests: %w", err)
 	}
 	return result.RowsAffected()
+}
+
+// QueryHourlyMetrics returns aggregated hourly usage metrics matching the filter.
+func (s *SQLiteStore) QueryHourlyMetrics(ctx context.Context, filter MetricsFilter) ([]UsageMetrics, error) {
+	return s.queryMetrics(ctx, "hourly_usage", "hour", filter)
+}
+
+// QueryDailyMetrics returns aggregated daily usage metrics matching the filter.
+func (s *SQLiteStore) QueryDailyMetrics(ctx context.Context, filter MetricsFilter) ([]UsageMetrics, error) {
+	return s.queryMetrics(ctx, "daily_usage", "day", filter)
+}
+
+// queryMetrics is a shared helper for querying hourly or daily aggregation tables.
+func (s *SQLiteStore) queryMetrics(ctx context.Context, table, periodCol string, filter MetricsFilter) ([]UsageMetrics, error) {
+	var conditions []string
+	var args []any
+
+	if filter.Since != nil {
+		conditions = append(conditions, periodCol+" >= ?")
+		if periodCol == "hour" {
+			args = append(args, filter.Since.UTC().Truncate(time.Hour).Format(time.RFC3339))
+		} else {
+			args = append(args, filter.Since.UTC().Format("2006-01-02"))
+		}
+	}
+	if filter.Until != nil {
+		conditions = append(conditions, periodCol+" <= ?")
+		if periodCol == "hour" {
+			args = append(args, filter.Until.UTC().Truncate(time.Hour).Format(time.RFC3339))
+		} else {
+			args = append(args, filter.Until.UTC().Format("2006-01-02"))
+		}
+	}
+	if filter.Provider != "" {
+		conditions = append(conditions, "provider = ?")
+		args = append(args, filter.Provider)
+	}
+	if filter.Model != "" {
+		conditions = append(conditions, "model = ?")
+		args = append(args, filter.Model)
+	}
+
+	where := ""
+	if len(conditions) > 0 {
+		where = " WHERE " + strings.Join(conditions, " AND ")
+	}
+
+	query := fmt.Sprintf(`
+SELECT %s, provider, model,
+       SUM(request_count), SUM(input_tokens), SUM(output_tokens),
+       SUM(estimated_cost_usd), SUM(total_latency_ms), SUM(error_count)
+FROM %s%s
+GROUP BY %s, provider, model
+ORDER BY %s, provider, model`,
+		periodCol, table, where, periodCol, periodCol)
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("querying %s metrics: %w", table, err)
+	}
+	defer rows.Close()
+
+	var results []UsageMetrics
+	for rows.Next() {
+		var m UsageMetrics
+		var totalLatency int64
+		if err := rows.Scan(
+			&m.Period, &m.Provider, &m.Model,
+			&m.RequestCount, &m.InputTokens, &m.OutputTokens,
+			&m.EstimatedCost, &totalLatency, &m.ErrorCount,
+		); err != nil {
+			return nil, fmt.Errorf("scanning %s metrics row: %w", table, err)
+		}
+		if m.RequestCount > 0 {
+			m.AvgLatencyMs = totalLatency / m.RequestCount
+		}
+		results = append(results, m)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating %s metrics rows: %w", table, err)
+	}
+	return results, nil
+}
+
+// RebuildMetrics deletes all aggregation data and recomputes it from the
+// raw requests table.
+func (s *SQLiteStore) RebuildMetrics(ctx context.Context) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("beginning rebuild transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.ExecContext(ctx, "DELETE FROM hourly_usage"); err != nil {
+		return fmt.Errorf("clearing hourly_usage: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM daily_usage"); err != nil {
+		return fmt.Errorf("clearing daily_usage: %w", err)
+	}
+
+	const rebuildHourly = `
+INSERT INTO hourly_usage (hour, provider, model, request_count, input_tokens, output_tokens, estimated_cost_usd, total_latency_ms, error_count)
+SELECT
+	strftime('%%Y-%%m-%%dT%%H:00:00Z', timestamp),
+	provider,
+	model,
+	COUNT(*),
+	SUM(input_tokens),
+	SUM(output_tokens),
+	SUM(estimated_cost_usd),
+	SUM(latency_ms),
+	SUM(CASE WHEN response_status >= 400 THEN 1 ELSE 0 END)
+FROM requests
+GROUP BY strftime('%%Y-%%m-%%dT%%H:00:00Z', timestamp), provider, model`
+
+	if _, err := tx.ExecContext(ctx, rebuildHourly); err != nil {
+		return fmt.Errorf("rebuilding hourly_usage: %w", err)
+	}
+
+	const rebuildDaily = `
+INSERT INTO daily_usage (day, provider, model, request_count, input_tokens, output_tokens, estimated_cost_usd, total_latency_ms, error_count)
+SELECT
+	strftime('%%Y-%%m-%%d', timestamp),
+	provider,
+	model,
+	COUNT(*),
+	SUM(input_tokens),
+	SUM(output_tokens),
+	SUM(estimated_cost_usd),
+	SUM(latency_ms),
+	SUM(CASE WHEN response_status >= 400 THEN 1 ELSE 0 END)
+FROM requests
+GROUP BY strftime('%%Y-%%m-%%d', timestamp), provider, model`
+
+	if _, err := tx.ExecContext(ctx, rebuildDaily); err != nil {
+		return fmt.Errorf("rebuilding daily_usage: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("committing rebuild transaction: %w", err)
+	}
+	return nil
 }
 
 // Close closes the underlying database connection.
