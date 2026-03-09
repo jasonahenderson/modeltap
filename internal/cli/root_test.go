@@ -137,11 +137,10 @@ func TestStubCommandsOutput(t *testing.T) {
 		// show is tested separately in show_test.go (requires a store)
 		// export is tested separately in export_test.go (requires a store)
 		// status is tested separately in status_test.go (requires a store/config)
+		// metrics is tested separately in metrics_test.go (requires a store)
 		{"config show", []string{"config", "show"}, "port:"},
 		{"config set", []string{"config", "set", "key", "val"}, "not implemented yet"},
 		{"config path", []string{"config", "path"}, "config.yaml"},
-		{"metrics", []string{"metrics"}, "not implemented yet"},
-		{"metrics rebuild", []string{"metrics", "rebuild"}, "not implemented yet"},
 		{"dashboard", []string{"dashboard"}, "not implemented yet"},
 	}
 
