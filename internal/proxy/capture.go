@@ -14,6 +14,12 @@ import (
 	"github.com/jasonahenderson/modeltap/internal/storage"
 )
 
+// maxCaptureBodySize is the maximum number of bytes read from request and
+// response bodies during capture. Bodies larger than this are truncated.
+// This prevents memory exhaustion from very large payloads (e.g., image
+// uploads or massive completions). 10 MB matches the default config value.
+const maxCaptureBodySize = 10 * 1024 * 1024 // 10 MB
+
 // CaptureMiddleware intercepts proxied requests and responses, saving them
 // to the Store for later inspection. It detects the provider using the
 // registry and extracts metadata (model, tokens, etc.) from the bodies.
@@ -40,10 +46,12 @@ func (m *CaptureMiddleware) Wrap(next http.Handler) http.Handler {
 		start := time.Now()
 
 		// 1. Read and re-buffer the request body so the proxy can still use it.
+		//    Limit read to maxCaptureBodySize to prevent memory exhaustion from
+		//    very large payloads.
 		var reqBody []byte
 		if r.Body != nil {
 			var err error
-			reqBody, err = io.ReadAll(r.Body)
+			reqBody, err = io.ReadAll(io.LimitReader(r.Body, maxCaptureBodySize))
 			if err != nil {
 				// If we can't read the body, just forward the request as-is.
 				http.Error(w, "failed to read request body", http.StatusBadGateway)
@@ -150,12 +158,27 @@ func (m *CaptureMiddleware) Wrap(next http.Handler) http.Handler {
 	})
 }
 
-// sanitizeHeaders returns a copy of the headers as map[string]string (first value only).
+// sensitiveHeaders lists header names whose values must be redacted before
+// storage. Comparison is case-insensitive (http.Header canonicalises keys).
+var sensitiveHeaders = map[string]bool{
+	"Authorization":   true,
+	"X-Api-Key":       true,
+	"Api-Key":         true,
+	"Proxy-Authorization": true,
+}
+
+// sanitizeHeaders returns a copy of the headers as map[string]string (first
+// value only). Values of sensitive headers (Authorization, X-Api-Key, etc.)
+// are redacted to prevent credential exposure in stored data.
 func sanitizeHeaders(h http.Header) map[string]string {
 	result := make(map[string]string, len(h))
 	for k, v := range h {
 		if len(v) > 0 {
-			result[k] = v[0]
+			if sensitiveHeaders[http.CanonicalHeaderKey(k)] {
+				result[k] = "[REDACTED]"
+			} else {
+				result[k] = v[0]
+			}
 		}
 	}
 	return result

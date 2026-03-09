@@ -4,6 +4,7 @@ package dashboard
 import (
 	"context"
 	"encoding/json"
+	"io/fs"
 	"net/http"
 	"strconv"
 	"time"
@@ -28,10 +29,34 @@ func NewAPIHandler(store storage.Store, cfg *config.Config) *APIHandler {
 
 // RegisterRoutes registers all dashboard API routes on the given mux.
 func (h *APIHandler) RegisterRoutes(mux *http.ServeMux) {
+	// API routes.
 	mux.HandleFunc("GET /api/logs", h.handleLogs)
 	mux.HandleFunc("GET /api/logs/{id}", h.handleLogDetail)
 	mux.HandleFunc("GET /api/metrics", h.handleMetrics)
 	mux.HandleFunc("GET /api/status", h.handleStatus)
+
+	// Serve embedded static assets.
+	staticSub, err := fs.Sub(StaticFS, "static")
+	if err != nil {
+		panic("dashboard: failed to create static sub-filesystem: " + err.Error())
+	}
+	fileServer := http.FileServer(http.FS(staticSub))
+	mux.Handle("GET /static/", http.StripPrefix("/static/", fileServer))
+
+	// Serve index.html at root.
+	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
+			return
+		}
+		data, err := StaticFS.ReadFile("static/index.html")
+		if err != nil {
+			http.Error(w, "index.html not found", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write(data)
+	})
 }
 
 // writeJSON writes a JSON response with the given status code.
@@ -394,8 +419,9 @@ func (h *APIHandler) ListenAndServe(ctx context.Context) error {
 	addr := bind + ":" + strconv.Itoa(port)
 
 	server := &http.Server{
-		Addr:    addr,
-		Handler: mux,
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	// Shut down gracefully when context is cancelled.

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"time"
 
 	"github.com/jasonahenderson/modeltap/internal/config"
 	"github.com/jasonahenderson/modeltap/internal/provider"
@@ -96,8 +97,9 @@ func NewServer(cfg ServerConfig) (*Server, error) {
 
 	addr := fmt.Sprintf(":%d", cfg.Port)
 	httpServer := &http.Server{
-		Addr:    addr,
-		Handler: handler,
+		Addr:              addr,
+		Handler:           handler,
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	return &Server{
