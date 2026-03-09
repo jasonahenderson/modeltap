@@ -4,7 +4,7 @@
 2026-03-08
 
 ## Current Phase
-Phase 8: Integration Testing and Security Review
+Phase 9-10: Dashboard CLI integration, docs, and polish
 
 ## Completed
 - [x] TPM: Create master plan from accepted ADRs and features (2026-03-06)
@@ -30,19 +30,28 @@ Phase 8: Integration Testing and Security Review
 - [x] WU-020: Logs Command (2026-03-08)
 - [x] WU-021: Show Command (2026-03-08)
 - [x] WU-022: Status Command (2026-03-08)
+- [x] WU-023: End-to-End Integration Tests (2026-03-08)
+- [x] WU-024: Security Review (2026-03-08)
+- [x] WU-025: Dashboard API Endpoints (2026-03-08)
+- [x] WU-026: Dashboard Log Viewer (2026-03-08)
+- [x] WU-027: Dashboard Metrics Display (2026-03-08)
+- [x] WU-028: Dashboard Status Page (2026-03-08)
 
 ## In Progress
 (none)
 
 ## Up Next
-- [ ] WU-023: End-to-End Integration Tests (integration) -- depends on WU-016, WU-018, WU-020, WU-021
-- [ ] WU-024: Security Review (security) -- depends on WU-023
-- [ ] WU-025: Dashboard API Endpoints (designer, tester, backend) -- depends on WU-007, WU-017, WU-013
+- [ ] WU-029: Dashboard CLI Integration and Config (tester, backend) -- depends on WU-025-028, WU-006
+- [ ] WU-030: Dashboard Security Review (security) -- depends on WU-029
+- [ ] WU-031: User Documentation and Usage Guide (docs) -- depends on WU-024, WU-029
+- [ ] WU-032: Shell Completion Generation (backend, docs) -- depends on WU-005
+- [ ] WU-033: CLI Help System (backend, docs) -- depends on WU-031
+- [ ] WU-034: Dashboard Help Page (designer, tester, ui) -- depends on WU-029, WU-031
 
 ## Blocked
 (none)
 
 ## Notes
-- 23 of 34 work units complete
-- Phases 1-7 complete. Backend core is done.
-- Next: integration tests, security review, then dashboard (Phase 9)
+- 29 of 34 work units complete
+- Known flaky test: TestCaptureMiddleware_DetectsProviderAndExtractsMetadata (async save race)
+- Security review: 2 High fixed, 4 Medium (2 fixed, 2 documented), 3 Low documented
