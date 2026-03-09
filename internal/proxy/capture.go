@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -27,6 +28,10 @@ type CaptureMiddleware struct {
 	store    storage.Store
 	registry *provider.Registry
 	pricing  *config.PricingTable
+
+	// OnSaved is called after a request is saved to the store (or save fails).
+	// Used for testing to synchronize with async middleware processing.
+	OnSaved func()
 }
 
 // NewCaptureMiddleware creates a new CaptureMiddleware.
@@ -151,9 +156,15 @@ func (m *CaptureMiddleware) Wrap(next http.Handler) http.Handler {
 			)
 		}
 
-		// Fire and forget — save asynchronously to avoid blocking the response.
+		// Save after response is complete. The response has already been sent
+		// to the client, so this doesn't add latency to the user's request.
 		go func() {
-			_ = m.store.SaveRequest(context.Background(), record)
+			if err := m.store.SaveRequest(context.Background(), record); err != nil {
+				slog.Error("failed to save captured request", "error", err)
+			}
+			if m.OnSaved != nil {
+				m.OnSaved()
+			}
 		}()
 	})
 }

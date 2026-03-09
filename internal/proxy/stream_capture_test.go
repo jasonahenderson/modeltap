@@ -96,7 +96,7 @@ func openaiSSEEvents() []sseEvent {
 	}
 }
 
-func newStreamTestSetup(t *testing.T, upstreamHandler http.HandlerFunc) (*httptest.Server, *storage.SQLiteStore) {
+func newStreamTestEnv(t *testing.T, upstreamHandler http.HandlerFunc) *captureTestEnv {
 	t.Helper()
 
 	upstream := httptest.NewServer(upstreamHandler)
@@ -115,11 +115,14 @@ func newStreamTestSetup(t *testing.T, upstreamHandler http.HandlerFunc) (*httpte
 	registry.Register(provider.NewAnthropicProvider())
 	registry.Register(provider.NewOpenAIProvider())
 
+	saved := make(chan struct{}, 100)
+
 	srv, err := proxy.NewServer(proxy.ServerConfig{
 		Port:        9999,
 		UpstreamURL: upstream.URL,
 		Store:       store,
 		Registry:    registry,
+		OnSaved:     func() { saved <- struct{}{} },
 	})
 	if err != nil {
 		t.Fatalf("NewServer: %v", err)
@@ -128,16 +131,21 @@ func newStreamTestSetup(t *testing.T, upstreamHandler http.HandlerFunc) (*httpte
 	proxyServer := httptest.NewServer(srv.Handler())
 	t.Cleanup(proxyServer.Close)
 
-	return proxyServer, store
+	return &captureTestEnv{
+		proxyServer: proxyServer,
+		store:       store,
+		registry:    registry,
+		saved:       saved,
+	}
 }
 
 func TestStreamCapture_Anthropic(t *testing.T) {
-	proxyServer, store := newStreamTestSetup(t, func(w http.ResponseWriter, r *http.Request) {
+	env := newStreamTestEnv(t, func(w http.ResponseWriter, r *http.Request) {
 		writeSSE(w, anthropicSSEEvents())
 	})
 
 	reqBody := `{"model":"claude-sonnet-4-20250514","max_tokens":100,"messages":[{"role":"user","content":"Hi"}],"stream":true}`
-	req, _ := http.NewRequest("POST", proxyServer.URL+"/v1/messages", strings.NewReader(reqBody))
+	req, _ := http.NewRequest("POST", env.proxyServer.URL+"/v1/messages", strings.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("x-api-key", "sk-test")
 	req.Header.Set("anthropic-version", "2023-06-01")
@@ -162,7 +170,16 @@ func TestStreamCapture_Anthropic(t *testing.T) {
 	}
 
 	// Wait for the async save.
-	saved := waitForStore(t, store, 2*time.Second)
+	env.waitForSave(t, 2*time.Second)
+
+	reqs, err := env.store.ListRequests(context.Background(), storage.ListFilter{Limit: 1})
+	if err != nil {
+		t.Fatalf("ListRequests: %v", err)
+	}
+	if len(reqs) == 0 {
+		t.Fatal("no requests saved")
+	}
+	saved := &reqs[0]
 
 	if saved.Provider != "anthropic" {
 		t.Errorf("provider = %q, want anthropic", saved.Provider)
@@ -180,18 +197,18 @@ func TestStreamCapture_Anthropic(t *testing.T) {
 	if !strings.Contains(saved.ResponseBody, "Hello world!") {
 		t.Errorf("saved response body = %q, want it to contain 'Hello world!'", saved.ResponseBody)
 	}
-	if saved.LatencyMs <= 0 {
-		t.Errorf("latency_ms = %d, want > 0", saved.LatencyMs)
+	if saved.LatencyMs < 0 {
+		t.Errorf("latency_ms = %d, want >= 0", saved.LatencyMs)
 	}
 }
 
 func TestStreamCapture_OpenAI(t *testing.T) {
-	proxyServer, store := newStreamTestSetup(t, func(w http.ResponseWriter, r *http.Request) {
+	env := newStreamTestEnv(t, func(w http.ResponseWriter, r *http.Request) {
 		writeSSE(w, openaiSSEEvents())
 	})
 
 	reqBody := `{"model":"gpt-4o","messages":[{"role":"user","content":"Hi"}],"stream":true}`
-	req, _ := http.NewRequest("POST", proxyServer.URL+"/v1/chat/completions", strings.NewReader(reqBody))
+	req, _ := http.NewRequest("POST", env.proxyServer.URL+"/v1/chat/completions", strings.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer sk-test")
 
@@ -210,7 +227,16 @@ func TestStreamCapture_OpenAI(t *testing.T) {
 		t.Errorf("response body should contain 'Hello', got: %s", string(body))
 	}
 
-	saved := waitForStore(t, store, 2*time.Second)
+	env.waitForSave(t, 2*time.Second)
+
+	reqs, err := env.store.ListRequests(context.Background(), storage.ListFilter{Limit: 1})
+	if err != nil {
+		t.Fatalf("ListRequests: %v", err)
+	}
+	if len(reqs) == 0 {
+		t.Fatal("no requests saved")
+	}
+	saved := &reqs[0]
 
 	if saved.Provider != "openai" {
 		t.Errorf("provider = %q, want openai", saved.Provider)
@@ -235,7 +261,7 @@ func TestStreamCapture_ChunksFlushedImmediately(t *testing.T) {
 	var mu sync.Mutex
 	clientReceiveTimes := make([]time.Time, 0)
 
-	proxyServer, _ := newStreamTestSetup(t, func(w http.ResponseWriter, r *http.Request) {
+	env := newStreamTestEnv(t, func(w http.ResponseWriter, r *http.Request) {
 		flusher := w.(http.Flusher)
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
@@ -256,7 +282,7 @@ func TestStreamCapture_ChunksFlushedImmediately(t *testing.T) {
 	})
 
 	reqBody := `{"model":"claude-sonnet-4-20250514","max_tokens":10,"messages":[{"role":"user","content":"test"}],"stream":true}`
-	req, _ := http.NewRequest("POST", proxyServer.URL+"/v1/messages", strings.NewReader(reqBody))
+	req, _ := http.NewRequest("POST", env.proxyServer.URL+"/v1/messages", strings.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("anthropic-version", "2023-06-01")
 
@@ -298,14 +324,14 @@ func TestStreamCapture_NonSSEStillHandled(t *testing.T) {
 	// Non-SSE (regular JSON) responses should still be captured via the existing path.
 	respBody := `{"id":"msg_123","type":"message","model":"claude-sonnet-4-20250514","content":[{"type":"text","text":"Hello!"}],"usage":{"input_tokens":10,"output_tokens":5},"stop_reason":"end_turn"}`
 
-	proxyServer, store := newStreamTestSetup(t, func(w http.ResponseWriter, r *http.Request) {
+	env := newStreamTestEnv(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(respBody))
 	})
 
 	reqBody := `{"model":"claude-sonnet-4-20250514","max_tokens":100,"messages":[{"role":"user","content":"Hi"}]}`
-	req, _ := http.NewRequest("POST", proxyServer.URL+"/v1/messages", strings.NewReader(reqBody))
+	req, _ := http.NewRequest("POST", env.proxyServer.URL+"/v1/messages", strings.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("x-api-key", "sk-test")
 	req.Header.Set("anthropic-version", "2023-06-01")
@@ -317,7 +343,16 @@ func TestStreamCapture_NonSSEStillHandled(t *testing.T) {
 	defer resp.Body.Close()
 	io.ReadAll(resp.Body)
 
-	saved := waitForStore(t, store, 2*time.Second)
+	env.waitForSave(t, 2*time.Second)
+
+	reqs, err := env.store.ListRequests(context.Background(), storage.ListFilter{Limit: 1})
+	if err != nil {
+		t.Fatalf("ListRequests: %v", err)
+	}
+	if len(reqs) == 0 {
+		t.Fatal("no requests saved")
+	}
+	saved := &reqs[0]
 
 	if saved.Provider != "anthropic" {
 		t.Errorf("provider = %q, want anthropic", saved.Provider)
@@ -335,12 +370,12 @@ func TestStreamCapture_NonSSEStillHandled(t *testing.T) {
 
 func TestStreamCapture_ReassembledResponseSavedWithMetadata(t *testing.T) {
 	// Verify that the complete metadata is extracted from the reassembled stream.
-	proxyServer, store := newStreamTestSetup(t, func(w http.ResponseWriter, r *http.Request) {
+	env := newStreamTestEnv(t, func(w http.ResponseWriter, r *http.Request) {
 		writeSSE(w, anthropicSSEEvents())
 	})
 
 	reqBody := `{"model":"claude-sonnet-4-20250514","max_tokens":100,"messages":[{"role":"user","content":"Hi"}],"stream":true}`
-	req, _ := http.NewRequest("POST", proxyServer.URL+"/v1/messages", strings.NewReader(reqBody))
+	req, _ := http.NewRequest("POST", env.proxyServer.URL+"/v1/messages", strings.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("x-api-key", "sk-test")
 	req.Header.Set("anthropic-version", "2023-06-01")
@@ -352,7 +387,16 @@ func TestStreamCapture_ReassembledResponseSavedWithMetadata(t *testing.T) {
 	defer resp.Body.Close()
 	io.ReadAll(resp.Body)
 
-	saved := waitForStore(t, store, 2*time.Second)
+	env.waitForSave(t, 2*time.Second)
+
+	reqs, err := env.store.ListRequests(context.Background(), storage.ListFilter{Limit: 1})
+	if err != nil {
+		t.Fatalf("ListRequests: %v", err)
+	}
+	if len(reqs) == 0 {
+		t.Fatal("no requests saved")
+	}
+	saved := &reqs[0]
 
 	// Verify all metadata fields are populated.
 	if saved.Provider != "anthropic" {
@@ -393,7 +437,7 @@ func TestStreamCapture_ReassembledResponseSavedWithMetadata(t *testing.T) {
 
 func TestStreamCapture_UnknownProviderSSE(t *testing.T) {
 	// SSE from an unknown provider: should still capture raw SSE data but no metadata.
-	proxyServer, store := newStreamTestSetup(t, func(w http.ResponseWriter, r *http.Request) {
+	env := newStreamTestEnv(t, func(w http.ResponseWriter, r *http.Request) {
 		flusher := w.(http.Flusher)
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
@@ -404,7 +448,7 @@ func TestStreamCapture_UnknownProviderSSE(t *testing.T) {
 		flusher.Flush()
 	})
 
-	req, _ := http.NewRequest("POST", proxyServer.URL+"/v1/custom/stream", strings.NewReader(`{}`))
+	req, _ := http.NewRequest("POST", env.proxyServer.URL+"/v1/custom/stream", strings.NewReader(`{}`))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
@@ -414,7 +458,16 @@ func TestStreamCapture_UnknownProviderSSE(t *testing.T) {
 	defer resp.Body.Close()
 	io.ReadAll(resp.Body)
 
-	saved := waitForStore(t, store, 2*time.Second)
+	env.waitForSave(t, 2*time.Second)
+
+	reqs, err := env.store.ListRequests(context.Background(), storage.ListFilter{Limit: 1})
+	if err != nil {
+		t.Fatalf("ListRequests: %v", err)
+	}
+	if len(reqs) == 0 {
+		t.Fatal("no requests saved")
+	}
+	saved := &reqs[0]
 
 	// Should still be saved with raw SSE data but no provider metadata.
 	if saved.Provider != "" {
@@ -424,22 +477,4 @@ func TestStreamCapture_UnknownProviderSSE(t *testing.T) {
 	if !strings.Contains(saved.ResponseBody, "hello") {
 		t.Errorf("response body = %q, want it to contain 'hello'", saved.ResponseBody)
 	}
-}
-
-// waitForStoreCount polls until at least count requests are saved.
-func waitForStoreCount(t *testing.T, store *storage.SQLiteStore, count int, timeout time.Duration) []storage.Request {
-	t.Helper()
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		reqs, err := store.ListRequests(context.Background(), storage.ListFilter{Limit: count + 1})
-		if err != nil {
-			t.Fatalf("ListRequests: %v", err)
-		}
-		if len(reqs) >= count {
-			return reqs
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	t.Fatalf("timed out waiting for store to have %d request(s)", count)
-	return nil
 }

@@ -22,6 +22,7 @@ type ServerConfig struct {
 	Registry          *provider.Registry
 	ProviderUpstreams map[string]string // provider name -> upstream URL
 	Pricing           *config.PricingTable
+	OnSaved           func() // test hook: called after each request is saved
 }
 
 // Server wraps httputil.ReverseProxy with modeltap's configuration.
@@ -92,6 +93,7 @@ func NewServer(cfg ServerConfig) (*Server, error) {
 	var handler http.Handler = rp
 	if cfg.Store != nil && cfg.Registry != nil {
 		capture := NewCaptureMiddleware(cfg.Store, cfg.Registry, cfg.Pricing)
+		capture.OnSaved = cfg.OnSaved
 		handler = capture.Wrap(rp)
 	}
 

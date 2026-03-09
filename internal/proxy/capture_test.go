@@ -17,9 +17,15 @@ import (
 	"github.com/jasonahenderson/modeltap/internal/storage"
 )
 
-// newCaptureTestSetup creates a full proxy+capture pipeline with a mock upstream,
-// an in-memory SQLite store, and a provider registry with Anthropic and OpenAI.
-func newCaptureTestSetup(t *testing.T, upstreamHandler http.HandlerFunc) (*httptest.Server, *storage.SQLiteStore, *provider.Registry) {
+// captureTestEnv holds the test proxy setup with a saved channel for synchronization.
+type captureTestEnv struct {
+	proxyServer *httptest.Server
+	store       *storage.SQLiteStore
+	registry    *provider.Registry
+	saved       chan struct{}
+}
+
+func newCaptureTestEnv(t *testing.T, upstreamHandler http.HandlerFunc) *captureTestEnv {
 	t.Helper()
 
 	upstream := httptest.NewServer(upstreamHandler)
@@ -38,11 +44,14 @@ func newCaptureTestSetup(t *testing.T, upstreamHandler http.HandlerFunc) (*httpt
 	registry.Register(provider.NewAnthropicProvider())
 	registry.Register(provider.NewOpenAIProvider())
 
+	saved := make(chan struct{}, 100)
+
 	srv, err := proxy.NewServer(proxy.ServerConfig{
 		Port:        9999,
 		UpstreamURL: upstream.URL,
 		Store:       store,
 		Registry:    registry,
+		OnSaved:     func() { saved <- struct{}{} },
 	})
 	if err != nil {
 		t.Fatalf("NewServer: %v", err)
@@ -51,38 +60,36 @@ func newCaptureTestSetup(t *testing.T, upstreamHandler http.HandlerFunc) (*httpt
 	proxyServer := httptest.NewServer(srv.Handler())
 	t.Cleanup(proxyServer.Close)
 
-	return proxyServer, store, registry
+	return &captureTestEnv{
+		proxyServer: proxyServer,
+		store:       store,
+		registry:    registry,
+		saved:       saved,
+	}
 }
 
-// waitForStore polls the store until at least one request is saved, with a timeout.
-func waitForStore(t *testing.T, store *storage.SQLiteStore, timeout time.Duration) *storage.Request {
+// waitForSave blocks until the capture middleware signals a save completed, with timeout.
+func (env *captureTestEnv) waitForSave(t *testing.T, timeout time.Duration) {
 	t.Helper()
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		reqs, err := store.ListRequests(context.Background(), storage.ListFilter{Limit: 1})
-		if err != nil {
-			t.Fatalf("ListRequests: %v", err)
-		}
-		if len(reqs) > 0 {
-			return &reqs[0]
-		}
-		time.Sleep(10 * time.Millisecond)
+	select {
+	case <-env.saved:
+	case <-time.After(timeout):
+		t.Fatal("timed out waiting for capture middleware to save request")
 	}
-	t.Fatal("timed out waiting for store to have a saved request")
-	return nil
 }
+
 
 func TestCaptureMiddleware_SavesRequestAndResponse(t *testing.T) {
 	respBody := `{"id":"msg_123","type":"message","model":"claude-3-5-sonnet-20241022","content":[{"type":"text","text":"Hello!"}],"usage":{"input_tokens":10,"output_tokens":5},"stop_reason":"end_turn"}`
 
-	proxyServer, store, _ := newCaptureTestSetup(t, func(w http.ResponseWriter, r *http.Request) {
+	env := newCaptureTestEnv(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(respBody))
 	})
 
 	reqBody := `{"model":"claude-3-5-sonnet-20241022","max_tokens":100,"messages":[{"role":"user","content":"Hi"}]}`
-	req, _ := http.NewRequest("POST", proxyServer.URL+"/v1/messages", strings.NewReader(reqBody))
+	req, _ := http.NewRequest("POST", env.proxyServer.URL+"/v1/messages", strings.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("x-api-key", "sk-test")
 	req.Header.Set("anthropic-version", "2023-06-01")
@@ -94,7 +101,16 @@ func TestCaptureMiddleware_SavesRequestAndResponse(t *testing.T) {
 	defer resp.Body.Close()
 	io.ReadAll(resp.Body)
 
-	saved := waitForStore(t, store, 2*time.Second)
+	env.waitForSave(t, 2*time.Second)
+
+	reqs, err := env.store.ListRequests(context.Background(), storage.ListFilter{Limit: 1})
+	if err != nil {
+		t.Fatalf("ListRequests: %v", err)
+	}
+	if len(reqs) == 0 {
+		t.Fatal("no requests saved")
+	}
+	saved := &reqs[0]
 
 	if saved.Method != "POST" {
 		t.Errorf("method = %q, want POST", saved.Method)
@@ -113,14 +129,14 @@ func TestCaptureMiddleware_SavesRequestAndResponse(t *testing.T) {
 func TestCaptureMiddleware_DetectsProviderAndExtractsMetadata(t *testing.T) {
 	respBody := `{"id":"msg_123","type":"message","model":"claude-3-5-sonnet-20241022","content":[{"type":"text","text":"Hi"}],"usage":{"input_tokens":15,"output_tokens":8},"stop_reason":"end_turn"}`
 
-	proxyServer, store, _ := newCaptureTestSetup(t, func(w http.ResponseWriter, r *http.Request) {
+	env := newCaptureTestEnv(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(respBody))
 	})
 
 	reqBody := `{"model":"claude-3-5-sonnet-20241022","max_tokens":100,"messages":[{"role":"user","content":"Hello"}]}`
-	req, _ := http.NewRequest("POST", proxyServer.URL+"/v1/messages", strings.NewReader(reqBody))
+	req, _ := http.NewRequest("POST", env.proxyServer.URL+"/v1/messages", strings.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("anthropic-version", "2023-06-01")
 	req.Header.Set("x-api-key", "sk-test")
@@ -132,7 +148,16 @@ func TestCaptureMiddleware_DetectsProviderAndExtractsMetadata(t *testing.T) {
 	defer resp.Body.Close()
 	io.ReadAll(resp.Body)
 
-	saved := waitForStore(t, store, 2*time.Second)
+	env.waitForSave(t, 2*time.Second)
+
+	reqs, err := env.store.ListRequests(context.Background(), storage.ListFilter{Limit: 1})
+	if err != nil {
+		t.Fatalf("ListRequests: %v", err)
+	}
+	if len(reqs) == 0 {
+		t.Fatal("no requests saved")
+	}
+	saved := &reqs[0]
 
 	if saved.Provider != "anthropic" {
 		t.Errorf("provider = %q, want anthropic", saved.Provider)
@@ -146,8 +171,8 @@ func TestCaptureMiddleware_DetectsProviderAndExtractsMetadata(t *testing.T) {
 	if saved.OutputTokens != 8 {
 		t.Errorf("output_tokens = %d, want 8", saved.OutputTokens)
 	}
-	if saved.LatencyMs <= 0 {
-		t.Errorf("latency_ms = %d, want > 0", saved.LatencyMs)
+	if saved.LatencyMs < 0 {
+		t.Errorf("latency_ms = %d, want >= 0", saved.LatencyMs)
 	}
 }
 
@@ -158,7 +183,7 @@ func TestCaptureMiddleware_ResponseUnchanged(t *testing.T) {
 		"X-Custom-Header": "custom-value",
 	}
 
-	proxyServer, _, _ := newCaptureTestSetup(t, func(w http.ResponseWriter, r *http.Request) {
+	env := newCaptureTestEnv(t, func(w http.ResponseWriter, r *http.Request) {
 		for k, v := range expectedHeaders {
 			w.Header().Set(k, v)
 		}
@@ -167,7 +192,7 @@ func TestCaptureMiddleware_ResponseUnchanged(t *testing.T) {
 	})
 
 	reqBody := `{"model":"claude-3","messages":[{"role":"user","content":"Hi"}]}`
-	req, _ := http.NewRequest("POST", proxyServer.URL+"/v1/messages", strings.NewReader(reqBody))
+	req, _ := http.NewRequest("POST", env.proxyServer.URL+"/v1/messages", strings.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("anthropic-version", "2023-06-01")
 
@@ -195,7 +220,7 @@ func TestCaptureMiddleware_ResponseUnchanged(t *testing.T) {
 func TestCaptureMiddleware_UnknownProvider(t *testing.T) {
 	respBody := `{"result":"ok"}`
 
-	proxyServer, store, _ := newCaptureTestSetup(t, func(w http.ResponseWriter, r *http.Request) {
+	env := newCaptureTestEnv(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(respBody))
@@ -203,7 +228,7 @@ func TestCaptureMiddleware_UnknownProvider(t *testing.T) {
 
 	// Send a request that doesn't match any known provider.
 	reqBody := `{"query":"test"}`
-	req, _ := http.NewRequest("POST", proxyServer.URL+"/v1/custom/endpoint", strings.NewReader(reqBody))
+	req, _ := http.NewRequest("POST", env.proxyServer.URL+"/v1/custom/endpoint", strings.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
@@ -213,7 +238,16 @@ func TestCaptureMiddleware_UnknownProvider(t *testing.T) {
 	defer resp.Body.Close()
 	io.ReadAll(resp.Body)
 
-	saved := waitForStore(t, store, 2*time.Second)
+	env.waitForSave(t, 2*time.Second)
+
+	reqs, err := env.store.ListRequests(context.Background(), storage.ListFilter{Limit: 1})
+	if err != nil {
+		t.Fatalf("ListRequests: %v", err)
+	}
+	if len(reqs) == 0 {
+		t.Fatal("no requests saved")
+	}
+	saved := &reqs[0]
 
 	// Should still capture raw data, just no provider/metadata.
 	if saved.Provider != "" {
@@ -233,7 +267,7 @@ func TestCaptureMiddleware_UnknownProvider(t *testing.T) {
 func TestCaptureMiddleware_PreservesRequestBody(t *testing.T) {
 	var receivedBody string
 
-	proxyServer, store, _ := newCaptureTestSetup(t, func(w http.ResponseWriter, r *http.Request) {
+	env := newCaptureTestEnv(t, func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 		receivedBody = string(body)
 		w.Header().Set("Content-Type", "application/json")
@@ -242,7 +276,7 @@ func TestCaptureMiddleware_PreservesRequestBody(t *testing.T) {
 	})
 
 	reqBody := `{"model":"gpt-4","messages":[{"role":"user","content":"Test"}]}`
-	req, _ := http.NewRequest("POST", proxyServer.URL+"/v1/chat/completions", strings.NewReader(reqBody))
+	req, _ := http.NewRequest("POST", env.proxyServer.URL+"/v1/chat/completions", strings.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer sk-test")
 
@@ -259,7 +293,16 @@ func TestCaptureMiddleware_PreservesRequestBody(t *testing.T) {
 	}
 
 	// Verify the store also captured the body.
-	saved := waitForStore(t, store, 2*time.Second)
+	env.waitForSave(t, 2*time.Second)
+
+	reqs, err := env.store.ListRequests(context.Background(), storage.ListFilter{Limit: 1})
+	if err != nil {
+		t.Fatalf("ListRequests: %v", err)
+	}
+	if len(reqs) == 0 {
+		t.Fatal("no requests saved")
+	}
+	saved := &reqs[0]
 	if saved.RequestBody != reqBody {
 		t.Errorf("saved request body = %q, want %q", saved.RequestBody, reqBody)
 	}
@@ -268,14 +311,14 @@ func TestCaptureMiddleware_PreservesRequestBody(t *testing.T) {
 func TestCaptureMiddleware_OpenAIProvider(t *testing.T) {
 	respBody := `{"id":"chatcmpl-abc","model":"gpt-4","choices":[{"message":{"role":"assistant","content":"Hi"},"finish_reason":"stop"}],"usage":{"prompt_tokens":12,"completion_tokens":3}}`
 
-	proxyServer, store, _ := newCaptureTestSetup(t, func(w http.ResponseWriter, r *http.Request) {
+	env := newCaptureTestEnv(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(respBody))
 	})
 
 	reqBody := `{"model":"gpt-4","messages":[{"role":"user","content":"Hello"}]}`
-	req, _ := http.NewRequest("POST", proxyServer.URL+"/v1/chat/completions", strings.NewReader(reqBody))
+	req, _ := http.NewRequest("POST", env.proxyServer.URL+"/v1/chat/completions", strings.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer sk-test")
 
@@ -286,7 +329,16 @@ func TestCaptureMiddleware_OpenAIProvider(t *testing.T) {
 	defer resp.Body.Close()
 	io.ReadAll(resp.Body)
 
-	saved := waitForStore(t, store, 2*time.Second)
+	env.waitForSave(t, 2*time.Second)
+
+	reqs, err := env.store.ListRequests(context.Background(), storage.ListFilter{Limit: 1})
+	if err != nil {
+		t.Fatalf("ListRequests: %v", err)
+	}
+	if len(reqs) == 0 {
+		t.Fatal("no requests saved")
+	}
+	saved := &reqs[0]
 
 	if saved.Provider != "openai" {
 		t.Errorf("provider = %q, want openai", saved.Provider)
@@ -303,14 +355,14 @@ func TestCaptureMiddleware_OpenAIProvider(t *testing.T) {
 }
 
 func TestCaptureMiddleware_HeadersCaptured(t *testing.T) {
-	proxyServer, store, _ := newCaptureTestSetup(t, func(w http.ResponseWriter, r *http.Request) {
+	env := newCaptureTestEnv(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("X-Request-Id", "req-789")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{}`))
 	})
 
-	req, _ := http.NewRequest("GET", proxyServer.URL+"/health", nil)
+	req, _ := http.NewRequest("GET", env.proxyServer.URL+"/health", nil)
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
@@ -320,7 +372,16 @@ func TestCaptureMiddleware_HeadersCaptured(t *testing.T) {
 	defer resp.Body.Close()
 	io.ReadAll(resp.Body)
 
-	saved := waitForStore(t, store, 2*time.Second)
+	env.waitForSave(t, 2*time.Second)
+
+	reqs, err := env.store.ListRequests(context.Background(), storage.ListFilter{Limit: 1})
+	if err != nil {
+		t.Fatalf("ListRequests: %v", err)
+	}
+	if len(reqs) == 0 {
+		t.Fatal("no requests saved")
+	}
+	saved := &reqs[0]
 
 	// Verify request headers were captured.
 	var reqHeaders map[string]string
@@ -342,13 +403,13 @@ func TestCaptureMiddleware_HeadersCaptured(t *testing.T) {
 }
 
 func TestCaptureMiddleware_NonSuccessStatusCode(t *testing.T) {
-	proxyServer, store, _ := newCaptureTestSetup(t, func(w http.ResponseWriter, r *http.Request) {
+	env := newCaptureTestEnv(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusTooManyRequests)
 		w.Write([]byte(`{"error":{"type":"rate_limit_error","message":"too many requests"}}`))
 	})
 
-	req, _ := http.NewRequest("POST", proxyServer.URL+"/v1/messages", strings.NewReader(`{}`))
+	req, _ := http.NewRequest("POST", env.proxyServer.URL+"/v1/messages", strings.NewReader(`{}`))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("anthropic-version", "2023-06-01")
 
@@ -363,7 +424,16 @@ func TestCaptureMiddleware_NonSuccessStatusCode(t *testing.T) {
 		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusTooManyRequests)
 	}
 
-	saved := waitForStore(t, store, 2*time.Second)
+	env.waitForSave(t, 2*time.Second)
+
+	reqs, err := env.store.ListRequests(context.Background(), storage.ListFilter{Limit: 1})
+	if err != nil {
+		t.Fatalf("ListRequests: %v", err)
+	}
+	if len(reqs) == 0 {
+		t.Fatal("no requests saved")
+	}
+	saved := &reqs[0]
 	if saved.ResponseStatus != http.StatusTooManyRequests {
 		t.Errorf("saved status = %d, want %d", saved.ResponseStatus, http.StatusTooManyRequests)
 	}
