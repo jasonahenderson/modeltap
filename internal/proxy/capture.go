@@ -64,13 +64,7 @@ func (m *CaptureMiddleware) Wrap(next http.Handler) http.Handler {
 		// 5. Compute latency.
 		latency := time.Since(start)
 
-		// 6. Check if this is a streaming response — skip capture for SSE (WU-015).
-		contentType := rec.Header().Get("Content-Type")
-		if strings.Contains(contentType, "text/event-stream") {
-			return
-		}
-
-		// 7. Build the storage record and save asynchronously.
+		// 6. Build the storage record.
 		reqHeaders, _ := json.Marshal(sanitizeHeaders(r.Header))
 		respHeaders, _ := json.Marshal(sanitizeHeaders(rec.Header()))
 
@@ -82,26 +76,59 @@ func (m *CaptureMiddleware) Wrap(next http.Handler) http.Handler {
 			RequestBody:     string(reqBody),
 			ResponseStatus:  rec.statusCode,
 			ResponseHeaders: string(respHeaders),
-			ResponseBody:    rec.body.String(),
 			LatencyMs:       latency.Milliseconds(),
 		}
 
-		// Extract provider name and metadata.
-		if prov != nil {
-			record.Provider = prov.Name()
+		// 7. Check if this is a streaming (SSE) response.
+		contentType := rec.Header().Get("Content-Type")
+		isSSE := strings.Contains(contentType, "text/event-stream")
 
-			// Parse request metadata.
-			if reqMeta, err := prov.ParseRequest(reqBody, r.Header); err == nil && reqMeta != nil {
-				record.Model = reqMeta.Model
-			}
+		if isSSE {
+			// Parse the buffered SSE data into StreamChunks and reassemble.
+			chunks := parseSSEChunks(rec.body.Bytes())
 
-			// Parse response metadata.
-			if respMeta, err := prov.ParseResponse(rec.body.Bytes(), rec.Header(), rec.statusCode); err == nil && respMeta != nil {
-				if respMeta.Model != "" {
-					record.Model = respMeta.Model
+			if prov != nil {
+				record.Provider = prov.Name()
+
+				// Parse request metadata.
+				if reqMeta, err := prov.ParseRequest(reqBody, r.Header); err == nil && reqMeta != nil {
+					record.Model = reqMeta.Model
 				}
-				record.InputTokens = respMeta.InputTokens
-				record.OutputTokens = respMeta.OutputTokens
+
+				// Reassemble stream to get full response text and metadata.
+				if respMeta, text, err := prov.ReassembleStream(chunks); err == nil && respMeta != nil {
+					record.ResponseBody = text
+					if respMeta.Model != "" {
+						record.Model = respMeta.Model
+					}
+					record.InputTokens = respMeta.InputTokens
+					record.OutputTokens = respMeta.OutputTokens
+				}
+			} else {
+				// No provider detected — save the raw SSE data.
+				record.ResponseBody = rec.body.String()
+			}
+		} else {
+			// Non-streaming response — use body as-is.
+			record.ResponseBody = rec.body.String()
+
+			// Extract provider name and metadata.
+			if prov != nil {
+				record.Provider = prov.Name()
+
+				// Parse request metadata.
+				if reqMeta, err := prov.ParseRequest(reqBody, r.Header); err == nil && reqMeta != nil {
+					record.Model = reqMeta.Model
+				}
+
+				// Parse response metadata.
+				if respMeta, err := prov.ParseResponse(rec.body.Bytes(), rec.Header(), rec.statusCode); err == nil && respMeta != nil {
+					if respMeta.Model != "" {
+						record.Model = respMeta.Model
+					}
+					record.InputTokens = respMeta.InputTokens
+					record.OutputTokens = respMeta.OutputTokens
+				}
 			}
 		}
 
@@ -160,4 +187,59 @@ func (r *responseRecorder) Flush() {
 	if f, ok := r.ResponseWriter.(http.Flusher); ok {
 		f.Flush()
 	}
+}
+
+// parseSSEChunks parses raw SSE bytes into StreamChunks.
+//
+// SSE format: events are separated by blank lines (\n\n). Each event
+// may have an "event:" line (the event type) and a "data:" line (the payload).
+//
+// For providers that use "event:" lines (e.g., Anthropic), the EventType is
+// populated and Data contains only the JSON payload. For providers that don't
+// use "event:" lines (e.g., OpenAI), EventType is empty and Data contains the
+// raw "data: ..." line as the provider's ReassembleStream expects it.
+func parseSSEChunks(raw []byte) []provider.StreamChunk {
+	var chunks []provider.StreamChunk
+
+	// Split on double-newline boundaries to get individual events.
+	events := bytes.Split(raw, []byte("\n\n"))
+
+	for _, event := range events {
+		event = bytes.TrimSpace(event)
+		if len(event) == 0 {
+			continue
+		}
+
+		var eventType string
+		var dataLine []byte
+
+		lines := bytes.Split(event, []byte("\n"))
+		for _, line := range lines {
+			if bytes.HasPrefix(line, []byte("event: ")) || bytes.HasPrefix(line, []byte("event:")) {
+				eventType = string(bytes.TrimSpace(bytes.TrimPrefix(line, []byte("event:"))))
+			} else if bytes.HasPrefix(line, []byte("data: ")) || bytes.HasPrefix(line, []byte("data:")) {
+				dataLine = bytes.TrimSpace(bytes.TrimPrefix(line, []byte("data:")))
+			}
+		}
+
+		if dataLine == nil {
+			continue
+		}
+
+		if eventType != "" {
+			// Provider uses event types (e.g., Anthropic) — Data is the raw JSON payload.
+			chunks = append(chunks, provider.StreamChunk{
+				EventType: eventType,
+				Data:      dataLine,
+			})
+		} else {
+			// No event type (e.g., OpenAI) — Data is the raw "data: ..." line
+			// as OpenAI's ReassembleStream expects.
+			chunks = append(chunks, provider.StreamChunk{
+				Data: []byte("data: " + string(dataLine)),
+			})
+		}
+	}
+
+	return chunks
 }
