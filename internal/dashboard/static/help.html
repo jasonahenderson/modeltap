@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>modeltap - Help</title>
+    <style>
+        /* Reset and base styles */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f9fafb;
+            color: #111827;
+            line-height: 1.5;
+            min-height: 100vh;
+        }
+        /* Nav bar (consistent with status.html) */
+        .nav {
+            background: #ffffff;
+            border-bottom: 1px solid #e5e7eb;
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+            height: 52px;
+            gap: 32px;
+        }
+        .nav-brand {
+            font-weight: 700;
+            font-size: 16px;
+            color: #111827;
+            text-decoration: none;
+            letter-spacing: -0.3px;
+        }
+        .nav-links {
+            display: flex;
+            gap: 4px;
+        }
+        .nav-links a {
+            text-decoration: none;
+            color: #6b7280;
+            font-size: 14px;
+            font-weight: 500;
+            padding: 6px 12px;
+            border-radius: 6px;
+            transition: background 0.15s, color 0.15s;
+        }
+        .nav-links a:hover { background: #f3f4f6; color: #111827; }
+        .nav-links a.active { background: #eef2ff; color: #4f46e5; }
+    </style>
+    <link rel="stylesheet" href="help.css">
+</head>
+<body>
+    <nav class="nav">
+        <a href="/" class="nav-brand">modeltap</a>
+        <div class="nav-links">
+            <a href="#logs">Logs</a>
+            <a href="#metrics">Metrics</a>
+            <a href="#status">Status</a>
+            <a href="help.html" class="active">Help</a>
+        </div>
+    </nav>
+
+    <div class="help-container">
+        <div class="help-header">
+            <h1>Help &amp; Documentation</h1>
+            <div class="help-search-wrapper">
+                <input type="text" id="help-search" class="help-search" placeholder="Search help topics..." aria-label="Search help topics" autocomplete="off">
+                <span id="help-search-count" class="help-search-count"></span>
+            </div>
+        </div>
+
+        <div id="help-no-results" class="help-no-results" hidden>
+            No help sections match your search. Try a different keyword.
+        </div>
+
+        <div id="help-sections">
+
+            <!-- Quick Start -->
+            <section class="help-section" data-help-section>
+                <h2 class="help-section-title">Quick Start</h2>
+                <div class="help-section-body">
+                    <p>Get up and running with modeltap in a few steps:</p>
+                    <ol>
+                        <li>
+                            <strong>Start the proxy</strong> with a default upstream:
+                            <pre><code>modeltap start</code></pre>
+                            <p>This starts the proxy on port 8080 with <code>https://api.anthropic.com</code> as the default upstream. Specify a different upstream with:</p>
+                            <pre><code>modeltap start --upstream https://api.openai.com</code></pre>
+                        </li>
+                        <li>
+                            <strong>Point your AI client</strong> to <code>http://localhost:8080</code> instead of the provider's API URL. For example:
+                            <pre><code># Anthropic Python SDK
+import anthropic
+client = anthropic.Anthropic(base_url="http://localhost:8080")
+
+# OpenAI Python SDK
+from openai import OpenAI
+client = OpenAI(base_url="http://localhost:8080/v1")</code></pre>
+                        </li>
+                        <li>
+                            <strong>View captured logs</strong>:
+                            <pre><code>modeltap logs</code></pre>
+                        </li>
+                        <li>
+                            <strong>Check proxy status</strong>:
+                            <pre><code>modeltap status</code></pre>
+                        </li>
+                        <li>
+                            <strong>Open the web dashboard</strong> (requires <code>--dashboard</code> flag on start):
+                            <pre><code>modeltap start --dashboard
+modeltap dashboard</code></pre>
+                        </li>
+                    </ol>
+                </div>
+            </section>
+
+            <!-- CLI Commands Reference -->
+            <section class="help-section" data-help-section>
+                <h2 class="help-section-title">CLI Commands Reference</h2>
+                <div class="help-section-body">
+
+                    <h3>modeltap start</h3>
+                    <p>Start the reverse proxy server.</p>
+                    <table class="help-table">
+                        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>--port, -p</code></td><td>8080</td><td>Port to listen on</td></tr>
+                            <tr><td><code>--upstream, -u</code></td><td>https://api.anthropic.com</td><td>Upstream API URL</td></tr>
+                            <tr><td><code>--dashboard</code></td><td>false</td><td>Enable the web dashboard</td></tr>
+                            <tr><td><code>--dashboard-port</code></td><td>8081</td><td>Port for the web dashboard</td></tr>
+                        </tbody>
+                    </table>
+
+                    <h3>modeltap logs</h3>
+                    <p>List captured request/response logs.</p>
+                    <table class="help-table">
+                        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>--limit</code></td><td>50</td><td>Maximum number of results</td></tr>
+                            <tr><td><code>--provider</code></td><td></td><td>Filter by provider name</td></tr>
+                            <tr><td><code>--model</code></td><td></td><td>Filter by model name</td></tr>
+                            <tr><td><code>--since</code></td><td></td><td>Show requests after this time</td></tr>
+                            <tr><td><code>--until</code></td><td></td><td>Show requests before this time</td></tr>
+                            <tr><td><code>--status</code></td><td></td><td>Filter by HTTP status code</td></tr>
+                        </tbody>
+                    </table>
+
+                    <h3>modeltap show &lt;id&gt;</h3>
+                    <p>Show the full detail of a captured request/response pair. Use the truncated 8-character ID from <code>logs</code> output or the full ID.</p>
+
+                    <h3>modeltap export</h3>
+                    <p>Export captured logs to JSONL or CSV format. Output is written to stdout.</p>
+                    <table class="help-table">
+                        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>--format</code></td><td>jsonl</td><td>Output format: jsonl or csv</td></tr>
+                            <tr><td><code>--since</code></td><td></td><td>Filter requests after this time</td></tr>
+                            <tr><td><code>--until</code></td><td></td><td>Filter requests before this time</td></tr>
+                        </tbody>
+                    </table>
+
+                    <h3>modeltap metrics</h3>
+                    <p>Display aggregated usage metrics.</p>
+                    <table class="help-table">
+                        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>--since</code></td><td>30d</td><td>Filter metrics after this time</td></tr>
+                            <tr><td><code>--until</code></td><td></td><td>Filter metrics before this time</td></tr>
+                            <tr><td><code>--group-by</code></td><td></td><td>Group by: provider, model, day, or hour</td></tr>
+                            <tr><td><code>--format</code></td><td>table</td><td>Output format: table, json, or csv</td></tr>
+                        </tbody>
+                    </table>
+
+                    <h3>modeltap status</h3>
+                    <p>Show the current proxy and database status.</p>
+
+                    <h3>modeltap config</h3>
+                    <p>Manage configuration settings.</p>
+                    <table class="help-table">
+                        <thead><tr><th>Subcommand</th><th>Description</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>show</code></td><td>Show the current resolved configuration as YAML</td></tr>
+                            <tr><td><code>set &lt;key&gt; &lt;value&gt;</code></td><td>Set a configuration value</td></tr>
+                            <tr><td><code>path</code></td><td>Print the config file path</td></tr>
+                        </tbody>
+                    </table>
+
+                    <h3>modeltap dashboard</h3>
+                    <p>Open the web dashboard in the default browser. The dashboard must be running (started via <code>modeltap start --dashboard</code>).</p>
+
+                    <h3>modeltap completion</h3>
+                    <p>Generate shell completion scripts for bash, zsh, fish, or powershell.</p>
+                    <pre><code>modeltap completion bash > /etc/bash_completion.d/modeltap
+modeltap completion zsh > "${fpath[1]}/_modeltap"
+modeltap completion fish > ~/.config/fish/completions/modeltap.fish</code></pre>
+                </div>
+            </section>
+
+            <!-- Configuration Options -->
+            <section class="help-section" data-help-section>
+                <h2 class="help-section-title">Configuration Options</h2>
+                <div class="help-section-body">
+                    <p>The config file is stored at <code>~/.config/modeltap/config.yaml</code>. If the file does not exist, modeltap uses built-in defaults.</p>
+
+                    <h3>Available Settings</h3>
+                    <table class="help-table">
+                        <thead><tr><th>Key</th><th>Default</th><th>Description</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>port</code></td><td>8080</td><td>Port the proxy listens on</td></tr>
+                            <tr><td><code>upstream</code></td><td>https://api.anthropic.com</td><td>Default upstream API URL</td></tr>
+                            <tr><td><code>db_path</code></td><td>~/.config/modeltap/modeltap.db</td><td>Path to the SQLite database</td></tr>
+                            <tr><td><code>retention_days</code></td><td>30</td><td>Days to retain captured data</td></tr>
+                            <tr><td><code>max_body_size</code></td><td>10MB</td><td>Maximum body size to store</td></tr>
+                            <tr><td><code>dashboard.enabled</code></td><td>false</td><td>Whether dashboard starts with proxy</td></tr>
+                            <tr><td><code>dashboard.port</code></td><td>8081</td><td>Port the dashboard listens on</td></tr>
+                            <tr><td><code>dashboard.bind</code></td><td>127.0.0.1</td><td>Address the dashboard binds to</td></tr>
+                        </tbody>
+                    </table>
+
+                    <h3>Example Config File</h3>
+                    <pre><code>port: 8080
+upstream: https://api.anthropic.com
+db_path: ~/.config/modeltap/modeltap.db
+retention_days: 30
+max_body_size: 10MB
+
+dashboard:
+  enabled: true
+  port: 8081
+  bind: 127.0.0.1
+
+providers:
+  anthropic:
+    upstream: https://api.anthropic.com
+  openai:
+    upstream: https://api.openai.com</code></pre>
+
+                    <h3>Environment Variable Overrides</h3>
+                    <p>Every config key can be overridden with an environment variable using the <code>MODELTAP_</code> prefix. Nested keys use underscores in place of dots.</p>
+                    <table class="help-table">
+                        <thead><tr><th>Config Key</th><th>Environment Variable</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>port</code></td><td><code>MODELTAP_PORT</code></td></tr>
+                            <tr><td><code>upstream</code></td><td><code>MODELTAP_UPSTREAM</code></td></tr>
+                            <tr><td><code>db_path</code></td><td><code>MODELTAP_DB_PATH</code></td></tr>
+                            <tr><td><code>retention_days</code></td><td><code>MODELTAP_RETENTION_DAYS</code></td></tr>
+                            <tr><td><code>dashboard.enabled</code></td><td><code>MODELTAP_DASHBOARD_ENABLED</code></td></tr>
+                            <tr><td><code>dashboard.port</code></td><td><code>MODELTAP_DASHBOARD_PORT</code></td></tr>
+                            <tr><td><code>dashboard.bind</code></td><td><code>MODELTAP_DASHBOARD_BIND</code></td></tr>
+                        </tbody>
+                    </table>
+                    <p>Precedence order (highest to lowest): CLI flags &gt; environment variables &gt; config file &gt; defaults.</p>
+                </div>
+            </section>
+
+            <!-- Provider Support -->
+            <section class="help-section" data-help-section>
+                <h2 class="help-section-title">Provider Support</h2>
+                <div class="help-section-body">
+                    <p>modeltap automatically detects which AI provider a request is targeting and applies the correct parser for extracting metadata (model name, token counts, cost).</p>
+
+                    <h3>Anthropic</h3>
+                    <ul>
+                        <li><strong>API:</strong> Messages API (<code>/v1/messages</code>)</li>
+                        <li><strong>Models:</strong> Claude model family (claude-sonnet-4-20250514, claude-haiku-4-20250414, etc.)</li>
+                        <li><strong>Authentication:</strong> <code>x-api-key</code> header</li>
+                        <li><strong>Streaming:</strong> SSE streams captured and reassembled (message_start, content_block_delta, message_delta events)</li>
+                    </ul>
+                    <p>Anthropic is detected when the request host is <code>api.anthropic.com</code>, an <code>anthropic-version</code> header is present, or the path contains <code>/v1/messages</code> with an <code>x-api-key</code> header.</p>
+
+                    <h3>OpenAI</h3>
+                    <ul>
+                        <li><strong>API:</strong> Chat Completions API (<code>/v1/chat/completions</code>)</li>
+                        <li><strong>Models:</strong> GPT model family (gpt-4o, gpt-4o-mini, etc.)</li>
+                        <li><strong>Authentication:</strong> <code>Authorization: Bearer &lt;key&gt;</code> header</li>
+                        <li><strong>Streaming:</strong> SSE streams captured and reassembled (chunked data with <code>[DONE]</code> terminator)</li>
+                    </ul>
+                    <p>OpenAI is detected when the request host is <code>api.openai.com</code> or the path contains <code>/v1/chat/completions</code> (without an <code>Anthropic-Version</code> header).</p>
+
+                    <h3>Provider-Specific Upstream Routing</h3>
+                    <p>You can configure different upstream URLs for each provider in the config file:</p>
+                    <pre><code>providers:
+  anthropic:
+    upstream: https://api.anthropic.com
+  openai:
+    upstream: https://api.openai.com</code></pre>
+                    <p>modeltap routes detected traffic to the correct upstream, even though clients always send requests to the single proxy address.</p>
+                </div>
+            </section>
+
+            <!-- Dashboard Usage Tips -->
+            <section class="help-section" data-help-section>
+                <h2 class="help-section-title">Dashboard Usage Tips</h2>
+                <div class="help-section-body">
+                    <h3>Enabling the Dashboard</h3>
+                    <p>The dashboard is disabled by default. Enable it in one of three ways:</p>
+                    <ul>
+                        <li><strong>CLI flag:</strong> <code>modeltap start --dashboard</code></li>
+                        <li><strong>Config file:</strong> set <code>dashboard.enabled: true</code></li>
+                        <li><strong>Environment variable:</strong> <code>MODELTAP_DASHBOARD_ENABLED=true</code></li>
+                    </ul>
+
+                    <h3>Log Viewer</h3>
+                    <ul>
+                        <li>Use the filter bar to narrow results by provider, model, status code, or time range.</li>
+                        <li>Click any row to see the full request/response detail, including headers and body with JSON syntax highlighting.</li>
+                        <li>Enable <strong>Auto-refresh</strong> to have the log table update automatically every 5 seconds.</li>
+                        <li>Use the pagination controls at the bottom to navigate through large result sets.</li>
+                    </ul>
+
+                    <h3>Metrics View</h3>
+                    <ul>
+                        <li>The metrics view shows aggregated usage statistics including request counts, token usage, estimated cost, and latency.</li>
+                        <li>Use the time range selector and group-by options to focus on specific periods or breakdowns by provider/model.</li>
+                    </ul>
+
+                    <h3>Status View</h3>
+                    <ul>
+                        <li>The status page shows current proxy configuration (port, upstream URL), database record count, and retention settings.</li>
+                        <li>Data refreshes automatically when you navigate to the status tab.</li>
+                    </ul>
+
+                    <h3>Theme</h3>
+                    <p>Use the theme toggle button in the top navigation bar to switch between light and dark modes. Your preference is saved in local storage.</p>
+
+                    <h3>Time Filters</h3>
+                    <p>Several views accept time-based filters. Times can be specified as:</p>
+                    <ul>
+                        <li><strong>Duration shorthand:</strong> a number followed by a unit -- <code>s</code> (seconds), <code>m</code> (minutes), <code>h</code> (hours), <code>d</code> (days). Examples: <code>24h</code>, <code>7d</code>.</li>
+                        <li><strong>RFC3339 timestamp:</strong> a full timestamp such as <code>2026-03-01T00:00:00Z</code>.</li>
+                    </ul>
+                </div>
+            </section>
+
+        </div>
+    </div>
+
+    <script src="help.js"></script>
+</body>
+</html>

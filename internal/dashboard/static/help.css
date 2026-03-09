@@ -1,0 +1,237 @@
+/* === Help Page Styles === */
+
+.help-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 24px;
+}
+
+.help-header {
+    margin-bottom: 24px;
+}
+
+.help-header h1 {
+    font-size: 24px;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 16px;
+}
+
+.help-search-wrapper {
+    position: relative;
+}
+
+.help-search {
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 15px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #111827;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.help-search:focus {
+    border-color: #4f46e5;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+}
+
+.help-search::placeholder {
+    color: #9ca3af;
+}
+
+.help-search-count {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 12px;
+    color: #6b7280;
+    pointer-events: none;
+}
+
+.help-no-results {
+    text-align: center;
+    padding: 48px 16px;
+    color: #6b7280;
+    font-size: 15px;
+    font-style: italic;
+}
+
+/* === Help Sections === */
+
+.help-section {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    overflow: hidden;
+    transition: opacity 0.15s;
+}
+
+.help-section.hidden {
+    display: none;
+}
+
+.help-section-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #111827;
+    padding: 14px 20px;
+    margin: 0;
+    background: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.help-section-title::after {
+    content: "\25BC";
+    font-size: 10px;
+    color: #9ca3af;
+    transition: transform 0.2s;
+}
+
+.help-section.collapsed .help-section-title::after {
+    transform: rotate(-90deg);
+}
+
+.help-section-title:hover {
+    background: #f3f4f6;
+}
+
+.help-section-body {
+    padding: 20px;
+    font-size: 14px;
+    line-height: 1.7;
+    color: #374151;
+}
+
+.help-section.collapsed .help-section-body {
+    display: none;
+}
+
+/* === Help Section Content Styles === */
+
+.help-section-body p {
+    margin-bottom: 12px;
+}
+
+.help-section-body h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #111827;
+    margin-top: 20px;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.help-section-body h3:first-child {
+    margin-top: 0;
+}
+
+.help-section-body ul,
+.help-section-body ol {
+    margin-bottom: 12px;
+    padding-left: 24px;
+}
+
+.help-section-body li {
+    margin-bottom: 6px;
+}
+
+.help-section-body code {
+    font-family: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, monospace;
+    font-size: 13px;
+    background: #f3f4f6;
+    padding: 1px 5px;
+    border-radius: 4px;
+    color: #1f2937;
+}
+
+.help-section-body pre {
+    background: #1f2937;
+    color: #e5e7eb;
+    padding: 14px 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin-bottom: 12px;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.help-section-body pre code {
+    background: none;
+    padding: 0;
+    border-radius: 0;
+    color: inherit;
+    font-size: inherit;
+}
+
+/* === Help Table === */
+
+.help-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 16px;
+    font-size: 13px;
+}
+
+.help-table th {
+    text-align: left;
+    padding: 8px 12px;
+    background: #f9fafb;
+    border-bottom: 2px solid #e5e7eb;
+    font-weight: 600;
+    color: #374151;
+    white-space: nowrap;
+}
+
+.help-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #f3f4f6;
+    vertical-align: top;
+}
+
+.help-table tbody tr:hover {
+    background: #f9fafb;
+}
+
+/* === Search Highlight === */
+
+.help-highlight {
+    background: #fef08a;
+    border-radius: 2px;
+    padding: 0 1px;
+}
+
+/* === Responsive === */
+
+@media (max-width: 768px) {
+    .help-container {
+        padding: 16px;
+    }
+
+    .help-header h1 {
+        font-size: 20px;
+    }
+
+    .help-section-body {
+        padding: 16px;
+    }
+
+    .help-table {
+        font-size: 12px;
+    }
+
+    .help-table th,
+    .help-table td {
+        padding: 6px 8px;
+    }
+}
