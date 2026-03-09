@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>modeltap Dashboard</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/metrics.css">
+</head>
+<body>
+  <nav class="navbar" role="navigation" aria-label="Main navigation">
+    <div class="navbar-brand">modeltap</div>
+    <ul class="navbar-links">
+      <li><a href="#" class="nav-link active" data-view="logs" aria-current="page">Logs</a></li>
+      <li><a href="#" class="nav-link" data-view="metrics">Metrics</a></li>
+      <li><a href="#" class="nav-link" data-view="status">Status</a></li>
+    </ul>
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode" title="Toggle dark mode">
+      <span class="theme-icon-light">&#9788;</span>
+      <span class="theme-icon-dark">&#9790;</span>
+    </button>
+  </nav>
+
+  <main class="container">
+    <!-- Logs View -->
+    <section id="view-logs" class="view active" aria-label="Log viewer">
+      <h2>Request Logs</h2>
+
+      <div class="filter-bar" role="search" aria-label="Filter logs">
+        <div class="filter-group">
+          <label for="filter-provider">Provider</label>
+          <select id="filter-provider" aria-label="Filter by provider">
+            <option value="">All Providers</option>
+            <option value="openai">OpenAI</option>
+            <option value="anthropic">Anthropic</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="filter-model">Model</label>
+          <input type="text" id="filter-model" placeholder="e.g. gpt-4o" aria-label="Filter by model name">
+        </div>
+        <div class="filter-group">
+          <label for="filter-status">Status</label>
+          <select id="filter-status" aria-label="Filter by status code">
+            <option value="">All</option>
+            <option value="200">200 OK</option>
+            <option value="400">400 Bad Request</option>
+            <option value="401">401 Unauthorized</option>
+            <option value="403">403 Forbidden</option>
+            <option value="404">404 Not Found</option>
+            <option value="429">429 Rate Limited</option>
+            <option value="500">500 Server Error</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="filter-since">Since</label>
+          <input type="datetime-local" id="filter-since" aria-label="Filter from date">
+        </div>
+        <div class="filter-group">
+          <label for="filter-until">Until</label>
+          <input type="datetime-local" id="filter-until" aria-label="Filter until date">
+        </div>
+        <div class="filter-group filter-actions">
+          <button id="btn-apply-filters" class="btn btn-primary" aria-label="Apply filters">Filter</button>
+          <button id="btn-clear-filters" class="btn btn-secondary" aria-label="Clear all filters">Clear</button>
+        </div>
+        <div class="filter-group">
+          <label class="auto-refresh-label">
+            <input type="checkbox" id="auto-refresh" aria-label="Toggle auto-refresh">
+            Auto-refresh
+          </label>
+        </div>
+      </div>
+
+      <div class="table-container" role="region" aria-label="Log entries" tabindex="0">
+        <table class="log-table" aria-describedby="log-table-description">
+          <caption id="log-table-description" class="sr-only">Request log entries with details</caption>
+          <thead>
+            <tr>
+              <th scope="col">ID</th>
+              <th scope="col">Timestamp</th>
+              <th scope="col">Provider</th>
+              <th scope="col">Model</th>
+              <th scope="col">Status</th>
+              <th scope="col">In Tokens</th>
+              <th scope="col">Out Tokens</th>
+              <th scope="col">Cost</th>
+              <th scope="col">Latency</th>
+            </tr>
+          </thead>
+          <tbody id="log-table-body">
+            <!-- Rows inserted by JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pagination" role="navigation" aria-label="Pagination">
+        <button id="btn-prev" class="btn btn-secondary" disabled aria-label="Previous page">Previous</button>
+        <span id="page-info" aria-live="polite">Page 1</span>
+        <button id="btn-next" class="btn btn-secondary" disabled aria-label="Next page">Next</button>
+      </div>
+
+      <!-- Detail panel (shown when a row is clicked) -->
+      <div id="detail-panel" class="detail-panel" hidden aria-label="Request detail">
+        <div class="detail-header">
+          <h3 id="detail-title">Request Detail</h3>
+          <button id="btn-close-detail" class="btn btn-secondary" aria-label="Close detail panel">&times;</button>
+        </div>
+        <div id="detail-content" class="detail-content">
+          <!-- Detail inserted by JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- Metrics View -->
+    <section id="view-metrics" class="view" aria-label="Metrics dashboard" hidden>
+      <h2>Metrics</h2>
+      <div id="metrics-view"></div>
+    </section>
+
+    <!-- Status View (placeholder) -->
+    <section id="view-status" class="view" aria-label="Proxy status" hidden>
+      <h2>Proxy Status</h2>
+      <div id="status-content" class="status-content">
+        <p class="placeholder-text">Loading status...</p>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/metrics.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
