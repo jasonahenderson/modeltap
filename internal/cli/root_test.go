@@ -133,8 +133,8 @@ func TestStubCommandsOutput(t *testing.T) {
 	}{
 		// start is no longer a stub; it launches the proxy server.
 		// Its behavior is tested in internal/proxy/server_test.go.
-		{"logs", []string{"logs"}, "not implemented yet"},
-		{"show", []string{"show", "abc123"}, "not implemented yet"},
+		// logs is no longer a stub; it is tested in logs_test.go.
+		// show is tested separately in show_test.go (requires a store)
 		// export is tested separately in export_test.go (requires a store)
 		{"config show", []string{"config", "show"}, "port:"},
 		{"config set", []string{"config", "set", "key", "val"}, "not implemented yet"},
