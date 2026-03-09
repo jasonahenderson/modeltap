@@ -185,6 +185,25 @@ modeltap dashboard</code></pre>
                         </tbody>
                     </table>
 
+                    <h3>modeltap service</h3>
+                    <p>Manage modeltap as a platform-native background service.</p>
+                    <table class="help-table">
+                        <thead><tr><th>Subcommand</th><th>Description</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>install</code></td><td>Install and start modeltap as a background service</td></tr>
+                            <tr><td><code>uninstall</code></td><td>Stop and remove the background service</td></tr>
+                            <tr><td><code>status</code></td><td>Show whether the service is installed and running</td></tr>
+                            <tr><td><code>logs</code></td><td>Display recent log output from the service</td></tr>
+                        </tbody>
+                    </table>
+                    <p><code>logs</code> flags:</p>
+                    <table class="help-table">
+                        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>--lines, -n</code></td><td>50</td><td>Number of log lines to display</td></tr>
+                        </tbody>
+                    </table>
+
                     <h3>modeltap dashboard</h3>
                     <p>Open the web dashboard in the default browser. The dashboard must be running (started via <code>modeltap start --dashboard</code>).</p>
 
@@ -285,6 +304,40 @@ providers:
   openai:
     upstream: https://api.openai.com</code></pre>
                     <p>modeltap routes detected traffic to the correct upstream, even though clients always send requests to the single proxy address.</p>
+                </div>
+            </section>
+
+            <!-- Service Management -->
+            <section class="help-section" data-help-section>
+                <h2 class="help-section-title">Service Management</h2>
+                <div class="help-section-body">
+                    <p>modeltap can run as a platform-native background service that starts automatically at login and restarts on crash. This is an alternative to running <code>modeltap start</code> in a terminal window.</p>
+
+                    <h3>Installing the Service</h3>
+                    <pre><code>modeltap service install</code></pre>
+                    <p>Creates a service definition appropriate for your platform:</p>
+                    <ul>
+                        <li><strong>macOS:</strong> A launchd user agent plist is written to <code>~/Library/LaunchAgents/</code> and loaded immediately.</li>
+                        <li><strong>Linux:</strong> A systemd user service unit is written to <code>~/.config/systemd/user/</code> and enabled.</li>
+                    </ul>
+                    <p>After installation, the proxy runs in the background with no terminal window required.</p>
+
+                    <h3>Checking Status</h3>
+                    <pre><code>modeltap service status</code></pre>
+                    <p>Shows whether the service is installed, running, and its process ID.</p>
+
+                    <h3>Viewing Logs</h3>
+                    <pre><code># Show the last 50 lines (default)
+modeltap service logs
+
+# Show the last 200 lines
+modeltap service logs --lines 200
+modeltap service logs -n 200</code></pre>
+                    <p>On macOS, logs are read from <code>~/.config/modeltap/modeltap.log</code>. On Linux, logs are read from journalctl.</p>
+
+                    <h3>Removing the Service</h3>
+                    <pre><code>modeltap service uninstall</code></pre>
+                    <p>Stops the running service and removes the service definition file. Your configuration and captured data are not affected.</p>
                 </div>
             </section>
 

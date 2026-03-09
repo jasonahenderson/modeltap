@@ -24,6 +24,17 @@ On Linux, this creates a systemd user service that starts automatically.
 
 Use "modeltap service install" to set up the service and
 "modeltap service uninstall" to remove it.`,
+		Example: `  # Install the proxy as a background service
+  modeltap service install
+
+  # Check whether the service is running
+  modeltap service status
+
+  # View recent service logs
+  modeltap service logs
+
+  # Remove the background service
+  modeltap service uninstall`,
 	}
 
 	cmd.AddCommand(newServiceInstallCommand())
@@ -43,9 +54,14 @@ func newServiceInstallCommand() *cobra.Command {
 On macOS, this writes a launchd plist to ~/Library/LaunchAgents/ and loads it.
 On Linux, this writes a systemd unit to ~/.config/systemd/user/ and enables it.
 
-The service is configured to start automatically at login and restart on failure.`,
+The service is configured to start automatically at login and restart on failure.
+The installed service uses your current modeltap binary and configuration file.
+After installation, no terminal window is required -- the proxy runs persistently.`,
 		Example: `  # Install as a background service
-  modeltap service install`,
+  modeltap service install
+
+  # Verify it is running
+  modeltap service status`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			platform := service.DetectPlatform()
 			if platform == service.PlatformUnsupported {
@@ -93,9 +109,13 @@ func newServiceUninstallCommand() *cobra.Command {
 		Long: `Uninstall the modeltap background service.
 
 This stops the running service, removes the service definition file, and
-unregisters it from the platform's service manager.`,
+unregisters it from the platform's service manager. Your configuration
+and captured data are not affected.`,
 		Example: `  # Remove the background service
-  modeltap service uninstall`,
+  modeltap service uninstall
+
+  # Verify it has been removed
+  modeltap service status`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			platform := service.DetectPlatform()
 			if platform == service.PlatformUnsupported {
@@ -120,9 +140,16 @@ func newServiceStatusCommand() *cobra.Command {
 		Short: "Show the status of the modeltap background service",
 		Long: `Show whether the modeltap background service is installed and running.
 
-Displays the installation state, running status, and process ID (if running).`,
+Displays the installation state, running status, and process ID (if running).
+Use this to verify the service is healthy after installation or to confirm
+it has been removed after uninstallation.`,
 		Example: `  # Check service status
-  modeltap service status`,
+  modeltap service status
+
+  # Typical output when running:
+  #   Service: installed
+  #   Status:  running
+  #   PID:     12345`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			platform := service.DetectPlatform()
 			if platform == service.PlatformUnsupported {
@@ -161,7 +188,9 @@ func newServiceLogsCommand() *cobra.Command {
 		Long: `Display recent log output from the modeltap background service.
 
 On macOS, reads from the log file at ~/.config/modeltap/modeltap.log.
-On Linux, reads from journalctl for the modeltap user service.`,
+On Linux, reads from journalctl for the modeltap user service.
+
+Use the --lines (-n) flag to control how many lines are displayed.`,
 		Example: `  # Show last 50 lines (default)
   modeltap service logs
 

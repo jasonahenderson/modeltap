@@ -193,6 +193,53 @@ modeltap start -p 9090 -u https://api.openai.com --dashboard
 
 The proxy runs in the foreground and shuts down gracefully on SIGINT or SIGTERM.
 
+For persistent background execution, see [Service Management](#service-management) below.
+
+### `modeltap service`
+
+Manage the modeltap proxy as a platform-native background service.
+
+```sh
+modeltap service <subcommand>
+```
+
+**Subcommands:**
+
+| Subcommand | Description |
+|------------|-------------|
+| `install` | Install and start modeltap as a background service |
+| `uninstall` | Stop and remove the background service |
+| `status` | Show whether the service is installed and running |
+| `logs` | Display recent log output from the service |
+
+**`logs` flags:**
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--lines` | `-n` | `50` | Number of log lines to display |
+
+**Examples:**
+
+```sh
+# Install as a background service
+modeltap service install
+
+# Check if the service is running
+modeltap service status
+
+# View the last 100 lines of service logs
+modeltap service logs --lines 100
+
+# Remove the service
+modeltap service uninstall
+```
+
+Platform details:
+- **macOS:** Uses launchd. The service file is written to `~/Library/LaunchAgents/`.
+- **Linux:** Uses systemd. The service unit is written to `~/.config/systemd/user/`.
+
+The service is configured to start automatically at login and restart on failure.
+
 ### `modeltap logs`
 
 List captured request/response logs.
@@ -401,6 +448,52 @@ source <(modeltap completion zsh)
 # Fish
 modeltap completion fish | source
 ```
+
+## Service Management
+
+By default, `modeltap start` runs the proxy in the foreground. For persistent background execution, use the `modeltap service` commands to install modeltap as a platform-native service that starts automatically at login and restarts on crash.
+
+### Installing the service
+
+```sh
+modeltap service install
+```
+
+This creates a service definition appropriate for your platform:
+
+- **macOS:** A launchd user agent plist is written to `~/Library/LaunchAgents/` and loaded immediately.
+- **Linux:** A systemd user service unit is written to `~/.config/systemd/user/` and enabled.
+
+The service uses your current modeltap binary and config file. After installation, the proxy runs in the background -- no terminal window required.
+
+### Checking service status
+
+```sh
+modeltap service status
+```
+
+Displays whether the service is installed, whether it is currently running, and its process ID.
+
+### Viewing service logs
+
+```sh
+# Show the last 50 lines (default)
+modeltap service logs
+
+# Show the last 200 lines
+modeltap service logs --lines 200
+modeltap service logs -n 200
+```
+
+On macOS, logs are read from `~/.config/modeltap/modeltap.log`. On Linux, logs are read from journalctl for the modeltap user service.
+
+### Removing the service
+
+```sh
+modeltap service uninstall
+```
+
+This stops the running service, removes the service definition file, and unregisters it from the platform's service manager. Your configuration and captured data are not affected.
 
 ## Multi-Provider Support
 
