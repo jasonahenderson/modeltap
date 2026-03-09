@@ -136,10 +136,10 @@ func TestStubCommandsOutput(t *testing.T) {
 		// logs is no longer a stub; it is tested in logs_test.go.
 		// show is tested separately in show_test.go (requires a store)
 		// export is tested separately in export_test.go (requires a store)
+		// status is tested separately in status_test.go (requires a store/config)
 		{"config show", []string{"config", "show"}, "port:"},
 		{"config set", []string{"config", "set", "key", "val"}, "not implemented yet"},
 		{"config path", []string{"config", "path"}, "config.yaml"},
-		{"status", []string{"status"}, "not implemented yet"},
 		{"metrics", []string{"metrics"}, "not implemented yet"},
 		{"metrics rebuild", []string{"metrics", "rebuild"}, "not implemented yet"},
 		{"dashboard", []string{"dashboard"}, "not implemented yet"},
