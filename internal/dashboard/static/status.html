@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>modeltap - Status</title>
+    <style>
+        /* Reset and base styles */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f9fafb;
+            color: #111827;
+            line-height: 1.5;
+            min-height: 100vh;
+        }
+        /* Simple nav bar */
+        .nav {
+            background: #ffffff;
+            border-bottom: 1px solid #e5e7eb;
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+            height: 52px;
+            gap: 32px;
+        }
+        .nav-brand {
+            font-weight: 700;
+            font-size: 16px;
+            color: #111827;
+            text-decoration: none;
+            letter-spacing: -0.3px;
+        }
+        .nav-links {
+            display: flex;
+            gap: 4px;
+        }
+        .nav-links a {
+            text-decoration: none;
+            color: #6b7280;
+            font-size: 14px;
+            font-weight: 500;
+            padding: 6px 12px;
+            border-radius: 6px;
+            transition: background 0.15s, color 0.15s;
+        }
+        .nav-links a:hover { background: #f3f4f6; color: #111827; }
+        .nav-links a.active { background: #eef2ff; color: #4f46e5; }
+    </style>
+    <link rel="stylesheet" href="status.css">
+</head>
+<body>
+    <nav class="nav">
+        <a href="/" class="nav-brand">modeltap</a>
+        <div class="nav-links">
+            <a href="#logs">Logs</a>
+            <a href="#metrics">Metrics</a>
+            <a href="#status" class="active">Status</a>
+        </div>
+    </nav>
+
+    <div class="status-container">
+        <div class="status-header">
+            <h1>System Status</h1>
+            <div id="refresh-indicator" class="refresh-indicator">
+                <div class="spinner"></div>
+                <span id="refresh-time"></span>
+            </div>
+        </div>
+
+        <div id="status-error" class="error-banner"></div>
+
+        <div class="status-grid">
+            <div class="status-card">
+                <div class="card-header">
+                    <div class="card-icon proxy">&#9889;</div>
+                    <span class="card-title">Proxy</span>
+                </div>
+                <div id="proxy-details">
+                    <p class="empty-state">Loading...</p>
+                </div>
+            </div>
+
+            <div class="status-card">
+                <div class="card-header">
+                    <div class="card-icon database">&#128451;</div>
+                    <span class="card-title">Database</span>
+                </div>
+                <div id="database-details">
+                    <p class="empty-state">Loading...</p>
+                </div>
+            </div>
+
+            <div class="status-card">
+                <div class="card-header">
+                    <div class="card-icon retention">&#128197;</div>
+                    <span class="card-title">Retention</span>
+                </div>
+                <div id="retention-details">
+                    <p class="empty-state">Loading...</p>
+                </div>
+            </div>
+
+            <div class="status-card">
+                <div class="card-header">
+                    <div class="card-icon providers">&#128279;</div>
+                    <span class="card-title">Providers</span>
+                </div>
+                <div id="providers-details">
+                    <p class="empty-state">Loading...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="status.js"></script>
+</body>
+</html>
