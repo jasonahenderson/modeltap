@@ -13,7 +13,17 @@ func newDashboardCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "dashboard",
 		Short: "Open web dashboard in browser",
-		Long:  `Open the modeltap web dashboard in the default browser.`,
+		Long: `Open the modeltap web dashboard in the default browser.
+
+Reads the dashboard bind address and port from the configuration file,
+constructs the URL, and attempts to launch the default browser. The
+dashboard must already be running (start the proxy with --dashboard or
+configure dashboard.enabled in the config file).
+
+If the browser cannot be opened automatically, the URL is printed so
+you can copy and paste it manually.`,
+		Example: `  # Open the dashboard in the default browser
+  modeltap dashboard`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := config.Load("")
 			if err != nil {

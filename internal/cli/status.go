@@ -43,7 +43,14 @@ func newStatusCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "Show proxy and database status",
-		Long:  `Display the current status of the modeltap proxy server and database.`,
+		Long: `Display the current status of the modeltap proxy server and database.
+
+Shows the configured proxy port and upstream URL, the database file path
+and total record count, the retention policy, and the list of registered
+API providers. This is useful for verifying your configuration before
+starting the proxy or diagnosing connectivity issues.`,
+		Example: `  # Show current status
+  modeltap status`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			w := cmd.OutOrStdout()
 

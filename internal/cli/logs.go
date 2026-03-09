@@ -32,7 +32,28 @@ func newLogsCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "logs",
 		Short: "List captured request/response logs",
-		Long:  `List captured request/response log entries with optional filtering.`,
+		Long: `List captured request/response log entries with optional filtering.
+
+Displays a table of captured API requests showing the request ID, timestamp,
+provider, model, HTTP status, token counts, estimated cost, and latency.
+Results are ordered by timestamp (newest first) and limited to 50 by default.
+
+Time filters (--since, --until) accept either a duration shorthand relative
+to now (e.g. "24h", "7d", "30m") or an RFC3339 timestamp.`,
+		Example: `  # Show the 50 most recent log entries
+  modeltap logs
+
+  # Filter by provider
+  modeltap logs --provider anthropic
+
+  # Filter by model and limit results
+  modeltap logs --model gpt-4 --limit 10
+
+  # Show only failed requests from the last hour
+  modeltap logs --status 500 --since 1h
+
+  # Show logs within a specific time window
+  modeltap logs --since 2026-03-01T00:00:00Z --until 2026-03-08T00:00:00Z`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if logsStore == nil {
 				return fmt.Errorf("no store configured")

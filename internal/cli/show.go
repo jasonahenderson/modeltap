@@ -26,7 +26,20 @@ func newShowCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "show <id>",
 		Short: "Show detail of a captured request",
-		Long:  `Show the full detail of a captured request/response pair by its ID.`,
+		Long: `Show the full detail of a captured request/response pair by its ID.
+
+Prints a comprehensive view of a single captured request including headers,
+body content (pretty-printed JSON), token usage, cost estimate, and latency.
+Use "modeltap logs" to find request IDs, then pass one to this command for
+the complete picture.
+
+The request ID can be the full UUID or the short 8-character prefix shown
+in the logs table output.`,
+		Example: `  # Show full detail for a request by its short ID
+  modeltap show abc12345
+
+  # Show detail using a full UUID
+  modeltap show 550e8400-e29b-41d4-a716-446655440000`,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if showStore == nil {

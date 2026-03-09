@@ -20,7 +20,32 @@ func newStartCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "start",
 		Short: "Start the reverse proxy",
-		Long:  `Start the modeltap reverse proxy server that intercepts and logs AI API traffic.`,
+		Long: `Start the modeltap reverse proxy server that intercepts and logs AI API traffic.
+
+The proxy listens on the configured port (default 8080) and forwards all
+requests to the upstream AI API provider. Every request/response pair is
+captured and stored in the local SQLite database for later inspection.
+
+Configuration is resolved in priority order: CLI flags > environment
+variables > config file > built-in defaults. The proxy handles graceful
+shutdown on SIGINT/SIGTERM.
+
+Optionally enable the built-in web dashboard with --dashboard to get a
+browser-based view of captured traffic while the proxy is running.`,
+		Example: `  # Start with default settings (port 8080, upstream https://api.anthropic.com)
+  modeltap start
+
+  # Listen on a custom port
+  modeltap start --port 9090
+
+  # Proxy to OpenAI instead of Anthropic
+  modeltap start --upstream https://api.openai.com
+
+  # Start with the web dashboard enabled
+  modeltap start --dashboard
+
+  # Start with dashboard on a custom port
+  modeltap start --dashboard --dashboard-port 3000`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, v, err := config.LoadWithViper("")
 			if err != nil {

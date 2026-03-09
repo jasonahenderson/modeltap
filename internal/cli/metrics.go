@@ -33,7 +33,29 @@ func newMetricsCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "metrics",
 		Short: "Show usage metrics",
-		Long:  `Display aggregated usage metrics for captured API traffic.`,
+		Long: `Display aggregated usage metrics for captured API traffic.
+
+Shows request counts, token usage, estimated costs, average latency, and
+error counts. By default, metrics cover the last 30 days and are displayed
+as a table. Use --group-by to segment results by provider, model, day, or
+hour.
+
+Output can be formatted as a table (default), JSON, or CSV for integration
+with other tools or dashboards.`,
+		Example: `  # Show metrics for the last 30 days (default)
+  modeltap metrics
+
+  # Group by provider
+  modeltap metrics --group-by provider
+
+  # Group by model for the last 7 days, output as JSON
+  modeltap metrics --group-by model --since 7d --format json
+
+  # Hourly breakdown as CSV
+  modeltap metrics --group-by hour --format csv > hourly.csv
+
+  # Metrics for a specific time window
+  modeltap metrics --since 2026-03-01T00:00:00Z --until 2026-03-08T00:00:00Z`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if metricsStore == nil {
 				return fmt.Errorf("no store configured")
@@ -113,6 +135,13 @@ func newMetricsRebuildCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "rebuild",
 		Short: "Rebuild metrics from stored logs",
+		Long: `Rebuild aggregated metrics by re-processing all stored log entries.
+
+This is useful after a database migration, manual data correction, or if
+metrics appear out of sync with the raw logs. The operation scans every
+stored request and recomputes all aggregated metric rows.`,
+		Example: `  # Rebuild all metrics from stored logs
+  modeltap metrics rebuild`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if metricsStore == nil {
 				return fmt.Errorf("no store configured")

@@ -34,7 +34,29 @@ func newExportCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "export",
 		Short: "Export logs to JSONL or CSV",
-		Long:  `Export captured request/response logs to JSONL or CSV format.`,
+		Long: `Export captured request/response logs to JSONL or CSV format.
+
+Writes all matching log entries to stdout in the chosen format. JSONL
+(JSON Lines) outputs one JSON object per line, suitable for streaming
+ingestion. CSV outputs a header row followed by one row per request.
+
+Both formats include: id, timestamp, provider, model, status, input_tokens,
+output_tokens, latency_ms, and cost. Redirect stdout to a file to save
+the output.
+
+Time filters (--since, --until) accept either a duration shorthand relative
+to now (e.g. "24h", "7d") or an RFC3339 timestamp.`,
+		Example: `  # Export all logs as JSONL (default format)
+  modeltap export > logs.jsonl
+
+  # Export as CSV
+  modeltap export --format csv > logs.csv
+
+  # Export only the last 7 days
+  modeltap export --since 7d > recent.jsonl
+
+  # Export a specific time window as CSV
+  modeltap export --format csv --since 2026-03-01T00:00:00Z --until 2026-03-08T00:00:00Z`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if format != "jsonl" && format != "csv" {
 				return fmt.Errorf("invalid format %q: must be jsonl or csv", format)
