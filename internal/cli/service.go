@@ -10,6 +10,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Default number of log lines to display.
+const defaultLogLines = 50
+
 func newServiceCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "service",
@@ -25,6 +28,8 @@ Use "modeltap service install" to set up the service and
 
 	cmd.AddCommand(newServiceInstallCommand())
 	cmd.AddCommand(newServiceUninstallCommand())
+	cmd.AddCommand(newServiceStatusCommand())
+	cmd.AddCommand(newServiceLogsCommand())
 
 	return cmd
 }
@@ -107,4 +112,83 @@ unregisters it from the platform's service manager.`,
 			return nil
 		},
 	}
+}
+
+func newServiceStatusCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "status",
+		Short: "Show the status of the modeltap background service",
+		Long: `Show whether the modeltap background service is installed and running.
+
+Displays the installation state, running status, and process ID (if running).`,
+		Example: `  # Check service status
+  modeltap service status`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			platform := service.DetectPlatform()
+			if platform == service.PlatformUnsupported {
+				return fmt.Errorf("service management is not supported on this platform (%s)", platform)
+			}
+
+			status, err := service.Status(platform)
+			if err != nil {
+				return fmt.Errorf("checking service status: %w", err)
+			}
+
+			if status.Installed {
+				fmt.Fprintf(cmd.OutOrStdout(), "Service: installed\n")
+			} else {
+				fmt.Fprintf(cmd.OutOrStdout(), "Service: not installed\n")
+			}
+
+			if status.Running {
+				fmt.Fprintf(cmd.OutOrStdout(), "Status:  running\n")
+				fmt.Fprintf(cmd.OutOrStdout(), "PID:     %d\n", status.PID)
+			} else {
+				fmt.Fprintf(cmd.OutOrStdout(), "Status:  stopped\n")
+			}
+
+			return nil
+		},
+	}
+}
+
+func newServiceLogsCommand() *cobra.Command {
+	var lines int
+
+	cmd := &cobra.Command{
+		Use:   "logs",
+		Short: "Show recent logs from the modeltap background service",
+		Long: `Display recent log output from the modeltap background service.
+
+On macOS, reads from the log file at ~/.config/modeltap/modeltap.log.
+On Linux, reads from journalctl for the modeltap user service.`,
+		Example: `  # Show last 50 lines (default)
+  modeltap service logs
+
+  # Show last 100 lines
+  modeltap service logs --lines 100
+  modeltap service logs -n 100`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			platform := service.DetectPlatform()
+			if platform == service.PlatformUnsupported {
+				return fmt.Errorf("service management is not supported on this platform (%s)", platform)
+			}
+
+			output, err := service.Logs(platform, lines)
+			if err != nil {
+				return fmt.Errorf("retrieving service logs: %w", err)
+			}
+
+			fmt.Fprint(cmd.OutOrStdout(), output)
+			if output != "" && output[len(output)-1] != '\n' {
+				fmt.Fprintln(cmd.OutOrStdout())
+			}
+
+			return nil
+		},
+	}
+
+	cmd.Flags().IntVarP(&lines, "lines", "n", defaultLogLines, "number of log lines to display")
+
+	return cmd
 }
