@@ -307,6 +307,40 @@ These work units build the web dashboard. They depend on the backend API existin
 
 ---
 
+## Phase 11: Service Management
+
+These work units implement background execution via platform-native service management (ADR-0012, feature: service-management).
+
+### WU-035: Service Template Generator
+
+- **Description:** Implement the core service template generation logic. Create a `service` package under `internal/service/` that generates platform-native service definitions: launchd plist XML for macOS and systemd unit files for Linux. Templates should embed the current binary path, config file path, and working directory. Include platform detection to select the correct template. Templates should configure auto-restart (launchd `KeepAlive`, systemd `Restart=on-failure`), logging to the OS log system, and standard output/error capture.
+- **Dependencies:** WU-006
+- **Agents:** designer, tester, backend
+- **Definition of Done:** Template generator produces valid launchd plist XML on macOS and valid systemd unit file on Linux. Templates include auto-restart, logging config, and correct binary/config paths. Unit tests verify template output for both platforms (using string assertions, no actual installation).
+
+### WU-036: Service Install and Uninstall Commands
+
+- **Description:** Implement `modeltap service install` and `modeltap service uninstall` CLI commands. `install` writes the generated service definition to the correct location (`~/Library/LaunchAgents/` on macOS, `~/.config/systemd/user/` on Linux), loads/enables it, and starts the service. `uninstall` stops the service, unloads/disables it, and removes the service file. Both commands operate at user level (no sudo required).
+- **Dependencies:** WU-035, WU-005
+- **Agents:** tester, backend
+- **Definition of Done:** `modeltap service install` writes the service file, loads it, and starts the proxy as a background service. `modeltap service uninstall` stops, unloads, and removes the service file. Commands print clear success/error messages. Unit tests verify file generation and command construction (without actually executing launchctl/systemctl).
+
+### WU-037: Service Status and Logs Commands
+
+- **Description:** Implement `modeltap service status` and `modeltap service logs` CLI commands. `status` checks whether the service is installed and running, shows PID and uptime if running. `logs` shows recent service log output (wraps `journalctl --user -u modeltap` on Linux, `log show --predicate 'process == "modeltap"'` on macOS). Support `--lines` flag to control how many log lines to show.
+- **Dependencies:** WU-036
+- **Agents:** tester, backend
+- **Definition of Done:** `modeltap service status` reports installed/running/stopped state with PID. `modeltap service logs` displays recent log output. `--lines` flag works. Unit tests verify output parsing.
+
+### WU-038: Service Documentation and Help Updates
+
+- **Description:** Update the usage guide (docs/usage-guide.md) with a "Background Execution" section covering `modeltap service` commands. Update CLI help text (`Long` and `Example` fields) for all service subcommands. Add a "Service Management" section to the dashboard help page. Update the status command to show whether the proxy is running as a service.
+- **Dependencies:** WU-037, WU-031, WU-033, WU-034
+- **Agents:** docs, ui
+- **Definition of Done:** Usage guide documents all service commands with examples. CLI `--help` output includes detailed descriptions and examples for service subcommands. Dashboard help page includes service management section. `modeltap status` indicates service mode when applicable.
+
+---
+
 ## v2 - Future Work (Not Planned in Detail)
 
 The following features are accepted but scoped for v2. They will be planned in detail after v1 ships.
@@ -388,4 +422,9 @@ WU-023 ---> WU-024 (Security review)
 WU-024 + WU-029 ---> WU-031 (User documentation + usage guide)
 WU-031 ---> WU-033 (CLI help system)
 WU-029 + WU-031 ---> WU-034 (Dashboard help/docs page)
+
+WU-006 ---> WU-035 (Service template generator)
+WU-035 + WU-005 ---> WU-036 (Service install/uninstall)
+WU-036 ---> WU-037 (Service status/logs)
+WU-037 + WU-031 + WU-033 + WU-034 ---> WU-038 (Service docs + help updates)
 ```

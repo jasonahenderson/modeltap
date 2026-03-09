@@ -4,7 +4,7 @@
 2026-03-08
 
 ## Current Phase
-Complete — all 34 work units delivered
+Phase 11: Service Management
 
 ## Completed
 - [x] TPM: Create master plan from accepted ADRs and features (2026-03-06)
@@ -48,13 +48,16 @@ Complete — all 34 work units delivered
 (none)
 
 ## Up Next
-(none — all work units complete)
+- [ ] WU-035: Service Template Generator (designer, tester, backend) -- depends on WU-006
+- [ ] WU-036: Service Install and Uninstall Commands (tester, backend) -- depends on WU-035, WU-005
+- [ ] WU-037: Service Status and Logs Commands (tester, backend) -- depends on WU-036
+- [ ] WU-038: Service Documentation and Help Updates (docs, ui) -- depends on WU-037, WU-031, WU-033, WU-034
 
 ## Blocked
 (none)
 
 ## Notes
-- 34 of 34 work units complete
+- 34 of 38 work units complete
 - Flaky test fix: replaced polling waitForStore with channel-based waitForSave (OnSaved callback)
 - Security reviews: WU-024 (proxy) and WU-030 (dashboard) — XSS, header redaction, body limits, CSP headers
 - All tests passing with `-count=1`
