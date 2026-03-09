@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jasonahenderson/modeltap/internal/config"
+	"github.com/jasonahenderson/modeltap/internal/dashboard"
 	"github.com/jasonahenderson/modeltap/internal/provider"
 	"github.com/jasonahenderson/modeltap/internal/proxy"
 	"github.com/jasonahenderson/modeltap/internal/storage"
@@ -33,9 +34,17 @@ func newStartCommand() *cobra.Command {
 			if cmd.Flags().Changed("upstream") {
 				v.Set("upstream", cmd.Flags().Lookup("upstream").Value.String())
 			}
+			if cmd.Flags().Changed("dashboard") {
+				v.Set("dashboard.enabled", true)
+			}
+			if cmd.Flags().Changed("dashboard-port") {
+				v.Set("dashboard.port", cmd.Flags().Lookup("dashboard-port").Value.String())
+			}
 
 			// Re-unmarshal after flag binding.
-			if cmd.Flags().Changed("port") || cmd.Flags().Changed("upstream") {
+			needsRemarshal := cmd.Flags().Changed("port") || cmd.Flags().Changed("upstream") ||
+				cmd.Flags().Changed("dashboard") || cmd.Flags().Changed("dashboard-port")
+			if needsRemarshal {
 				cfg, err = config.UnmarshalFrom(v)
 				if err != nil {
 					return fmt.Errorf("applying flag overrides: %w", err)
@@ -81,6 +90,27 @@ func newStartCommand() *cobra.Command {
 			ctx, stop := signal.NotifyContext(cmd.Context(), syscall.SIGINT, syscall.SIGTERM)
 			defer stop()
 
+			// Start dashboard if enabled.
+			if cfg.Dashboard.Enabled {
+				handler := dashboard.NewAPIHandler(store, cfg)
+				dashCtx, dashCancel := context.WithCancel(ctx)
+				defer dashCancel()
+				go func() {
+					if err := handler.ListenAndServe(dashCtx); err != nil {
+						fmt.Fprintf(cmd.ErrOrStderr(), "dashboard error: %v\n", err)
+					}
+				}()
+				dashBind := cfg.Dashboard.Bind
+				if dashBind == "" {
+					dashBind = "127.0.0.1"
+				}
+				dashPort := cfg.Dashboard.Port
+				if dashPort == 0 {
+					dashPort = 8081
+				}
+				fmt.Fprintf(cmd.OutOrStdout(), "Dashboard: http://%s:%d\n", dashBind, dashPort)
+			}
+
 			fmt.Fprintf(cmd.OutOrStdout(), "modeltap proxy listening on :%d -> %s\n", srv.Port(), srv.UpstreamURL())
 
 			// Start server in a goroutine.
@@ -114,6 +144,8 @@ func newStartCommand() *cobra.Command {
 
 	cmd.Flags().IntP("port", "p", 8080, "Port to listen on")
 	cmd.Flags().StringP("upstream", "u", "https://api.anthropic.com", "Upstream API URL")
+	cmd.Flags().Bool("dashboard", false, "Enable the web dashboard")
+	cmd.Flags().Int("dashboard-port", 8081, "Port for the web dashboard")
 
 	return cmd
 }

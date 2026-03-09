@@ -85,6 +85,10 @@ func TestSubcommandsAcceptHelp(t *testing.T) {
 		{"metrics rebuild --help", []string{"metrics", "rebuild", "--help"}},
 		{"dashboard --help", []string{"dashboard", "--help"}},
 		{"completion --help", []string{"completion", "--help"}},
+		{"completion bash --help", []string{"completion", "bash", "--help"}},
+		{"completion zsh --help", []string{"completion", "zsh", "--help"}},
+		{"completion fish --help", []string{"completion", "fish", "--help"}},
+		{"completion powershell --help", []string{"completion", "powershell", "--help"}},
 	}
 
 	for _, tt := range tests {
@@ -138,10 +142,10 @@ func TestStubCommandsOutput(t *testing.T) {
 		// export is tested separately in export_test.go (requires a store)
 		// status is tested separately in status_test.go (requires a store/config)
 		// metrics is tested separately in metrics_test.go (requires a store)
+		// dashboard is tested separately in dashboard_test.go (loads config)
 		{"config show", []string{"config", "show"}, "port:"},
 		{"config set", []string{"config", "set", "key", "val"}, "not implemented yet"},
 		{"config path", []string{"config", "path"}, "config.yaml"},
-		{"dashboard", []string{"dashboard"}, "not implemented yet"},
 	}
 
 	for _, tt := range tests {
