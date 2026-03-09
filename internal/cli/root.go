@@ -63,6 +63,7 @@ Key capabilities:
 		newMetricsCommand(),
 		newDashboardCommand(),
 		newCompletionCommand(),
+		newServiceCommand(),
 	)
 
 	return rootCmd

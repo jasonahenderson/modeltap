@@ -48,6 +48,7 @@ func TestSubcommandsRegistered(t *testing.T) {
 		{"metrics", "metrics"},
 		{"dashboard", "dashboard"},
 		{"completion", "completion"},
+		{"service", "service"},
 	}
 
 	cmd := NewRootCommand("test")
@@ -89,6 +90,9 @@ func TestSubcommandsAcceptHelp(t *testing.T) {
 		{"completion zsh --help", []string{"completion", "zsh", "--help"}},
 		{"completion fish --help", []string{"completion", "fish", "--help"}},
 		{"completion powershell --help", []string{"completion", "powershell", "--help"}},
+		{"service --help", []string{"service", "--help"}},
+		{"service install --help", []string{"service", "install", "--help"}},
+		{"service uninstall --help", []string{"service", "uninstall", "--help"}},
 	}
 
 	for _, tt := range tests {
@@ -120,7 +124,7 @@ func TestHelpListsAllSubcommands(t *testing.T) {
 	output := buf.String()
 	expected := []string{
 		"start", "logs", "show", "export", "config",
-		"status", "metrics", "dashboard", "completion",
+		"status", "metrics", "dashboard", "completion", "service",
 	}
 	for _, sub := range expected {
 		if !strings.Contains(output, sub) {
