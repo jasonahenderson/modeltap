@@ -7,12 +7,17 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+
+	"github.com/jasonahenderson/modeltap/internal/provider"
+	"github.com/jasonahenderson/modeltap/internal/storage"
 )
 
 // ServerConfig holds the configuration for a proxy Server.
 type ServerConfig struct {
 	Port        int
 	UpstreamURL string
+	Store       storage.Store
+	Registry    *provider.Registry
 }
 
 // Server wraps httputil.ReverseProxy with modeltap's configuration.
@@ -51,10 +56,17 @@ func NewServer(cfg ServerConfig) (*Server, error) {
 		req.Host = upstream.Host
 	}
 
+	// Wrap the proxy with capture middleware if Store and Registry are provided.
+	var handler http.Handler = rp
+	if cfg.Store != nil && cfg.Registry != nil {
+		capture := NewCaptureMiddleware(cfg.Store, cfg.Registry)
+		handler = capture.Wrap(rp)
+	}
+
 	addr := fmt.Sprintf(":%d", cfg.Port)
 	httpServer := &http.Server{
 		Addr:    addr,
-		Handler: rp,
+		Handler: handler,
 	}
 
 	return &Server{

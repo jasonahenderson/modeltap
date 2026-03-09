@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"github.com/jasonahenderson/modeltap/internal/config"
+	"github.com/jasonahenderson/modeltap/internal/provider"
 	"github.com/jasonahenderson/modeltap/internal/proxy"
+	"github.com/jasonahenderson/modeltap/internal/storage"
 	"github.com/spf13/cobra"
 )
 
@@ -40,9 +42,23 @@ func newStartCommand() *cobra.Command {
 				}
 			}
 
+			// Create storage.
+			store, err := storage.NewSQLiteStore(cfg.DBPath)
+			if err != nil {
+				return fmt.Errorf("creating store: %w", err)
+			}
+			defer store.Close()
+
+			// Create provider registry with known providers.
+			registry := provider.NewRegistry()
+			registry.Register(provider.NewAnthropicProvider())
+			registry.Register(provider.NewOpenAIProvider())
+
 			srv, err := proxy.NewServer(proxy.ServerConfig{
 				Port:        cfg.Port,
 				UpstreamURL: cfg.Upstream,
+				Store:       store,
+				Registry:    registry,
 			})
 			if err != nil {
 				return fmt.Errorf("creating proxy server: %w", err)
