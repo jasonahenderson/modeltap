@@ -226,7 +226,7 @@
         <td>${escapeHtml(formatTimestamp(row.timestamp))}</td>
         <td>${escapeHtml(row.provider || "-")}</td>
         <td>${escapeHtml(row.model || "-")}</td>
-        <td><span class="status-badge ${statusClass(row.response_status)}">${row.response_status || "-"}</span></td>
+        <td><span class="status-badge ${statusClass(row.response_status)}">${escapeHtml(String(row.response_status || "-"))}</span></td>
         <td>${row.input_tokens != null ? row.input_tokens.toLocaleString() : "-"}</td>
         <td>${row.output_tokens != null ? row.output_tokens.toLocaleString() : "-"}</td>
         <td>${formatCost(row.estimated_cost_usd)}</td>
@@ -285,7 +285,7 @@
           <dt>Model</dt><dd>${escapeHtml(d.model || "-")}</dd>
           <dt>Method</dt><dd>${escapeHtml(d.method || "-")}</dd>
           <dt>URL</dt><dd style="word-break:break-all">${escapeHtml(d.url || "-")}</dd>
-          <dt>Status</dt><dd><span class="status-badge ${statusClass(d.response_status)}">${d.response_status || "-"}</span></dd>
+          <dt>Status</dt><dd><span class="status-badge ${statusClass(d.response_status)}">${escapeHtml(String(d.response_status || "-"))}</span></dd>
           <dt>Latency</dt><dd>${formatLatency(d.latency_ms)}</dd>
           <dt>Input Tokens</dt><dd>${d.input_tokens != null ? d.input_tokens.toLocaleString() : "-"}</dd>
           <dt>Output Tokens</dt><dd>${d.output_tokens != null ? d.output_tokens.toLocaleString() : "-"}</dd>
@@ -337,10 +337,10 @@
       (match, num) => ': <span class="json-number">' + escapeHtml(num) + "</span>"
     ).replace(
       /:\s*(true|false)/g,
-      (match, val) => ': <span class="json-boolean">' + val + "</span>"
+      (match, val) => ': <span class="json-boolean">' + escapeHtml(val) + "</span>"
     ).replace(
       /:\s*(null)/g,
-      (match, val) => ': <span class="json-null">' + val + "</span>"
+      (match, val) => ': <span class="json-null">' + escapeHtml(val) + "</span>"
     ).replace(
       // Handle values in arrays (not preceded by colon)
       /(?<=[\[,\n]\s*)("(?:\\.|[^"\\])*")(?=\s*[,\]\n])/g,
@@ -350,10 +350,10 @@
       (match) => '<span class="json-number">' + escapeHtml(match) + "</span>"
     ).replace(
       /(?<=[\[,\n]\s*)(true|false)(?=\s*[,\]\n])/g,
-      (match) => '<span class="json-boolean">' + match + "</span>"
+      (match) => '<span class="json-boolean">' + escapeHtml(match) + "</span>"
     ).replace(
       /(?<=[\[,\n]\s*)(null)(?=\s*[,\]\n])/g,
-      (match) => '<span class="json-null">' + match + "</span>"
+      (match) => '<span class="json-null">' + escapeHtml(match) + "</span>"
     );
   }
 
@@ -364,20 +364,20 @@
         <div class="status-card">
           <h4>Proxy</h4>
           <dl>
-            <dt>Port</dt><dd>${data.proxy?.port || "-"}</dd>
+            <dt>Port</dt><dd>${escapeHtml(String(data.proxy?.port || "-"))}</dd>
             <dt>Upstream</dt><dd>${escapeHtml(data.proxy?.upstream || "-")}</dd>
           </dl>
         </div>
         <div class="status-card">
           <h4>Database</h4>
           <dl>
-            <dt>Records</dt><dd>${data.database?.records != null ? data.database.records.toLocaleString() : "-"}</dd>
+            <dt>Records</dt><dd>${escapeHtml(data.database?.records != null ? data.database.records.toLocaleString() : "-")}</dd>
           </dl>
         </div>
         <div class="status-card">
           <h4>Retention</h4>
           <dl>
-            <dt>Days</dt><dd>${data.retention?.days || "-"}</dd>
+            <dt>Days</dt><dd>${escapeHtml(String(data.retention?.days || "-"))}</dd>
           </dl>
         </div>
       </div>

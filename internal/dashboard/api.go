@@ -41,7 +41,10 @@ func (h *APIHandler) RegisterRoutes(mux *http.ServeMux) {
 		panic("dashboard: failed to create static sub-filesystem: " + err.Error())
 	}
 	fileServer := http.FileServer(http.FS(staticSub))
-	mux.Handle("GET /static/", http.StripPrefix("/static/", fileServer))
+	mux.Handle("GET /static/", http.StripPrefix("/static/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		securityHeaders(w)
+		fileServer.ServeHTTP(w, r)
+	})))
 
 	// Serve index.html at root.
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
@@ -54,13 +57,23 @@ func (h *APIHandler) RegisterRoutes(mux *http.ServeMux) {
 			http.Error(w, "index.html not found", http.StatusInternalServerError)
 			return
 		}
+		securityHeaders(w)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Write(data)
 	})
 }
 
+// securityHeaders sets common security headers on the response.
+func securityHeaders(w http.ResponseWriter) {
+	w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Frame-Options", "DENY")
+	w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+}
+
 // writeJSON writes a JSON response with the given status code.
 func writeJSON(w http.ResponseWriter, status int, v any) {
+	securityHeaders(w)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(v)
@@ -126,7 +139,7 @@ func toRequestJSON(r *storage.Request) requestJSON {
 func (h *APIHandler) handleLogs(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 
-	// Parse limit (default 50).
+	// Parse limit (default 50, max 1000).
 	limit := 50
 	if s := q.Get("limit"); s != "" {
 		v, err := strconv.Atoi(s)
@@ -135,6 +148,9 @@ func (h *APIHandler) handleLogs(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		limit = v
+	}
+	if limit > 1000 {
+		limit = 1000
 	}
 
 	// Parse offset.
