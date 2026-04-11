@@ -4,7 +4,7 @@ date: 2026-03-03
 decision-makers: Jason Henderson
 ---
 
-# Knowledge Layer Architecture
+# ADR-0008: Knowledge Layer Architecture
 
 ## Context and Problem Statement
 

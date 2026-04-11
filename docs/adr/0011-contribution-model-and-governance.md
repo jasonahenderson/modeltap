@@ -4,7 +4,7 @@ date: 2026-03-03
 decision-makers: Jason Henderson
 ---
 
-# Contribution Model and Governance
+# ADR-0011: Contribution Model and Governance
 
 ## Context and Problem Statement
 

@@ -1,6 +1,15 @@
-# Service Management
-
+---
+feature: FEAT-0004
+title: Service Management
 status: accepted
+date: 2026-03-08
+adr-constraints:
+  - ADR-0003: Cobra CLI framework
+  - ADR-0004: Viper configuration management
+  - ADR-0012: Background execution strategy
+---
+
+# FEAT-0004: Service Management
 
 ## Problem
 

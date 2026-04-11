@@ -4,7 +4,7 @@ date: 2026-03-03
 decision-makers: Jason Henderson
 ---
 
-# MCP Server for Knowledge Access
+# ADR-0009: MCP Server for Knowledge Access
 
 ## Context and Problem Statement
 

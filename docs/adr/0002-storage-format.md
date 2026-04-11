@@ -4,7 +4,7 @@ date: 2026-03-03
 decision-makers: Jason Henderson
 ---
 
-# Storage Format for Request/Response Logs
+# ADR-0002: Storage Format for Request/Response Logs
 
 ## Context and Problem Statement
 

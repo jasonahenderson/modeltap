@@ -4,7 +4,7 @@ date: 2026-03-03
 decision-makers: Jason Henderson
 ---
 
-# Configuration Management Approach
+# ADR-0004: Configuration Management Approach
 
 ## Context and Problem Statement
 

@@ -1,4 +1,16 @@
-# Knowledge Layer (Cross-Model Brain)
+---
+exploration: EXP-0001
+title: Knowledge Layer (Cross-Model Brain)
+status: promoted
+date: 2026-03-03
+related:
+  - ADR-0008: Knowledge layer architecture
+  - ADR-0009: MCP server for knowledge access
+promoted-to:
+  - PATCH-0001
+---
+
+# EXP-0001: Knowledge Layer (Cross-Model Brain)
 
 ## Overview
 
@@ -16,6 +28,13 @@ Today's AI memory is fragmented:
 - Every platform has built a walled garden of memory — none of them talk to each other
 
 Users who switch between models, or who want to try a new tool, lose all accumulated context. This creates artificial lock-in and degrades the quality of AI interactions across the board.
+
+Even when history is available, users still lack good control over **what context should stay live right now**:
+
+- Long-running sessions bloat with stale messages, repeated plans, and irrelevant detours
+- `/clear` and "new chat" semantics are inconsistent across tools and usually scoped to a single vendor
+- Users have no neutral assistant that can inspect the current context window and suggest whether to compact, summarize, preserve, or drop parts of it
+- Important working state often dies at model boundaries, even when the user wants the session to continue with a different model
 
 ## How Modeltap Solves This
 
@@ -69,6 +88,8 @@ When enabled via configuration:
 - **Semantic Search**: Query past interactions by meaning, not just keywords or timestamps. "What approaches did I consider for database caching?" finds relevant conversations even if those exact words weren't used.
 - **Metadata Extraction**: Automatically extract decisions, action items, people, topics, and key concepts from captured conversations.
 - **MCP Server**: Expose the knowledge base via Model Context Protocol, allowing any MCP-compatible AI client to query the user's full cross-model history.
+- **Context Curation**: Build an active layer on top of captured history that can score recency, relevance, duplication, and user-pinned importance to determine what belongs in the live context window.
+- **Session State**: Track session-level state that survives model switches, so commands like "compact this session and continue in another model" operate on a portable session object rather than a single vendor thread.
 
 ## Key Capabilities
 
@@ -79,6 +100,32 @@ Unlike manual "second brain" systems that require the user to explicitly log tho
 ### Cross-Model Continuity
 
 A user working in Claude Code on a project can switch to ChatGPT for a different perspective, and ChatGPT (via MCP) can access the full context of what was discussed in Claude. No re-explaining, no context loss, no starting from zero.
+
+### Context Curation and Compaction Guidance
+
+The knowledge layer should not only retrieve prior context, but help the user decide what to do with the current context window.
+
+- Detect context bloat: repeated instructions, obsolete branches, superseded decisions, low-signal chatter
+- Distinguish between content that should be dropped, summarized, pinned, or kept verbatim
+- Support an interactive "chat with my context" workflow where the user can ask:
+  - "What should I compact before switching models?"
+  - "Which parts of this thread are still carrying useful state?"
+  - "What can I safely prune if I want a smaller working set?"
+- Produce explicit compaction plans with tradeoffs, instead of opaque summarization
+
+This makes the knowledge layer an active context steward, not just a passive archive.
+
+### Portable Session Control
+
+Modeltap should provide session controls that span providers and clients:
+
+- `/clear`: start a fresh live session while preserving prior captured history in the knowledge base
+- `/compact`: replace verbose live context with a curated compact state derived from the current session
+- `/pin`: mark context fragments, decisions, or constraints as mandatory carry-forward state
+- `/unpin`: remove previously pinned state from the portable session context
+- `/handoff`: package the curated session state for continuation in another model or client
+
+These commands operate on modeltap's session abstraction, not a provider-specific conversation primitive, so the same workflow works across Anthropic, OpenAI, Ollama, and future providers.
 
 ### Semantic Search Across All Interactions
 
@@ -97,6 +144,10 @@ When the MCP server is enabled, AI clients gain access to tools such as:
 - **get_context**: Retrieve full context for a specific interaction
 - **get_decisions**: Surface decisions and action items extracted from past conversations
 - **get_stats**: Usage patterns and knowledge base statistics
+- **inspect_context**: Analyze the active session context for redundancy, staleness, token pressure, and pinned state
+- **suggest_compaction**: Return a structured compaction or pruning plan, including what to summarize, keep verbatim, or discard
+- **apply_session_command**: Execute session controls such as `/clear`, `/compact`, `/pin`, `/unpin`, and `/handoff`
+- **export_session_state**: Emit a portable session bundle that another model or client can import as continuation context
 
 ### Privacy and Control
 
@@ -104,6 +155,7 @@ When the MCP server is enabled, AI clients gain access to tools such as:
 - Users control what gets embedded (capture modes from ADR-0005 apply)
 - Embedding can use local models (Ollama) for fully offline operation
 - Retention policies control how long data is kept
+- Context curation policies remain user-visible and inspectable; modeltap should not silently discard state the user expects to keep
 
 ## Relationship to Other ADRs
 
@@ -115,6 +167,57 @@ When the MCP server is enabled, AI clients gain access to tools such as:
 | ADR-0007 (Usage Metrics) | Metrics and knowledge are complementary views of the same captured data |
 | ADR-0008 (Knowledge Layer Architecture) | Formal decision on how to implement this feature |
 | ADR-0009 (MCP Server) | Formal decision on how to expose knowledge via MCP |
+
+## Implementation Options
+
+The context-management layer should be specified in terms of modeltap-owned interfaces such as session state, pinned context, compaction plans, and handoff bundles. The implementation behind those interfaces can vary.
+
+### Option 1: Native Modeltap Implementation
+
+- Store portable session state directly in modeltap's SQLite database alongside captured interactions
+- Implement compaction, pruning suggestions, and carry-forward policies inside modeltap
+- Keep the smallest operational surface and the strongest alignment with modeltap's local-first architecture
+
+This is the default architectural direction because it preserves modeltap's role as a neutral cross-client substrate rather than an agent framework.
+
+### Option 2: MemGPT / Letta-Style Hierarchical Memory
+
+MemGPT, now evolved into Letta, is a credible implementation reference for this feature area. Its memory hierarchy maps well to modeltap's context-management goals:
+
+- in-context memory for always-visible working state
+- recall memory for recent conversational history
+- archival memory for larger searchable history
+- automatic compaction or summarization when the live context window fills
+
+This makes Letta-style memory a strong candidate for:
+
+- `inspect_context`
+- `suggest_compaction`
+- session summarization and carry-forward bundle generation
+- deciding what remains verbatim versus what is compressed into durable state
+
+However, modeltap should not adopt Letta's runtime abstractions as its public product model. The risks are:
+
+- coupling modeltap to one agent framework's concepts and lifecycle
+- weakening modeltap's cross-client neutrality
+- turning a knowledge/session substrate into a full agent runtime by accident
+
+Recommended stance: treat MemGPT/Letta as an optional backend or plugin for compaction and memory-management logic, not as the canonical session abstraction.
+
+### Option 3: Workflow Runtime Integration
+
+Frameworks such as LangGraph may also be useful, especially where context management overlaps with workflow state, checkpointing, and resumability.
+
+- Good fit for stateful execution graphs and resumable workflows
+- Weaker fit as the canonical memory substrate for all captured traffic across independent clients
+
+These runtimes are better viewed as consumers of modeltap session state than as the owner of it.
+
+### Recommendation
+
+- Modeltap owns the canonical session abstraction and cross-model commands
+- External memory runtimes are optional implementation strategies behind modeltap-managed interfaces
+- Any integration must preserve local-first operation, inspectable policies, and provider-neutral behavior
 
 ## Phasing
 
@@ -132,6 +235,8 @@ When the MCP server is enabled, AI clients gain access to tools such as:
 - Semantic search via CLI
 - Metadata extraction
 - MCP server for knowledge access
+- Context inspection and curation APIs
+- Portable session state and cross-model session commands
 
 ### Phase 3: Advanced Features (future)
 
@@ -139,3 +244,5 @@ When the MCP server is enabled, AI clients gain access to tools such as:
 - Knowledge graph: relationships between decisions, people, projects
 - Team knowledge: shared knowledge bases for teams (with access controls)
 - Dashboard: web UI for browsing and visualizing knowledge patterns
+- Policy-driven compaction profiles (coding, research, planning, support)
+- Automatic session handoff between clients and models

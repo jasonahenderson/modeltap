@@ -9,6 +9,14 @@ This document defines the agent team responsible for designing, building, testin
 3. **ADR/Feature driven** — Only accepted ADRs and accepted features drive work. Other statuses are ignored.
 4. **History logging** — Every action is logged to `docs/history/` with a plan before starting and a summary after completion.
 
+## Artifact Boundaries
+
+- `docs/explorations/` holds upstream problem framing and design-space exploration. Explorations can promote into features, patches, or ADRs, but do not authorize implementation by themselves.
+- `docs/features/` holds behavior-scoped work that can drive `WU-NNN` implementation once accepted.
+- `docs/patches/` holds implementation-scoped work authorization for fixes, tooling, infra, and internal plumbing.
+- `docs/adr/` holds architectural decisions with future constraint value.
+- `ADMIN:` work covers repo process and instruction changes such as `CLAUDE.md`, `AGENTS.md`, prompts, hooks, or documentation structure.
+
 ## Agents
 
 ### TPM (Technical Program Manager)
@@ -82,7 +90,7 @@ This document defines the agent team responsible for designing, building, testin
 - Ensure responsive design and accessible markup
 - Respect user isolation when multi-user is enabled (users see only their data)
 
-**Inputs:** Design document, feature spec (`docs/features/web-dashboard.md`), failing test files
+**Inputs:** Design document, feature spec (`docs/features/0003-web-dashboard.md`), failing test files
 **Outputs:** Frontend assets, Go API handlers, logged to history
 
 ### Infrastructure Engineer
@@ -195,6 +203,13 @@ Commits happen at natural checkpoints within each work unit, not just at the end
 Not every work unit hits all commit points. The rule is: **if you've done meaningful, compilable work, commit it before moving on.**
 
 All commits use `git commit -s` for DCO sign-off. See `CLAUDE.md` for commit message format.
+
+Commit prefix summary:
+
+- `WU-NNN:` for implementation under accepted features
+- `PATCH-NNNN:` for implementation under an approved patch
+- `FEAT-NNNN:`, `ADR-NNNN:`, and `EXP-NNNN:` for editing the corresponding canonical docs
+- `ADMIN:` for process-only changes
 
 ### Agent Selection
 

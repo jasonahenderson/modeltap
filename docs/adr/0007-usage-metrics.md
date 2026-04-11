@@ -4,7 +4,7 @@ date: 2026-03-03
 decision-makers: Jason Henderson
 ---
 
-# Usage Metrics Tracking and Reporting
+# ADR-0007: Usage Metrics Tracking and Reporting
 
 ## Context and Problem Statement
 

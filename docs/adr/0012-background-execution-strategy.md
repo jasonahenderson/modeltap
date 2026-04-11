@@ -4,7 +4,7 @@ date: 2026-03-08
 decision-makers: jasonahenderson
 ---
 
-# Background Execution Strategy for Proxy Server
+# ADR-0012: Background Execution Strategy for Proxy Server
 
 ## Context and Problem Statement
 

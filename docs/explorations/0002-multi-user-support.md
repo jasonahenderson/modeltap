@@ -1,4 +1,14 @@
-# Multi-User Support
+---
+exploration: EXP-0002
+title: Multi-User Support
+status: exploring
+date: 2026-03-03
+related:
+  - ADR-0002: Storage format (per-user database scoping implications)
+  - ADR-0006: Multi-provider support
+---
+
+# EXP-0002: Multi-User Support
 
 ## Overview
 

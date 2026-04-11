@@ -1,6 +1,15 @@
-# Web Dashboard
-
+---
+feature: FEAT-0003
+title: Web Dashboard
 status: accepted
+date: 2026-03-06
+adr-constraints:
+  - ADR-0001: Go as primary language (embed.FS for assets)
+  - ADR-0002: SQLite storage (dashboard reads via Store interface)
+  - ADR-0007: Pre-computed aggregation tables
+---
+
+# FEAT-0003: Web Dashboard
 
 ## Problem
 

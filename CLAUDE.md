@@ -4,11 +4,37 @@ Reverse proxy for AI/ML clients that captures requests/responses, tracks usage m
 
 ## Key References
 
-- Architecture decisions: `docs/adr/` (only `status: accepted` ADRs drive work)
-- Feature specs: `docs/features/` (only accepted features drive work)
+- Architecture decisions: `docs/adr/` (only `status: accepted` ADRs drive work) — see `docs/adr/README.md` for the index, format, and lifecycle
+- Explorations: `docs/explorations/` (upstream problem framing; does not by itself authorize implementation) — see `docs/explorations/README.md`
+- Feature specs: `docs/features/` (only `status: accepted` features drive work) — see `docs/features/README.md` for the index, format, and lifecycle
+- Patches: `docs/patches/` (implementation-scoped fixes, missing-endpoint coverage, internal plumbing) — see `docs/patches/README.md` for when to use vs. ADR or feature spec
 - Agent team definition: `docs/agents.md`
+- OpenCode / generic agent instructions: `AGENTS.md`
 - Project status: `docs/history/status.md`
 - Work logs: `docs/history/`
+
+## Doc Type Taxonomy
+
+| Doc Type | Scope | Lives In | Identifier |
+|----------|-------|----------|------------|
+| Exploration | Upstream problem framing and design-space exploration | `docs/explorations/` | `EXP-NNNN` |
+| ADR | Architectural decisions with future constraint value | `docs/adr/` | `ADR-NNNN` |
+| Feature spec | Behavior — user-visible capabilities | `docs/features/` | `FEAT-NNNN` |
+| Patch | Implementation — fixes, missing endpoints, internal work | `docs/patches/` | `PATCH-NNNN` |
+| Work unit | Planned increments inside an accepted feature | tracked in `docs/history/status.md` | `WU-NNN` |
+| Admin task | Repo workflow / instruction / process changes | no numbered doc required by default | `ADMIN` |
+
+`PATCH` does not mean semver patch — it means implementation-scoped work. `ADMIN:` commits cover repo workflow / instruction-file changes and don't need a numbered doc.
+
+### Which Artifact to Use
+
+- Use an **exploration** when the problem is still being framed, multiple solution shapes are plausible, or the topic may later promote into a feature, ADR, or patch.
+- Use a **feature spec** when the work is behavior-scoped and needs user-visible scope, capabilities, and success criteria.
+- Use a **patch** when the work is implementation-scoped and a checklist is enough to define "done."
+- Use an **ADR** when the work requires a hard architectural choice with future constraint value.
+- Use **ADMIN** for repo workflow / instruction / prompt / process changes such as `CLAUDE.md`, `AGENTS.md`, review structure, status-process rules, or similar meta work.
+
+If a change mixes product work and repo-process work, split it into separate artifacts or commits rather than forcing a single classification.
 
 ## Technology Stack (from accepted ADRs)
 
@@ -26,7 +52,7 @@ Reverse proxy for AI/ML clients that captures requests/responses, tracks usage m
 
 ## Agent Team
 
-When working as part of the agent team, follow the workflow defined in `docs/agents.md`. Every action must be logged to `docs/history/`.
+When working as part of the agent team, follow the workflow defined in `docs/agents.md`. `AGENTS.md` is the concise cross-agent version of the same expectations. Every significant action must be logged to `docs/history/`.
 
 ### Agent Roles
 
@@ -64,13 +90,51 @@ This ensures continuity across sessions even for planning, review, or ad-hoc con
 
 Every completed work unit is a commit point. Commit immediately when a work unit's definition of done is met. Do not batch multiple work units into a single commit.
 
-Commit message format:
+Code and product-affecting changes must trace to one of:
+
+- an accepted feature with an active or planned `WU-NNN`
+- an approved patch
+- an ADR, feature, or exploration authoring/editing change
+- an `ADMIN:` task when the change is process-only
+
+Explorations are upstream rationale artifacts. They do **not** authorize code changes by themselves.
+
+Commit prefixes:
+
+- `WU-NNN: <short description>` for implementation work units under accepted features
+- `PATCH-NNNN: <short description>` for implementation-scoped work under an approved patch
+- `FEAT-NNNN: <short description>` for drafting or revising a feature spec itself
+- `ADR-NNNN: <short description>` for drafting or revising an ADR itself
+- `EXP-NNNN: <short description>` for drafting or revising an exploration itself
+- `ADMIN: <short description>` for repo process / instruction / workflow changes, with no numbered doc required by default
+
+Commit body requirements:
+
+- Briefly state what changed in 1-3 lines
+- Reference the canonical doc path when one exists (feature, patch, ADR, exploration)
+- Use `git commit -s` for DCO sign-off
+- Include `Co-Authored-By` only if the current workflow or user explicitly requires it
+
+Examples:
+
+```text
+WU-039: add MCP search_knowledge command
+
+Implements the CLI surface and handler wiring for MCP-backed semantic search.
+Ref: docs/features/0003-web-dashboard.md
 ```
-WU-<NNN>: <short description>
 
-<what was done, 1-3 lines>
+```text
+PATCH-0002: add local inference provider support
 
-Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+Adds implementation-scoped provider, routing, and metrics work for MLX and Ollama support.
+Ref: docs/patches/0002-local-inference-support.md
+```
+
+```text
+ADMIN: add exploration taxonomy and agent instruction files
+
+Introduces docs/explorations/README.md and aligns CLAUDE.md / AGENTS.md with commit-prefix rules.
 ```
 
 Additional commit points within a work unit (commit these as you go, don't wait):

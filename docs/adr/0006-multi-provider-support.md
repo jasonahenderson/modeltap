@@ -4,7 +4,7 @@ date: 2026-03-03
 decision-makers: Jason Henderson
 ---
 
-# Multi-Provider Support Strategy
+# ADR-0006: Multi-Provider Support Strategy
 
 ## Context and Problem Statement
 

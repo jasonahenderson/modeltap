@@ -4,7 +4,7 @@ date: 2026-03-03
 decision-makers: Jason Henderson
 ---
 
-# CLI Framework and Approach
+# ADR-0003: CLI Framework and Approach
 
 ## Context and Problem Statement
 

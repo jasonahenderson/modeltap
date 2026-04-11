@@ -4,7 +4,7 @@ date: 2026-03-03
 decision-makers: Jason Henderson
 ---
 
-# Capture Mode Strategy
+# ADR-0005: Capture Mode Strategy
 
 ## Context and Problem Statement
 

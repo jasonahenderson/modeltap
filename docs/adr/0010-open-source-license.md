@@ -4,7 +4,7 @@ date: 2026-03-03
 decision-makers: Jason Henderson
 ---
 
-# Open Source License
+# ADR-0010: Open Source License
 
 ## Context and Problem Statement
 
