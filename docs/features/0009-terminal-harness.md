@@ -59,7 +59,9 @@ The harness executes tools locally on the user's machine. The BFF forwards model
 - Bash displays the full command before execution, requiring explicit approval
 - Tool descriptions instruct the model on when to use each tool and when NOT to (e.g., "use Read instead of cat via Bash")
 
-**MCP tool discovery:** The harness connects to configured MCP servers (stdio transport) and discovers their tools. MCP tools appear alongside core tools with the same permission enforcement.
+**Tool registration with server:** On connection, the harness sends `capabilities.register` (FEAT-0008) declaring all available tools — core tools and any MCP-discovered tools — with their names, descriptions, input schemas, and permission levels. The server uses this catalog to populate the model's tool definitions. Only tools the harness has registered are available to the model. When MCP servers connect or disconnect, the harness sends `capabilities.update` to add or remove tools dynamically.
+
+**MCP tool discovery:** The harness connects to configured MCP servers (stdio transport) and discovers their tools. MCP tools appear alongside core tools with the same permission enforcement and are included in capability registration.
 
 ### Permission Model
 
@@ -96,13 +98,21 @@ Execution mode is harness-local. The BFF always forwards tool calls the same way
 - Images: base64-encoded for vision-capable models
 - Spreadsheets (XLSX/CSV): parsed as structured text
 
+**Attachment wire format**: the harness always sends both the raw content and any transformed representation in the `turn.submit` payload. Specifically:
+- `attachments[].raw`: the original file bytes (for capture integrity and reproducibility)
+- `attachments[].content`: the extracted/transformed text (for model context)
+- `attachments[].content_type`: original MIME type
+- `attachments[].transform`: what processing was applied ("pdf_text_extract", "docx_text_extract", "base64_encode", "none")
+
+The server captures the raw payload per ADR-0005 and uses the transformed content for model prompt assembly. This ensures capture correctness (the raw file is always preserved) while allowing the harness to handle format-specific extraction.
+
 ### Large Paste Handling
 
 When the harness detects a paste exceeding the configurable threshold (default: 2KB):
 
 - Show preview (first 5 lines + line count + byte size)
 - Offer: summarize (via cheap model), include full, truncate (first N lines), cancel
-- Full paste is always captured by the BFF regardless of what the user chooses for the live context
+- The `turn.submit` payload includes both the full raw paste (`paste.raw`) and the user's chosen representation (`paste.content` — full, truncated, or summarized), plus `paste.intent` ("full", "truncated", "summarized"). The server captures the raw paste per ADR-0005 and uses the chosen representation for model context. Summarization is performed harness-side before submission (using a local model or the BFF's cheap routing target).
 
 ### Status Bar
 
@@ -203,17 +213,30 @@ mcp:
 
 ## Success Criteria
 
-1. The harness connects to a running server (local socket or remote TLS) and authenticates.
-2. A user can type a message, receive a streamed response, and see it rendered in the terminal with markdown styling.
+### Phase 1: Minimal Prototype (per ADR-0013)
+
+These criteria define acceptance for the initial harness using minimal rendering (stdout + readline). Styled markdown, scrollable viewport, and status bar are Phase 2.
+
+1. The harness connects to a running server (local socket or remote TLS), performs capability registration (FEAT-0008 `capabilities.register`), and establishes a session.
+2. A user can type a message, receive a streamed response, and see it printed to the terminal (plaintext with ANSI code blocks, not styled markdown).
 3. The model can request tool calls (Read, Edit, Bash at minimum) which the harness executes locally with permission prompts.
 4. The agentic loop works: model reads files, makes changes, runs tests, observes results, and continues — multiple tool call rounds in a single turn.
 5. File attachments (`@file`) are included in the turn and visible to the model.
-6. Large pastes trigger the summarize/truncate/full flow.
-7. Session commands (`/compact`, `/model`, `/cost`, `/context`) work.
-8. The status bar displays current model, context usage, session cost, and call timer.
-9. Sessions persist — closing and reopening the harness in the same project directory resumes the previous session.
-10. Plan mode collects tool calls into a reviewable plan before execution.
-11. MCP servers configured in the harness provide discoverable tools to the model.
+6. Session commands (`/compact`, `/model`, `/cost`) work. Cost is printed inline, not in a status bar.
+7. Sessions persist — closing and reopening the harness in the same project directory resumes the previous session.
+8. Plan mode collects tool calls into a reviewable plan before execution.
+9. The harness registers its tool catalog with the server via `capabilities.register`, and only registered tools appear in model prompts.
+
+### Phase 2: Bubbletea Production UI (follow-on work unit)
+
+These criteria define acceptance for the production harness after migration to Bubbletea. Phase 2 does not block Phase 1 acceptance.
+
+10. Streaming markdown output rendered with terminal styling (headings, code blocks, lists, bold/italic) via Glamour.
+11. Scrollable conversation viewport with auto-scroll-to-bottom and keyboard-driven scroll-up.
+12. Persistent status bar displaying current model, context usage, session cost, and call timer.
+13. Large pastes trigger the summarize/truncate/full flow.
+14. MCP servers configured in the harness provide discoverable tools to the model (sent via `capabilities.update`).
+15. `/context` command shows files, knowledge injections, and token budget.
 
 ## Relationship to ADRs
 

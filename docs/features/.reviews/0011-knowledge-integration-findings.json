@@ -1,0 +1,49 @@
+[
+  {
+    "id": "F1",
+    "summary": "The feature depends on an unaccepted ADR-0008 amendment but treats it as already settled.",
+    "reviewer": "ADR Conformance",
+    "severity": "blocking",
+    "affected_sections": [
+      "Problem",
+      "Configuration",
+      "Relationship to ADRs",
+      "Success Criteria"
+    ],
+    "detail": "FEAT-0011 repeatedly states that knowledge is on by default and labels this as an ADR-0008 amendment. At the same time it also promises graceful no-knowledge operation when knowledge.enabled is false. That means the feature is straddling two different product postures: optional knowledge layer versus default-on integrated memory. Until the ADR change is accepted, this feature is not anchored to a stable architectural constraint.",
+    "recommendation": "Resolve the ADR-0008 amendment first, or rewrite the feature so acceptance does not depend on the amendment. The feature can still specify a recommended default without treating the architectural change as already decided.",
+    "disposition": null,
+    "disposition_rationale": null
+  },
+  {
+    "id": "F2",
+    "summary": "The `/forget` behavior conflicts with always-full capture and rebuild-from-capture semantics.",
+    "reviewer": "Product Semantics",
+    "severity": "blocking",
+    "affected_sections": [
+      "Knowledge Commands",
+      "Graceful Degradation",
+      "Success Criteria",
+      "Relationship to ADRs"
+    ],
+    "detail": "The feature promises that /forget removes entries from the knowledge base and that forgotten content no longer appears in search or injection results. But the same feature says the knowledge layer can be rebuilt from raw capture, while ADR-0005 requires always-full capture with retention-based pruning. Without tombstones, redaction markers, or a second-layer suppression list, forgotten content can reappear after rebuild and is not actually forgotten in any durable sense.",
+    "recommendation": "Define /forget precisely as either suppression-from-retrieval, durable redaction with rebuild support, or deletion subject to capture-retention policy. The current wording overpromises behavior the underlying capture model does not provide.",
+    "disposition": null,
+    "disposition_rationale": null
+  },
+  {
+    "id": "F3",
+    "summary": "Several success criteria are not testable enough to function as acceptance gates.",
+    "reviewer": "Acceptance Quality",
+    "severity": "significant",
+    "affected_sections": [
+      "Transparent Context Enrichment",
+      "Success Criteria",
+      "Open Questions"
+    ],
+    "detail": "Criteria such as semantic search returns relevant results and the model demonstrates awareness of prior decisions are directionally right, but they do not specify an evaluation dataset, ranking threshold, or pass/fail method. Without that, the feature can neither fail nor pass objectively.",
+    "recommendation": "Add measurable evaluation rules such as a fixed benchmark set, top-k retrieval thresholds, latency limits, and a concrete before-and-after prompt-evaluation procedure for injection quality.",
+    "disposition": null,
+    "disposition_rationale": null
+  }
+]

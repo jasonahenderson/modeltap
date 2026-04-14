@@ -1,0 +1,50 @@
+[
+  {
+    "id": "F1",
+    "summary": "Critical auth negotiation and downgrade-resistance behavior is still outside the feature contract.",
+    "reviewer": "Security",
+    "severity": "blocking",
+    "affected_sections": [
+      "Pluggable Identity Provider Chain",
+      "Harness Auth Integration",
+      "Configuration",
+      "Success Criteria"
+    ],
+    "detail": "FEAT-0010 says auth negotiation is server-driven and points to EXP-0002 for the full protocol, including downgrade resistance. For a proposed feature on authentication and authorization, that is not enough. The feature itself still needs to specify method pinning, challenge binding, session identity caching rules, and the exact failure semantics when multiple methods are configured.",
+    "recommendation": "Pull the auth handshake and downgrade-resistance rules into FEAT-0010 directly, or add a constraining ADR that the feature can normatively depend on before acceptance.",
+    "disposition": null,
+    "disposition_rationale": null
+  },
+  {
+    "id": "F2",
+    "summary": "The spec does not define a clear bootstrap and recovery path for the first admin.",
+    "reviewer": "Operational Readiness",
+    "severity": "significant",
+    "affected_sections": [
+      "Roles and Authorization",
+      "CLI Integration",
+      "Configuration",
+      "Success Criteria"
+    ],
+    "detail": "The feature says admin operations require OIDC or SPIFFE and blocks token-authenticated users from admin actions. That improves security, but it leaves an operational gap: how the very first admin is established in a new deployment, and what the break-glass path is if OIDC is unavailable. The listed admin commands assume an admin already exists.",
+    "recommendation": "Define an initial bootstrap path explicitly, such as local-only bootstrap on first start, a signed config-time admin seed, or a one-time installation command with tightly scoped semantics.",
+    "disposition": null,
+    "disposition_rationale": null
+  },
+  {
+    "id": "F3",
+    "summary": "The isolation test contract is narrower than the full set of cross-user data surfaces.",
+    "reviewer": "Isolation Assurance",
+    "severity": "significant",
+    "affected_sections": [
+      "Per-User Data Isolation",
+      "Admin Aggregate Metrics",
+      "Success Criteria",
+      "Open Questions"
+    ],
+    "detail": "The feature requires negative isolation tests for query paths and defines a UserScopedStore boundary. That is good, but the spec also exposes admin metrics, background aggregation, token provisioning, and future knowledge integration. It does not explicitly require negative tests for rebuild jobs, export paths, MCP or search access, or any other non-request-path data access. On a multi-user feature, those are common leak paths.",
+    "recommendation": "Expand the success criteria to require isolation tests for every data-access surface: request queries, session resume and list, metrics, export or search, background rebuild jobs, and any MCP-facing knowledge queries introduced by dependent features.",
+    "disposition": null,
+    "disposition_rationale": null
+  }
+]
