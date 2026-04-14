@@ -8,6 +8,10 @@ This directory holds **behavior-scoped** product definitions for modeltap that a
 |---------|-------|--------|
 | [FEAT-0003](0003-web-dashboard.md) | Web Dashboard | accepted |
 | [FEAT-0004](0004-service-management.md) | Service Management | accepted |
+| [FEAT-0008](0008-bff-server.md) | BFF Server | proposed |
+| [FEAT-0009](0009-terminal-harness.md) | Terminal Harness | proposed |
+| [FEAT-0010](0010-enterprise-auth.md) | Enterprise Auth and Multi-User | proposed |
+| [FEAT-0011](0011-knowledge-integration.md) | Knowledge Integration | proposed |
 
 Other previously feature-shaped docs were reclassified when they proved to be upstream explorations or implementation-scoped patches rather than active behavior contracts. See `docs/explorations/` and `docs/patches/`.
 
