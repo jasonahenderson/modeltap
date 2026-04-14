@@ -12,6 +12,7 @@ This directory holds **behavior-scoped** product definitions for modeltap that a
 | [FEAT-0009](0009-terminal-harness.md) | Terminal Harness | proposed |
 | [FEAT-0010](0010-enterprise-auth.md) | Enterprise Auth and Multi-User | proposed |
 | [FEAT-0011](0011-knowledge-integration.md) | Knowledge Integration | proposed |
+| [FEAT-0012](0012-skills-and-agent-teams.md) | Skills and Agent Teams | proposed |
 
 Other previously feature-shaped docs were reclassified when they proved to be upstream explorations or implementation-scoped patches rather than active behavior contracts. See `docs/explorations/` and `docs/patches/`.
 
