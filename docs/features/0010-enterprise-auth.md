@@ -36,7 +36,33 @@ Add pluggable identity providers, per-user data isolation, server-owned provider
 
 ### Pluggable Identity Provider Chain
 
-The server supports multiple identity providers through an adapter interface. Auth negotiation is server-driven: the server declares which methods it accepts, the harness selects from that set. See EXP-0002 for the full auth negotiation protocol including downgrade resistance.
+The server supports multiple identity providers through an adapter interface. Auth negotiation is server-driven with explicit downgrade resistance guarantees.
+
+### Auth Negotiation Protocol
+
+Auth negotiation occurs at TLS connection time, before `capabilities.register` (FEAT-0008). The protocol is:
+
+1. **TLS handshake**: if the client presents a valid SVID (SPIFFE), the server authenticates via mTLS immediately. Session is pinned to SPIFFE auth. Done.
+2. **Auth challenge**: if no mTLS client cert, the server sends an auth challenge over the established TLS connection:
+   ```json
+   {
+     "supported_methods": ["oidc", "token"],
+     "required_methods": ["oidc"],
+     "oidc": { "issuer": "...", "client_id": "...", "device_code_endpoint": "..." }
+   }
+   ```
+3. **Method selection**: the harness selects from `supported_methods`. If `required_methods` is set, the harness MUST use one of those. If it cannot, the connection is refused.
+4. **Credential presentation**: the harness presents the credential for the selected method (JWT for OIDC, bearer token for token auth).
+5. **Verification**: the server verifies via the selected provider. On success: session pinned to `{method, resolved identity}`. On failure: connection closed — **no fallback to a weaker method**. The harness must reconnect to try a different method.
+
+**Downgrade resistance guarantees:**
+- No fallback on credential failure. The connection closes. No chance to try a weaker method in the same connection.
+- `required_methods` is a hard constraint — methods not in the list are rejected even if configured as supported.
+- Method is pinned to the session. No in-session re-negotiation.
+- The auth challenge is served over TLS, preventing a network attacker from modifying the supported methods list.
+- Auth-method gating (see Roles and Authorization) prevents a stolen token from performing operations that require stronger auth even if the token maps to an admin user.
+
+**Session identity caching**: once authenticated, the resolved identity is cached for the connection lifetime. Reconnection requires re-authentication. OIDC access tokens are validated on connection establishment; the server does not re-validate mid-session (token expiry during an active session does not terminate it, but the next connection requires a fresh token).
 
 **Phase 1 providers:**
 
@@ -183,9 +209,29 @@ The harness participates in the auth flow:
 
 For OIDC: the harness manages the browser flow (device code or localhost redirect), caches refresh tokens locally (OS keychain preferred, encrypted file fallback), and re-authenticates silently on subsequent launches.
 
+### Admin Bootstrap
+
+The first admin must be established before OIDC or SPIFFE are operational. The bootstrap path:
+
+```
+# On first server start, or via explicit bootstrap command:
+modeltap admin bootstrap --user alice@acme.com --role admin
+```
+
+Bootstrap is permitted only when:
+- The server has zero admin users in its database, OR
+- The command is run from a local session (Unix socket / localhost) with OS-level access to the server process
+
+Bootstrap creates a token for the first admin. Once at least one admin exists, the bootstrap command is disabled — subsequent admins are created via `modeltap admin create-token` by an existing admin.
+
+**Break-glass recovery**: if OIDC is unavailable and all admin tokens are lost, the server operator can run `modeltap admin bootstrap --force` from the server host via local socket. `--force` requires direct OS access to the server machine and logs an audit event. This ensures recoverability without weakening the normal auth model.
+
 ## CLI Integration
 
 ```
+# Bootstrap (first admin, or break-glass)
+modeltap admin bootstrap --user alice@acme.com --role admin
+
 # Admin commands (on server)
 modeltap admin create-token --user alice --role developer
 modeltap admin revoke-token --user alice
@@ -233,7 +279,15 @@ auth:
 
 1. An admin can create a token for a user, and the user can authenticate to the server with that token.
 2. OIDC authentication works with at least one provider (Okta or Keycloak for testing): browser flow, token caching, silent re-auth.
-3. Data isolation: user A's conversations, sessions, and metrics are invisible to user B. Negative isolation tests pass for every query path.
+3. Data isolation: user A's data is invisible to user B. Negative isolation tests pass for **every data-access surface**:
+   - Request/response queries (`requests` table)
+   - Session list and resume (`sessions`, `turns` tables)
+   - Metrics queries (per-user and aggregate — aggregate must not leak content)
+   - Export paths (log export, session export)
+   - Knowledge search and injection (when FEAT-0011 is active)
+   - MCP-facing knowledge queries (when MCP server is active)
+   - Background rebuild/re-embedding jobs (must be user-scoped)
+   - Context list (`context.list` protocol message)
 4. Admin sees aggregate metrics (total spend per user, model distribution) without seeing any conversation content.
 5. Model access control prevents a developer-role user from using a denied model.
 6. Spend budget enforcement blocks requests when a user exceeds their daily or monthly limit.

@@ -45,14 +45,42 @@ The server listens for harness connections on:
 
 The protocol is JSON-RPC with bidirectional streaming. The server supports concurrent harness connections (one per authenticated user in multi-user deployments).
 
+### Protocol Specification
+
+The harness protocol is a JSON-RPC 2.0 transport with extensions for server-initiated streaming. This section defines the protocol semantics that downstream features (FEAT-0009, FEAT-0010, FEAT-0012) implement against.
+
+**Framing**: JSON-RPC 2.0 messages encoded as newline-delimited JSON (NDJSON) over the transport (Unix socket or TLS). Each message is a complete JSON object terminated by `\n`.
+
+**Correlation**: every request from the harness includes a `id` field (JSON-RPC standard). The server's response or error carries the same `id`. Streaming events for a turn carry a `turn_id` field that correlates all events to the originating `turn.submit` request.
+
+**Stream lifecycle**: a `turn.submit` request initiates a streaming response. The server sends zero or more streaming events (`token.delta`, `tool.call`, `status.update`, `knowledge.hit`, `cost.update`, `compact.notice`) followed by exactly one terminal event (`turn.complete` or `error`). The terminal event closes the stream for that turn. The harness must not send a new `turn.submit` until the previous turn's stream terminates, or it sends an explicit `turn.cancel`.
+
+**Cancellation**: the harness may send `turn.cancel` with the `turn_id` at any time during a streaming response. The server makes a best-effort to stop the provider request and emits `turn.complete` with `cancelled: true`. Provider-side cancellation is not guaranteed (some providers don't support it), but the server stops forwarding events to the harness immediately.
+
+**Tool call round-trips**: when the server emits `tool.call`, streaming pauses. The harness executes the tool (or rejects it) and sends `tool.result` with the matching `tool_call_id`. The server resumes streaming after receiving the result. Multiple `tool.call` events may be emitted in sequence within a single turn, each requiring a `tool.result` before the stream continues.
+
+**Capability and tool registration**: on connection establishment (after auth, see FEAT-0010), the harness sends a `capabilities.register` message declaring:
+- Available local tools (name, description, input schema, permission level)
+- Supported protocol version
+- Harness metadata (version, platform)
+
+The server uses this tool catalog when assembling the model prompt — only tools the harness has registered are included in the model's tool definitions. When MCP servers are connected, the harness sends `capabilities.update` to add newly discovered tools. The server can also send `capabilities.request` to ask the harness to re-register (e.g., after reconnection).
+
+**Protocol versioning**: the harness and server exchange protocol versions during `capabilities.register`. The server declares its supported version range. If the harness's version is outside the range, the connection is rejected with a version-mismatch error. Within a compatible range, the server uses the highest mutually supported version.
+
+**Auth handshake boundary**: auth negotiation (FEAT-0010) occurs before `capabilities.register`. The connection is not considered established until both auth and capability registration complete. See FEAT-0010 for the auth handshake details.
+
 ### Protocol Messages
 
 **Harness → Server:**
 
 | Message | Description |
 |---------|-------------|
+| `capabilities.register` | Declare tools, protocol version, and harness metadata |
+| `capabilities.update` | Add or remove tools (e.g., MCP server connected/disconnected) |
 | `turn.submit` | User message with optional file attachments and tool results |
-| `tool.result` | Result of a tool execution (success or error) |
+| `turn.cancel` | Cancel the current streaming turn |
+| `tool.result` | Result of a tool execution (success, error, or rejected) |
 | `session.resume` | Resume an existing session by ID |
 | `session.list` | List available sessions for this user/project |
 | `session.compact` | Request context compaction |
@@ -65,14 +93,20 @@ The protocol is JSON-RPC with bidirectional streaming. The server supports concu
 
 | Event | Description |
 |-------|-------------|
-| `token.delta` | Incremental text from model response |
-| `tool.call` | Model requests a tool execution |
-| `status.update` | Status message ("routing to claude-opus-4-6...", "searching knowledge...") |
+| `token.delta` | Incremental text from model response (`turn_id` correlated) |
+| `tool.call` | Model requests a tool execution (`tool_call_id` for correlation) |
+| `status.update` | Status message ("routing to claude-opus-4-6...") |
 | `knowledge.hit` | Knowledge context was injected (summary, relevance score) |
 | `cost.update` | Running token count and cost for this turn |
 | `compact.notice` | Context was compacted (what was compressed, what was retained) |
-| `turn.complete` | Turn finished (final usage, model, latency, total cost) |
+| `turn.complete` | Turn finished (final usage, model, latency, total cost, cancelled flag) |
 | `error` | Server-side error (provider failure, budget exceeded, auth failure) |
+
+**Server → Harness (non-streaming):**
+
+| Message | Description |
+|---------|-------------|
+| `capabilities.request` | Ask harness to re-register capabilities |
 
 ### Conversation State Management
 
@@ -99,7 +133,7 @@ Translation handles:
 - Context window truncation (drop oldest turns when exceeding model's window, preserving system prompt and recent context)
 - Feature availability (graceful handling when a model doesn't support tool use)
 
-The provider adapter interface (ADR-0006) is extended to support both parsing (inbound response) and formatting (outbound request) for full message histories.
+The provider adapter interface (ADR-0006) is extended to support both parsing (inbound response) and formatting (outbound request) for full message histories. This is a material change to the accepted ADR-0006 interface — it must be formalized as an amendment (`ADR-0006-amendment-001`) or superseding ADR before this feature is accepted. The amendment adds `FormatMessages(canonical []Message, windowSize int) (providerPayload, error)` to the provider interface alongside the existing parse/detect methods.
 
 ### System Prompt Engine
 
@@ -172,6 +206,51 @@ Sessions are persisted to SQLite and survive:
 - Model switches within a session
 
 Session data includes: conversation history (canonical format), active model, routing overrides, pinned items, compaction state, cost totals, creation/update timestamps, and project association.
+
+### Session and Turn Storage Model
+
+This feature introduces two new table families alongside the existing request log and aggregation tables (ADR-0002, ADR-0007):
+
+**`sessions` table:**
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | TEXT PK | Session UUID |
+| `user_id` | TEXT | Owner (for FEAT-0010 isolation) |
+| `project` | TEXT | Project path or identifier |
+| `active_model` | TEXT | Currently selected model |
+| `routing_overrides` | JSON | Per-session routing overrides |
+| `pinned_items` | JSON | Pinned context items |
+| `total_cost` | REAL | Running session cost |
+| `total_input_tokens` | INTEGER | Running input token total |
+| `total_output_tokens` | INTEGER | Running output token total |
+| `created_at` | TIMESTAMP | Session creation time |
+| `updated_at` | TIMESTAMP | Last activity time |
+| `status` | TEXT | active, suspended, completed |
+
+**`turns` table:**
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | TEXT PK | Turn UUID |
+| `session_id` | TEXT FK | Parent session |
+| `sequence` | INTEGER | Turn order within session |
+| `role` | TEXT | user, assistant |
+| `content` | TEXT | Canonical message content (JSON) |
+| `model` | TEXT | Model used for this turn |
+| `provider` | TEXT | Provider used |
+| `input_tokens` | INTEGER | Input tokens for this turn |
+| `output_tokens` | INTEGER | Output tokens for this turn |
+| `cost` | REAL | Cost for this turn |
+| `latency_ms` | INTEGER | Provider response latency |
+| `tool_calls` | JSON | Tool calls made in this turn |
+| `compacted` | BOOLEAN | Whether this turn has been compacted |
+| `compacted_summary` | TEXT | Summary if compacted |
+| `created_at` | TIMESTAMP | Turn timestamp |
+
+**Retention**: session and turn data follows the existing retention policy (ADR-0005). Sessions older than the configured retention period are pruned, along with their turns. The raw request log (existing capture) is the authoritative record — session/turn tables are a structured view on top of it.
+
+**Relationship to ADR-0007 aggregation**: per-turn cost data feeds into the existing hourly/daily aggregation tables via the same rollup mechanism. Sessions add a new aggregation dimension but do not change the rollup architecture.
 
 ## CLI Integration
 
@@ -257,7 +336,7 @@ sessions:
 | ADR-0002 (SQLite) | Session state and conversation history stored in SQLite |
 | ADR-0004 (Viper) | New config keys use Viper, non-global instances |
 | ADR-0005 (Capture) | Full capture continues — BFF adds conversation-level capture alongside request-level |
-| ADR-0006 (Providers) | Provider adapters extended with formatting (outbound) in addition to parsing (inbound) |
+| ADR-0006 (Providers) | Provider adapters extended with formatting (outbound) in addition to parsing (inbound). Requires ADR-0006 amendment before acceptance. |
 | ADR-0007 (Metrics) | Cost tracking feeds into existing aggregation tables |
 | ADR-0009 (MCP) | MCP stdio interface is separate and unchanged. BFF does not use MCP for harness communication. |
 

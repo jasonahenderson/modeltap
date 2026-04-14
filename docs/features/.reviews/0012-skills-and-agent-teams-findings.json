@@ -1,0 +1,51 @@
+[
+  {
+    "id": "F1",
+    "summary": "The spec combines two materially different features that should not share one acceptance gate.",
+    "reviewer": "Feature Scoping",
+    "severity": "blocking",
+    "affected_sections": [
+      "Solution",
+      "Skills",
+      "Agent Teams",
+      "Success Criteria"
+    ],
+    "detail": "FEAT-0012 says skills are harness-side and require no new server capabilities, while agent teams require BFF-coordinated multi-agent orchestration, shared context, concurrency, cost controls, and policy enforcement. Those are not one unit of behavior or risk. As written, a lightweight skill implementation and a safe agent-team implementation either block each other or get accepted together without equivalent maturity.",
+    "recommendation": "Split FEAT-0012 into at least two features: one for skills and one for agent teams, or phase the document explicitly so only one capability is acceptance-critical at a time.",
+    "disposition": null,
+    "disposition_rationale": null
+  },
+  {
+    "id": "F2",
+    "summary": "The feature assumes safe multi-agent execution before defining failure, conflict, and write-serialization behavior.",
+    "reviewer": "Safety and Execution Model",
+    "severity": "blocking",
+    "affected_sections": [
+      "Team Execution Flow",
+      "Tool Execution and Permissions",
+      "Agent Context Sharing",
+      "Open Questions",
+      "Success Criteria"
+    ],
+    "detail": "The success criteria require concurrent agent execution, scoped approvals, shared file-system effects, and policy-respecting total cost caps. But the open questions still leave unresolved what happens when a writing agent fails, when two writers conflict, and whether the BFF must serialize writes. Those are core safety semantics, not follow-up polish. Without them, the feature cannot serve as implementation authorization for an agent-team system that mutates local files.",
+    "recommendation": "Define the minimal safe execution rules before acceptance: write serialization policy, retry and fail behavior, plan-scope enforcement, and what exactly pauses or aborts the team when a sub-agent goes off-plan or fails.",
+    "disposition": null,
+    "disposition_rationale": null
+  },
+  {
+    "id": "F3",
+    "summary": "The feature understates how much skills depend on BFF and harness protocol changes.",
+    "reviewer": "Dependency Clarity",
+    "severity": "significant",
+    "affected_sections": [
+      "Solution",
+      "Skills",
+      "CLI Integration",
+      "Success Criteria"
+    ],
+    "detail": "The spec says skills are harness-side and need no new server capabilities, but even the skill behavior described here requires per-turn model overrides, narrowed tool availability, skill discovery, and capture semantics that FEAT-0008 and FEAT-0009 do not yet formalize. That does not mean skills are a bad idea; it means their implementation dependency surface is wider than the feature currently claims.",
+    "recommendation": "Either narrow skills to pure prompt aliases in the first phase, or explicitly add the required protocol and session-state changes to the dependency story so the feature remains honest about scope.",
+    "disposition": null,
+    "disposition_rationale": null
+  }
+]

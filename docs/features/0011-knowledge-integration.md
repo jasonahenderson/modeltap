@@ -7,8 +7,9 @@ depends-on:
   - FEAT-0008: BFF Server
   - FEAT-0009: Terminal Harness
 adr-constraints:
-  - ADR-0008: sqlite-vec for vector embeddings (amendment proposed — on by default)
+  - ADR-0008: sqlite-vec for vector embeddings (optional per current ADR; amendment proposed but not required for acceptance)
   - ADR-0009: MCP stdio for external knowledge access (unchanged)
+  - ADR-0005: Always full capture (constrains /forget semantics)
 promoted-from:
   - EXP-0001: Knowledge Layer
   - EXP-0008: Integrated Harness
@@ -32,6 +33,12 @@ Wire the knowledge layer into the BFF's conversation loop so that:
 4. Users can query, pin, forget, and manage their knowledge explicitly
 
 This feature implements the integration between the existing knowledge layer architecture (ADR-0008) and the BFF conversation loop (FEAT-0008). It does not re-implement embedding or vector search — it wires them together.
+
+**Relationship to ADR-0008 amendment**: EXP-0008 proposes changing the knowledge layer default from off to on. This feature does not depend on that amendment. It works under either default:
+- If the amendment is accepted (on by default): this feature is active for all harness users out of the box.
+- If ADR-0008 is unchanged (off by default): this feature activates when the user sets `knowledge.enabled: true`.
+
+The feature's acceptance criteria are testable regardless of the default. The recommended default is a product decision, not a behavior contract.
 
 ## Key Capabilities
 
@@ -85,7 +92,7 @@ This makes compaction reversible from the user's perspective. Nothing is lost �
 | `/context` | Show files in context, knowledge injections, and token budget |
 | `/pin <text>` | Mark a decision or constraint as always-carry-forward |
 | `/unpin <text>` | Remove a pinned item |
-| `/forget <query>` | Remove specific knowledge entries matching the query |
+| `/forget <query>` | Suppress knowledge entries from retrieval (see Forget Semantics) |
 | `/search <query>` | Explicit semantic search across knowledge base |
 | `/knowledge stats` | Show knowledge base size, embedding coverage, recent extractions |
 
@@ -100,6 +107,19 @@ The BFF extracts structured metadata from conversations:
 - **People mentioned**: names and roles referenced in conversation
 
 Extraction is model-driven: the BFF prompts a cheap/fast model to extract structured fields from completed turns. Extraction happens asynchronously — it does not block the conversation.
+
+### Forget Semantics
+
+`/forget` is **suppression from retrieval**, not deletion of captured data. This respects ADR-0005 (always full capture, retention-based pruning):
+
+- Forgotten entries are marked with a `suppressed` flag in the knowledge tables.
+- Suppressed entries are excluded from semantic search results and context injection.
+- The raw capture in the request log (ADR-0005) is **not modified** — it remains for audit and compliance purposes.
+- Knowledge rebuild (`modeltap knowledge rebuild`) respects suppression markers — forgotten entries are re-embedded but remain suppressed from retrieval.
+- Suppression is durable across rebuilds via a `suppressed_entries` table that maps capture IDs to suppression timestamps and user-provided reasons.
+- The user can un-suppress via `/remember <query>` if they change their mind.
+
+This design ensures `/forget` is honest: the content is not surfaced in future interactions, but the raw capture record is preserved per the capture policy. True deletion occurs only through retention-based pruning (ADR-0005) when content ages past the configured retention period.
 
 ### Graceful Degradation
 
@@ -140,16 +160,16 @@ knowledge:
 
 ## Success Criteria
 
-1. Conversations are automatically embedded within 30 seconds of turn completion when an embedding model is available.
-2. Semantic search returns relevant results: a query for "authentication decisions" finds conversations where auth was discussed, even if the word "authentication" was not used.
-3. Context enrichment injects relevant prior context into the system prompt before each turn. The model demonstrates awareness of prior decisions without being explicitly told.
-4. Compacted content is retrievable: after compaction, a query referencing compacted content re-surfaces it from the knowledge layer.
-5. Pinned items appear in every turn's context regardless of relevance scoring.
-6. `/forget` removes entries from the knowledge base and they no longer appear in search or injection results.
-7. The knowledge layer degrades gracefully when no embedding model is available — conversations work, just without semantic features.
-8. Knowledge features respect per-user isolation (FEAT-0010): user A's knowledge is not visible to user B.
-9. Injection budget is respected: knowledge injections never exceed the configured percentage of the context window.
-10. The embedding backfill queue processes historical captures when an embedding model becomes available for the first time.
+1. Conversations are automatically embedded within 30 seconds of turn completion when an embedding model is available. **Test**: submit a turn, wait 30s, query the embedding table — the turn's embedding exists.
+2. Semantic search returns relevant results using a fixed benchmark. **Test**: seed the knowledge base with 20 known interactions covering 5 topics. For each topic, run a semantic query using synonyms (not exact keywords). The correct topic's interactions must appear in the top 5 results at least 80% of the time.
+3. Context enrichment injects relevant prior context. **Test**: seed knowledge with a decision ("use JWT for auth"). In a new session, ask about authentication. Verify the system prompt sent to the provider contains the JWT decision in the knowledge injection block.
+4. Compacted content is retrievable. **Test**: create a session with 10 turns, compact it, then query for content from a compacted turn. The knowledge search returns the original content.
+5. Pinned items appear in every turn's injected context. **Test**: pin an item, submit 3 unrelated turns. Verify the pinned item is present in the system prompt for all 3 turns.
+6. `/forget` suppresses entries from retrieval. **Test**: embed a turn, verify it appears in search, run `/forget`, verify it no longer appears in search or injection. Verify the raw capture record is unchanged. Run `knowledge rebuild`, verify the entry remains suppressed.
+7. The knowledge layer degrades gracefully when no embedding model is available. **Test**: start with no embedding model configured. Verify conversations work, embedding queue grows, keyword search returns results. Add an embedding model. Verify the backfill queue processes pending items within 60 seconds.
+8. Knowledge features respect per-user isolation (FEAT-0010). **Test**: user A embeds conversations. User B's search returns zero results from user A's knowledge. User A's injection does not include user B's content.
+9. Injection budget is respected. **Test**: configure a 20% budget on a model with 100K context. Seed knowledge with 50K tokens of relevant content. Verify injected knowledge does not exceed 20K tokens.
+10. The embedding backfill queue processes historical captures when an embedding model becomes available for the first time. **Test**: capture 50 interactions with knowledge disabled. Enable knowledge with an embedding model. Verify all 50 interactions are embedded within 5 minutes.
 
 ## Relationship to ADRs
 
