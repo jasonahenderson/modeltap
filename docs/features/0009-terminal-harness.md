@@ -197,7 +197,8 @@ When the harness detects a paste exceeding the configurable threshold (default: 
 
 - Show preview (first 5 lines + line count + byte size)
 - Offer: summarize (via cheap model), include full, truncate (first N lines), cancel
-- The `turn.submit` payload includes both the full raw paste (`paste.raw`) and the user's chosen representation (`paste.content` — full, truncated, or summarized), plus `paste.intent` ("full", "truncated", "summarized"). The server captures the raw paste per ADR-0005 and uses the chosen representation for model context. Summarization is performed harness-side before submission (using a local model or the BFF's cheap routing target).
+- **Full or truncate**: the harness includes the chosen representation directly in `turn.submit` with `paste.raw` (full content for capture) and `paste.content` (user's choice).
+- **Summarize**: the harness sends `content.transform` (FEAT-0008) to the BFF with the raw paste and `transform: "summarize"`. The BFF routes to the cheap model, captures the raw content per ADR-0005, and returns the summary. The harness then includes the summary in `turn.submit`. This preserves the rule that the harness never speaks provider protocols directly — all model calls go through the BFF, even pre-turn transformations. The `content.transform` call is captured and cost-attributed separately from the conversation turn.
 
 ### Status Bar
 
@@ -497,12 +498,95 @@ Each reviewer's output is rendered in its own labeled section as soon as it comp
 | `/sessions` | Show session explorer (also shown on launch) |
 | `/help` | Show available commands |
 
+### Connection UX and Recovery
+
+The harness renders the BFF connection lifecycle (FEAT-0008) as visible UI state. The user always knows the connection status and what to do when something goes wrong.
+
+**Status bar connection indicator** (leftmost element):
+
+```
+[●] [build] claude-opus-4-6 | 47% ctx | $0.42 | ⏱ 3.2s       # ready (green)
+[◐] [build] claude-opus-4-6 | 47% ctx | $0.42                 # degraded (yellow)
+[↻] reconnecting (attempt 3/10)...                              # reconnecting
+[✗] connection failed — MT-CONN-001 service not running         # failed (red)
+```
+
+**Transient state banners** for states the user doesn't normally see:
+
+```
+Starting local server...                              # starting
+Authenticating (OIDC)...                              # authenticating
+Registering tools (14 built-in + 3 MCP)...            # registering
+```
+
+These banners appear during connection establishment and disappear when `ready` is reached.
+
+**Degraded state**: when `connection.health` reports unhealthy dependencies, the status bar shows `[◐]` and a banner describes what's degraded:
+
+```
+⚠ Provider ollama-gpu unavailable — routing fallback active. /models for details.
+```
+
+The user can continue working — degraded means the server is reachable but some routes may fail or fall back.
+
+**Reconnecting state**: during automatic reconnect, the harness shows retry progress:
+
+```
+↻ Connection lost. Reconnecting (attempt 2/10, next in 2s)...
+```
+
+If a turn was in-flight when the connection dropped, the harness shows what happened after `session.sync`:
+
+```
+↻ Reconnected. Recovering session...
+  In-flight turn: model requested Edit on auth.go, awaiting tool result.
+  Resuming from pending tool call.
+```
+
+Or if the turn completed while disconnected:
+
+```
+↻ Reconnected. Turn completed while disconnected.
+  [response displayed]
+```
+
+**Failed state**: when auto-recovery is exhausted or a terminal error occurs, the harness renders the diagnostic with suggested action:
+
+```
+✗ MT-CONN-004 version_mismatch: server protocol v2, harness supports v1.
+  → Update the harness: modeltap upgrade
+```
+
+```
+✗ MT-CONN-006 auth_expired: OIDC token expired and refresh failed.
+  → Re-authenticate: modeltap auth login
+```
+
+**In-session diagnostic commands:**
+
+| Command | Description |
+|---------|-------------|
+| `/status` | Show current connection health (same as `modeltap server status`) |
+| `/reconnect` | Force reconnection attempt |
+| `/session unlock` | Force-release a stuck session lock |
+
+**Multi-model stream recovery**: if the connection drops during a parallel multi-model review, `session.sync` returns per-reviewer state. The harness renders completed reviewers' results immediately and shows the remaining reviewer(s) as resumed:
+
+```
+↻ Reconnected. Multi-model review in progress.
+  [gpt-5.4] ✓ complete (recovered)
+    ⚠ Rate limiter uses in-memory store
+  [claude-opus-4-6] ●●● resumed streaming...
+```
+
 ### Project Awareness
 
 - Running `modeltap` in a git repository scopes the session to that project
-- Project-level configuration (`.modeltap.yaml`) overrides global settings
-- File operations are relative to the project root
+- The harness transmits the project root and config content to the server via the `project` field in `capabilities.register` (FEAT-0008). The server uses this for session scoping, system prompt Layer 4 (project instructions), knowledge layer project scoping, and path normalization.
+- Project-level configuration (`.modeltap.yaml` or `MODELTAP.md`) is read by the harness and sent to the server as content (the server may be remote and cannot read the harness's filesystem directly)
+- File paths in tool calls and results are relative to the project root
 - Session resume defaults to the most recent session for the current project
+- If the project config changes between sessions, the harness sends the updated content on `session.resume`
 
 ## CLI Integration
 
@@ -580,6 +664,16 @@ All criteria use Bubbletea for rendering (per ADR-0013 — no phased UI approach
 18. MCP servers configured in the harness provide discoverable tools to the model (sent via `capabilities.update`).
 19. `/context` command shows files, knowledge injections, and token budget.
 20. The harness registers its tool catalog with the server via `capabilities.register`, and only registered tools appear in model prompts.
+
+### Connection UX
+
+21. The status bar shows connection state: `[●]` ready, `[◐]` degraded, `[↻]` reconnecting, `[✗]` failed.
+22. Degraded state shows a banner identifying the unhealthy dependency and fallback active.
+23. Reconnecting state shows retry progress (attempt count, next retry timing).
+24. Failed state renders the diagnostic code, cause, auto-repair attempted, and suggested command.
+25. After reconnect during an in-flight turn, the harness displays `session.sync` results: pending tool calls, completed branches, or completed turn.
+26. `/status` shows full connection health (FEAT-0008 `connection.health` output).
+27. Large paste summarization uses `content.transform` (FEAT-0008) — the harness never calls a provider directly.
 
 ## Relationship to ADRs
 

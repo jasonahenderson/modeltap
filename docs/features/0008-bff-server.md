@@ -59,12 +59,101 @@ The harness protocol is a JSON-RPC 2.0 transport with extensions for server-init
 
 **Tool call round-trips**: when the server emits `tool.call`, streaming pauses. The harness executes the tool (or rejects it) and sends `tool.result` with the matching `tool_call_id`. The server resumes streaming after receiving the result. Multiple `tool.call` events may be emitted in sequence within a single turn, each requiring a `tool.result` before the stream continues.
 
-**Capability and tool registration**: on connection establishment (after auth, see FEAT-0010), the harness sends a `capabilities.register` message declaring:
-- Available local tools (name, description, input schema, permission level)
-- Supported protocol version
-- Harness metadata (version, platform)
+**Capability and tool registration**: on connection establishment (after auth, see FEAT-0010), the harness sends a `capabilities.register` message declaring available tools, supported protocol version, harness metadata (version, platform), and the project context (see Project Context below).
 
-The server uses this tool catalog when assembling the model prompt — only tools the harness has registered are included in the model's tool definitions. When MCP servers are connected, the harness sends `capabilities.update` to add newly discovered tools. The server can also send `capabilities.request` to ask the harness to re-register (e.g., after reconnection).
+The server uses the tool catalog when assembling the model prompt — only tools the harness has registered are included in the model's tool definitions. When MCP servers connect or disconnect, the harness sends `capabilities.update` to add or remove tools. The server can also send `capabilities.request` to ask the harness to re-register (e.g., after reconnection).
+
+**Tool catalog schema**: each tool in `capabilities.register` and `capabilities.update` uses this canonical schema:
+
+```json
+{
+  "name": "Read",
+  "namespace": "builtin",
+  "description": "Read file contents. Supports text, PDF, DOCX, images, and spreadsheets...",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "path": { "type": "string", "description": "File path relative to project root" },
+      "offset": { "type": "integer", "description": "Start line (optional)" },
+      "limit": { "type": "integer", "description": "Max lines (optional)" }
+    },
+    "required": ["path"]
+  },
+  "output_envelope": "text",
+  "risk_level": "read_only",
+  "capabilities_required": []
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `name` | Tool name as the model sees it |
+| `namespace` | `builtin` for core tools, `mcp:<server_name>` for MCP tools (e.g., `mcp:github`) |
+| `description` | Full behavioral description including when to use and when NOT to (system prompt Layer 2) |
+| `input_schema` | JSON Schema for the tool's input parameters |
+| `output_envelope` | `text`, `json`, `binary`, or `image` — how the result is formatted |
+| `risk_level` | Static metadata: `read_only`, `write`, `execute`, `destructive`. This is tool-inherent risk, not dynamic permission state. |
+| `capabilities_required` | Model capabilities needed (e.g., `["vision"]` for image output). The server omits tools from the model prompt when the active model lacks required capabilities. |
+
+**Risk level vs. permission state**: `risk_level` is static metadata about the tool's inherent danger (Read is always `read_only`, Bash is always `execute`). Permission state (default/accept-edits/autonomous, per-tool approval history) is harness-local and not sent to the server. The server uses `risk_level` for prompt assembly (e.g., instructing the model to be cautious with `destructive` tools). The harness uses its local permission state to decide whether to execute or prompt.
+
+**Unified Read dispatch**: the harness registers one `Read` tool. The model calls `Read` with a file path. The harness detects the file type and applies the appropriate extraction (text, PDF, DOCX, image base64, spreadsheet). The server sees `Read` in the tool catalog with `capabilities_required: []` — but if an image is read and the current model lacks `vision`, the server can note this in the response context.
+
+**Tool call and result payloads**:
+
+`tool.call` (server → harness):
+```json
+{
+  "tool_call_id": "tc_001",
+  "tool": "Edit",
+  "namespace": "builtin",
+  "input": { "path": "auth.go", "old_string": "...", "new_string": "..." }
+}
+```
+
+`tool.result` (harness → server):
+```json
+{
+  "tool_call_id": "tc_001",
+  "status": "success",
+  "output": "Edit applied: 1 replacement in auth.go",
+  "output_type": "text"
+}
+```
+
+Or rejection:
+```json
+{
+  "tool_call_id": "tc_001",
+  "status": "rejected",
+  "reason": "user_denied",
+  "output": "User denied Edit on auth.go"
+}
+```
+
+Or error:
+```json
+{
+  "tool_call_id": "tc_001",
+  "status": "error",
+  "error": "file_not_found",
+  "output": "auth.go does not exist"
+}
+```
+
+**Project context**: the harness transmits the project root on connection and session start:
+
+```json
+{
+  "project": {
+    "root": "/Users/alice/Projects/modeltap",
+    "config_file": ".modeltap.yaml",
+    "config_content": "..."
+  }
+}
+```
+
+The server uses the project root for: session scoping (sessions are per-project), project instruction loading (Layer 4 system prompt — the server receives the config content from the harness rather than reading the filesystem directly, since the server may be remote), path normalization in session details, and knowledge layer project scoping. File paths in tool calls and results are relative to the project root.
 
 **Protocol versioning**: the harness and server exchange protocol versions during `capabilities.register`. The server declares its supported version range. If the harness's version is outside the range, the connection is rejected with a version-mismatch error. Within a compatible range, the server uses the highest mutually supported version.
 
@@ -79,6 +168,7 @@ The server uses this tool catalog when assembling the model prompt — only tool
 | `capabilities.register` | Declare tools, protocol version, and harness metadata |
 | `capabilities.update` | Add or remove tools (e.g., MCP server connected/disconnected) |
 | `turn.submit` | User message with optional file attachments and tool results |
+| `content.transform` | Pre-turn content transformation (e.g., summarize large paste). Returns transformed content. Captured separately from conversation turns. |
 | `turn.cancel` | Cancel the current streaming turn |
 | `tool.result` | Result of a tool execution (success, error, or rejected) |
 | `session.resume` | Resume an existing session by ID |
@@ -97,7 +187,10 @@ The server uses this tool catalog when assembling the model prompt — only tool
 | Event | Description |
 |-------|-------------|
 | `model.selected` | Which model was chosen for this turn and why (routing reason) |
-| `token.delta` | Incremental text from model response (`turn_id` correlated) |
+| `token.delta` | Incremental text from model response (`turn_id` correlated, `branch_id` for multi-model) |
+| `branch.started` | Multi-model: a review branch has started (`branch_id`, model, provider) |
+| `branch.complete` | Multi-model: a branch finished (`branch_id`, final usage) |
+| `branch.error` | Multi-model: a branch failed (`branch_id`, error, diagnostic code) |
 | `tool.call` | Model requests a tool execution (`tool_call_id` for correlation) |
 | `status.update` | Status message ("routing to claude-opus-4-6...") |
 | `knowledge.hit` | Knowledge context was injected (summary, relevance score) |
@@ -561,9 +654,29 @@ The user must always know which model is being used and why. The server ensures 
 - `provider`: the provider (e.g., `anthropic`), or an array
 - `reason`: why this model was selected — `"routing_policy:coding"`, `"user_override"`, `"fallback:default"`, `"routing_policy:code_review[2]"` (multi-model with count), etc.
 
-For multi-model roles, the harness receives a `model.selected` with the full reviewer list, then interleaved `token.delta` events tagged with a `reviewer_id` to distinguish which model's output is which. The harness renders them as labeled parallel results.
+**Multi-model branch streaming**: for multi-model roles, the server manages parallel provider calls as branches. Each branch has a lifecycle:
 
-This ensures the harness can display the model(s) before any response text appears.
+| Event | Description |
+|-------|-------------|
+| `branch.started` | A branch has started (`branch_id`, `model`, `provider`) |
+| `token.delta` | Incremental text, tagged with `branch_id` |
+| `cost.update` | Per-branch running cost, tagged with `branch_id` |
+| `branch.complete` | Branch finished successfully (`branch_id`, final usage) |
+| `branch.error` | Branch failed (`branch_id`, error detail, diagnostic code) |
+| `turn.complete` | Aggregate turn completion (all branches done or errored, total cost) |
+
+Branch lifecycle:
+1. Server emits `model.selected` with the full reviewer list
+2. Server emits `branch.started` for each branch as it begins
+3. `token.delta` and `cost.update` events arrive interleaved, tagged with `branch_id`
+4. Each branch terminates with `branch.complete` or `branch.error`
+5. After all branches terminate, the server emits aggregate `turn.complete`
+
+**Branch cancellation**: `turn.cancel` cancels all branches. Individual branch cancellation is not supported — if one reviewer is stuck, the user cancels the whole turn.
+
+**Branch-aware `session.sync`**: after reconnect, `session.sync` for a multi-model turn returns per-branch state (complete with summary, streaming with token count, failed with error, or pending). The harness renders completed branches immediately and resumes streaming branches.
+
+This ensures the harness can display the model(s) before any response text appears, render results progressively as branches complete, and recover cleanly after disconnection.
 
 **Model override**: the user can override routing for the session via `model.switch`:
 - `/model claude-opus-4-6` — all subsequent turns use this model regardless of routing policy
@@ -922,6 +1035,23 @@ sessions:
 7. Context window management triggers interactive and auto-compaction at configured thresholds.
 8. The existing proxy functionality (capture, metrics, retention) continues to work — the BFF layer does not break the v1 proxy core.
 9. The server handles concurrent harness connections (preparation for FEAT-0010 multi-user, even if initially single-user).
+
+### Protocol Methods (harness-facing)
+
+These criteria cover specific protocol methods that FEAT-0009 depends on:
+
+19. `model.list` returns all available models with provider, cost, capabilities, context window, and routing roles. Models on unavailable providers are marked `unavailable`.
+20. `model.selected` is emitted before every turn's first `token.delta`, showing model name, provider, and routing reason.
+21. `model.switch` with a model name sets a persistent session override. `model.switch` with `auto` clears it. Override persists across reconnection.
+22. `session.list` returns recent sessions with summary, context usage, cost, turn count, model, files touched, and server events.
+23. `session.details` returns full session timeline including compacted turns, pinned items, files touched/modified, and server events (auto-compaction, restarts).
+24. `compact.plan` returns categorized context breakdown with per-category token counts, value scores, suggested actions, and summary previews.
+25. `compact.apply` accepts user-modified per-category actions and applies them. The server confirms what was compacted.
+26. `capabilities.register` accepts the tool catalog schema (name, namespace, description, input_schema, output_envelope, risk_level, capabilities_required) and project context. The server reflects registered tools in model prompts.
+27. `capabilities.update` adds or removes tools dynamically. The server updates model prompts on the next turn.
+28. `content.transform` accepts raw content and a transform type (e.g., "summarize"), routes to the cheap model, captures the raw content, and returns the transformed result with cost attribution.
+29. Multi-model turns emit `branch.started`, branch-tagged `token.delta`, branch-tagged `cost.update`, `branch.complete`/`branch.error`, and aggregate `turn.complete`. Branch state is available via `session.sync` after reconnect.
+30. `connection.health` returns structured status of all server dependencies (auth, storage, providers, routing, sessions) with diagnostic codes for degraded components.
 
 ### Connectivity and Self-Recovery
 
