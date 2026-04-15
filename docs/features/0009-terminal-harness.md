@@ -133,13 +133,87 @@ claude-opus-4-6 | 47% context (38K/80K) | $0.42 session | timer 3.2s
 --- claude-opus-4-6 | 1,247 in / 3,891 out | $0.08 | 4.1s ---
 ```
 
-**Context pressure warnings** at configurable thresholds.
+**Context pressure warnings** at configurable thresholds. When the server sends `compact.suggest`, the harness displays:
+
+```
+⚠ Context at 78% — consider /compact to review and prune
+```
+
+### Interactive Compaction
+
+When the user types `/compact`, the harness sends `session.compact` to the server and renders the returned `compact.plan`:
+
+```
+> /compact
+
+Analyzing context (38K / 80K tokens, 47%)...
+
+Category breakdown:
+  [A] Architecture decisions (3.2K)    ★ high value, referenced 4x
+  [B] Debugging session (8.1K)         ○ resolved, not referenced since turn 6
+  [C] Test iteration (6.4K)            ○ tests passing, 3 retry cycles
+  [D] File contents (12.8K)            ◐ 4 files, 2 still relevant
+  [E] Planning discussion (4.1K)       ◐ plan approved, some items pending
+  [F] System/tool overhead (3.4K)      ○ tool call metadata, low value
+
+Suggestions:
+  B → summarize (8.1K → ~0.5K)  "fixed DB connection timeout by..."
+  C → summarize (6.4K → ~0.3K)  "tests pass after retry config fix"
+  D → drop stale (12.8K → 6.2K) keep handler.go, types.go; drop config.go, old router.go
+  F → drop (3.4K → 0)           tool call metadata, reproducible from capture
+
+Estimated savings: 21.8K tokens (57% reduction)
+Retained: A (full), D (partial), E (full)
+
+[a]pply all  [s]elect  [e]dit  [c]ancel
+```
+
+**Apply all**: sends `compact.apply` with the server's suggested actions for every category.
+
+**Select mode**: the user chooses an action per category:
+
+```
+> s
+Select action per category:
+  [B] Debugging session (8.1K)     [s]ummarize  [k]eep  [d]rop  [p]in
+> s
+  [C] Test iteration (6.4K)        [s]ummarize  [k]eep  [d]rop  [p]in
+> d
+  [D] File contents (12.8K)        [s]elect files...
+    config.go (3.1K)               [k]eep  [d]rop
+> d
+    old router.go (3.5K)           [k]eep  [d]rop
+> d
+    handler.go (3.4K)              [k]eep  [d]rop
+> k
+    types.go (2.8K)                [k]eep  [d]rop
+> k
+  [F] Tool overhead (3.4K)         [s]ummarize  [k]eep  [d]rop  [p]in
+> d
+
+Applied. Context: 38K → 19.4K (24% of window). Full history in knowledge layer.
+```
+
+**Edit mode**: opens the compaction plan as editable text for advanced users.
+
+Categories marked with ★ (high value) or as pinned are not suggested for removal but can still be compacted if the user explicitly chooses. The user always has final authority over what stays in context.
+
+**Auto-compaction notification**: when the server auto-compacts at 92%, the harness displays what happened:
+
+```
+⚠ Context at 92% — auto-compacted 4 categories
+  Debugging session: summarized (8.1K → 0.5K)
+  Test iteration: dropped (6.4K)
+  Tool overhead: dropped (3.4K)
+  Stale files: dropped config.go, old router.go (6.6K)
+  Total freed: 22.0K tokens. Use /compact to review or adjust.
+```
 
 ### Session Commands
 
 | Command | Description |
 |---------|-------------|
-| `/compact` | Compress context, retain full history on server |
+| `/compact` | Interactive context analysis and compaction |
 | `/clear` | Fresh context within the same session |
 | `/fork` | Branch session into independent continuation |
 | `/model <name>` | Switch models within session |
@@ -222,21 +296,23 @@ These criteria define acceptance for the initial harness using minimal rendering
 3. The model can request tool calls (Read, Edit, Bash at minimum) which the harness executes locally with permission prompts.
 4. The agentic loop works: model reads files, makes changes, runs tests, observes results, and continues — multiple tool call rounds in a single turn.
 5. File attachments (`@file`) are included in the turn and visible to the model.
-6. Session commands (`/compact`, `/model`, `/cost`) work. Cost is printed inline, not in a status bar.
-7. Sessions persist — closing and reopening the harness in the same project directory resumes the previous session.
-8. Plan mode collects tool calls into a reviewable plan before execution.
-9. The harness registers its tool catalog with the server via `capabilities.register`, and only registered tools appear in model prompts.
+6. `/compact` shows categorized context breakdown with per-category actions (summarize, keep, drop, pin). User choices are sent to the server and applied. In Phase 1, the interactive flow uses inline text prompts (not TUI widgets).
+7. Session commands (`/model`, `/cost`) work. Cost is printed inline, not in a status bar.
+8. Sessions persist — closing and reopening the harness in the same project directory resumes the previous session.
+9. Plan mode collects tool calls into a reviewable plan before execution.
+10. The harness registers its tool catalog with the server via `capabilities.register`, and only registered tools appear in model prompts.
 
 ### Phase 2: Bubbletea Production UI (follow-on work unit)
 
 These criteria define acceptance for the production harness after migration to Bubbletea. Phase 2 does not block Phase 1 acceptance.
 
-10. Streaming markdown output rendered with terminal styling (headings, code blocks, lists, bold/italic) via Glamour.
-11. Scrollable conversation viewport with auto-scroll-to-bottom and keyboard-driven scroll-up.
-12. Persistent status bar displaying current model, context usage, session cost, and call timer.
-13. Large pastes trigger the summarize/truncate/full flow.
-14. MCP servers configured in the harness provide discoverable tools to the model (sent via `capabilities.update`).
-15. `/context` command shows files, knowledge injections, and token budget.
+11. Streaming markdown output rendered with terminal styling (headings, code blocks, lists, bold/italic) via Glamour.
+12. Scrollable conversation viewport with auto-scroll-to-bottom and keyboard-driven scroll-up.
+13. Persistent status bar displaying current model, context usage, session cost, and call timer.
+14. Large pastes trigger the summarize/truncate/full flow.
+15. MCP servers configured in the harness provide discoverable tools to the model (sent via `capabilities.update`).
+16. `/context` command shows files, knowledge injections, and token budget.
+17. `/compact` interactive flow uses TUI widgets (category list, action selectors, file-level drill-down) instead of inline text prompts.
 
 ## Relationship to ADRs
 
