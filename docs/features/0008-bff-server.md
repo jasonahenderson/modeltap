@@ -81,12 +81,9 @@ The server uses this tool catalog when assembling the model prompt — only tool
 | `turn.submit` | User message with optional file attachments and tool results |
 | `turn.cancel` | Cancel the current streaming turn |
 | `tool.result` | Result of a tool execution (success, error, or rejected) |
-| `session.resume` | Resume an existing session by ID (joins as observer if another harness is active) |
+| `session.resume` | Resume an existing session by ID |
 | `session.list` | List available sessions for this user/project (returns summaries) |
 | `session.details` | Get full session timeline, pinned items, files touched |
-| `session.takeover.request` | Observer requests active control from the current active harness |
-| `session.takeover.accept` | Active harness accepts the takeover request |
-| `session.takeover.deny` | Active harness denies the takeover request |
 | `session.compact` | Request interactive context compaction (server returns plan) |
 | `compact.apply` | Apply compaction plan with user's per-category choices |
 | `session.clear` | Clear live context (retain in storage) |
@@ -116,9 +113,6 @@ The server uses this tool catalog when assembling the model prompt — only tool
 | Message | Description |
 |---------|-------------|
 | `capabilities.request` | Ask harness to re-register capabilities |
-| `session.shared` | Another harness has joined/left this session (includes participant identity and role) |
-| `session.takeover` | A participant is requesting active control of the session |
-| `session.handoff` | Active control has been transferred (includes new active participant) |
 
 ### Conversation State Management
 
@@ -609,19 +603,11 @@ sessions:
 
 1. ~~**Protocol versioning**~~: resolved in the Protocol Specification section. Version exchange happens during `capabilities.register`; incompatible clients are rejected.
 
-2. **Shared sessions**: when two harness clients resume the same session, the server allows it with explicit role assignment. Real-time collaborative AI sessions (both participants simultaneously directing the model) have no established pattern and create unresolvable concurrency conflicts: crossed turns, mode conflicts (plan vs. build), tool call approval races, and permission disagreements. Instead, shared sessions use two safe patterns:
-
-   **Observer mode**: one harness is **active** (can submit turns, approve/reject tool calls, switch modes), the other is **observer** (receives all streaming events, tool calls, and status updates in real time, but cannot interact with the model or approve tools). This supports the mentor/apprentice scenario (EXP-0005) — the mentor watches the apprentice work, or vice versa.
-
-   **Sequential handoff**: only one harness is active at a time. An observer can request control via `/takeover`. The active harness receives a `session.takeover` notification and can accept or deny. On acceptance, the server sends `session.handoff` to both harnesses with the new active participant. The previous active becomes observer. This is like screen sharing where one person drives at a time.
-
-   When a second harness joins a session, the server sends `session.shared` to both harnesses identifying the participants. The joining harness starts as observer by default. The server rejects `turn.submit`, `tool.result`, and `model.switch` from observer harnesses.
-
-   True concurrent collaboration (Google Docs for AI sessions) is a future exploration when interaction patterns are better understood.
+2. **Session conflict**: when a second harness attempts to resume a session that is already active, the server rejects the resume with a `session.active` error identifying the current participant. Only one harness may be active on a session at a time. A future **observer mode** (read-only live stream of an active session, no input) is a natural upgrade for mentor/apprentice workflows (EXP-0005), but is not part of this feature.
 
 3. **Compaction model**: compaction uses a configurable cheap model, not the session's active model. Default: the model assigned to the `cheap` routing role (e.g., `llama-3.1-8b`). Configurable via `context.compact_model` in server config. This follows OpenCode's approach — a separate, potentially cheaper model handles summarization, keeping compaction costs minimal.
 
 ## Open Questions
 
-1. **Observer annotations**: should observers be able to send out-of-band annotations (text notes visible to the active participant but not to the model)? This would support the mentor/apprentice workflow where the mentor comments without disrupting the session.
+1. **Session handoff**: when the active harness disconnects (crash, network loss), should the session automatically become available for another harness to resume, or should there be a lock timeout?
 2. **Compaction quality**: should the server validate compaction summaries (e.g., check that key decisions are preserved) or trust the compact model's output?
