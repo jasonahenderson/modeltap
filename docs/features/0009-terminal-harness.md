@@ -402,20 +402,29 @@ Model override cleared. Routing policy will select models per turn.
 > /models
 
 Available models:
-                                              Roles          Cost/1K     Context
-  claude-opus-4-6     Anthropic    coding, default   $0.015/$0.075      200K
+                                                         Roles                Cost/1K     Context
+  claude-opus-4-6     Anthropic    coding, ui_design              $0.015/$0.075      200K
     Strongest reasoning and code generation
-  claude-sonnet-4-6   Anthropic    default           $0.003/$0.015      200K
+  claude-sonnet-4-6   Anthropic    default, design_docs, planning $0.003/$0.015      200K
     Fast, balanced for most tasks
-  gpt-4               OpenAI       review            $0.010/$0.030      128K
-    Strong review, different perspective from Claude
-  llama-3.1-8b        Ollama       cheap             $0.000/$0.000      128K
+  gpt-5.4             OpenAI       code_review, design_review,    $0.010/$0.030      128K
+                                   workplanning_review
+    Strong reviewer, different perspective
+  llama-3.1-8b        Ollama       cheap, compaction              $0.000/$0.000      128K
     Fast local model, good for simple tasks
-  llama-3.1-70b       Ollama       —                 $0.000/$0.000      128K
+  llama-3.1-70b       Ollama       —                              $0.000/$0.000      128K
     Strong local model, good for security review
 
-Routing policy: default→claude-sonnet-4-6, coding→claude-opus-4-6,
-  review→gpt-4, cheap→llama-3.1-8b
+Routing policy:
+  default          → claude-sonnet-4-6
+  coding           → claude-opus-4-6
+  ui_design        → claude-opus-4-6
+  design_docs      → claude-sonnet-4-6
+  workplanning     → claude-sonnet-4-6
+  code_review      → gpt-5.4
+  design_review    → gpt-5.4
+  code_review (2)  → [gpt-5.4, claude-opus-4-6]    # if multi-reviewer configured
+
 Current: routing policy (no override)
 ```
 
@@ -423,6 +432,12 @@ When a model override is active:
 
 ```
 Current: claude-opus-4-6 [override] — /model auto to clear
+```
+
+When a multi-model review is in progress:
+
+```
+→ code_review (2 reviewers: gpt-5.4, claude-opus-4-6)
 ```
 
 ### Session Commands
