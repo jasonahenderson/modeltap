@@ -82,18 +82,21 @@ The server uses this tool catalog when assembling the model prompt — only tool
 | `turn.cancel` | Cancel the current streaming turn |
 | `tool.result` | Result of a tool execution (success, error, or rejected) |
 | `session.resume` | Resume an existing session by ID |
-| `session.list` | List available sessions for this user/project |
+| `session.list` | List available sessions for this user/project (returns summaries) |
+| `session.details` | Get full session timeline, pinned items, files touched |
 | `session.compact` | Request interactive context compaction (server returns plan) |
 | `compact.apply` | Apply compaction plan with user's per-category choices |
 | `session.clear` | Clear live context (retain in storage) |
 | `session.fork` | Branch session into independent continuation |
-| `model.switch` | Change the active model for this session |
+| `model.switch` | Set session model override (or clear to return to routing policy) |
+| `model.list` | List available models with routing roles and capabilities |
 | `context.list` | List files, knowledge injections, and context budget |
 
 **Server → Harness (streaming):**
 
 | Event | Description |
 |-------|-------------|
+| `model.selected` | Which model was chosen for this turn and why (routing reason) |
 | `token.delta` | Incremental text from model response (`turn_id` correlated) |
 | `tool.call` | Model requests a tool execution (`tool_call_id` for correlation) |
 | `status.update` | Status message ("routing to claude-opus-4-6...") |
@@ -162,9 +165,128 @@ routing:
   embedding: nomic-embed-text      # local embedding
 ```
 
-The user can override routing at any time via `/model <name>`. Explicit model selection overrides policy for that session until changed again.
-
 Routing policy is extensible — future work (EXP-0007) may add complexity-based routing, cost-aware automatic selection, and multi-model orchestration. This feature implements the static policy engine only.
+
+### Model Transparency
+
+The user must always know which model is being used and why. The server ensures this through:
+
+**`model.selected` event**: emitted at the start of every turn before `token.delta` begins streaming. Contains:
+- `model`: the model name (e.g., `claude-opus-4-6`)
+- `provider`: the provider (e.g., `anthropic`)
+- `reason`: why this model was selected — `"routing_policy:coding"`, `"user_override"`, `"fallback:default"`, etc.
+
+This ensures the harness can display the model before any response text appears.
+
+**Model override**: the user can override routing for the session via `model.switch`:
+- `/model claude-opus-4-6` — all subsequent turns use this model regardless of routing policy
+- The override is sticky for the session until explicitly cleared
+- The server records the override in session state; it persists across harness reconnection
+
+**Clearing an override**: the user can return to routing-policy defaults:
+- `/model auto` — clears the override, routing policy resumes
+- The `model.selected` event shows `reason: "routing_policy:..."` again after clearing
+
+**Model listing**: the server responds to `model.list` with all available models, their routing roles, capabilities, and cost:
+
+```json
+{
+  "models": [
+    {
+      "name": "claude-opus-4-6",
+      "provider": "anthropic",
+      "roles": ["coding", "default"],
+      "capabilities": ["tool_use", "vision", "long_context"],
+      "context_window": 200000,
+      "cost_per_1k_input": 0.015,
+      "cost_per_1k_output": 0.075,
+      "description": "Strongest reasoning and code generation"
+    },
+    {
+      "name": "llama-3.1-8b",
+      "provider": "ollama",
+      "roles": ["cheap"],
+      "capabilities": ["tool_use"],
+      "context_window": 128000,
+      "cost_per_1k_input": 0.0,
+      "cost_per_1k_output": 0.0,
+      "description": "Fast local model, good for simple tasks and explanations"
+    }
+  ],
+  "current_override": null,
+  "routing_policy": {
+    "default": "claude-sonnet-4-6",
+    "coding": "claude-opus-4-6",
+    "review": "gpt-4",
+    "cheap": "llama-3.1-8b"
+  }
+}
+```
+
+The `roles` field shows which routing categories this model is assigned to. The `description` field provides a human-readable recommendation. In enterprise deployments (FEAT-0010), models the user's role cannot access are either omitted or marked `"access": "denied"`.
+
+### Session List and Details
+
+The server supports rich session exploration for resume decisions.
+
+**`session.list` response** — returns recent sessions with enough context to choose:
+
+```json
+{
+  "sessions": [
+    {
+      "id": "sess_a8f3c2",
+      "project": "~/Projects/modeltap",
+      "status": "active",
+      "summary": "rate limiting implementation",
+      "last_active": "2026-04-15T10:23:00Z",
+      "context_pct": 0.47,
+      "total_cost": 1.23,
+      "turn_count": 24,
+      "model": "claude-opus-4-6",
+      "model_override": null,
+      "last_turn_summary": "backend agent completed, reviewer found 2 issues",
+      "files_touched": ["ratelimit.go", "router.go", "ratelimit_test.go"],
+      "pinned_count": 2
+    }
+  ]
+}
+```
+
+**`session.details` response** — full session timeline for inspection before resume:
+
+```json
+{
+  "id": "sess_a8f3c2",
+  "summary": "rate limiting implementation",
+  "created_at": "2026-04-14T14:22:00Z",
+  "last_active": "2026-04-15T10:23:00Z",
+  "model": "claude-opus-4-6",
+  "model_override": null,
+  "context_pct": 0.47,
+  "total_cost": 1.23,
+  "turns": [
+    { "sequence": 1, "summary": "Read auth.go, config.go", "compacted": false, "model": "claude-opus-4-6", "cost": 0.03 },
+    { "sequence": 2, "summary": "Planned JWT migration (6 steps)", "compacted": false, "model": "claude-opus-4-6", "cost": 0.05 },
+    { "sequence": 3, "summary": "User approved plan", "compacted": false, "model": "claude-opus-4-6", "cost": 0.01 },
+    { "sequence": 4, "summary": "researched JWT libraries", "compacted": true, "original_turns": [4, 5, 6, 7], "cost": 0.12 },
+    { "sequence": 8, "summary": "Decision: use golang-jwt/jwt/v5", "compacted": false, "model": "claude-opus-4-6", "cost": 0.04 }
+  ],
+  "pinned_items": [
+    "Use golang-jwt/jwt/v5, not dgrijalva",
+    "Token expiry: 15min access, 7d refresh"
+  ],
+  "files_touched": ["auth.go", "config.go"],
+  "files_modified": [],
+  "server_events": [
+    { "type": "auto_compact", "at": "2026-04-15T03:00:00Z", "freed_tokens": 12800, "detail": "debugging session summarized, stale files dropped" }
+  ]
+}
+```
+
+**Session summaries** are auto-generated by the server: after the first 2-3 turns, the server prompts a cheap model to produce a short session title (e.g., "rate limiting implementation"). The summary updates periodically if the session topic shifts.
+
+**Server events** track what happened to the session outside of user interaction (auto-compaction, server restarts) so the harness can inform the user on resume.
 
 ### Streaming Relay
 
