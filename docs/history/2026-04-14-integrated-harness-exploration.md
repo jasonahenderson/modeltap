@@ -10,7 +10,7 @@ Deep product-architecture exploration session that reframed modeltap from a pass
 2. **Server always required**: the harness never talks to providers directly. Even solo developers run a local server process (auto-started).
 3. **Proxy owns API keys**: developers never hold provider credentials. Server is the credential boundary.
 4. **Per-user isolation, no shared knowledge (for now)**: each user's data is fully isolated. Shared knowledge deferred.
-5. **Phased terminal UI**: minimal prototype first (stdout + readline), Bubbletea for production (ADR-0013).
+5. **Bubbletea from day one**: ADR-0013 revised 2026-04-15 — feature requirements make phased approach impractical.
 6. **Domain-neutral architecture**: coding is the first vertical. Legal, finance, healthcare are future verticals with the same server, different tool packages and system prompts.
 7. **Skills and agent teams are separate features**: skills are harness-side prompt templates; agent teams are BFF-orchestrated multi-model coordination.
 
@@ -58,9 +58,8 @@ Full differentiated product: + FEAT-0011 + FEAT-0012 + FEAT-0013
 - ADR-0009 scope clarification: external MCP surface only, harness protocol is separate
 
 ## What's Next
-- User review of FEAT-0008 and FEAT-0009 for acceptance
-- Planning phase for implementation work units
-- ADR-0006 amendment before FEAT-0008 implementation begins
+- See 2026-04-15 session log for continued refinement
+- Implementation planning for FEAT-0008 and FEAT-0009
 
 ## Memory Notes
 - User wants enterprise support as near-term priority for contract work and LinkedIn positioning
