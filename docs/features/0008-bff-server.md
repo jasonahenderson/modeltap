@@ -113,6 +113,8 @@ The server uses this tool catalog when assembling the model prompt — only tool
 | Message | Description |
 |---------|-------------|
 | `capabilities.request` | Ask harness to re-register capabilities |
+| `session.collaborative` | Another harness has joined/left this session (includes participant identity) |
+| `turn.queued` | Harness submitted a turn while another turn is in flight (serialized, will execute next) |
 
 ### Conversation State Management
 
@@ -559,6 +561,7 @@ routing:
 context:
   warning_threshold: 0.78     # emit warning at 78%
   compact_threshold: 0.92     # auto-compact at 92%
+  compact_model: llama-3.1-8b # cheap model for summarization (default: routing.cheap)
 
 # Session management
 sessions:
@@ -598,8 +601,15 @@ sessions:
 | ADR-0007 (Metrics) | Cost tracking feeds into existing aggregation tables |
 | ADR-0009 (MCP) | MCP stdio interface is separate and unchanged. BFF does not use MCP for harness communication. |
 
+## Resolved Questions
+
+1. ~~**Protocol versioning**~~: resolved in the Protocol Specification section. Version exchange happens during `capabilities.register`; incompatible clients are rejected.
+
+2. **Session collaboration**: when two harness clients resume the same session, the server allows it. Both harnesses receive a `session.collaborative` event indicating they are sharing the session, along with the identity of the other participant(s). Both harnesses see all streaming events, tool calls, and status updates. Turn submission is serialized — only one harness can have an active turn at a time; the other receives a `turn.queued` event if it submits while a turn is in flight. This supports pair programming and mentor/apprentice scenarios (EXP-0005).
+
+3. **Compaction model**: compaction uses a configurable cheap model, not the session's active model. Default: the model assigned to the `cheap` routing role (e.g., `llama-3.1-8b`). Configurable via `context.compact_model` in server config. This follows OpenCode's approach — a separate, potentially cheaper model handles summarization, keeping compaction costs minimal.
+
 ## Open Questions
 
-1. **Protocol versioning**: how does the server handle harness clients running a different protocol version? Strict version match, or negotiated compatibility?
-2. **Session conflict**: what happens when two harness clients try to resume the same session? Reject the second, or support collaborative sessions?
-3. **Compaction model selection**: should compaction use the session's active model, a cheap dedicated model, or be configurable?
+1. **Collaborative session UX**: how much visibility should each participant have into the other's actions? Should one harness see the other's tool calls in real time, or only the model's responses?
+2. **Compaction quality**: should the server validate compaction summaries (e.g., check that key decisions are preserved) or trust the compact model's output?
