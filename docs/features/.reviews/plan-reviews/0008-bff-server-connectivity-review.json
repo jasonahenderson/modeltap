@@ -1,0 +1,89 @@
+[
+  {
+    "id": "F1",
+    "summary": "The feature still lacks a connection lifecycle state machine, so self-curing behavior remains implementation-defined.",
+    "reviewer": "Connectivity Reliability",
+    "severity": "blocking",
+    "affected_sections": [
+      "Harness Protocol Endpoint",
+      "Protocol Specification",
+      "Session Persistence",
+      "Resolved Questions",
+      "Open Questions",
+      "Success Criteria"
+    ],
+    "detail": "FEAT-0008 now references reconnect and heartbeat timeout for session handoff, but it still does not define the lifecycle of the harness/BFF connection itself. There is no normative sequence for discovering, starting local service, connecting, authenticating, registering capabilities, ready, degraded, reconnecting, and failed; no retry/backoff policy; no transient-vs-terminal failure taxonomy; and no local repair policy for stopped services or stale sockets.",
+    "recommendation": "Add a Connection Lifecycle and Self-Recovery section defining connection states, transitions, retry timing, max retry behavior, local-service auto-start rules, stale socket cleanup rules, remote reconnect behavior, and the exact point at which the harness stops retrying and tells the user what to do.",
+    "disposition": null,
+    "disposition_rationale": null
+  },
+  {
+    "id": "F2",
+    "summary": "Heartbeat timeout is mentioned, but heartbeat, readiness, and dependency health protocol primitives are still absent.",
+    "reviewer": "Health and Readiness",
+    "severity": "blocking",
+    "affected_sections": [
+      "Protocol Messages",
+      "Model Configuration",
+      "CLI Integration",
+      "Resolved Questions",
+      "Success Criteria"
+    ],
+    "detail": "The spec says the server detects broken connections via heartbeat timeout, but it does not define heartbeat messages, interval, timeout, missed-heartbeat threshold, readiness checks, or machine-readable health output. This gap is larger now that FEAT-0008 includes provider endpoint discovery, model registry status, routing fallback, storage, auth, and capability registration. The harness needs to know whether the BFF is merely reachable or actually ready to serve a turn with a healthy store, compatible protocol, registered tools, and available route target.",
+    "recommendation": "Add protocol methods such as connection.ping, connection.pong, connection.health, and connection.ready, or equivalent JSON-RPC methods. Define heartbeat interval and timeout defaults. Health should report server version, supported and negotiated protocol version, uptime, listener state, active session id, auth state, capability registration state, storage readiness, provider endpoint status, model registry status, routing readiness, and degraded dependencies.",
+    "disposition": null,
+    "disposition_rationale": null
+  },
+  {
+    "id": "F3",
+    "summary": "Reconnect behavior is not defined for in-flight turns, partial streams, pending tool calls, or multi-model streams.",
+    "reviewer": "Recovery Semantics",
+    "severity": "blocking",
+    "affected_sections": [
+      "Protocol Specification",
+      "Streaming Relay",
+      "Session Persistence",
+      "Session and Turn Storage Model",
+      "Open Questions",
+      "Success Criteria"
+    ],
+    "detail": "Sessions survive reconnect at a high level, but the spec still does not define what happens if the connection drops during a provider stream, while a tool.call is waiting for tool.result, or after the server emitted tokens the harness did not receive. The newer multi-model routing behavior adds another failure mode: interleaved token.delta events can be tagged by reviewer/model, but there is no resume contract for partially completed parallel streams. The turns table has id, sequence, tool_calls, and content fields, but no idempotency or synchronization contract.",
+    "recommendation": "Define turn-level idempotency and resume rules. turn.submit should carry a stable client-generated turn_id, session id, and sequence number. tool.result should be idempotent by tool_call_id. Add session.sync or turn.resume returning the authoritative state of the active turn, pending tool calls, completed model branches, failed model branches, and whether token replay is available. If token replay is not supported, define the exact recovery summary the server returns.",
+    "disposition": null,
+    "disposition_rationale": null
+  },
+  {
+    "id": "F4",
+    "summary": "User-facing diagnostics are still generic and do not meet the clearly communicative with suggestions requirement.",
+    "reviewer": "User Communication",
+    "severity": "blocking",
+    "affected_sections": [
+      "Protocol Messages",
+      "CLI Integration",
+      "Success Criteria",
+      "Resolved Questions",
+      "Open Questions"
+    ],
+    "detail": "The spec has a generic error event, session.active, modeltap server status, and force-unlock commands. It still does not define stable diagnostic codes, error categories, or required remediation text. Users need precise messages for service not installed, service stopped, stale socket, socket permission denied, TLS trust failure, auth expired, protocol version mismatch, session locked, provider endpoint down, model unavailable, routing fallback, storage unready, and capability registration failure.",
+    "recommendation": "Add a diagnostic taxonomy. Every connection failure should include a stable code, short cause, automatic repair attempted, path/endpoint involved, and suggested next command. Example codes: MT-CONN-001 service_not_running, MT-CONN-002 stale_socket, MT-CONN-003 socket_permission_denied, MT-CONN-004 version_mismatch, MT-CONN-005 tls_untrusted, MT-CONN-006 auth_expired, MT-CONN-007 storage_unready, MT-CONN-008 session_locked, MT-CONN-009 provider_unavailable, MT-CONN-010 capability_registration_failed.",
+    "disposition": null,
+    "disposition_rationale": null
+  },
+  {
+    "id": "F5",
+    "summary": "Local service bootstrap and session unlock behavior are still not fully integrated into CLI and configuration semantics.",
+    "reviewer": "Service Integration",
+    "severity": "significant",
+    "affected_sections": [
+      "Harness Protocol Endpoint",
+      "CLI Integration",
+      "Configuration",
+      "Relationship to ADRs",
+      "Open Questions"
+    ],
+    "detail": "FEAT-0008 relies on FEAT-0004/ADR-0012 for service management and defines a Unix socket path, but it does not define how the harness determines whether the local BFF is installed, stopped, stale, wrong-version, using a different config file, or safe to auto-start. The open question text introduces modeltap session unlock <id> and /session unlock, but the CLI Integration section still only lists modeltap server status, modeltap server sessions, and modeltap server session <id>. The connection repair path should be visible in the CLI contract.",
+    "recommendation": "Add a local bootstrap algorithm and CLI commands. The algorithm should check configured socket path, validate socket ownership and mode, query service status, auto-start service or subprocess when allowed, wait for readiness, clean stale sockets only when safe, and print fallback commands when repair is unsafe. Add unlock/status/diagnostic commands introduced by connectivity recovery to CLI Integration.",
+    "disposition": null,
+    "disposition_rationale": null
+  }
+]
