@@ -253,29 +253,69 @@ The server does not enforce mode boundaries — it provides the appropriate prom
 
 ### Model Routing Policy
 
-The server selects which model handles each request based on configurable policy:
+The server selects which model handles each request based on configurable routing roles. Role names are arbitrary — the user defines whatever roles their workflow needs:
 
 ```yaml
 routing:
-  default: claude-sonnet-4-6       # fallback for unclassified requests
-  coding: claude-opus-4-6          # strong code generation
-  review: gpt-4                    # different model to avoid same-model blind spots
-  cheap: llama-3.1-8b              # local via Ollama, $0.00
-  embedding: nomic-embed-text      # local embedding
+  # Core roles
+  default: claude-sonnet-4-6
+  cheap: llama-3.1-8b
+  embedding: nomic-embed-text
+
+  # Creation roles
+  coding: claude-opus-4-6
+  ui_design: claude-opus-4-6
+  design_docs: claude-sonnet-4-6
+  workplanning: claude-sonnet-4-6
+
+  # Review roles — single model
+  code_review: gpt-5.4
+  design_review: gpt-5.4
+  workplanning_review: gpt-5.4
+
+  # Review roles — multiple reviewers (parallel)
+  code_review:
+    - gpt-5.4
+    - claude-opus-4-6
 ```
 
-Routing policy is extensible — future work (EXP-0007) may add complexity-based routing, cost-aware automatic selection, and multi-model orchestration. This feature implements the static policy engine only.
+**Single-model roles** (string value): the server routes to that model. Standard behavior.
+
+**Multi-model roles** (array value): the server runs all listed models in parallel on the same input. Each model's response is returned to the harness as a separate labeled result:
+
+```
+→ code_review (2 reviewers: gpt-5.4, claude-opus-4-6)
+
+[gpt-5.4] Review:
+  ⚠ Rate limiter uses in-memory store — won't scale across instances.
+  ✓ Token bucket implementation is correct.
+
+[claude-opus-4-6] Review:
+  ✓ Implementation looks solid.
+  ⚠ Missing rate limit headers in response (X-RateLimit-Remaining).
+  ⚠ Health check endpoint should bypass rate limiting.
+
+─── 2 reviewers | gpt-5.4: $0.08, claude-opus-4-6: $0.12 | 4.2s ───
+```
+
+Multi-model routing is parallel by default — reviewers work independently and don't see each other's output. Sequential review (where reviewer 2 sees reviewer 1's findings) is an orchestration concern handled by FEAT-0013 (Agent Teams).
+
+**How roles are selected**: the BFF classifies the current turn's intent based on the conversation context and the system prompt. For example, when the model produces output that is a code review, the BFF tags it with the `code_review` role. The user can also explicitly request a role via `/review` or skill invocations (FEAT-0012). The `default` role is the fallback when no specific role matches.
+
+Routing policy is extensible — future work (EXP-0007) may add complexity-based routing and cost-aware automatic selection. This feature implements the static policy engine with parallel multi-model support.
 
 ### Model Transparency
 
 The user must always know which model is being used and why. The server ensures this through:
 
 **`model.selected` event**: emitted at the start of every turn before `token.delta` begins streaming. Contains:
-- `model`: the model name (e.g., `claude-opus-4-6`)
-- `provider`: the provider (e.g., `anthropic`)
-- `reason`: why this model was selected — `"routing_policy:coding"`, `"user_override"`, `"fallback:default"`, etc.
+- `model`: the model name (e.g., `claude-opus-4-6`), or an array for multi-model roles
+- `provider`: the provider (e.g., `anthropic`), or an array
+- `reason`: why this model was selected — `"routing_policy:coding"`, `"user_override"`, `"fallback:default"`, `"routing_policy:code_review[2]"` (multi-model with count), etc.
 
-This ensures the harness can display the model before any response text appears.
+For multi-model roles, the harness receives a `model.selected` with the full reviewer list, then interleaved `token.delta` events tagged with a `reviewer_id` to distinguish which model's output is which. The harness renders them as labeled parallel results.
+
+This ensures the harness can display the model(s) before any response text appears.
 
 **Model override**: the user can override routing for the session via `model.switch`:
 - `/model claude-opus-4-6` — all subsequent turns use this model regardless of routing policy
@@ -551,9 +591,17 @@ system_prompt:
 # Routing policy
 routing:
   default: claude-sonnet-4-6
-  coding: claude-opus-4-6
   cheap: llama-3.1-8b
   embedding: nomic-embed-text
+  coding: claude-opus-4-6
+  ui_design: claude-opus-4-6
+  design_docs: claude-sonnet-4-6
+  workplanning: claude-sonnet-4-6
+  code_review: gpt-5.4               # single reviewer
+  design_review: gpt-5.4
+  workplanning_review: gpt-5.4
+  # or multi-reviewer:
+  # code_review: [gpt-5.4, claude-opus-4-6]
 
 # Context management
 context:
