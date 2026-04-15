@@ -609,5 +609,5 @@ sessions:
 
 ## Open Questions
 
-1. **Session handoff**: when the active harness disconnects (crash, network loss), should the session automatically become available for another harness to resume, or should there be a lock timeout?
+1. ~~**Session handoff**~~: resolved. When the active harness disconnects (crash, network loss, close), the session automatically becomes available for resume after a short grace period (default: 10 seconds, to handle brief reconnections). If a harness crashes without a clean disconnect, the server detects the broken connection via heartbeat timeout and releases the lock. Users can also force-release a stuck session via `modeltap session unlock <id>` or `/session unlock` from another harness connection, in case the grace period or heartbeat detection fails.
 2. **Compaction quality**: should the server validate compaction summaries (e.g., check that key decisions are preserved) or trust the compact model's output?
