@@ -12,7 +12,7 @@ related:
   - ADR-0008: sqlite-vec powers knowledge retrieval (amendment proposed — see ADR Amendments)
   - ADR-0009: MCP stdio transport for external knowledge access (scope clarified — see Interface Separation)
   - ADR-0012: Service management for background server
-  - ADR-0013: Terminal UI framework (proposed — phased minimal → Bubbletea)
+  - ADR-0013: Terminal UI framework (Bubbletea from day one)
   - PATCH-0002: Local inference as first-class routing targets
 ---
 
