@@ -122,10 +122,24 @@ Persistent display at bottom of terminal:
 claude-opus-4-6 | 47% context (38K/80K) | $0.42 session | timer 3.2s
 ```
 
-- Current model name
+- Current model name (shows `[override]` when user has overridden routing policy)
 - Context window usage (percentage and absolute tokens)
 - Running session cost
 - Timer for the current model call (starts on send, stops on stream complete)
+
+**Model routing indicator**: before each response begins streaming, the harness displays the `model.selected` event:
+
+```
+→ claude-opus-4-6 (routing: coding)
+```
+
+Or when overridden:
+
+```
+→ claude-opus-4-6 [override]
+```
+
+This ensures the user always knows which model is about to respond and why it was chosen, before any tokens appear.
 
 **Per-turn metadata** displayed inline after each response:
 
@@ -209,6 +223,123 @@ Categories marked with ★ (high value) or as pinned are not suggested for remov
   Total freed: 22.0K tokens. Use /compact to review or adjust.
 ```
 
+### Session Explorer
+
+When the user launches `modeltap`, the harness queries `session.list` and presents recent sessions:
+
+```
+Recent sessions for ~/Projects/modeltap:
+
+  1. [active]  2h ago   47% ctx   $1.23   "rate limiting implementation"
+     Last: backend agent completed, reviewer found 2 issues
+     Files: ratelimit.go, router.go, ratelimit_test.go
+
+  2. [paused]  1d ago   23% ctx   $0.41   "auth middleware JWT migration"
+     Last: plan approved, implementation not started
+     Files: auth.go, config.go
+
+  3. [paused]  3d ago   61% ctx   $2.87   "database connection pooling"
+     Last: tests passing, PR ready for review
+     Files: pool.go, pool_test.go, db.go
+
+Other projects:
+  4. [active]  5h ago   ~/Projects/api-gateway   $0.18   "CORS config"
+
+[1-4] resume  [n]ew session  [d]etails <n>
+```
+
+**Details view** (`d 2`):
+
+```
+Session: auth middleware JWT migration
+  ID:          sess_a8f3c2
+  Created:     2026-04-13 14:22
+  Last active: 2026-04-14 09:15
+  Model:       claude-opus-4-6 (no override, routing: default)
+  Turns:       12
+  Context:     23% (18.4K / 80K)
+  Cost:        $0.41
+
+  Timeline:
+    Turn 1:  Read auth.go, config.go
+    Turn 2:  Planned JWT migration (6 steps)
+    Turn 3:  User approved plan
+    Turn 4-7: [compacted] researched JWT libraries
+    Turn 8:  Decision: use golang-jwt/jwt/v5
+    Turn 9:  Started implementation — paused by user
+
+  Pinned:
+    - "Use golang-jwt/jwt/v5, not dgrijalva"
+    - "Token expiry: 15min access, 7d refresh"
+
+  Files touched: auth.go (read), config.go (read)
+  Files modified: none yet
+
+[r]esume  [f]ork  [c]ompact before resume  [b]ack
+```
+
+"Compact before resume" runs interactive compaction (see above) before restoring the session, which is useful when returning to a session days later with stale context.
+
+**Server event notifications** on resume:
+
+```
+Resuming session: "rate limiting implementation"
+  ⚠ Server restarted since last session (2026-04-15 03:00)
+  ⚠ Auto-compacted: debugging session (8.1K → 0.5K), stale files dropped
+  Context: 47% → 31% (freed 12.8K tokens)
+  Use /compact to review what changed.
+
+>
+```
+
+If the session has only one recent session for the current project and no server events to report, the harness resumes it directly without showing the explorer.
+
+### Model Commands
+
+**`/model <name>`** — override the routing policy for this session:
+
+```
+> /model claude-opus-4-6
+Model override set: claude-opus-4-6
+All turns will use this model until cleared with /model auto.
+```
+
+**`/model auto`** — clear the override and return to routing policy:
+
+```
+> /model auto
+Model override cleared. Routing policy will select models per turn.
+```
+
+**`/models`** — list available models with routing roles, capabilities, and cost:
+
+```
+> /models
+
+Available models:
+                                              Roles          Cost/1K     Context
+  claude-opus-4-6     Anthropic    coding, default   $0.015/$0.075      200K
+    Strongest reasoning and code generation
+  claude-sonnet-4-6   Anthropic    default           $0.003/$0.015      200K
+    Fast, balanced for most tasks
+  gpt-4               OpenAI       review            $0.010/$0.030      128K
+    Strong review, different perspective from Claude
+  llama-3.1-8b        Ollama       cheap             $0.000/$0.000      128K
+    Fast local model, good for simple tasks
+  llama-3.1-70b       Ollama       —                 $0.000/$0.000      128K
+    Strong local model, good for security review
+
+Routing policy: default→claude-sonnet-4-6, coding→claude-opus-4-6,
+  review→gpt-4, cheap→llama-3.1-8b
+Current: routing policy (no override)
+```
+
+When a model override is active:
+
+```
+Current: claude-opus-4-6 [override] — /model auto to clear
+```
+
 ### Session Commands
 
 | Command | Description |
@@ -216,7 +347,9 @@ Categories marked with ★ (high value) or as pinned are not suggested for remov
 | `/compact` | Interactive context analysis and compaction |
 | `/clear` | Fresh context within the same session |
 | `/fork` | Branch session into independent continuation |
-| `/model <name>` | Switch models within session |
+| `/model <name>` | Override routing policy for this session |
+| `/model auto` | Clear override, return to routing policy |
+| `/models` | List available models with roles, cost, and capabilities |
 | `/plan` | Enter plan mode |
 | `/build` | Enter build mode (default) |
 | `/auto` | Enter auto mode |
@@ -224,6 +357,7 @@ Categories marked with ★ (high value) or as pinned are not suggested for remov
 | `/trace` | Show model routing for last turn |
 | `/context` | Show files, knowledge injections, context budget |
 | `/drop <file>` | Remove file from context |
+| `/sessions` | Show session explorer (also shown on launch) |
 | `/help` | Show available commands |
 
 ### Project Awareness
@@ -297,22 +431,28 @@ These criteria define acceptance for the initial harness using minimal rendering
 4. The agentic loop works: model reads files, makes changes, runs tests, observes results, and continues — multiple tool call rounds in a single turn.
 5. File attachments (`@file`) are included in the turn and visible to the model.
 6. `/compact` shows categorized context breakdown with per-category actions (summarize, keep, drop, pin). User choices are sent to the server and applied. In Phase 1, the interactive flow uses inline text prompts (not TUI widgets).
-7. Session commands (`/model`, `/cost`) work. Cost is printed inline, not in a status bar.
-8. Sessions persist — closing and reopening the harness in the same project directory resumes the previous session.
-9. Plan mode collects tool calls into a reviewable plan before execution.
-10. The harness registers its tool catalog with the server via `capabilities.register`, and only registered tools appear in model prompts.
+7. Session commands (`/model`, `/model auto`, `/models`, `/cost`) work. Cost is printed inline, not in a status bar.
+8. The model routing indicator displays before each response, showing which model was selected and why (routing reason or user override).
+9. `/model <name>` overrides routing for the session; `/model auto` clears the override. Override persists across harness reconnection.
+10. `/models` lists available models with routing roles, capabilities, cost, and current override status.
+11. The session explorer displays on launch with recent sessions, summaries, context usage, and cost. User can resume, view details, or start new.
+12. Session details view shows turn timeline (including compacted turns), pinned items, files touched, and server events (auto-compaction, restarts).
+13. Sessions persist — closing and reopening the harness in the same project directory shows the session explorer with the previous session available.
+14. Plan mode collects tool calls into a reviewable plan before execution.
+15. The harness registers its tool catalog with the server via `capabilities.register`, and only registered tools appear in model prompts.
 
 ### Phase 2: Bubbletea Production UI (follow-on work unit)
 
 These criteria define acceptance for the production harness after migration to Bubbletea. Phase 2 does not block Phase 1 acceptance.
 
-11. Streaming markdown output rendered with terminal styling (headings, code blocks, lists, bold/italic) via Glamour.
-12. Scrollable conversation viewport with auto-scroll-to-bottom and keyboard-driven scroll-up.
-13. Persistent status bar displaying current model, context usage, session cost, and call timer.
-14. Large pastes trigger the summarize/truncate/full flow.
-15. MCP servers configured in the harness provide discoverable tools to the model (sent via `capabilities.update`).
-16. `/context` command shows files, knowledge injections, and token budget.
-17. `/compact` interactive flow uses TUI widgets (category list, action selectors, file-level drill-down) instead of inline text prompts.
+16. Streaming markdown output rendered with terminal styling (headings, code blocks, lists, bold/italic) via Glamour.
+17. Scrollable conversation viewport with auto-scroll-to-bottom and keyboard-driven scroll-up.
+18. Persistent status bar displaying current model (with override indicator), context usage, session cost, and call timer.
+19. Large pastes trigger the summarize/truncate/full flow.
+20. MCP servers configured in the harness provide discoverable tools to the model (sent via `capabilities.update`).
+21. `/context` command shows files, knowledge injections, and token budget.
+22. `/compact` interactive flow uses TUI widgets (category list, action selectors, file-level drill-down) instead of inline text prompts.
+23. Session explorer uses TUI layout (list navigation, detail panes) instead of inline text prompts.
 
 ## Relationship to ADRs
 
