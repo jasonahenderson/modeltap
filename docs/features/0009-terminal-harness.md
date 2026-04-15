@@ -401,29 +401,48 @@ Model override cleared. Routing policy will select models per turn.
 ```
 > /models
 
+Provider endpoints:
+  anthropic       cloud    ✓ connected
+  openai          cloud    ✓ connected
+  ollama-local    local    ✓ 3 models
+  ollama-gpu      remote   ✓ 2 models
+  mlx-local       local    ✗ not running
+
 Available models:
-                                                         Roles                Cost/1K     Context
-  claude-opus-4-6     Anthropic    coding, ui_design              $0.015/$0.075      200K
+                                   Provider         Cost/1K       Context
+  claude-opus-4-6     anthropic       $0.015/$0.075    200K   tool_use, vision
     Strongest reasoning and code generation
-  claude-sonnet-4-6   Anthropic    default, design_docs, planning $0.003/$0.015      200K
+  claude-sonnet-4-6   anthropic       $0.003/$0.015    200K   tool_use, vision
     Fast, balanced for most tasks
-  gpt-5.4             OpenAI       code_review, design_review,    $0.010/$0.030      128K
-                                   workplanning_review
+  gpt-5.4             openai          $0.010/$0.030    128K   tool_use, vision
     Strong reviewer, different perspective
-  llama-3.1-8b        Ollama       cheap, compaction              $0.000/$0.000      128K
-    Fast local model, good for simple tasks
-  llama-3.1-70b       Ollama       —                              $0.000/$0.000      128K
-    Strong local model, good for security review
+  llama-3.1-8b        ollama-local    $0.000/$0.000    128K   tool_use
+    Fast local model, simple tasks
+  llama-3.1-70b       ollama-gpu      $0.000/$0.000    128K   tool_use
+    Strong local model, security review
+  nomic-embed-text    ollama-local    $0.000/$0.000      —    embedding
 
 Routing policy:
-  default          → claude-sonnet-4-6
-  coding           → claude-opus-4-6
-  ui_design        → claude-opus-4-6
-  design_docs      → claude-sonnet-4-6
-  workplanning     → claude-sonnet-4-6
-  code_review      → gpt-5.4
-  design_review    → gpt-5.4
-  code_review (2)  → [gpt-5.4, claude-opus-4-6]    # if multi-reviewer configured
+  default                → claude-sonnet-4-6
+
+  backend:
+    default              → claude-opus-4-6
+    design               → claude-sonnet-4-6
+    code                 → claude-opus-4-6
+    review               → gpt-5.4
+    review_security      → llama-3.1-70b (local)
+
+  frontend:
+    default              → claude-opus-4-6
+    review               → gpt-5.4
+
+  infrastructure:
+    default              → claude-sonnet-4-6
+    review               → [gpt-5.4, claude-opus-4-6]  ×2 parallel
+
+  planning:
+    default              → claude-sonnet-4-6
+    review               → gpt-5.4
 
 Current: routing policy (no override)
 ```
