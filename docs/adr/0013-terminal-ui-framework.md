@@ -39,9 +39,22 @@ Drivers are weighted 1-5, where 5 = critical.
 
 ## Decision Outcome
 
-Chosen option: **Phased approach — start Minimal for the prototype, migrate to Bubbletea for the production harness**, because this sequences risk correctly. The minimal approach (weighted total: 99) ships the fastest prototype with zero framework overhead, proving the conversation loop end-to-end before investing in UI polish. Bubbletea (weighted total: 119) is the clear production choice among full frameworks — it leads on language alignment, ecosystem, and async handling, with a solvable weakness in streaming markdown. Starting minimal avoids premature investment in terminal rendering before the BFF protocol, tool execution loop, and knowledge injection are proven.
+Chosen option: **Bubbletea (Charm ecosystem) from day one**, because it achieves the highest weighted score (119) with a clear margin over all alternatives, and the feature requirements (FEAT-0009) make a minimal prototype impractical.
 
-The migration path is concrete: the minimal prototype uses `fmt.Print` for output and a readline library for input. When the interaction patterns stabilize, Bubbletea replaces the rendering layer. The BFF protocol, tool execution, and permission logic are framework-independent and carry over unchanged.
+The original proposal was a phased approach: minimal prototype first, Bubbletea later. This was revised after the feature specifications were developed. The features require interactive UI that a readline + stdout approach cannot render:
+
+- **Plan/build mode indicator** in a persistent status bar with `Ctrl+P` toggle
+- **Session explorer** with list navigation, details view, and compact-before-resume
+- **Interactive compaction** with categorized context, per-category action selectors, and file-level drill-down
+- **Model routing indicator** displayed before every response
+- **Streaming markdown** with styled output (headings, code blocks, bold/italic)
+- **Scrollable viewport** with auto-scroll and keyboard navigation
+
+A minimal prototype would be a throwaway — it cannot render half the required UX. The phased approach would mean building the conversation loop twice: once in raw stdout, once in Bubbletea. That is wasted effort.
+
+**Precedent**: OpenCode, the most comparable Go terminal AI tool, uses Bubbletea from the start with no phased approach. Their plan/build tab switching, styled markdown, and status bar are all Bubbletea from day one. Claude Code uses TypeScript + Ink (React for terminal), which is the equivalent choice in the TS ecosystem — they also did not phase.
+
+Bubbletea's streaming weakness (D2: 3) is a solvable engineering challenge, not an architectural risk. The debounced redraw approach (buffer tokens, re-render every 50ms) is well-understood and used by OpenCode.
 
 ### Scoring Matrix
 
@@ -130,39 +143,32 @@ Scale: 1 (poor) - 5 (excellent). Weighted total = sum of (weight x score).
 
 ### Consequences
 
-**Phase 1: Minimal prototype**
-
-* Good, because the conversation loop, BFF protocol, tool execution, and permission logic ship without any framework dependency or framework-imposed architecture.
-* Good, because interaction patterns are discovered empirically before committing to a framework.
-* Good, because prototyping speed is maximized — no learning curve, no framework debugging.
-* Bad, because the prototype has no scrollback, rough permission prompts, and unstyled output. It will not feel like a polished product.
-* Bad, because code written in the minimal phase must be restructured for Bubbletea's Model-Update-View pattern. The rendering layer is throwaway; the protocol and tool execution logic carries over.
-* Neutral, because the prototype is not shipped to users — it is an internal proof-of-concept. UX roughness is acceptable.
-
-**Phase 2: Bubbletea production harness**
-
-* Good, because Bubbletea's Elm architecture provides a clean state management model that scales as the UI grows.
+* Good, because Bubbletea's Elm architecture (Model-Update-View) provides a clean state management model that scales as the UI grows. The harness has enough interactive UI (session explorer, compaction selector, plan/build modes, status bar) to justify the framework.
 * Good, because Glamour produces high-quality markdown rendering, and the Charm ecosystem provides reusable components (textarea, viewport, spinner, table) that accelerate development.
 * Good, because the single-binary story is preserved — no runtime dependencies, simple installation, clean goreleaser integration.
-* Good, because Go alignment means shared types, one build, one test suite, and a single-language contribution path.
-* Bad, because streaming token display requires a debounced redraw workaround rather than direct `Write()` calls. This is the primary engineering challenge in the migration. The workaround is well-understood (buffer tokens, re-render every 50ms, final clean render on completion) but requires deliberate implementation.
+* Good, because Go alignment means shared types with the BFF server, one build, one test suite, and a single-language contribution path.
+* Good, because OpenCode proves this stack works for this exact use case — plan/build modes, styled markdown, status bar, all in Bubbletea.
+* Bad, because streaming token display requires a debounced redraw workaround rather than direct `Write()` calls. This is the primary engineering challenge. The workaround is well-understood (buffer tokens, re-render every 50ms, final clean render on completion) but requires deliberate implementation.
 * Bad, because Glamour's batch markdown rendering means long responses may show brief render pauses during streaming. Mitigation: chunk the response buffer and only re-render the latest chunk during streaming; render the full response on completion.
-* Neutral, because Bubbletea's message-passing architecture adds structural overhead (message types, Update handlers) compared to the minimal approach. This is appropriate complexity for a production UI but more code than printing to stdout.
+* Bad, because the framework imposes Elm architecture from the start — every interaction requires message types, Update handlers, and View rendering. This is more upfront work than raw stdout. The tradeoff is accepted because the feature requirements demand it.
+* Neutral, because the Bubbletea learning curve is real but bounded. The ecosystem is well-documented, and OpenCode's open source provides a direct reference for this use case.
 
 ### Confirmation
 
-**Phase 1 is confirmed** when: a minimal harness can connect to the BFF, send a user message, stream a model response to the terminal, execute at least one tool (Read or Bash), handle a permission prompt, and display the result. No framework required.
+The decision is confirmed when: the Bubbletea harness can connect to the BFF, render a session explorer with list navigation, display a persistent status bar with mode/model/context/cost, stream a model response with styled markdown (Glamour), execute tools with permission prompts that don't disrupt the conversation flow, and render the interactive compaction category selector. Streaming token display latency must be under 100ms perceived delay.
 
-**Phase 2 migration is confirmed** when: the Bubbletea harness reproduces all Phase 1 functionality with: styled markdown output (Glamour), scrollable conversation viewport, multi-line text input, non-disruptive permission prompts, and a status bar showing model/cost/context. Streaming token display latency must be indistinguishable from the minimal prototype (< 100ms perceived delay).
+### Why Not Phased
 
-**Migration trigger**: Phase 2 begins when the BFF protocol and tool execution loop are stable (no breaking changes expected in the next development cycle). Do not migrate while the protocol is still churning — framework code amplifies the cost of protocol changes.
+The original proposal (2026-04-14) was to start with a minimal prototype and migrate to Bubbletea when interaction patterns stabilized. This was revised (2026-04-15) after feature specifications (FEAT-0009) revealed that the required UI — plan/build mode indicator with keyboard toggle, session explorer, interactive compaction, model routing display — cannot be rendered with stdout + readline. A minimal prototype would be throwaway code, and the migration would mean building the rendering layer twice. OpenCode's successful direct adoption of Bubbletea for the same UI patterns confirms that the framework risk is manageable.
 
 ## More Information
 
-TypeScript + Ink scored competitively on most drivers (101) but its failure on D1 (single binary distribution, weight 5, score 1) is disqualifying. The 18-point deficit versus Bubbletea is almost entirely explained by D1 and D3. In a project where the server was also TypeScript, Ink would be the clear winner. In a Go project, the two-language tax is too high.
+**TypeScript + Ink** scored competitively on most drivers (101) but its failure on D1 (single binary distribution, weight 5, score 1) is disqualifying. The 18-point deficit versus Bubbletea is almost entirely explained by D1 and D3. Claude Code uses Ink because they are a TypeScript shop. In a Go project, the two-language tax is too high.
 
-tview (108) is a credible alternative to Bubbletea with better streaming ergonomics (D2: 4 vs. 3) but weaker markdown rendering (D4: 2 vs. 4) and a smaller ecosystem (D8: 3 vs. 5). If Bubbletea's streaming workaround proves more problematic than expected during Phase 2 implementation, tview is the first fallback to evaluate.
+**tview** (108) is a credible alternative with better streaming ergonomics (D2: 4 vs. 3) but weaker markdown rendering (D4: 2 vs. 4) and a smaller ecosystem (D8: 3 vs. 5). If Bubbletea's streaming workaround proves more problematic than expected, tview is the first fallback to evaluate.
 
-Raw tcell (103) is rejected because building a UI framework contradicts the harness's design philosophy as the thin part of the product. The effort is disproportionate to the UI's actual requirements.
+**Raw tcell** (103) is rejected because building a UI framework contradicts the harness's design philosophy as the thin part of the product.
 
-The Minimal approach (99) has the lowest weighted score but is chosen for Phase 1 because its strengths (speed, simplicity, zero framework risk) are exactly what a prototype needs, and its weaknesses (no scrollback, rough prompts, unstyled output) are acceptable in a proof-of-concept that will not be shipped to users.
+**Minimal** (99) was originally chosen for a prototype phase but is no longer part of the decision. The feature requirements make a minimal prototype impractical — the UI demands (mode indicators, session explorer, compaction selectors, model display) exceed what stdout + readline can render. See "Why Not Phased" above.
+
+**Comparable tools**: Claude Code (TypeScript + Ink), OpenCode (Go + Bubbletea). Both went straight to their framework without a phased approach. OpenCode is the most direct precedent for modeltap's technology and UI choices.

@@ -22,7 +22,7 @@ modeltap is a single-binary **Go** reverse proxy (ADR-0001) that captures AI/ML 
 | [0010](0010-open-source-license.md) | Apache 2.0 | Accepted |
 | [0011](0011-contribution-model-and-governance.md) | BDFL with contributor tiers | Accepted |
 | [0012](0012-background-execution-strategy.md) | launchd + systemd integration | Accepted |
-| [0013](0013-terminal-ui-framework.md) | Phased: Minimal prototype → Bubbletea production | Proposed |
+| [0013](0013-terminal-ui-framework.md) | Bubbletea (Charm ecosystem) for terminal UI | Proposed |
 
 ## When to Write an ADR
 

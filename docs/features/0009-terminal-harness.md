@@ -8,7 +8,7 @@ depends-on:
 adr-constraints:
   - ADR-0001: Go as primary language
   - ADR-0003: Cobra CLI framework
-  - ADR-0013: Terminal UI framework (proposed — phased minimal to Bubbletea)
+  - ADR-0013: Terminal UI framework (Bubbletea from day one)
 promoted-from:
   - EXP-0008: Integrated Harness
 ---
@@ -23,7 +23,7 @@ Existing terminal AI tools (Claude Code, aider, Codex) are either single-provide
 
 ## Solution
 
-A terminal UI that connects to the modeltap server via the harness protocol (FEAT-0008), sends conversation turns, streams responses, executes tools locally, and enforces permissions. The harness is implemented in Go per ADR-0001, using a phased UI approach per ADR-0013: minimal prototype first (stdout + readline), Bubbletea for production (styled markdown, scrollable viewport, status bar).
+A terminal UI that connects to the modeltap server via the harness protocol (FEAT-0008), sends conversation turns, streams responses, executes tools locally, and enforces permissions. The harness is implemented in Go per ADR-0001, using Bubbletea (Charm ecosystem) per ADR-0013 for terminal rendering — styled markdown via Glamour, scrollable viewport, persistent status bar, and interactive UI components.
 
 ## Key Capabilities
 
@@ -502,42 +502,32 @@ mcp:
 - **Server-side features**: the harness is a thin client. Routing, knowledge, orchestration, auth, and capture are server-side (FEAT-0008, FEAT-0010, FEAT-0011).
 - **Web or IDE frontend**: the terminal is the first frontend. Other frontends are future work.
 - **Custom tool implementation**: the core tool set is fixed. Domain-specific tools are added via MCP servers, not harness modifications.
-- **Bubbletea UI in the initial delivery**: per ADR-0013, the prototype uses minimal rendering. Bubbletea migration is a follow-up work unit.
+- **Non-terminal frontends**: the terminal harness is the first and only frontend. Web or IDE frontends are future work.
 
 ## Success Criteria
 
-### Phase 1: Minimal Prototype (per ADR-0013)
-
-These criteria define acceptance for the initial harness using minimal rendering (stdout + readline). Styled markdown, scrollable viewport, and status bar are Phase 2.
+All criteria use Bubbletea for rendering (per ADR-0013 — no phased UI approach).
 
 1. The harness connects to a running server (local socket or remote TLS), performs capability registration (FEAT-0008 `capabilities.register`), and establishes a session.
-2. A user can type a message, receive a streamed response, and see it printed to the terminal (plaintext with ANSI code blocks, not styled markdown).
+2. A user can type a message in a multi-line input area, receive a streamed response, and see it rendered with styled markdown (headings, code blocks, lists, bold/italic) via Glamour.
 3. All built-in tools work: Read (text, PDF, DOCX, images, spreadsheets), Write, Edit, Bash, Glob, Grep, Git, WebSearch, WebFetch. Each executes locally with appropriate permission prompts.
 4. The agentic loop works: model reads files, makes changes, runs tests, observes results, and continues — multiple tool call rounds in a single turn.
-5. File attachments (`@file`) are included in the turn and visible to the model.
-6. `/compact` shows categorized context breakdown with per-category actions (summarize, keep, drop, pin). User choices are sent to the server and applied. In Phase 1, the interactive flow uses inline text prompts (not TUI widgets).
-7. Session commands (`/model`, `/model auto`, `/models`, `/cost`) work. Cost is printed inline, not in a status bar.
-8. The model routing indicator displays before each response, showing which model was selected and why (routing reason or user override).
-9. `/model <name>` overrides routing for the session; `/model auto` clears the override. Override persists across harness reconnection.
-10. `/models` lists available models with routing roles, capabilities, cost, and current override status.
-11. The session explorer displays on launch with recent sessions, summaries, context usage, and cost. User can resume, view details, or start new.
-12. Session details view shows turn timeline (including compacted turns), pinned items, files touched, and server events (auto-compaction, restarts).
-13. Sessions persist — closing and reopening the harness in the same project directory shows the session explorer with the previous session available.
-14. Plan mode collects tool calls into a reviewable plan before execution.
-15. The harness registers its tool catalog with the server via `capabilities.register`, and only registered tools appear in model prompts.
-
-### Phase 2: Bubbletea Production UI (follow-on work unit)
-
-These criteria define acceptance for the production harness after migration to Bubbletea. Phase 2 does not block Phase 1 acceptance.
-
-16. Streaming markdown output rendered with terminal styling (headings, code blocks, lists, bold/italic) via Glamour.
+5. File attachments (`@file`, globs, drag-and-drop path detection) are included in the turn and visible to the model.
+6. Large pastes trigger the summarize/truncate/full flow.
+7. `/compact` shows categorized context breakdown with per-category action selectors (summarize, keep, drop, pin) and file-level drill-down.
+8. The persistent status bar displays `[plan]`/`[build]`/`[auto]` mode, current model (with `[override]` indicator), context usage, session cost, and call timer.
+9. `Ctrl+P` toggles between plan and build mode. The mode indicator updates immediately.
+10. Plan mode: reads execute silently, writes accumulate into a structured plan. Approve-and-execute, step-through, and edit-plan flows work.
+11. The model routing indicator displays before each response, showing which model was selected and why.
+12. `/model <name>` overrides routing for the session; `/model auto` clears the override. Override persists across harness reconnection.
+13. `/models` lists available models with routing roles, capabilities, cost, and current override status.
+14. The session explorer displays on launch with recent sessions, summaries, context usage, and cost. TUI list navigation with details pane.
+15. Session details view shows turn timeline (including compacted turns), pinned items, files touched, and server events.
+16. Sessions persist — closing and reopening the harness in the same project directory shows the session explorer.
 17. Scrollable conversation viewport with auto-scroll-to-bottom and keyboard-driven scroll-up.
-18. Persistent status bar displaying current model (with override indicator), context usage, session cost, and call timer.
-19. Large pastes trigger the summarize/truncate/full flow.
-20. MCP servers configured in the harness provide discoverable tools to the model (sent via `capabilities.update`).
-21. `/context` command shows files, knowledge injections, and token budget.
-22. `/compact` interactive flow uses TUI widgets (category list, action selectors, file-level drill-down) instead of inline text prompts.
-23. Session explorer uses TUI layout (list navigation, detail panes) instead of inline text prompts.
+18. MCP servers configured in the harness provide discoverable tools to the model (sent via `capabilities.update`).
+19. `/context` command shows files, knowledge injections, and token budget.
+20. The harness registers its tool catalog with the server via `capabilities.register`, and only registered tools appear in model prompts.
 
 ## Relationship to ADRs
 
@@ -545,7 +535,7 @@ These criteria define acceptance for the production harness after migration to B
 |-----|-------------|
 | ADR-0001 (Go) | Harness is Go, same binary as server |
 | ADR-0003 (Cobra) | Harness launch and session flags use Cobra subcommands |
-| ADR-0013 (Terminal UI) | Phased: minimal prototype, then Bubbletea production UI |
+| ADR-0013 (Terminal UI) | Bubbletea (Charm ecosystem) from day one |
 | ADR-0009 (MCP) | Harness is an MCP client for external tool servers |
 
 ## Open Questions
