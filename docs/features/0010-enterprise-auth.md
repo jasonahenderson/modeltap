@@ -302,6 +302,26 @@ auth:
 | ADR-0002 (SQLite) | Per-user data isolation via user_id column or per-user databases |
 | ADR-0007 (Metrics) | Aggregation tables gain per-user dimension; admin queries span users |
 
+## Future: Observer Mode
+
+Once multi-user identity is in place, a lightweight observer mode becomes possible: a second user connects to an active session as a read-only viewer. The server copies stream events (token deltas, tool calls, status updates) to the observer but rejects any action messages. The observer harness renders everything minus the input loop — no textarea, no permission prompts, no mode switching.
+
+**Requirements from FEAT-0010**: the observer needs their own authenticated identity so the server can verify they are allowed to observe this session and maintain an audit trail of who watched what.
+
+**Permission model**: observation requires explicit consent. Options:
+- The active user approves the observer on join
+- An admin grants observe permission to specific users or roles
+- The session owner pre-authorizes observers in session settings
+
+**Use cases**:
+- Mentor watching an apprentice work (EXP-0005)
+- Team lead monitoring a junior developer's AI-assisted workflow
+- Live demo of an AI session to stakeholders
+
+**Implementation complexity**: low. The server already streams all events to the active harness. Observer mode adds a second subscriber to the same event stream. No new protocol beyond `session.resume` with an `observe: true` flag and a `session.observer_joined` notification to the active harness.
+
+This is not part of the initial FEAT-0010 scope. It is documented here because it depends on multi-user identity and is a natural follow-on.
+
 ## Open Questions
 
 1. **JIT provisioning**: should the server auto-create user records on first OIDC login, or require admin pre-registration?
