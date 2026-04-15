@@ -434,11 +434,29 @@ When a model override is active:
 Current: claude-opus-4-6 [override] — /model auto to clear
 ```
 
-When a multi-model review is in progress:
+**Multi-model review display**: when the BFF routes to a multi-model role, each reviewer runs as a background thread with progressive completion. Results stream as each reviewer finishes — the harness does not wait for all reviewers before showing any output:
 
 ```
-→ code_review (2 reviewers: gpt-5.4, claude-opus-4-6)
+→ code_review (2 reviewers)
+  [gpt-5.4]          ●●● reviewing...
+  [claude-opus-4-6]  ●●● reviewing...
+
+[gpt-5.4] ✓ complete (3.1s, $0.08)
+  ⚠ Rate limiter uses in-memory store — won't scale across instances.
+  ✓ Token bucket implementation is correct.
+  ✓ Config validation handles edge cases.
+
+  [claude-opus-4-6]  ●●● reviewing...
+
+[claude-opus-4-6] ✓ complete (4.2s, $0.12)
+  ✓ Implementation looks solid.
+  ⚠ Missing rate limit headers in response (X-RateLimit-Remaining).
+  ⚠ Health check endpoint should bypass rate limiting.
+
+─── 2 reviewers | $0.20 total | 4.2s ───
 ```
+
+Each reviewer's output is rendered in its own labeled section as soon as it completes. Spinners show which reviewers are still working. The BFF streams `token.delta` events tagged with a `reviewer_id`; the harness routes them to the appropriate section. This is the same pattern as Claude Code's background sub-agents — parallel work with progressive results.
 
 ### Session Commands
 
