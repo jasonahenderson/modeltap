@@ -1213,6 +1213,10 @@ These criteria cover specific protocol methods that FEAT-0009 depends on:
 29. Multi-model turns emit `branch.started`, branch-tagged `token.delta`, branch-tagged `cost.update`, `branch.complete`/`branch.error`, and aggregate `turn.complete`. Branch state is available via `session.sync` after reconnect.
 30. `connection.health` returns structured status of all server dependencies (auth, storage, providers, routing, sessions) with diagnostic codes for degraded components.
 
+### Interface Definition
+
+31. `internal/protocol/` package exists with Go struct types for every protocol message, event, and payload defined in this spec. Both server and harness import this package. Round-trip serialization tests pass for every type.
+
 ### Connectivity and Self-Recovery
 
 10. The harness auto-starts or reconnects to the local BFF in the solo profile without user action when the service is installed but stopped.
@@ -1249,15 +1253,111 @@ FEAT-0008 (BFF Server) and FEAT-0009 (Terminal Harness) can be built in parallel
 
 **Protocol freeze**: the Protocol Payload Schemas and Canonical Field Names sections are frozen for implementation. Changes require agreement from both build tracks. The protocol should be extracted into a standalone interface definition (JSON Schema or similar) to enable automated contract testing — see Interface Definition below.
 
-### Interface Definition
+### Interface Definition (required)
 
-The protocol contract should be formalized as a standalone artifact (e.g., `docs/protocol/harness-protocol.json` or `internal/protocol/schema.go`) that both FEAT-0008 and FEAT-0009 import. This enables:
+The protocol contract must be formalized as a shared Go package (`internal/protocol/`) before implementation of either feature begins. This package is the single source of truth for the wire format. Both the server and harness import the same types.
 
-- **Automated contract testing**: both sides validate messages against the schema
-- **Drift detection**: CI fails if either side produces or expects messages that don't match the schema
-- **Post-implementation verification**: after both features are built, run the schema validator against real traffic to confirm conformance
+**Package structure:**
 
-The interface definition should be created early in implementation and maintained as the authoritative source of truth. The feature specs describe the intent; the interface definition describes the wire format.
+```
+internal/protocol/
+├── messages.go        # All message types (turn.submit, session.resume, etc.)
+├── events.go          # All streaming events (token.delta, branch.started, etc.)
+├── tools.go           # Tool catalog schema, tool.call, tool.result
+├── health.go          # connection.health, connection.ready, diagnostics
+├── sessions.go        # session.list, session.details, session.sync payloads
+├── models.go          # model.list, model.selected payloads
+├── compact.go         # compact.plan, compact.apply payloads
+├── errors.go          # Error codes, diagnostic taxonomy (MT-CONN-*)
+├── protocol.go        # Protocol version, framing, canonical field names
+└── protocol_test.go   # Round-trip serialization tests for every type
+```
+
+**What this provides:**
+
+- **Type safety**: both sides compile against the same struct definitions with JSON tags. Serialization/deserialization mismatches are compile-time errors, not runtime bugs.
+- **Contract testing**: CI runs round-trip tests (marshal → unmarshal → compare) for every message type. If a field is added, renamed, or removed, the test fails.
+- **Drift prevention**: there is no separate "spec document" to drift from code. The Go types ARE the spec. Feature specs describe intent and behavior; `internal/protocol/` describes the exact wire format.
+- **Implementation independence**: both the server and harness import `internal/protocol/` but implement their own logic. The shared package contains only types and serialization — no business logic.
+
+**Example types:**
+
+```go
+// internal/protocol/messages.go
+
+type TurnSubmit struct {
+    TurnID      string          `json:"turn_id"`
+    SessionID   string          `json:"session_id"`
+    Sequence    int             `json:"sequence"`
+    Mode        Mode            `json:"mode"`
+    Content     string          `json:"content,omitempty"`
+    Attachments []Attachment    `json:"attachments,omitempty"`
+    Paste       *PastePayload   `json:"paste,omitempty"`
+    ToolResults []ToolResult    `json:"tool_results,omitempty"`
+}
+
+type Mode string
+const (
+    ModePlan  Mode = "plan"
+    ModeBuild Mode = "build"
+    ModeAuto  Mode = "auto"
+)
+
+type Attachment struct {
+    Path        string `json:"path"`
+    Raw         []byte `json:"raw"`
+    Content     string `json:"content"`
+    ContentType string `json:"content_type"`
+    Transform   string `json:"transform"`
+}
+```
+
+```go
+// internal/protocol/events.go
+
+type TokenDelta struct {
+    TurnID   string `json:"turn_id"`
+    BranchID string `json:"branch_id,omitempty"`
+    Text     string `json:"text"`
+}
+
+type BranchStarted struct {
+    TurnID   string `json:"turn_id"`
+    BranchID string `json:"branch_id"`
+    Model    string `json:"model"`
+    Provider string `json:"provider"`
+}
+```
+
+```go
+// internal/protocol/errors.go
+
+type DiagnosticCode string
+const (
+    DiagServiceNotRunning  DiagnosticCode = "MT-CONN-001"
+    DiagStaleSocket        DiagnosticCode = "MT-CONN-002"
+    DiagSocketPermission   DiagnosticCode = "MT-CONN-003"
+    DiagVersionMismatch    DiagnosticCode = "MT-CONN-004"
+    // ... all 12 codes
+)
+
+type Diagnostic struct {
+    Code              DiagnosticCode `json:"code"`
+    Category          string         `json:"category"`
+    Cause             string         `json:"cause"`
+    AutoRepairAttempted bool         `json:"auto_repair_attempted"`
+    RepairResult      string         `json:"repair_result,omitempty"`
+    SuggestedCommand  string         `json:"suggested_command,omitempty"`
+    PathOrEndpoint    string         `json:"path_or_endpoint,omitempty"`
+}
+```
+
+**Lifecycle:**
+1. Create `internal/protocol/` as the first work unit before either feature begins implementation
+2. Both build tracks import and compile against it from day one
+3. Protocol changes are PRs to this package, reviewed by both tracks
+4. After implementation, run the contract tests against real traffic to verify conformance
+5. The protocol package becomes the authoritative reference for future features (FEAT-0010, 0011, 0012, 0013) that add messages to the protocol
 
 ## Resolved Questions
 
