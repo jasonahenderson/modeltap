@@ -205,12 +205,172 @@ The server uses the project root for: session scoping (sessions are per-project)
 
 | Message | Description |
 |---------|-------------|
-| `capabilities.request` | Ask harness to re-register capabilities |
-| `connection.ping` | Heartbeat from harness (server replies with `connection.pong`) |
-| `connection.pong` | Heartbeat reply from server |
-| `connection.health` | Request machine-readable health status from server |
-| `connection.ready` | Request readiness check (auth, storage, providers, routing) |
-| `session.sync` | After reconnect: request authoritative state of active turn |
+| `capabilities.request` | Ask harness to re-register capabilities (triggered on reconnect or when server detects tool schema drift) |
+| `connection.pong` | Reply to harness `connection.ping` heartbeat |
+
+Note: `connection.ping`, `connection.health`, `connection.ready`, and `session.sync` are harness→server messages listed in the harness table above. The heartbeat is harness-initiated: the harness sends `connection.ping`, the server replies with `connection.pong`.
+
+### Protocol Payload Schemas
+
+Formal schemas for the critical protocol messages. All messages use JSON-RPC 2.0 framing (`jsonrpc`, `id`, `method`, `params`/`result`).
+
+**`turn.submit`** (harness → server):
+
+```json
+{
+  "method": "turn.submit",
+  "params": {
+    "turn_id": "<uuid, client-generated, idempotency key>",
+    "session_id": "<uuid>",
+    "sequence": "<int, turn order within session>",
+    "mode": "plan|build|auto",
+    "content": "<user message text>",
+    "attachments": [
+      {
+        "path": "<project-relative file path>",
+        "raw": "<base64-encoded original bytes>",
+        "content": "<extracted/transformed text for model context>",
+        "content_type": "<MIME type>",
+        "transform": "none|pdf_text_extract|docx_text_extract|xlsx_parse|csv_parse|base64_encode"
+      }
+    ],
+    "paste": {
+      "raw": "<full paste text, for capture>",
+      "content": "<user's chosen representation: full, truncated, or summarized>",
+      "intent": "full|truncated|summarized"
+    },
+    "tool_results": [
+      {
+        "tool_call_id": "<matches tool.call.tool_call_id>",
+        "status": "success|rejected|error",
+        "output": "<tool output text>",
+        "output_type": "text|json|binary|image",
+        "error": "<error message, if status is error>",
+        "reason": "<rejection reason, if status is rejected>"
+      }
+    ]
+  }
+}
+```
+
+Fields `attachments`, `paste`, and `tool_results` are optional. At least one of `content` or `tool_results` must be present.
+
+**`session.resume`** (harness → server):
+
+```json
+{
+  "method": "session.resume",
+  "params": {
+    "session_id": "<uuid>",
+    "project": {
+      "root": "<absolute path>",
+      "config_file": "<filename>",
+      "config_content": "<file contents, may be updated since last session>"
+    }
+  }
+}
+```
+
+The `project` field is included so the server picks up config changes since the session was last active.
+
+**`session.clear`** (harness → server):
+
+```json
+{
+  "method": "session.clear",
+  "params": {
+    "session_id": "<uuid>"
+  }
+}
+```
+
+Server clears the live conversation context. All turns are retained in storage and the knowledge layer. The session continues with an empty context. Returns `{ "cleared_turns": <int>, "retained_in_storage": true }`.
+
+**`session.fork`** (harness → server):
+
+```json
+{
+  "method": "session.fork",
+  "params": {
+    "session_id": "<uuid>"
+  }
+}
+```
+
+Server creates a new session with a copy of the current conversation history, pinned items, and context. Returns `{ "new_session_id": "<uuid>" }`. The original session is unchanged.
+
+**`context.list`** (harness → server):
+
+```json
+{
+  "method": "context.list",
+  "params": {
+    "session_id": "<uuid>"
+  }
+}
+```
+
+Returns:
+
+```json
+{
+  "files": [
+    { "path": "auth.go", "size_bytes": 2400, "attached_turn": 2, "stale": false }
+  ],
+  "knowledge_injections": [
+    { "summary": "Decision: use JWT for auth", "source_date": "2026-04-10", "relevance": 0.92 }
+  ],
+  "pinned_items": [
+    "Use golang-jwt/jwt/v5, not dgrijalva"
+  ],
+  "context_tokens": 38000,
+  "context_window": 80000,
+  "context_pct": 0.475,
+  "system_prompt_tokens": 4200,
+  "knowledge_injection_tokens": 1800
+}
+```
+
+**`status.update`** (server → harness):
+
+```json
+{
+  "turn_id": "<uuid>",
+  "phase": "routing|knowledge_search|provider_call|compacting",
+  "detail": "routing to claude-opus-4-6 via anthropic",
+  "timestamp": "<ISO8601>"
+}
+```
+
+**`content.transform`** (harness → server):
+
+```json
+{
+  "method": "content.transform",
+  "params": {
+    "transform": "summarize",
+    "raw_content": "<full content>",
+    "content_type": "text/plain",
+    "max_output_tokens": 500
+  }
+}
+```
+
+Returns `{ "content": "<transformed text>", "model_used": "llama-3.1-8b", "cost": 0.00 }`. The server captures the raw content per ADR-0005 and attributes the transform cost separately from conversation turns.
+
+### Canonical Field Names
+
+To avoid terminology drift between specs, these field names are canonical:
+
+| Field | Used in | Meaning |
+|-------|---------|---------|
+| `turn_id` | All streaming events, `turn.submit`, `turn.cancel` | Client-generated UUID identifying a conversation turn |
+| `branch_id` | `branch.started`, `token.delta`, `cost.update`, `branch.complete`, `branch.error`, `session.sync` | Server-generated identifier for a parallel model branch in multi-model turns |
+| `tool_call_id` | `tool.call`, `tool.result` | Server-generated identifier linking a tool request to its result |
+| `session_id` | All session messages | UUID identifying a session |
+| `sequence` | `turn.submit` | Integer turn order within a session |
+
+Note: the term `reviewer_id` is not used. Multi-model parallel streams are tagged with `branch_id`.
 
 ### Connection Lifecycle and Self-Recovery
 
@@ -1076,6 +1236,28 @@ These criteria cover specific protocol methods that FEAT-0009 depends on:
 | ADR-0006 (Providers) | Provider adapters extended with formatting (outbound) in addition to parsing (inbound). Requires ADR-0006 amendment before acceptance. |
 | ADR-0007 (Metrics) | Cost tracking feeds into existing aggregation tables |
 | ADR-0009 (MCP) | MCP stdio interface is separate and unchanged. BFF does not use MCP for harness communication. |
+
+## Parallel Build Strategy
+
+FEAT-0008 (BFF Server) and FEAT-0009 (Terminal Harness) can be built in parallel. The protocol contract defined in this spec (Protocol Specification, Protocol Messages, Protocol Payload Schemas, Canonical Field Names, Tool Catalog Schema) is the integration surface. Both teams build against test doubles of the other side.
+
+**BFF team** builds against a test harness: a Go client that sends protocol messages, validates responses, and simulates tool execution. Tests cover: connection lifecycle, turn streaming, tool call round-trips, session persistence, model routing, compaction, multi-model branching, and all diagnostic codes.
+
+**Harness team** builds against a mock server: a Go server that returns scripted/canned protocol responses. Tests cover: Bubbletea UI rendering, tool execution (all 13 built-in tools — these are entirely harness-local), permission enforcement, plan/build/auto modes, session explorer, compaction UI, model display, connection UX states, and MCP client integration.
+
+**Integration** connects the real implementations. The test harness and mock server become integration test fixtures.
+
+**Protocol freeze**: the Protocol Payload Schemas and Canonical Field Names sections are frozen for implementation. Changes require agreement from both build tracks. The protocol should be extracted into a standalone interface definition (JSON Schema or similar) to enable automated contract testing — see Interface Definition below.
+
+### Interface Definition
+
+The protocol contract should be formalized as a standalone artifact (e.g., `docs/protocol/harness-protocol.json` or `internal/protocol/schema.go`) that both FEAT-0008 and FEAT-0009 import. This enables:
+
+- **Automated contract testing**: both sides validate messages against the schema
+- **Drift detection**: CI fails if either side produces or expects messages that don't match the schema
+- **Post-implementation verification**: after both features are built, run the schema validator against real traffic to confirm conformance
+
+The interface definition should be created early in implementation and maintained as the authoritative source of truth. The feature specs describe the intent; the interface definition describes the wire format.
 
 ## Resolved Questions
 
