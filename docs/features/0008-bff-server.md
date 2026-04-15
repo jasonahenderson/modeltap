@@ -113,6 +113,169 @@ The server uses this tool catalog when assembling the model prompt — only tool
 | Message | Description |
 |---------|-------------|
 | `capabilities.request` | Ask harness to re-register capabilities |
+| `connection.ping` | Heartbeat from harness (server replies with `connection.pong`) |
+| `connection.pong` | Heartbeat reply from server |
+| `connection.health` | Request machine-readable health status from server |
+| `connection.ready` | Request readiness check (auth, storage, providers, routing) |
+| `session.sync` | After reconnect: request authoritative state of active turn |
+
+### Connection Lifecycle and Self-Recovery
+
+The harness treats the BFF connection as a managed lifecycle, not a raw socket.
+
+**Connection states:**
+
+```
+discovering → starting → connecting → authenticating → registering → ready → degraded → reconnecting → failed
+```
+
+| State | Description |
+|-------|-------------|
+| `discovering` | Harness checks if server is reachable (socket exists, port responds) |
+| `starting` | Local profile only: harness auto-starts the local service if installed but stopped |
+| `connecting` | TCP/TLS handshake or Unix socket connection in progress |
+| `authenticating` | Auth handshake (FEAT-0010) in progress |
+| `registering` | Capability registration (`capabilities.register`) in progress |
+| `ready` | Fully connected, authenticated, registered. Turns can be submitted. |
+| `degraded` | Connected but a dependency is unhealthy (provider down, storage unready, etc.) |
+| `reconnecting` | Connection lost, attempting automatic recovery |
+| `failed` | Automatic recovery exhausted. User action required. |
+
+**Transitions:**
+- `ready → degraded`: a `connection.health` check reports an unhealthy dependency. The harness can still submit turns, but the server may return errors for routes that depend on the degraded component.
+- `ready → reconnecting`: heartbeat missed or connection dropped. Harness begins recovery.
+- `reconnecting → connecting`: retry attempt. Exponential backoff: 1s, 2s, 4s, 8s, max 30s. Max retries: 10 (configurable).
+- `reconnecting → failed`: max retries exhausted or terminal error (version mismatch, auth permanently revoked).
+- Any state → `failed`: terminal error detected (incompatible protocol version, TLS cert rejected, socket permission denied).
+
+**Local service auto-start (solo profile):**
+
+When the harness is configured for a local socket and the server is not running:
+
+1. Check if the socket file exists.
+2. If socket exists: test if a process is listening. If not → stale socket.
+3. Stale socket: check if any process owns the socket file (via `lsof` or `/proc`). If no owner → safe to remove. Remove and proceed to step 4. If owner exists but unresponsive → print diagnostic, do not auto-remove.
+4. If service is installed (FEAT-0004): start it via `modeltap service start`. Wait for readiness (poll `connection.ready`, timeout 10s).
+5. If service is not installed: start a server subprocess (`modeltap serve` as a child process). The subprocess inherits the harness's config.
+6. If startup fails → `failed` state with diagnostic.
+
+**Heartbeat:**
+- Harness sends `connection.ping` every 15 seconds (configurable).
+- Server replies with `connection.pong` within 5 seconds.
+- After 3 consecutive missed pongs, harness transitions to `degraded`.
+- After 5 consecutive missed pongs, harness transitions to `reconnecting`.
+- Server-side: after heartbeat timeout (missed pings for 30 seconds) plus grace period (10 seconds), the server releases the active session lock.
+
+**Readiness and health:**
+
+`connection.health` returns machine-readable status of all server dependencies:
+
+```json
+{
+  "server_version": "0.2.0",
+  "protocol_version": "1",
+  "uptime_seconds": 3600,
+  "auth": { "status": "ready", "method": "oidc" },
+  "storage": { "status": "ready", "path": "/var/lib/modeltap/data.db" },
+  "capabilities": { "status": "ready", "tools_registered": 14 },
+  "providers": {
+    "anthropic": { "status": "ready" },
+    "openai": { "status": "ready" },
+    "ollama-local": { "status": "ready", "models": 3 },
+    "ollama-gpu": { "status": "unavailable", "error": "connection refused" }
+  },
+  "routing": { "status": "degraded", "reason": "ollama-gpu unavailable, fallback active" },
+  "active_session": { "id": "sess_a8f3c2", "owner": "alice" }
+}
+```
+
+`connection.ready` is a simplified boolean: is the server ready to accept a `turn.submit` right now? Returns `true` only if auth, storage, capability registration, and at least one routing target are healthy.
+
+### In-Flight Turn Recovery
+
+When the connection drops during an active turn (streaming response, pending tool call, or multi-model parallel review), the harness must be able to recover cleanly on reconnect.
+
+**Idempotency rules:**
+- `turn.submit` carries a client-generated `turn_id` (UUID) and `sequence` number. If the server receives a `turn.submit` with a `turn_id` it has already processed, it does not re-send to the provider. It returns the existing turn state.
+- `tool.result` is idempotent by `tool_call_id`. Duplicate submissions are accepted and ignored.
+
+**`session.sync` after reconnect:**
+
+After re-establishing the connection (auth + capabilities), the harness sends `session.sync` for its active session. The server returns the authoritative state:
+
+```json
+{
+  "session_id": "sess_a8f3c2",
+  "active_turn": {
+    "turn_id": "turn_x9f2",
+    "status": "pending_tool_result",
+    "pending_tool_calls": [
+      { "tool_call_id": "tc_001", "tool": "Edit", "status": "awaiting_result" }
+    ],
+    "completed_tokens": 1247,
+    "token_replay_available": false,
+    "summary": "Model requested Edit on auth.go, awaiting tool result"
+  },
+  "multi_model": null
+}
+```
+
+Or for a multi-model turn:
+
+```json
+{
+  "active_turn": {
+    "turn_id": "turn_y3a1",
+    "status": "streaming",
+    "multi_model": {
+      "reviewers": [
+        { "model": "gpt-5.4", "status": "complete", "tokens": 892 },
+        { "model": "claude-opus-4-6", "status": "streaming", "tokens": 341 }
+      ]
+    },
+    "token_replay_available": false,
+    "summary": "gpt-5.4 complete, claude-opus-4-6 still streaming"
+  }
+}
+```
+
+**Token replay**: the server does not guarantee token replay after reconnect (buffering all tokens for replay is expensive). Instead, `session.sync` returns a summary of what was produced before the disconnect. The harness displays this summary and continues receiving new tokens from the resumed stream. If the turn completed while disconnected, `session.sync` returns the full completed turn.
+
+### Diagnostic Taxonomy
+
+Every connection failure maps to a stable diagnostic code with structured information. The harness renders these as actionable messages.
+
+| Code | Category | Cause | Auto-Repair | Suggested Command |
+|------|----------|-------|-------------|-------------------|
+| `MT-CONN-001` | `service_not_running` | Local service not started | Auto-start attempted | `modeltap service install` |
+| `MT-CONN-002` | `stale_socket` | Socket exists, no listener | Remove if safe | `rm ~/.local/share/modeltap/server.sock` |
+| `MT-CONN-003` | `socket_permission` | Socket exists, wrong owner/mode | None | `ls -la <path>`, check user |
+| `MT-CONN-004` | `version_mismatch` | Server/harness protocol incompatible | None (terminal) | `modeltap upgrade` or update server |
+| `MT-CONN-005` | `tls_untrusted` | Server TLS cert not trusted | None (terminal) | Check `server.tls.cert` config |
+| `MT-CONN-006` | `auth_expired` | OIDC token expired, refresh failed | Re-auth attempted | `modeltap auth login` |
+| `MT-CONN-007` | `storage_unready` | SQLite database inaccessible | None | Check `storage.path`, permissions |
+| `MT-CONN-008` | `session_locked` | Another harness owns the session | None | `modeltap session unlock <id>` |
+| `MT-CONN-009` | `provider_unavailable` | Provider endpoint down | Routing fallback | Check provider config, network |
+| `MT-CONN-010` | `capability_registration_failed` | Tool registration rejected | Re-register attempted | Check MCP server configs |
+| `MT-CONN-011` | `model_unavailable` | Requested model not in registry | Routing fallback | `/models` to see available |
+| `MT-CONN-012` | `heartbeat_timeout` | Server stopped responding | Reconnect attempted | `modeltap server status` |
+
+Each diagnostic is emitted as a structured `error` event with fields: `code`, `category`, `cause`, `auto_repair_attempted` (bool), `repair_result`, `suggested_command`, `path_or_endpoint`.
+
+The harness renders these as:
+
+```
+⚠ MT-CONN-002 stale_socket: found ~/.local/share/modeltap/server.sock
+  but no server is listening. Removed stale socket and restarted service.
+```
+
+Or when auto-repair fails:
+
+```
+✗ MT-CONN-003 socket_permission: ~/.local/share/modeltap/server.sock is
+  owned by root. Cannot connect.
+  → Check socket permissions: ls -la ~/.local/share/modeltap/server.sock
+```
 
 ### Conversation State Management
 
@@ -644,13 +807,18 @@ modeltap serve                    # Start the server (foreground)
 modeltap service install          # Install as background service (existing FEAT-0004)
 ```
 
-New server administration commands:
+New server administration and connectivity commands:
 
 ```
-modeltap server status            # Show server status, connected clients, active sessions
+modeltap server status            # Machine-readable and human-readable health
+                                  # (protocol, auth, storage, providers, routing, sessions)
 modeltap server sessions          # List active and recent sessions
 modeltap server session <id>      # Show session details (turns, cost, model history)
+modeltap session unlock <id>      # Force-release a stuck session lock
+modeltap auth login               # Re-authenticate (OIDC re-auth flow)
 ```
+
+`modeltap server status` output includes: server version, protocol version, uptime, listener state (socket/TLS), auth readiness, storage readiness, provider endpoint status per endpoint, model registry status (available/unavailable counts), routing readiness, active sessions, and any degraded dependencies with diagnostic codes.
 
 ## Configuration
 
@@ -743,15 +911,29 @@ sessions:
 
 ## Success Criteria
 
+### Core
+
 1. A harness client can connect to the server via Unix socket or TLS and authenticate (initially: local socket with peer credentials).
 2. The server accepts a conversation turn, routes it to a configured provider, and streams the response back as harness protocol events.
 3. Conversation state persists across harness disconnection and reconnection — resuming a session restores the full conversation history.
 4. Switching models mid-session preserves conversation context — the server translates the canonical history to the new provider's format.
-5. The server assembles system prompts from domain, project, and session sources and includes them in every provider request.
+5. The server assembles system prompts from all seven layers and includes them in every provider request.
 6. Cost tracking reports accurate token counts and costs per turn and per session, matching provider billing within 5%.
-7. Context window management triggers compaction at the configured threshold without user intervention.
+7. Context window management triggers interactive and auto-compaction at configured thresholds.
 8. The existing proxy functionality (capture, metrics, retention) continues to work — the BFF layer does not break the v1 proxy core.
 9. The server handles concurrent harness connections (preparation for FEAT-0010 multi-user, even if initially single-user).
+
+### Connectivity and Self-Recovery
+
+10. The harness auto-starts or reconnects to the local BFF in the solo profile without user action when the service is installed but stopped.
+11. The harness detects stale socket files and removes them when safe (no owning process), or prints a specific remediation command when not safe.
+12. The harness detects half-open or wedged connections within the heartbeat interval (default: 3 missed pongs at 15s interval = 45s) and begins reconnecting with exponential backoff.
+13. Reconnection after harness crash, BFF crash, or network drop preserves session identity. `session.sync` reports the final state of any in-flight turn.
+14. Replayed `turn.submit` (same `turn_id`) and `tool.result` (same `tool_call_id`) are idempotent — no duplicate model calls or tool effects.
+15. Multi-model streamed turns can be synchronized after reconnect via `session.sync`, including per-model completed/failed/pending state.
+16. Every connection failure maps to a diagnostic code from the taxonomy. Each diagnostic includes cause, auto-repair attempted, and suggested next command.
+17. `modeltap server status` reports machine-readable health: protocol version, auth readiness, storage readiness, provider endpoint status, model registry status, routing readiness, active sessions, and degraded dependencies with diagnostic codes.
+18. Tests exist for: version mismatch, auth expiry, TLS trust failure, socket permission denied, stale socket, provider down, model unavailable, storage unready, capability registration failed, and session locked — each asserting the correct diagnostic code and user-facing message.
 
 ## Relationship to ADRs
 
