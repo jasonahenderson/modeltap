@@ -83,7 +83,8 @@ The server uses this tool catalog when assembling the model prompt — only tool
 | `tool.result` | Result of a tool execution (success, error, or rejected) |
 | `session.resume` | Resume an existing session by ID |
 | `session.list` | List available sessions for this user/project |
-| `session.compact` | Request context compaction |
+| `session.compact` | Request interactive context compaction (server returns plan) |
+| `compact.apply` | Apply compaction plan with user's per-category choices |
 | `session.clear` | Clear live context (retain in storage) |
 | `session.fork` | Branch session into independent continuation |
 | `model.switch` | Change the active model for this session |
@@ -98,7 +99,9 @@ The server uses this tool catalog when assembling the model prompt — only tool
 | `status.update` | Status message ("routing to claude-opus-4-6...") |
 | `knowledge.hit` | Knowledge context was injected (summary, relevance score) |
 | `cost.update` | Running token count and cost for this turn |
-| `compact.notice` | Context was compacted (what was compressed, what was retained) |
+| `compact.plan` | Compaction analysis with per-category breakdown and suggested actions |
+| `compact.suggest` | Context pressure advisory (threshold reached, suggest /compact) |
+| `compact.notice` | Auto-compaction applied (what was compressed, what was retained) |
 | `turn.complete` | Turn finished (final usage, model, latency, total cost, cancelled flag) |
 | `error` | Server-side error (provider failure, budget exceeded, auth failure) |
 
@@ -186,16 +189,50 @@ Per-turn and per-session cost tracking:
 
 ### Context Window Management
 
-The server tracks context window usage and manages compaction:
+The server tracks context window usage and provides context analysis and compaction.
 
-- Token counting for the full conversation (system prompt + history + current turn)
-- Warning events at configurable threshold (default: 78% of model's context window)
-- Auto-compaction at high threshold (default: 92%):
-  - Identify low-value segments (old turns, resolved tangents, repeated instructions)
-  - Summarize them using a compact prompt
-  - Replace verbose history with summary in the live conversation
-  - Retain full original in storage for future retrieval
-- Manual compaction via `session.compact` message
+**Token counting**: the server maintains a running token count for the full conversation (system prompt + history + knowledge injections + current turn) and reports it to the harness via `cost.update` events.
+
+**Pressure warnings**: at a configurable threshold (default: 78%), the server emits a `compact.suggest` event to the harness advising the user to compact.
+
+**Context categorization and compaction plan**: when the harness sends `session.compact` (interactive) or when auto-compact triggers (at 92% threshold), the server performs context analysis:
+
+1. **Categorize** all context into semantic categories:
+   - Architecture/design decisions (reference count, recency)
+   - Debugging sessions (resolved vs. active)
+   - Test iterations (passing vs. failing, retry cycles)
+   - File contents (still referenced vs. stale)
+   - Planning discussion (approved vs. pending items)
+   - Tool call metadata (reproducible from capture, low value)
+   - Knowledge injections (still relevant vs. stale)
+
+2. **Score** each category by value signals:
+   - Reference count: how often this content was referenced in later turns
+   - Recency: when was it last relevant
+   - Resolution status: is the issue resolved, the test passing, the plan approved
+   - Pin status: user-pinned items are never suggested for removal
+
+3. **Generate a compaction plan**: for each category, the server proposes an action:
+   - **keep**: high-value, retain verbatim
+   - **summarize**: moderate value, compress to a summary (server generates the summary text)
+   - **drop**: low value, remove from live context
+   - **pin**: user-designated always-carry-forward
+
+4. **Return the plan to the harness** via `compact.plan` response, including:
+   - Per-category breakdown: name, token count, value score, suggested action, summary preview (for summarize actions)
+   - Per-file breakdown within the file-contents category
+   - Estimated savings (tokens freed, percentage reduction)
+   - The harness decides how to present this to the user (see FEAT-0009)
+
+5. **Apply the plan**: the harness sends `compact.apply` with the user's choices (which may differ from the suggestions). The server executes:
+   - Summarized categories: replace verbose content with the summary in the live conversation
+   - Dropped categories: remove from the live conversation
+   - Pinned categories: mark as always-carry-forward
+   - Full originals are always retained in storage and the knowledge layer
+
+**Auto-compaction**: at 92% context usage, the server runs the same analysis but applies its default recommendations automatically (configurable as `context.auto_compact_policy`). The harness receives a `compact.notice` event showing what was compacted. The user can always `/compact` afterward to review and adjust.
+
+**Compaction is lossless**: nothing is deleted from storage. Compacted content moves from the live context window to searchable long-term memory. The knowledge layer (FEAT-0011) can re-retrieve compacted content if it becomes relevant in a later turn.
 
 ### Session Persistence
 
