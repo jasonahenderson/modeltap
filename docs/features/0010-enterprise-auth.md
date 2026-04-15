@@ -322,9 +322,13 @@ Once multi-user identity is in place, a lightweight observer mode becomes possib
 
 This is not part of the initial FEAT-0010 scope. It is documented here because it depends on multi-user identity and is a natural follow-on.
 
+## Resolved Questions
+
+1. ~~**JIT provisioning**~~: resolved. The server auto-creates user records on first OIDC login (JIT provisioning). New users get the default role (`developer`). Admin can adjust roles afterward. This removes the onboarding friction of pre-registering every user.
+
+2. ~~**Token storage**~~: resolved. OS keychain (macOS Keychain, Linux Secret Service via D-Bus). Platform-specific but correct — OIDC refresh tokens are credentials and should be stored where the OS stores credentials. Fallback to encrypted file (`~/.config/modeltap/.tokens`, encrypted with a key derived from the user's OS identity) for environments without a keychain.
+
 ## Open Questions
 
-1. **JIT provisioning**: should the server auto-create user records on first OIDC login, or require admin pre-registration?
-2. **Token storage**: where does the harness cache OIDC refresh tokens? OS keychain is ideal but platform-specific. Encrypted file is simpler but less secure.
-3. **Service accounts**: for CI/CD or automation harnesses (headless, no human), which auth provider? Tokens are simplest. SPIFFE is strongest.
-4. **Database encryption at rest**: should the server database be encrypted? SQLite options (SQLCipher) add complexity. Filesystem encryption (LUKS, FileVault) may suffice.
+1. **Service accounts**: for CI/CD or automation harnesses (headless, no human), which auth provider? Tokens are simplest. SPIFFE is strongest.
+2. **Database encryption at rest**: should the server database be encrypted? SQLite options (SQLCipher) add complexity. Filesystem encryption (LUKS, FileVault) may suffice.
