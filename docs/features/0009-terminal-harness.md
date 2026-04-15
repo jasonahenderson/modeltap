@@ -75,13 +75,84 @@ Permissions are enforced entirely in the harness. The BFF has no knowledge of th
 
 ### Execution Modes
 
-The harness supports three modes that control how tool calls are handled:
+The harness operates in one of three modes. The current mode is always visible in the status bar and affects both the system prompt (Layer 5, server-side) and tool call handling (harness-side).
 
-- **Plan** (`/plan`): collect tool calls into a structured plan. Present for approval before executing. "Step through" executes one at a time.
-- **Build** (`/build`, default): execute tool calls as they arrive, subject to the permission level.
-- **Auto** (`/auto`): auto-approve within the permission level without per-action prompts.
+**Visual mode indicator** — always visible in the status bar:
 
-Execution mode is harness-local. The BFF always forwards tool calls the same way — the harness decides what to do with them.
+```
+[plan] claude-opus-4-6 | 47% ctx | $0.42 | ⏱ 3.2s
+```
+
+```
+[build] claude-opus-4-6 | 47% ctx | $0.42 | ⏱ 3.2s
+```
+
+```
+[auto] claude-opus-4-6 [override] | 47% ctx | $0.42 | ⏱ 3.2s
+```
+
+**Mode switching** — fast and immediate:
+- `/plan`, `/build`, `/auto` commands
+- Keyboard shortcut: `Ctrl+P` toggles between plan and build (the two most common modes)
+- Mode change takes effect on the next turn — mid-turn mode switches do not interrupt a streaming response
+- The harness sends the current mode as a `mode` field on every `turn.submit` so the server injects the appropriate Layer 5 prompt
+
+**Plan mode** (`/plan`):
+
+The model is instructed via the mode prompt (FEAT-0008 Layer 5) to analyze and propose rather than execute. The harness handles tool calls as follows:
+
+- Read-only tools (Read, Glob, Grep, Git status/log/diff): execute silently. The model needs context to plan well.
+- Write/Edit/Bash/Git mutation tools: intercepted by the harness, collected into the plan display, NOT executed.
+
+As the model works, the plan accumulates:
+
+```
+[plan] claude-opus-4-6 (routing: coding)
+→ Analyzing task...
+  Read: internal/api/router.go ✓
+  Read: internal/middleware/ ✓
+
+Proposed plan:
+  1. Create internal/middleware/ratelimit.go
+     - Token bucket implementation
+     - Per-endpoint configuration
+  2. Edit internal/api/router.go
+     - Add rate limit middleware to route chain
+  3. Edit internal/config/config.go
+     - Add rate limit config section
+  4. Create internal/middleware/ratelimit_test.go
+     - Table-driven tests for token bucket
+     - Integration test for middleware chain
+  5. Run: go test ./internal/middleware/...
+
+[a]pprove and execute  [e]dit  [s]tep through  [c]ancel
+```
+
+**Approve and execute**: the harness switches to build mode, sends a new `turn.submit` with `mode: "build"` and the approved plan as context. The model re-executes with the plan as a reference.
+
+**Step through**: executes one plan step at a time. After each step, the harness pauses:
+
+```
+Step 1/5: Create internal/middleware/ratelimit.go ✓ (87 lines)
+[n]ext  [v]iew file  [e]dit plan  [a]pprove remaining  [c]ancel
+```
+
+Step-through gives the user maximum control — inspect each change before proceeding.
+
+**Edit**: the user modifies the plan before execution — reorder steps, remove steps, add constraints, change the approach. The edited plan is sent with the build-mode turn.
+
+**Build mode** (`/build`, default):
+
+The model is instructed to execute directly. Tool calls flow through the normal permission model:
+- Default permission: prompt per tool type on first use
+- Accept-edits: auto-approve file operations
+- Autonomous: auto-approve all within safety limits
+
+No plan accumulation. Tool calls execute as they arrive. This is the default mode.
+
+**Auto mode** (`/auto`):
+
+Same as build mode, but the model is additionally instructed to proceed without requesting confirmation. The harness auto-approves tool calls within the configured permission level without per-action prompts. Dangerous operations (force push, rm -rf) still prompt regardless of mode.
 
 ### File Context Management
 

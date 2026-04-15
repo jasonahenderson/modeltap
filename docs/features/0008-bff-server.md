@@ -143,14 +143,113 @@ The provider adapter interface (ADR-0006) is extended to support both parsing (i
 
 ### System Prompt Engine
 
-The server assembles system prompts from multiple sources, concatenated in priority order:
+The system prompt is the primary driver of session quality. It is not a single static string — it is assembled per-turn from seven layers, each serving a different purpose. The model sees one prompt; the server builds it from multiple sources.
 
-1. **Domain prompt**: behavioral specification for the workflow domain (coding, legal, finance, etc.). Configurable per server or per project.
-2. **Project instructions**: project-level configuration file (`.modeltap.yaml` or equivalent) that specifies conventions, constraints, and preferences.
-3. **Knowledge injections**: relevant prior context from the knowledge layer (when FEAT-0011 is active).
-4. **Session state**: pinned items, active constraints, compaction summaries.
+**Prompt Assembly (top to bottom, all concatenated):**
 
-The assembled system prompt is included in every provider request. It is re-assembled on every turn (not cached) so that knowledge injections and session state reflect the latest information.
+**Layer 1 — Core behavioral prompt (always present, ships with product):**
+
+The methodology specification that shapes every interaction. This is the engineering investment that makes sessions feel like working with a competent colleague. It covers:
+
+- *Work methodology*: read files before editing. Try the simplest approach first. If an approach fails, diagnose why before switching tactics. Don't retry blindly, but don't abandon a viable approach after one failure.
+- *Scope discipline*: don't add features, refactor code, or make improvements beyond what was asked. Don't add docstrings, comments, or type annotations to code you didn't change. Don't create helpers or abstractions for one-time operations.
+- *Output discipline*: keep text output brief and direct. Lead with the answer, not the reasoning. If you can say it in one sentence, don't use three. No filler words or preamble.
+- *Safety*: don't introduce security vulnerabilities. Confirm before destructive operations. Don't push to remote repositories without explicit instruction.
+- *Error recovery*: when a tool call fails, read the error, check assumptions, try a focused fix. Escalate to the user only when genuinely stuck after investigation.
+
+This layer is hundreds of lines, not a paragraph. It is the most carefully engineered part of the product and should be iteratively refined based on real session quality. It ships as a bundled asset, not user-editable configuration.
+
+**Layer 2 — Tool-use instructions (always present, ships with product):**
+
+Per-tool behavioral guidance injected alongside the tool definitions. Each tool's description includes not just what it does, but when to use it and when NOT to:
+
+- *Read*: "always read a file before editing it"
+- *Edit*: "use exact string matching — provide enough surrounding context to match uniquely"
+- *Bash*: "do NOT use Bash to run cat, head, tail, sed, awk — use the dedicated Read/Edit tools instead"
+- *Write*: "prefer editing existing files over creating new ones"
+- *Git*: "prefer new commits over amending. Never force push without explicit instruction"
+
+These instructions are injected into the tool schema descriptions that the provider receives, so they are model-visible regardless of which provider or model is selected.
+
+**Layer 3 — Domain prompt (per-domain, configurable):**
+
+Behavioral specification for the workflow domain. Configurable per server or per project via `system_prompt.domain` in config.
+
+For the coding domain (built-in default):
+- Go code: gofmt, go vet, effective Go idioms
+- Tests: table-driven, in _test.go files alongside production code
+- Commits: conventional format, meaningful messages
+- Reviews: check for OWASP top 10, injection, data leakage
+
+For other domains (shipped as domain packages or user-authored):
+- Legal: never state a conclusion without citing authority, distinguish binding vs. persuasive authority, preserve privilege
+- Finance: verify every number against source data, distinguish GAAP vs. IFRS, flag materiality thresholds
+- Custom: user provides a markdown file path in config
+
+```yaml
+system_prompt:
+  domain: coding                    # built-in: coding, legal, finance
+  # or custom:
+  domain: prompts/my-domain.md      # path to custom domain prompt
+```
+
+**Layer 4 — Project instructions (per-project):**
+
+Loaded from `.modeltap.yaml` or `MODELTAP.md` in the project root. Specifies project-specific conventions, architecture decisions, team preferences, and constraints. Equivalent to Claude Code's `CLAUDE.md` but server-managed.
+
+The server reads this file from the harness's project root (communicated during session start) and includes it verbatim. It is re-read on every turn so edits take effect immediately.
+
+**Layer 5 — Mode prompt (per-mode, see Execution Mode Support):**
+
+Different system prompt fragments for plan mode vs. build mode:
+
+- *Plan mode*: "Analyze the task and propose a step-by-step plan. Read files to understand context, but do not make changes. Present the plan for user approval with clear steps, affected files, and rationale."
+- *Build mode*: "Execute the task directly. Read relevant files, make changes, run tests, and iterate until done. Report what you changed and why."
+- *Auto mode*: same as build mode, plus "proceed without asking for confirmation on standard operations."
+
+The mode is communicated to the server by the harness (see `mode` field on `turn.submit`). The server selects the appropriate mode prompt fragment.
+
+**Layer 6 — Knowledge injections (per-turn, when FEAT-0011 is active):**
+
+Relevant prior context from the knowledge layer, assembled fresh each turn. Formatted as a clearly labeled block:
+
+```
+<prior-context source="knowledge-layer">
+Decision (2026-04-10, this project): Use JWT for API auth. Rationale: stateless, no server session storage needed.
+Decision (2026-04-12, this project): Token expiry: 15min access, 7d refresh.
+</prior-context>
+```
+
+The model sees this as contextual reference, not as instructions. The block is clearly delimited so the model can weigh it appropriately.
+
+**Layer 7 — Session state (per-turn):**
+
+Current session context assembled by the server:
+- Pinned items (user-designated always-carry-forward state)
+- Active plan (if in plan mode and a plan has been approved, the plan steps are included)
+- Compaction summaries (compressed turns replaced by their summaries)
+- Files currently in context (names and sizes, not contents — contents are in the conversation history)
+- Active model override (if any)
+
+**Assembly and delivery:**
+
+The server concatenates all layers into a single system prompt string on every turn. The total is included in the provider request as the system message (Anthropic `system` parameter, OpenAI `system` role message, etc.). The prompt is re-assembled on every turn — never cached — so that knowledge injections, session state, mode changes, and project instruction edits take effect immediately.
+
+The assembled prompt's token count is tracked and included in the context budget. If the system prompt grows too large (e.g., many knowledge injections), the server trims Layer 6 (knowledge injections) first, then Layer 7 (session state summaries), preserving Layers 1-5 which are essential for behavior quality.
+
+### Execution Mode Support
+
+The server supports three execution modes communicated by the harness via a `mode` field on `turn.submit`:
+
+- **`plan`**: the server injects the plan-mode prompt (Layer 5). The model is instructed to analyze and propose. The server forwards all tool calls to the harness as normal — the harness decides which to execute (reads) and which to collect into the plan display (writes). Read-only tool calls (`Read`, `Glob`, `Grep`, `Git status/log/diff`) are expected and normal in plan mode — the model needs context to plan well.
+
+- **`build`**: the server injects the build-mode prompt (Layer 5). The model is instructed to execute directly. All tool calls flow to the harness for normal permission-based execution.
+
+- **`auto`**: same as build, with an additional prompt fragment encouraging the model to proceed without requesting confirmation for standard operations.
+
+When the harness approves a plan and switches to build mode for execution, the harness sends a `turn.submit` with `mode: "build"` and includes the approved plan text in the user message. The server injects the build-mode prompt and includes the plan in Layer 7 (session state) so the model has it as a reference during execution.
+
+The server does not enforce mode boundaries — it provides the appropriate prompt. Mode enforcement (intercepting write tool calls in plan mode) is the harness's responsibility per the execution boundary principle (see FEAT-0009).
 
 ### Model Routing Policy
 
