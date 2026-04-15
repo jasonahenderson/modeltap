@@ -476,7 +476,7 @@ Current: claude-opus-4-6 [override] — /model auto to clear
 ─── 2 reviewers | $0.20 total | 4.2s ───
 ```
 
-Each reviewer's output is rendered in its own labeled section as soon as it completes. Spinners show which reviewers are still working. The BFF streams `token.delta` events tagged with a `reviewer_id`; the harness routes them to the appropriate section. This is the same pattern as Claude Code's background sub-agents — parallel work with progressive results.
+Each reviewer's output is rendered in its own labeled section as soon as it completes. Spinners show which reviewers are still working. The BFF streams `branch.started`, `token.delta` (tagged with `branch_id`), `branch.complete`/`branch.error`, and aggregate `turn.complete` events (FEAT-0008). The harness routes `token.delta` events to the appropriate section by `branch_id`. This is the same pattern as Claude Code's background sub-agents — parallel work with progressive results.
 
 ### Session Commands
 
@@ -674,6 +674,16 @@ All criteria use Bubbletea for rendering (per ADR-0013 — no phased UI approach
 25. After reconnect during an in-flight turn, the harness displays `session.sync` results: pending tool calls, completed branches, or completed turn.
 26. `/status` shows full connection health (FEAT-0008 `connection.health` output).
 27. Large paste summarization uses `content.transform` (FEAT-0008) — the harness never calls a provider directly.
+
+## Parallel Build Strategy
+
+This feature can be built in parallel with FEAT-0008 (BFF Server). See FEAT-0008's Parallel Build Strategy section for the full approach.
+
+**Harness team builds against a mock server**: a Go server that returns scripted protocol responses per FEAT-0008's Protocol Payload Schemas. The mock covers: turn streaming, tool calls, session list/details, model list/selected, compaction plans, connection health, diagnostic codes, and multi-model branch events.
+
+**Harness-local work that needs no server**: all 13 built-in tools (Read with format detection, Edit, Write, Bash, Glob, Grep, Git, WebSearch, WebFetch), Bubbletea component architecture, permission enforcement, plan/build/auto mode logic, MCP client integration, file context management, and large paste detection.
+
+**Integration surface**: the protocol contract in FEAT-0008 (Protocol Payload Schemas, Canonical Field Names, Tool Catalog Schema). Both sides should import a shared interface definition for automated contract testing.
 
 ## Relationship to ADRs
 
