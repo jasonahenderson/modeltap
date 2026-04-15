@@ -38,30 +38,38 @@ A terminal UI that connects to the modeltap server via the harness protocol (FEA
 
 The harness executes tools locally on the user's machine. The BFF forwards model tool calls; the harness decides whether to execute based on the current permission level and execution mode.
 
-**Core tool set:**
+**Built-in tool set:**
 
-| Tool | Description | Default Permission |
-|------|-------------|-------------------|
-| Read | Read file contents (text, PDF, DOCX, images) | Auto-allow |
-| Write | Create new files | Prompt first use |
-| Edit | Modify existing files (exact string match) | Prompt first use |
-| Bash | Execute shell commands | Prompt per command |
-| Glob | Find files by pattern | Auto-allow |
-| Grep | Search file contents | Auto-allow |
-| Git | Git operations | Prompt for mutations |
-| WebSearch | Search the web | Prompt first use |
-| WebFetch | Fetch URL contents | Prompt per domain |
+All tools are required for the initial release. There is no phased tool rollout.
+
+| Tool | Description | Default Permission | Go Implementation |
+|------|-------------|-------------------|-------------------|
+| Read | Read text file contents | Auto-allow | `os.ReadFile`, line numbering |
+| ReadPDF | Extract text from PDF files | Auto-allow | `pdfcpu` or `unipdf` |
+| ReadDOCX | Extract text from DOCX files | Auto-allow | `unioffice` |
+| ReadImage | Encode image for vision-capable models | Auto-allow | `encoding/base64` + MIME detection |
+| ReadSpreadsheet | Parse XLSX/CSV as structured text | Auto-allow | `excelize` / `encoding/csv` |
+| Write | Create or overwrite files | Prompt first use | `os.WriteFile` with snapshot |
+| Edit | Modify existing files (exact string match) | Prompt first use | String replacement with uniqueness check |
+| Bash | Execute shell commands | Prompt per command | `exec.Command`, stdout/stderr capture |
+| Glob | Find files by pattern | Auto-allow | `filepath.Glob` / `doublestar` |
+| Grep | Search file contents by regex | Auto-allow | `regexp` + file walker, or embed ripgrep |
+| Git | Git operations | Prompt for mutations | Shell out to `git` CLI |
+| WebSearch | Search the web | Prompt first use | External search API (Brave, SerpAPI) |
+| WebFetch | Fetch URL contents as text | Prompt per domain | `net/http` + HTML-to-text extraction |
+
+The Read* tools are unified behind a single `Read` tool call from the model's perspective — the harness detects the file type and applies the appropriate extraction. The model calls `Read` with a file path; the harness returns extracted text regardless of whether the source is `.go`, `.pdf`, `.docx`, `.png`, or `.xlsx`. For images, the harness returns a base64-encoded representation if the current model supports vision, or an error explaining the model does not support images.
 
 **Tool safety guardrails:**
 - Edit requires exact string matching — prevents hallucinated file overwrites
 - Edit fails if the file has not been Read first in the session
 - Write snapshots the original file before overwriting (reversibility)
 - Bash displays the full command before execution, requiring explicit approval
-- Tool descriptions instruct the model on when to use each tool and when NOT to (e.g., "use Read instead of cat via Bash")
+- Tool descriptions instruct the model on when to use each tool and when NOT to (e.g., "use Read instead of cat via Bash"). These descriptions are part of the system prompt Layer 2 (FEAT-0008).
 
-**Tool registration with server:** On connection, the harness sends `capabilities.register` (FEAT-0008) declaring all available tools — core tools and any MCP-discovered tools — with their names, descriptions, input schemas, and permission levels. The server uses this catalog to populate the model's tool definitions. Only tools the harness has registered are available to the model. When MCP servers connect or disconnect, the harness sends `capabilities.update` to add or remove tools dynamically.
+**Tool registration with server:** On connection, the harness sends `capabilities.register` (FEAT-0008) declaring all available tools — built-in tools and any MCP-discovered tools — with their names, descriptions, input schemas, and permission levels. The server uses this catalog to populate the model's tool definitions. Only tools the harness has registered are available to the model. When MCP servers connect or disconnect, the harness sends `capabilities.update` to add or remove tools dynamically.
 
-**MCP tool discovery:** The harness connects to configured MCP servers (stdio transport) and discovers their tools. MCP tools appear alongside core tools with the same permission enforcement and are included in capability registration.
+**MCP tool discovery (required):** The harness connects to configured MCP servers (stdio transport) and discovers their tools at startup. MCP tools appear alongside built-in tools with the same permission enforcement and are included in capability registration. MCP is the extension mechanism — users add domain-specific tools, database access, CI/CD integration, and any custom tooling via MCP servers without modifying the harness.
 
 ### Permission Model
 
@@ -158,7 +166,13 @@ Same as build mode, but the model is additionally instructed to proceed without 
 
 - `@path/to/file` syntax to attach files to a message
 - `@src/**/*.go` glob patterns for multiple files
-- Drag and drop detection (terminal emits file paths)
+- Drag and drop from file manager: most modern terminals (iTerm2, Kitty, WezTerm, Ghostty, Terminal.app) paste the file path as text when a file is dragged onto the terminal. The harness detects this pattern (absolute path pasted in a burst, file exists on disk) and converts it to a file attachment. Multiple files are detected from space-separated or newline-separated paths:
+  ```
+  Attached 3 files (7.1 KB):
+    internal/middleware/auth.go (2.4 KB)
+    internal/config/config.go (1.8 KB)
+    internal/api/router.go (2.9 KB)
+  ```
 - `/context` command shows files in context, knowledge injections, and token budget
 - `/drop <file>` removes a file from context
 
@@ -498,7 +512,7 @@ These criteria define acceptance for the initial harness using minimal rendering
 
 1. The harness connects to a running server (local socket or remote TLS), performs capability registration (FEAT-0008 `capabilities.register`), and establishes a session.
 2. A user can type a message, receive a streamed response, and see it printed to the terminal (plaintext with ANSI code blocks, not styled markdown).
-3. The model can request tool calls (Read, Edit, Bash at minimum) which the harness executes locally with permission prompts.
+3. All built-in tools work: Read (text, PDF, DOCX, images, spreadsheets), Write, Edit, Bash, Glob, Grep, Git, WebSearch, WebFetch. Each executes locally with appropriate permission prompts.
 4. The agentic loop works: model reads files, makes changes, runs tests, observes results, and continues — multiple tool call rounds in a single turn.
 5. File attachments (`@file`) are included in the turn and visible to the model.
 6. `/compact` shows categorized context breakdown with per-category actions (summarize, keep, drop, pin). User choices are sent to the server and applied. In Phase 1, the interactive flow uses inline text prompts (not TUI widgets).
