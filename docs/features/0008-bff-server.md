@@ -251,58 +251,143 @@ When the harness approves a plan and switches to build mode for execution, the h
 
 The server does not enforce mode boundaries — it provides the appropriate prompt. Mode enforcement (intercepting write tool calls in plan mode) is the harness's responsibility per the execution boundary principle (see FEAT-0009).
 
-### Model Routing Policy
+### Model Configuration: Three-Layer Architecture
 
-The server selects which model handles each request based on configurable routing roles. Role names are arbitrary — the user defines whatever roles their workflow needs:
+Model configuration separates three concerns: where services run (provider endpoints), what models are available (model registry), and how they're used (routing policy).
+
+#### Layer 1: Provider Endpoints
+
+Provider endpoints define where model services run and how to authenticate:
+
+```yaml
+providers:
+  anthropic:
+    type: anthropic
+    api_key: ${ANTHROPIC_API_KEY}
+    # Cloud provider — models are well-known, auto-registered from built-in catalog
+
+  openai:
+    type: openai
+    api_key: ${OPENAI_API_KEY}
+
+  ollama-local:
+    type: ollama
+    host: http://localhost:11434
+    discover: true                    # poll /api/tags for available models
+
+  ollama-gpu:
+    type: ollama
+    host: http://gpu-server.internal:11434
+    discover: true
+
+  mlx-local:
+    type: mlx
+    host: http://localhost:8080
+    discover: true
+```
+
+Multiple endpoints of the same type are supported (e.g., two Ollama instances). Each endpoint has a unique name used for model-to-endpoint mapping.
+
+#### Layer 2: Model Registry
+
+The model registry maps model names to provider endpoints with metadata. It is populated from two sources:
+
+**Auto-discovery** (primary):
+- **Ollama/MLX**: the server polls each endpoint's model list (`/api/tags` for Ollama) on startup and periodically (default: every 60 seconds). Models that appear are auto-registered with the endpoint they were found on.
+- **Cloud providers** (Anthropic, OpenAI): the server has a built-in catalog of available models per provider type. No polling needed. The server validates the API key on startup.
+
+**Manual overrides** (optional): the user can pin models to specific endpoints, override metadata, or add models that auto-discovery doesn't find:
+
+```yaml
+models:
+  # Override auto-discovered metadata
+  claude-opus-4-6:
+    provider: anthropic
+    description: "Strongest reasoning and code generation"
+
+  # Pin a local model to a specific endpoint
+  llama-3.1-70b:
+    provider: ollama-gpu              # always use the GPU server for this model
+    description: "Strong local model, security review"
+
+  # Add a model that auto-discovery misses
+  custom-fine-tune:
+    provider: ollama-local
+    context_window: 32000
+    capabilities: [tool_use]
+    cost: { input: 0, output: 0 }
+    description: "Project-specific fine-tune"
+```
+
+Auto-discovered models do not need manual entries unless the user wants to override defaults. The registry merges auto-discovered and manual entries, with manual taking precedence.
+
+**Registry fields per model** (auto-populated where possible):
+
+| Field | Source | Description |
+|-------|--------|-------------|
+| `provider` | Discovery or manual | Which endpoint this model runs on |
+| `context_window` | Built-in catalog or discovery | Max context tokens |
+| `capabilities` | Built-in catalog or discovery | `[tool_use, vision, long_context, embedding]` |
+| `cost` | Built-in catalog or manual | `{ input: $/1K, output: $/1K }` |
+| `description` | Manual or generated | Human-readable purpose |
+| `status` | Runtime | `available`, `unavailable`, `error` |
+
+**Model availability changes**: if a local model disappears (Ollama restarted, model unloaded), the server marks it `unavailable` in the registry. If the routing policy references it, the server falls back up the routing tree. The harness receives a `status.update`: "llama-3.1-70b unavailable on ollama-gpu, falling back to claude-opus-4-6."
+
+**Duplicate models across endpoints**: if `llama-3.1-8b` appears on both `ollama-local` and `ollama-gpu`, the server registers both. The user can pin via the manual config, or the server selects the first available endpoint (configurable: prefer local, prefer fastest, round-robin).
+
+#### Layer 3: Routing Policy
+
+The routing policy maps workflow roles to models from the registry. Role names are hierarchical — organized by domain and activity:
 
 ```yaml
 routing:
-  # Core roles
-  default: claude-sonnet-4-6
+  default: claude-sonnet-4-6         # global fallback
   cheap: llama-3.1-8b
   embedding: nomic-embed-text
 
-  # Creation roles
-  coding: claude-opus-4-6
-  ui_design: claude-opus-4-6
-  design_docs: claude-sonnet-4-6
-  workplanning: claude-sonnet-4-6
+  backend:
+    default: claude-opus-4-6         # all backend work defaults to opus
+    design: claude-sonnet-4-6        # except design docs
+    code: claude-opus-4-6
+    review: gpt-5.4
+    review_security: llama-3.1-70b   # local, no data leaves machine
 
-  # Review roles — single model
-  code_review: gpt-5.4
-  design_review: gpt-5.4
-  workplanning_review: gpt-5.4
+  frontend:
+    default: claude-opus-4-6
+    design: claude-opus-4-6
+    code: claude-opus-4-6
+    review: gpt-5.4
 
-  # Review roles — multiple reviewers (parallel)
-  code_review:
-    - gpt-5.4
-    - claude-opus-4-6
+  infrastructure:
+    default: claude-sonnet-4-6
+    code: claude-opus-4-6
+    review: [gpt-5.4, claude-opus-4-6]   # multi-reviewer, parallel
+
+  planning:
+    default: claude-sonnet-4-6
+    review: gpt-5.4
 ```
 
-**Single-model roles** (string value): the server routes to that model. Standard behavior.
+**Resolution** — dot-path with fallback up the tree:
 
-**Multi-model roles** (array value): the server runs all listed models in parallel on the same input. Each model's response is returned to the harness as a separate labeled result:
+| Query | Resolution | Reason |
+|-------|-----------|--------|
+| `backend.review` | gpt-5.4 | Exact match |
+| `backend.testing` | claude-opus-4-6 | No match → `backend.default` |
+| `backend` | claude-opus-4-6 | Resolves to `backend.default` |
+| `infrastructure.review` | [gpt-5.4, claude-opus-4-6] | Multi-reviewer |
+| `something.unknown` | claude-sonnet-4-6 | No match at any level → root `default` |
 
-```
-→ code_review (2 reviewers: gpt-5.4, claude-opus-4-6)
+Resolution order: `category.role` → `category.default` → `default`
 
-[gpt-5.4] Review:
-  ⚠ Rate limiter uses in-memory store — won't scale across instances.
-  ✓ Token bucket implementation is correct.
+**Single-model roles** (string value): the server routes to that model.
 
-[claude-opus-4-6] Review:
-  ✓ Implementation looks solid.
-  ⚠ Missing rate limit headers in response (X-RateLimit-Remaining).
-  ⚠ Health check endpoint should bypass rate limiting.
+**Multi-model roles** (array value): the server runs all listed models in parallel as background threads. Each model's response is returned to the harness as a separate labeled result (see FEAT-0009 for display). Reviewers work independently and don't see each other's output. Sequential review (where reviewer 2 sees reviewer 1's findings) is an orchestration concern handled by FEAT-0013 (Agent Teams).
 
-─── 2 reviewers | gpt-5.4: $0.08, claude-opus-4-6: $0.12 | 4.2s ───
-```
+**How roles are selected**: the BFF classifies the current turn's intent based on the conversation context, system prompt, and any explicit user request. The user can request a specific role via skill invocations (FEAT-0012) or direct commands. The `default` role (at any tree level) is the fallback when no specific role matches.
 
-Multi-model routing is parallel by default — reviewers work independently and don't see each other's output. Sequential review (where reviewer 2 sees reviewer 1's findings) is an orchestration concern handled by FEAT-0013 (Agent Teams).
-
-**How roles are selected**: the BFF classifies the current turn's intent based on the conversation context and the system prompt. For example, when the model produces output that is a code review, the BFF tags it with the `code_review` role. The user can also explicitly request a role via `/review` or skill invocations (FEAT-0012). The `default` role is the fallback when no specific role matches.
-
-Routing policy is extensible — future work (EXP-0007) may add complexity-based routing and cost-aware automatic selection. This feature implements the static policy engine with parallel multi-model support.
+Routing policy is extensible — future work (EXP-0007) may add complexity-based routing and cost-aware automatic selection. This feature implements the static hierarchical policy engine with parallel multi-model support.
 
 ### Model Transparency
 
@@ -588,20 +673,53 @@ system_prompt:
   # Project instructions file name (searched in project root)
   project_file: .modeltap.yaml
 
-# Routing policy
+# Layer 1: Provider endpoints
+providers:
+  anthropic:
+    type: anthropic
+    api_key: ${ANTHROPIC_API_KEY}
+  openai:
+    type: openai
+    api_key: ${OPENAI_API_KEY}
+  ollama-local:
+    type: ollama
+    host: http://localhost:11434
+    discover: true
+  ollama-gpu:
+    type: ollama
+    host: http://gpu-server.internal:11434
+    discover: true
+
+# Layer 2: Model registry (optional — auto-discovery fills most of this)
+models:
+  llama-3.1-70b:
+    provider: ollama-gpu              # pin to GPU server
+    description: "Strong local model, security review"
+
+# Layer 3: Routing policy (hierarchical)
 routing:
   default: claude-sonnet-4-6
   cheap: llama-3.1-8b
   embedding: nomic-embed-text
-  coding: claude-opus-4-6
-  ui_design: claude-opus-4-6
-  design_docs: claude-sonnet-4-6
-  workplanning: claude-sonnet-4-6
-  code_review: gpt-5.4               # single reviewer
-  design_review: gpt-5.4
-  workplanning_review: gpt-5.4
-  # or multi-reviewer:
-  # code_review: [gpt-5.4, claude-opus-4-6]
+
+  backend:
+    default: claude-opus-4-6
+    design: claude-sonnet-4-6
+    code: claude-opus-4-6
+    review: gpt-5.4
+    review_security: llama-3.1-70b
+
+  frontend:
+    default: claude-opus-4-6
+    review: gpt-5.4
+
+  infrastructure:
+    default: claude-sonnet-4-6
+    review: [gpt-5.4, claude-opus-4-6]  # parallel multi-reviewer
+
+  planning:
+    default: claude-sonnet-4-6
+    review: gpt-5.4
 
 # Context management
 context:
