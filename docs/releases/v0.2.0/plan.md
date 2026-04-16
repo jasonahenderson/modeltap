@@ -9,12 +9,12 @@ The two features can be built in parallel against a shared protocol contract (`i
 ## Approach
 
 **Three tracks + integration:**
-- **Track 0** (7 WUs): Shared prerequisites — protocol types, ADR-0006 amendment, provider formatting, session storage
+- **Track 0** (9 WUs): Shared prerequisites — protocol types, ADR-0006 amendment, provider formatting, session storage, protocol contract fixtures, migration upgrade tests
 - **Track A** (23 WUs): FEAT-0008 BFF Server (includes WU-091 command history)
 - **Track B** (21 WUs): FEAT-0009 Terminal Harness (includes WU-092 command history client)
-- **Integration** (3 WUs): End-to-end tests, CLI launch, docs
+- **Integration** (5 WUs): End-to-end tests, CLI launch, docs, security review, performance benchmarks
 
-**Total: 54 work units (WU-039 through WU-092; WU-091/092 added to satisfy FEAT-0009 command history)**
+**Total: 58 work units (WU-039 through WU-096; WU-091/092 added for command history, WU-093-096 added from the 2026-04-16 test-coverage gap review)**
 
 ---
 
@@ -36,8 +36,10 @@ This relaxation avoids blocking harness-local progress behind provider formattin
 | 043 | Anthropic outbound formatting (`FormatMessages`) | 042 | M | 044, 045 |
 | 044 | OpenAI outbound formatting (`FormatMessages`) | 042 | M | 043, 045 |
 | 045 | Session and turn storage schema (migration v2) | 039 | L | 043, 044 |
+| 093 | Protocol contract: golden fixtures + conformance tests | 039, 040, 041 | M | 042-045 |
+| 096 | Storage migration v1→v2 upgrade tests | 045 | M | 043, 044, Track A (post-045) |
 
-**Critical path:** 039 → 042 → 043/044 (parallel) → done. 045 can run alongside 043/044.
+**Critical path:** 039 → 042 → 043/044 (parallel) → done. 045 can run alongside 043/044. WU-093 (parallel with 042-045) and WU-096 (parallel with 043/044) do not extend the critical path. WU-093 is a gate for **WU-067 and WU-087** (integration suites must consume the fixtures), not for the foundation WUs of Tracks A or B.
 
 **Key files:**
 - NEW `internal/protocol/*.go` — all message/event/payload types with JSON tags
@@ -159,9 +161,11 @@ This relaxation avoids blocking harness-local progress behind provider formattin
 
 | WU | Title | Dependencies | Size | Parallelizes With |
 |----|-------|-------------|------|-------------------|
-| 088 | End-to-end: harness → BFF → mock provider | 067, 087 | L | 089 |
-| 089 | CLI and harness launch integration | 067, 087 | M | 088 |
+| 088 | End-to-end: harness → BFF → mock provider | 067, 087 | L | 089, 094, 095 |
+| 089 | CLI and harness launch integration | 067, 087 | M | 088, 094, 095 |
 | 090 | Documentation and config schema updates | 088, 089 | M | — |
+| 094 | Security review suite: tools, storage, protocol, credentials | 067, 087 | L | 088, 089, 095 |
+| 095 | Performance benchmarks and budgets | 067, 087 | M | 088, 089, 094 |
 
 ---
 
@@ -169,11 +173,11 @@ This relaxation avoids blocking harness-local progress behind provider formattin
 
 | Track | WUs | Count | Key Deliverable |
 |-------|-----|-------|----------------|
-| 0 (Shared) | 039-045 | 7 | Protocol types, provider formatting, session storage |
+| 0 (Shared) | 039-045, 093, 096 | 9 | Protocol types, provider formatting, session storage, contract fixtures, migration upgrade tests |
 | A (BFF) | 046-067, 091 | 23 | Server: transport, sessions, routing, streaming, compaction, diagnostics, command history |
 | B (Harness) | 068-087, 092 | 21 | UI: Bubbletea, 13 tools, modes, MCP, session explorer, connection UX, command history |
-| Integration | 088-090 | 3 | E2E tests, CLI launch, docs |
-| **Total** | **039-092** | **54** | |
+| Integration | 088-090, 094, 095 | 5 | E2E tests, CLI launch, docs, security review, performance budgets |
+| **Total** | **039-096** | **58** | |
 
 ## Serialization Option
 
