@@ -26,8 +26,8 @@ This document defines the agent team responsible for designing, building, testin
 **Responsibilities:**
 - Read accepted ADRs (`docs/adr/`) and features (`docs/features/`) to determine project scope
 - Break scope into ordered, independently completable work units
-- Write and maintain the plan (`docs/history/plan.md`)
-- Update the status file (`docs/history/status.md`) after each unit completes
+- Write and maintain the plan in the current release directory (`docs/releases/<version>/plan.md` and per-track files)
+- Update the status file (`docs/releases/<version>/status.md`) after each unit completes
 - Determine what to do next when resuming from a prior session
 - Ensure agents work in the right order (design before implementation, tests before code, security review after code, docs after all)
 
@@ -241,11 +241,11 @@ Examples of bad work units (too large):
 
 ## History & Status Files
 
-### `docs/history/plan.md`
-The master plan. Created by TPM at the start of the project. Updated as work progresses. Contains the ordered list of work units with their status.
+### `docs/releases/<version>/plan.md`
+The release plan. Created by TPM at the start of each release cycle. Contains the ordered list of work units with their tracks and dependencies. Per-track detail files (`track-*.md`) accompany the plan.
 
-### `docs/history/status.md`
-Living status file. Updated after every work unit completes. Structure:
+### `docs/releases/<version>/status.md`
+Living status file for the active release. Updated after every work unit completes. Structure:
 
 ```markdown
 # Project Status
@@ -280,7 +280,7 @@ Individual work logs. Each agent writes one per task with:
 ### Session Resumption
 
 When starting a new session:
-1. TPM reads `docs/history/status.md`
+1. TPM reads `docs/releases/<current-version>/status.md`
 2. If a task is marked "In Progress", TPM checks if the work was actually completed (files exist, tests pass) and updates accordingly
 3. TPM picks the next task from "Up Next" and assigns it
 4. Work continues normally

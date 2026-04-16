@@ -94,7 +94,7 @@ Existing features in this directory follow this shape. New features should match
 
 1. **Draft** — Status `draft`. Spec is a sketch; problem and solution are still being shaped.
 2. **Propose** — Status `proposed`. Spec is complete enough to review. Open questions are explicit. Decision-makers can evaluate trade-offs.
-3. **Accept** — Status `accepted`. The feature is selected for implementation. Work units are planned in `docs/history/status.md` and tracked through completion. Only `accepted` features drive work per `CLAUDE.md`.
+3. **Accept** — Status `accepted`. The feature is selected for implementation. Work units are planned in `docs/releases/<version>/` and tracked through completion. Only `accepted` features drive work per `CLAUDE.md`.
 4. **Supersede** — If a later feature replaces this one, set status to `superseded` and add a forward reference. Do not delete the original.
 
 ## Commit Convention

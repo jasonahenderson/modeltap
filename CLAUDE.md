@@ -10,8 +10,9 @@ Reverse proxy for AI/ML clients that captures requests/responses, tracks usage m
 - Patches: `docs/patches/` (implementation-scoped fixes, missing-endpoint coverage, internal plumbing) — see `docs/patches/README.md` for when to use vs. ADR or feature spec
 - Agent team definition: `docs/agents.md`
 - OpenCode / generic agent instructions: `AGENTS.md`
-- Project status: `docs/history/status.md`
-- Work logs: `docs/history/`
+- Release plans and status: `docs/releases/` — each release (vX.Y.Z) has `plan.md`, `status.md`, `track-*.md`, and `changelog.md`
+- Current active release: `docs/releases/v0.2.0/`
+- Work logs (session history): `docs/history/`
 
 ## Doc Type Taxonomy
 
@@ -21,7 +22,7 @@ Reverse proxy for AI/ML clients that captures requests/responses, tracks usage m
 | ADR | Architectural decisions with future constraint value | `docs/adr/` | `ADR-NNNN` |
 | Feature spec | Behavior — user-visible capabilities | `docs/features/` | `FEAT-NNNN` |
 | Patch | Implementation — fixes, missing endpoints, internal work | `docs/patches/` | `PATCH-NNNN` |
-| Work unit | Planned increments inside an accepted feature | tracked in `docs/history/status.md` | `WU-NNN` |
+| Work unit | Planned increments inside an accepted feature | tracked in `docs/releases/<version>/status.md` | `WU-NNN` |
 | Admin task | Repo workflow / instruction / process changes | no numbered doc required by default | `ADMIN` |
 
 `PATCH` does not mean semver patch — it means implementation-scoped work. `ADMIN:` commits cover repo workflow / instruction-file changes and don't need a numbered doc.
@@ -80,7 +81,7 @@ This ensures continuity across sessions even for planning, review, or ad-hoc con
 
 ### Resumption Protocol
 
-1. Read `docs/history/status.md`
+1. Read `docs/releases/<current-version>/status.md` (check `docs/releases/README.md` for the current release)
 2. Check if any "In Progress" items are actually complete (files exist, tests pass)
 3. Update status accordingly
 4. Pick next task from "Up Next"
