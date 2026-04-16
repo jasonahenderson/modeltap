@@ -187,28 +187,28 @@ Per `docs/agents.md` §"Workflow", v0.2.0 executes in three release-level phases
 - **Phase 2 — Peer review (opt-in, batched):** User selects high-stakes designs for external-model peer review. Designer prepares bundled prompts; user runs in one external-model session.
 - **Phase 3 — Implementation:** Red → green → security review → docs per WU, in any dependency-legal order.
 
-Current phase: **Phase 1** (57 WU designs pending; WU-039 already shipped).
+Current phase: **Phase 1 — DESIGN COMPLETE.** Awaiting user confirmation to transition to Phase 2.
 
 ### Phase 1 Completion Checklist
 
-Phase 1 is NOT complete until every line below is checked. Phase 2 begins only when the user confirms.
+All design bundles complete. Pre-review lints run on all bundles; all blocking findings resolved.
 
 - [x] Track 0 designs: Bundles 1-3 (WU-040, 041, 042, 043, 044, 045, 093, 096)
-- [ ] Track A designs: BFF Foundation (WU-046, 047, 048, 049)
-- [ ] Track A designs: Sessions & Conversation (WU-050, 051, 052)
-- [ ] Track A designs: Streaming, Prompts, Cost (WU-053, 054, 055, 056)
-- [ ] Track A designs: Model Config & Routing (WU-057, 058, 059, 060)
-- [ ] Track A designs: Context, Diagnostics, Recovery (WU-061, 062, 063, 064)
-- [ ] Track A designs: CLI, Ollama Provider, Command History (WU-065, 066, 091)
-- [ ] Track A designs: BFF Integration Tests (WU-067)
-- [ ] Track B designs: Bubbletea Scaffold (WU-068, 069, 070, 071, 072)
-- [ ] Track B designs: Protocol Client (WU-073, 074)
-- [ ] Track B designs: Tool Framework + Tools (WU-075, 076, 077, 078, 079)
-- [ ] Track B designs: Harness Features (WU-080, 081, 082, 083, 084, 085, 086, 092)
-- [ ] Track B designs: Harness Integration Tests (WU-087)
-- [ ] Integration Track designs (WU-088, 089, 090, 094, 095)
+- [x] Track A designs: BFF Foundation (WU-046, 047, 048, 049) — Bundle 4
+- [x] Track A designs: Sessions & Conversation (WU-050, 051, 052) — Bundle 8
+- [x] Track A designs: Streaming, Prompts, Cost (WU-053, 054, 055, 056) — Bundle 10
+- [x] Track A designs: Model Config & Routing (WU-057, 058, 059, 060) — Bundle 9
+- [x] Track A designs: Context, Diagnostics, Recovery (WU-061, 062, 063, 064) — Bundle 11
+- [x] Track A designs: CLI, Ollama Provider, Command History (WU-065, 066, 091) — Bundle 12
+- [x] Track A designs: BFF Integration Tests (WU-067) — Bundle 14
+- [x] Track B designs: Bubbletea Scaffold (WU-068, 069, 070, 071, 072) — Bundle 5
+- [x] Track B designs: Protocol Client (WU-073, 074) — Bundle 6
+- [x] Track B designs: Tool Framework + Tools (WU-075, 076, 077, 078, 079) — Bundle 7
+- [x] Track B designs: Harness Features (WU-080, 081, 082, 083, 084, 085, 086, 092) — Bundle 13
+- [x] Track B designs: Harness Integration Tests (WU-087) — Bundle 14
+- [x] Integration Track designs (WU-088, 089, 090, 094, 095) — Bundle 15
 
-Design order follows dependency graph: foundation → sessions/routing → streaming/context → CLI/features → integration tests → integration track.
+Design order followed dependency graph: foundation → sessions/routing → streaming/context → CLI/features → integration tests → integration track.
 
 ## Serialization Option
 
