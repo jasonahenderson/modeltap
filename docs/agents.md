@@ -164,7 +164,21 @@ This document defines the agent team responsible for designing, building, testin
 
 ## Workflow
 
-Releases execute in three sequential phases. Phase boundaries are at the release level, not the WU level — all designs complete before any coding begins. This is a deliberate change from the per-WU end-to-end flow: contract-heavy releases benefit from seeing the complete design surface before fossilizing it in implementation. Catching cross-WU drift costs minutes at the design-doc layer and hours-per-WU once code is written.
+### Prime directives — DO NOT VIOLATE
+
+1. **Phases are release-level, not WU-level.** A release moves through Phase 1 → Phase 2 → Phase 3 in strict order. You do not interleave them.
+2. **Phase 1 is design for ALL WUs in the release.** Finish every design doc (with subagent pre-review lint on Tier B and Tier C) before Phase 2 begins. No coding in Phase 1. No peer reviews in Phase 1.
+3. **Phase 2 is one batched peer-review pass.** The user flags which designs need external peer review; the batch runs in one session. No new designs, no coding in Phase 2. Phase 2 is skippable if the user decides pre-review lint coverage is sufficient.
+4. **Phase 3 is implementation for ALL WUs.** Red → green → security → docs per WU, in any dependency-legal order. No new design work in Phase 3 — if implementation reveals a design flaw, file a patch or revise the design doc explicitly, don't silently improvise.
+5. **The current phase lives in `docs/releases/<version>/plan.md` §"Phased Execution".** Any action that does not match the current phase is wrong. If you are asked to code during Phase 1, STOP and check the phase.
+6. **Pre-review lint is NOT Tier C.** A Claude subagent with fresh context catches mechanical drift; it does not catch Claude-family reasoning blind spots. Tier C is peer-model (different model family) review, user-driven, batched in Phase 2. A subagent never satisfies Tier C.
+7. **Peer-review handoff is chat-only — no committed prompt file.** The Designer announces the request in chat (WU/bundle ID + file paths); the user chooses their external model and frames the review themselves. Prescriptive prompts bias the outcome.
+
+If any instruction anywhere else in this document or the codebase contradicts these prime directives, the prime directives win. File an ADMIN commit to reconcile.
+
+### Why release-level phases
+
+Phase boundaries are at the release level, not the WU level — all designs complete before any coding begins. This is a deliberate change from the per-WU end-to-end flow: contract-heavy releases benefit from seeing the complete design surface before fossilizing it in implementation. Catching cross-WU drift costs minutes at the design-doc layer and hours-per-WU once code is written.
 
 ```
 ===============================================================
@@ -270,7 +284,7 @@ A release's `plan.md` records which phase the release is in. Status updates move
 
 ### Design Review
 
-Design errors are cheapest to fix before tests cement them. Every WU receives a design review between Designer and Test Engineer; depth scales with the WU's risk tier.
+Design errors are cheapest to fix before tests cement them. Every WU receives a design review during Phase 1, before Phase 3 implementation begins. Depth scales with the WU's risk tier.
 
 #### Tier assignment
 
@@ -355,7 +369,7 @@ Aggressive bundling collapses 33 Tier-C WUs to ~10-12 peer reviews across v0.2.0
 
 #### Pre-review lint (Phase 1, standard on Tier B and C)
 
-A **pre-review lint** is a Claude subagent with fresh context that reads the design doc and (if applicable) source specs for drift, scope gaps, missing fields, and undocumented assumptions. It runs as part of Phase 1 design, after the Designer produces the doc and before moving to the next WU.
+A **pre-review lint** is a Claude subagent with fresh context that reads the design doc and (if applicable) source specs for drift, scope gaps, missing fields, and undocumented assumptions. It runs as part of Phase 1 design, after the Designer produces the doc and before the WU's Phase 1 design is considered complete.
 
 The lint is **not a tier**. It runs on every Tier-B and Tier-C design as the default coverage. It does not satisfy Tier C peer review — it catches mechanical drift, not Claude-family reasoning blind spots. For WUs the user opts into Phase 2 peer review, the lint artifact is referenced in the peer-review prompt so the peer reviewer doesn't waste attention rediscovering lint findings.
 
