@@ -52,6 +52,12 @@ type ActiveSession struct {
 }
 
 func NewSessionManager(store storage.Store) *SessionManager
+
+// GetActiveSession returns the in-memory state for an active session.
+// Returns nil if the session is not currently active on any connection.
+// Exported for WU-064 (session.sync handler) which needs to read
+// conversation state, pending tool calls, and branch state.
+func (sm *SessionManager) GetActiveSession(sessionID string) *ActiveSession
 ```
 
 #### D2.2. Session creation (implicit on first turn.submit)
@@ -89,7 +95,7 @@ Flow:
 6. Build in-memory `Conversation` from persisted turns
 7. Create `ActiveSession`, bind to connection
 8. If the session's tool catalog differs from connection's current catalog → send `capabilities.request` with reason `"reconnection"` (per Bundle 4 D5.5)
-9. Return `protocol.SessionDetail` (from WU-041 `sessions.go`)
+9. Return `protocol.SessionResumeResponse` (from WU-041 `sessions.go`) — lightweight response with `session_id`, `model`, `model_override`, `project`. **NOT** `SessionDetail` (that's for `session.details`, a separate heavier query). Resolves B-02.
 
 #### D2.4. Session list handler
 
@@ -261,13 +267,34 @@ Attachments from `turn.submit` are stored in the `storage.Turn.Content` field as
 
 Pastes are stored as part of the user message content. If the harness used `content.transform` to summarize a paste (WU-062), both the original and summary are stored (original in `Attachments[].Raw`, summary in `Content`).
 
-#### D3.6. Conversion between storage and canonical formats
+#### D3.6. Canonical turn serialization format (resolves B-01)
+
+The `storage.Turn.Content` field (`json.RawMessage`) stores a JSON-serialized `provider.Message`. The serialization format is:
+
+```json
+{
+  "role": "user",
+  "content": "the message text",
+  "tool_calls": [],
+  "tool_results": [],
+  "attachments": [{"path": "...", "raw": "base64...", "content": "...", "content_type": "...", "transform": "..."}],
+  "metadata": {"turn_id": "...", "sequence": 1}
+}
+```
+
+This is a direct `json.Marshal(provider.Message)`. The `provider.Message.Content` field is a plain string; it becomes a JSON string inside the serialized blob. On restore, `json.Unmarshal(turn.Content, &msg)` recovers the canonical form.
+
+**Round-trip contract:** `json.Unmarshal(json.Marshal(msg))` must produce an identical `provider.Message`. Tests assert this for each message variant (user, assistant, tool call, tool result, with attachments).
+
+#### D3.7. Conversion between storage and canonical formats
 
 ```go
 // turnToMessage converts a persisted storage.Turn to a canonical provider.Message.
+// Unmarshals Turn.Content (json.RawMessage) into provider.Message.
 func turnToMessage(t *storage.Turn) (provider.Message, error)
 
 // messageToTurn converts a canonical provider.Message to a storage.Turn for persistence.
+// Marshals the Message into Turn.Content as JSON.
 func messageToTurn(sessionID string, sequence int, msg provider.Message, meta TurnMetadata) *storage.Turn
 
 type TurnMetadata struct {
@@ -508,5 +535,5 @@ Tests use `httptest.Server` as mock provider:
 - **WU-059 (Routing)**: integrates with `DispatchOpts` model/provider selection
 - **WU-060 (Multi-model)**: uses `TurnDispatcher.Dispatch()` for parallel provider calls
 - **WU-061 (Compaction)**: uses `Conversation.Messages()` for token counting
-- **WU-064 (Recovery)**: uses `Conversation.PendingToolCalls()` for `session.sync`
+- **WU-064 (Recovery)**: uses `Conversation.PendingToolCalls()` for `session.sync`. **Note (resolves B-03):** `SessionManager` exports `GetActiveSession(sessionID string) *ActiveSession` so WU-064 can build the sync response from `ActiveSession.Conversation.PendingToolCalls()`, `ActiveSession.ActiveTurn`, and `ActiveSession.BranchManager`. The `session.sync` handler itself lives in WU-064's `recovery.go` but calls into `SessionManager` and `Conversation` exported methods.
 - **WU-091 (Command history)**: wired via `store.AppendCommandHistory()` in turn.submit handler

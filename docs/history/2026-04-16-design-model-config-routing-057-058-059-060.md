@@ -73,23 +73,22 @@ func NewProviderRegistry(config ProviderConfig) *ProviderRegistry
 
 #### D2.2. Config parsing
 
-Config lives under the `providers` key in `config.yaml` (via Viper):
+Config lives under the `providers` key in `config.yaml` (via Viper). **Map format keyed by name** per FEAT-0008 (resolves B-01):
 
 ```yaml
 providers:
-  - name: anthropic-prod
+  anthropic-prod:
     type: anthropic
     api_key: ${ANTHROPIC_API_KEY}
-    host: https://api.anthropic.com
-  - name: openai-prod
+    # host defaults to https://api.anthropic.com for type: anthropic
+  openai-prod:
     type: openai
     api_key: ${OPENAI_API_KEY}
-    host: https://api.openai.com/v1
-  - name: ollama-local
+  ollama-local:
     type: ollama
     host: http://localhost:11434
     discover: true
-  - name: mlx-local
+  mlx-local:
     type: mlx
     host: http://localhost:8080
     discover: true
@@ -97,16 +96,16 @@ providers:
 
 ```go
 type ProviderConfig struct {
-    Endpoints []ProviderEndpointConfig `mapstructure:"providers"`
+    Endpoints map[string]ProviderEndpointConfig `mapstructure:"providers"` // keyed by name
 }
 
 type ProviderEndpointConfig struct {
-    Name     string `mapstructure:"name"`
     Type     string `mapstructure:"type"`
     APIKey   string `mapstructure:"api_key"` // supports ${ENV_VAR} expansion
     Host     string `mapstructure:"host"`
     Discover bool   `mapstructure:"discover"`
 }
+// The map key is the endpoint name (e.g., "anthropic-prod").
 ```
 
 Environment variable expansion: API key values starting with `${` and ending with `}` are resolved from `os.Getenv`. Missing env vars → endpoint marked as `StatusUnavailable` with error message.
@@ -201,15 +200,26 @@ Discovered models are added with `Source: "discovered"`. If a discovered model h
 
 #### D3.4. Manual overrides
 
-Users can define custom model entries in config:
+Users can define custom model entries in config. **Map format keyed by model name** per FEAT-0008 (resolves B-02):
 
 ```yaml
 models:
-  - name: llama-3.1-8b
+  llama-3.1-8b:
     provider: ollama-local
     context_window: 8192
     capabilities: [tool_use]
-    roles: [cheap, coding]
+    description: "Fast local model for coding tasks"
+```
+
+```go
+type ModelConfig map[string]ModelOverrideConfig // keyed by model name
+
+type ModelOverrideConfig struct {
+    Provider      string   `mapstructure:"provider"`
+    ContextWindow int      `mapstructure:"context_window"`
+    Capabilities  []string `mapstructure:"capabilities"`
+    Description   string   `mapstructure:"description"`
+}
 ```
 
 Manual entries override both builtin and discovered entries.
@@ -271,12 +281,13 @@ func NewRoutingPolicy(config map[string]json.RawMessage) *RoutingPolicy
 func (rp *RoutingPolicy) Resolve(path string) (models []string, isMulti bool, found bool)
 ```
 
-Resolution algorithm:
-1. Look up `path` in tree → if found, return
+Resolution algorithm — flat 3-step per FEAT-0008 (resolves B-03):
+1. Look up `path` exactly in tree (e.g., `coding.review`) → if found, return
 2. Replace last segment with `default` (e.g., `coding.review` → `coding.default`) → if found, return
-3. Drop the last segment (e.g., `coding.default` → `coding`) → if found, return
-4. Recurse until reaching top-level `default`
-5. If no `default` exists → not found
+3. Look up top-level `default` → if found, return
+4. Not found
+
+**No deeper recursion.** The resolution is exactly 3 lookups, not recursive. FEAT-0008 defines a flat `category.role → category.default → default` chain, not an arbitrarily nested tree. Deeper nesting in the config (e.g., `coding.review.fast`) is allowed for organizational purposes but only the leaf path and its two fallbacks are checked.
 
 Value parsing: each tree value is either a JSON string (single model) or a JSON array of strings (multi-model).
 
