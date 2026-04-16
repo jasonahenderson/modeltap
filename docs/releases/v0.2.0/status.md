@@ -4,7 +4,7 @@
 2026-04-16
 
 ## Current Phase
-Track 0 in progress; WU-039 complete. WU-040, WU-041, WU-042, WU-093, WU-096 are now unblocked and parallelizable. WU-045 blocked only on WU-039 (done).
+**Release Phase 1 — Design.** WU-039 shipped under the earlier per-WU workflow (complete). All remaining 57 WUs are in the design phase. See `plan.md` §"Phased Execution" and `docs/agents.md` §"Workflow" for phase semantics.
 
 ## Planned
 See `plan.md`, `track-0-shared.md`, `track-a-bff-server.md`, `track-b-terminal-harness.md`, `track-integration.md`.

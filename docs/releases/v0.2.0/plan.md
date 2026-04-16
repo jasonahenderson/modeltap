@@ -179,6 +179,16 @@ This relaxation avoids blocking harness-local progress behind provider formattin
 | Integration | 088-090, 094, 095 | 5 | E2E tests, CLI launch, docs, security review, performance budgets |
 | **Total** | **039-096** | **58** | |
 
+## Phased Execution
+
+Per `docs/agents.md` §"Workflow", v0.2.0 executes in three release-level phases:
+
+- **Phase 1 — Design (current):** All WU designs produced, with subagent pre-review lint on every Tier-B/Tier-C design. WU-039 predates this phase and shipped under the earlier per-WU workflow.
+- **Phase 2 — Peer review (opt-in, batched):** User selects high-stakes designs for external-model peer review. Designer prepares bundled prompts; user runs in one external-model session.
+- **Phase 3 — Implementation:** Red → green → security review → docs per WU, in any dependency-legal order.
+
+Current phase: **Phase 1** (57 WU designs pending; WU-039 already shipped).
+
 ## Design Review Tiers
 
 Every WU has a default review tier recorded in its spec (`**Review tier:** A | B | C`). The tiering rules, procedures, and artifact conventions live in `docs/agents.md` §"Design Review".
