@@ -167,11 +167,18 @@ This document defines the agent team responsible for designing, building, testin
 Each work unit follows this pipeline:
 
 ```
-TPM assigns task
+TPM assigns task (with default review tier)
     |
     v
-Design Engineer -> design doc
+Design Engineer -> design doc (records final review tier in doc)
     |
+    v
+Design Review per tier:
+    Tier A -> self-checklist passes
+    Tier B -> user reviews and approves
+    Tier C -> external/subagent reviewer produces review artifact;
+              blocking findings addressed before proceeding
+    |                                  COMMIT: design + review artifact
     v
 Test Engineer -> failing unit tests
     |                                  COMMIT: tests (red phase)
@@ -199,6 +206,91 @@ Infrastructure Engineer -> CI/build updates (if needed)
     v
 TPM logs completion, updates status
 ```
+
+### Design Review
+
+Design errors are cheapest to fix before tests cement them. Every WU receives a design review between Designer and Test Engineer; depth scales with the WU's risk tier.
+
+#### Tier assignment
+
+The TPM assigns a **default tier** when writing the WU spec in the track file (see `docs/releases/<version>/track-*.md`). The Designer re-evaluates against the rules below after completing the design doc and records the **final tier** at the top of the doc.
+
+Designers may **escalate** (A → B → C) with a recorded reason. Downgrades are not permitted — if a Designer thinks the default is too conservative, they ask the TPM to change the rules rather than skipping review on a specific WU.
+
+#### Tier rules
+
+Apply top-down. First matching rule wins. A WU is Tier C if **any** C rule fires; otherwise Tier B if any B rule fires; otherwise Tier A.
+
+**Tier C — external peer review required** if any of:
+- Creates or modifies files in `internal/protocol/`, `internal/bff/{transport,server,connection,capabilities}.go`, or any other package imported by both Track A and Track B.
+- Creates or modifies a protocol message type, a shared Go interface, a stable on-disk schema, or an ADR.
+- Touches credentials, tokens, TLS config, model-supplied file-path input, shell invocation, network listeners, permission policy, or tool execution.
+- Appears as a dependency of another track beyond Track 0 (cross-track surface).
+
+**Tier B — user review required** if any of (and not already C):
+- Size = L per `plan.md`.
+- Creates ≥3 new `.go` files.
+- Modifies `internal/config/config.go` or adds new config keys.
+- Adds a new Cobra command.
+- Defines UI component layout or key bindings.
+
+**Tier A — self-checklist only** otherwise.
+
+#### Design doc header
+
+Every design doc begins with:
+
+```markdown
+## Review Tier
+**Assigned:** <A | B | C>
+**Basis:** <which rule(s) fired>
+**Plan default:** <tier from WU spec>
+**Escalation reason:** <required only if assigned > plan default>
+```
+
+#### Tier A — self-checklist
+
+The Designer confirms in the design doc that each item holds. A failing item is a blocker until fixed.
+
+1. Every input (ADR, feature spec, dependency WU) is referenced and its relevant constraints captured.
+2. Every field from the source spec is enumerated; required/optional labels match the source.
+3. Cross-WU types (names, shapes) are consistent with the WUs that produce or consume them.
+4. Package and naming conventions (`gofmt`, effective Go, snake_case on the wire) are followed.
+5. At least one "what could go wrong" case is listed with mitigation.
+6. Scope boundaries are explicit: what is in, what is deferred.
+
+#### Tier B — user review
+
+Designer publishes the design doc and pauses. The user reads, asks questions, and approves or requests changes before the Test Engineer proceeds. Approval is recorded in the design doc or in the commit message that promotes the WU to tests.
+
+#### Tier C — external peer review
+
+A reviewer **independent of the Designer** produces a review artifact. Options in priority order:
+
+1. **External LLM via user-mediated submission** — Codex, Kimi, GPT-5, Gemini, etc. Designer prepares the prompt; user runs it through their chosen model; artifact committed back. Best option: catches blind spots specific to any one model's reasoning style. This is how plan reviews already work (`.reviews/codex-plan-review.md`, `.reviews/kimi-plan-review.md`).
+2. **Claude subagent with fresh context** — via the Agent tool. Useful for catching undocumented assumptions, spec drift, and scope gaps. **Not a substitute for #1** — it is same-model-different-session and shares Claude's blind spots with the Designer.
+3. **Another human maintainer** when available.
+
+A subagent review is *same-model, fresh-context* and should be clearly labeled as such. It does not replace an external-model review when one is practical. Until Modeltap itself supports cross-model routing (FEAT-0008 + FEAT-0013), external-model reviews are user-driven.
+
+**Bundled reviews:** multiple related WUs sharing a contract surface may go through a single review. The review artifact covers all WUs reviewed; each WU's design doc links to it. Example: WU-040, WU-041, WU-093 could share one protocol-types design review.
+
+#### Review artifact location and naming
+
+Path: `docs/releases/<version>/.reviews/wu-NNN/<reviewer>-design-review.md`
+For bundled reviews: `docs/releases/<version>/.reviews/<wu-range-or-topic>/<reviewer>-design-review.md`.
+
+Reviewer name prefixes follow the existing plan-review convention (`codex-`, `kimi-`, `gpt5-`, `gemini-`, `claude-subagent-`, etc.). Reviewer-first naming matches `CLAUDE.md` §"Review Artifact Naming".
+
+#### Finding severity and handling
+
+Reviewers bucket findings as:
+
+- **Blocking** — must be resolved before the Test Engineer begins. Design doc is updated; commit references the finding.
+- **Attention** — should be addressed unless there is a documented reason not to. Can be handled in the same WU or deferred to a named follow-up WU or patch.
+- **Nit** — optional. Designer's call.
+
+The Designer updates the design doc in response to Blocking/Attention findings and records the disposition in the review artifact (or a short reply appended to it).
 
 ### Commit Points
 
