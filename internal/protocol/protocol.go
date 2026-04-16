@@ -14,9 +14,23 @@
 // request types (declared in messages.go). Server->harness streaming events,
 // session/tool/model/health/error/compact payloads, and cross-track
 // conformance fixtures are added by WU-040, WU-041, and WU-093 respectively.
+//
+// Canonical field names (snake_case):
+//
+//	turn_id, session_id, tool_call_id, content_type, output_type,
+//	raw_content, max_output_tokens, protocol_version, harness_version,
+//	harness_platform, config_file, config_content, input_schema,
+//	output_envelope, risk_level, capabilities_required, added_tools,
+//	removed_tools, tool_results, attachments, actions.
+//
+// Go-side field identifiers use CamelCase; every struct field carries an
+// explicit `json:"..."` tag so default lowercasing cannot leak a CamelCase
+// form onto the wire.
 package protocol
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
@@ -25,17 +39,16 @@ import (
 // ProtocolVersion is the wire-format protocol version advertised in
 // capabilities.register and connection.health. Bumped on incompatible
 // changes to the protocol message catalog.
-const ProtocolVersion = ""
+const ProtocolVersion = "1"
 
 // MaxFrameSize is the maximum size in bytes of a single NDJSON frame.
 //
-// The cap exists to bound attacker-controlled memory use: turn.submit
-// payloads may carry attachments (base64-encoded raw bytes + extracted
-// text) and large pastes, so the limit is generous enough to accommodate
-// typical documents and screenshots but small enough to prevent trivial
-// exhaustion. Enforced on the reader side only; writer-side policing is
-// the caller's responsibility.
-const MaxFrameSize = 0
+// The cap bounds attacker-controlled memory use: turn.submit payloads may
+// carry attachments (base64-encoded raw bytes + extracted text) and large
+// pastes, so the limit accommodates typical documents and screenshots
+// without allowing trivial exhaustion. Enforced on the reader side only;
+// writer-side policing is the caller's responsibility.
+const MaxFrameSize = 10 * 1024 * 1024 // 10 MiB
 
 // ErrFrameTooLarge is returned by FrameReader.ReadFrame when the next
 // frame exceeds MaxFrameSize. The caller should treat this as a terminal
@@ -51,37 +64,33 @@ var ErrInvalidFrame = errors.New("protocol: invalid frame")
 // literal newline byte, so callers must not supply pre-indented JSON.
 var ErrEmbeddedNewline = errors.New("protocol: frame contains embedded newline")
 
-// errNotImplemented is the red-phase stub sentinel; replaced in the
-// green phase with real framing logic.
-var errNotImplemented = errors.New("protocol: not implemented")
-
 // Request is the JSON-RPC 2.0 request envelope.
 //
 // Method selects the handler; Params is the method-specific payload held as
 // raw JSON so callers can decode into the correct typed struct. ID is raw
 // JSON because JSON-RPC permits string, number, or null identifiers.
 type Request struct {
-	JSONRPC string          // JSON tags added in the green phase
-	ID      json.RawMessage
-	Method  string
-	Params  json.RawMessage
+	JSONRPC string          `json:"jsonrpc"`
+	ID      json.RawMessage `json:"id,omitempty"`
+	Method  string          `json:"method"`
+	Params  json.RawMessage `json:"params,omitempty"`
 }
 
 // Response is the JSON-RPC 2.0 response envelope. Exactly one of Result or
-// Error is set.
+// Error is set on any given response.
 type Response struct {
-	JSONRPC string
-	ID      json.RawMessage
-	Result  json.RawMessage
-	Error   *ErrorObject
+	JSONRPC string          `json:"jsonrpc"`
+	ID      json.RawMessage `json:"id"`
+	Result  json.RawMessage `json:"result,omitempty"`
+	Error   *ErrorObject    `json:"error,omitempty"`
 }
 
 // ErrorObject is the JSON-RPC 2.0 error shape. Data carries optional
 // diagnostic details (e.g., an MT-CONN-* diagnostic code and cause).
 type ErrorObject struct {
-	Code    int
-	Message string
-	Data    json.RawMessage
+	Code    int             `json:"code"`
+	Message string          `json:"message"`
+	Data    json.RawMessage `json:"data,omitempty"`
 }
 
 // Mode is the harness conversational mode submitted on every turn.
@@ -95,26 +104,84 @@ const (
 
 // Valid reports whether m is one of the defined Mode values.
 func (m Mode) Valid() bool {
-	// Red-phase stub: always false so Mode tests fail until green phase.
-	return false
+	switch m {
+	case ModePlan, ModeBuild, ModeAuto:
+		return true
+	default:
+		return false
+	}
 }
 
 // FrameReader reads NDJSON frames from an io.Reader.
 //
 // Each call to ReadFrame returns a single frame's raw JSON bytes (without
-// the trailing newline). EOF is returned cleanly between frames.
+// the trailing newline). io.EOF is returned cleanly between frames.
+// ErrFrameTooLarge is returned without buffering the full oversized input.
 type FrameReader struct {
-	r io.Reader
+	br *bufio.Reader
 }
 
 // NewFrameReader returns a FrameReader wrapping r.
 func NewFrameReader(r io.Reader) *FrameReader {
-	return &FrameReader{r: r}
+	// Use a modest initial buffer; bufio grows as needed. We enforce the
+	// MaxFrameSize cap ourselves so we can return the typed error without
+	// relying on bufio's "token too long" semantics.
+	return &FrameReader{br: bufio.NewReaderSize(r, 64*1024)}
 }
 
 // ReadFrame reads the next NDJSON frame from the underlying reader.
+//
+// On success, returns the raw JSON bytes of the frame, without the trailing
+// newline. Returns io.EOF if the stream ended cleanly between frames.
+// Returns ErrInvalidFrame (wrapped around io.ErrUnexpectedEOF) if the
+// stream ends mid-frame. Returns ErrFrameTooLarge if the frame would
+// exceed MaxFrameSize; in that case, as many bytes as possible are
+// discarded up to the next newline (best-effort) so the caller may close
+// the connection cleanly.
 func (fr *FrameReader) ReadFrame() ([]byte, error) {
-	return nil, errNotImplemented
+	var buf bytes.Buffer
+	for {
+		b, err := fr.br.ReadByte()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				if buf.Len() == 0 {
+					return nil, io.EOF
+				}
+				// Stream ended mid-frame.
+				return nil, errors.Join(ErrInvalidFrame, io.ErrUnexpectedEOF)
+			}
+			return nil, err
+		}
+		if b == '\n' {
+			// Return a defensive copy so the caller can retain it.
+			out := make([]byte, buf.Len())
+			copy(out, buf.Bytes())
+			return out, nil
+		}
+		if buf.Len() >= MaxFrameSize {
+			// Drain until next newline or EOF so the connection can be
+			// closed without leaving garbage in the buffer; discard bytes
+			// rather than buffering them.
+			drainUntilNewline(fr.br)
+			return nil, ErrFrameTooLarge
+		}
+		buf.WriteByte(b)
+	}
+}
+
+// drainUntilNewline reads and discards bytes from br up to and including
+// the next newline, or until EOF. Errors are ignored: the caller has
+// already decided to abandon the frame.
+func drainUntilNewline(br *bufio.Reader) {
+	for {
+		b, err := br.ReadByte()
+		if err != nil {
+			return
+		}
+		if b == '\n' {
+			return
+		}
+	}
 }
 
 // FrameWriter writes NDJSON frames to an io.Writer.
@@ -130,10 +197,16 @@ func NewFrameWriter(w io.Writer) *FrameWriter {
 // WriteFrame writes b as a single NDJSON frame (appends a trailing newline).
 // b must be a complete JSON object with no literal newline bytes; callers
 // should use json.Marshal, not json.MarshalIndent.
+//
+// Returns ErrEmbeddedNewline if b contains a \n byte. Write errors from
+// the underlying io.Writer are returned as-is.
 func (fw *FrameWriter) WriteFrame(b []byte) error {
-	return errNotImplemented
+	if bytes.IndexByte(b, '\n') >= 0 {
+		return ErrEmbeddedNewline
+	}
+	if _, err := fw.w.Write(b); err != nil {
+		return err
+	}
+	_, err := fw.w.Write([]byte{'\n'})
+	return err
 }
-
-// compile-time type check that json.RawMessage is reachable from this
-// package so that envelope types can reference it in the green phase.
-var _ = json.RawMessage{}
