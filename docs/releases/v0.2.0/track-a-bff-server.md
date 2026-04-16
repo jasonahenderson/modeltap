@@ -14,6 +14,8 @@ NEW `internal/bff/transport.go` — NDJSON JSON-RPC 2.0 reader/writer over `net.
 
 **Done:** Can send/receive JSON-RPC messages over `net.Conn`. Correlation works. Error responses use JSON-RPC 2.0 format.
 
+**Security requirement (inherited from WU-039 review SR-039-01):** on `protocol.ErrFrameTooLarge` from `FrameReader.ReadFrame`, the transport MUST close the connection immediately. The reader is left mid-frame and cannot be safely resynchronized against attacker-controlled bytes. Tests must cover the close-on-oversize path.
+
 ### WU-047: Protocol Endpoint — Socket and TLS Listeners
 **Size:** Medium | **Dependencies:** WU-046 | **Parallelizes with:** WU-048
 

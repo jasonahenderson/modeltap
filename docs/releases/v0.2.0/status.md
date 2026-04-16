@@ -4,7 +4,7 @@
 2026-04-16
 
 ## Current Phase
-Planning revised after test-coverage gap review; implementation not yet started
+Track 0 in progress; WU-039 complete. WU-040, WU-041, WU-042, WU-093, WU-096 are now unblocked and parallelizable. WU-045 blocked only on WU-039 (done).
 
 ## Planned
 See `plan.md`, `track-0-shared.md`, `track-a-bff-server.md`, `track-b-terminal-harness.md`, `track-integration.md`.
@@ -12,13 +12,20 @@ See `plan.md`, `track-0-shared.md`, `track-a-bff-server.md`, `track-b-terminal-h
 58 work units total: WU-039 through WU-096.
 
 ## Completed
-(none yet)
+- [x] WU-039: Protocol types — core messages and framing (2026-04-16) — commits `28213eb` (red), `1aa3830` (green), `50febd0` (security fix SR-039-01). Tests, design doc, and security review doc in `docs/history/`.
 
 ## In Progress
 (none yet)
 
 ## Up Next
-WU-039: Protocol types — core messages and framing (Track 0)
+Track 0 (all now runnable in parallel — any subset):
+- WU-040: Protocol types — streaming events
+- WU-041: Protocol types — tools, sessions, models, health, errors
+- WU-042: ADR-0006 amendment — provider outbound formatting interface
+- WU-045: Session and turn storage schema (migration v2)
+- WU-093: Protocol contract — shared golden fixtures and conformance tests (can begin once WU-040 and WU-041 land to cover their types)
+
+Track B harness-local work (WU-068-072, WU-075-079) is also unblocked now that WU-039 is done. Recommended: finish Track 0 first (server-first serialization per plan.md §"Serialization Option").
 
 ## Blocked
 (none)
