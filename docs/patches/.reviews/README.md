@@ -13,6 +13,11 @@ Plan reviews (reviews of implementation plans derived from a patch, broader exec
 
 - `docs/patches/.reviews/plan-reviews/`
 
+When the reviewing model or harness is known, include it in the plan-review filename:
+
+- `docs/patches/.reviews/plan-reviews/codex-0001-openai-responses-api-support-plan-review.md`
+- `docs/patches/.reviews/plan-reviews/codex-0001-openai-responses-api-support-plan-review.json`
+
 Cross-cutting syntheses (multi-patch reviews, baseline crosswalks, security sweeps spanning several patches) live under:
 
 - `docs/patches/.reviews/syntheses/`
