@@ -39,6 +39,7 @@ func TestMethodConstants(t *testing.T) {
 		{"CapabilitiesUpdate", MethodCapabilitiesUpdate, "capabilities.update"},
 		{"ConnectionPing", MethodConnectionPing, "connection.ping"},
 		{"ConnectionHealth", MethodConnectionHealth, "connection.health"},
+		{"ConnectionReady", MethodConnectionReady, "connection.ready"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -305,6 +306,11 @@ func TestConnectionPing_RoundTrip(t *testing.T) {
 func TestConnectionHealth_RoundTrip(t *testing.T) {
 	in := ConnectionHealth{}
 	assertRoundTrip(t, &in, new(ConnectionHealth))
+}
+
+func TestConnectionReady_RoundTrip(t *testing.T) {
+	in := ConnectionReady{}
+	assertRoundTrip(t, &in, new(ConnectionReady))
 }
 
 // -----------------------------------------------------------------------

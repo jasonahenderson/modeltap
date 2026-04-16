@@ -10,7 +10,7 @@
 // (internal/bff and internal/harness).
 //
 // Scope for WU-039: protocol version constants, JSON-RPC 2.0 envelope,
-// NDJSON framing reader/writer, the Mode enum, and the 19 harness->server
+// NDJSON framing reader/writer, the Mode enum, and the 20 harness->server
 // request types (declared in messages.go). Server->harness streaming events,
 // session/tool/model/health/error/compact payloads, and cross-track
 // conformance fixtures are added by WU-040, WU-041, and WU-093 respectively.
@@ -26,6 +26,14 @@
 // Go-side field identifiers use CamelCase; every struct field carries an
 // explicit `json:"..."` tag so default lowercasing cannot leak a CamelCase
 // form onto the wire.
+//
+// References:
+//   - Feature spec: docs/features/0008-bff-server.md (Protocol Specification,
+//     Protocol Messages, Protocol Payload Schemas, Canonical Field Names).
+//   - JSON-RPC 2.0: https://www.jsonrpc.org/specification
+//   - Cross-track conformance (golden fixtures, round-trip tests against
+//     frozen wire samples): see WU-093 deliverables in
+//     docs/releases/v0.2.0/track-0-shared.md.
 package protocol
 
 import (
