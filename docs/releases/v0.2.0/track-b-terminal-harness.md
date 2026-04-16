@@ -1,8 +1,10 @@
 # Track B: FEAT-0009 Terminal Harness
 
 **Release:** v0.2.0
-**WU Range:** WU-068 through WU-087 (20 work units)
-**Depends on:** Track 0 (WU-039 through WU-045)
+**WU Range:** WU-068 through WU-087, plus WU-092 (21 work units)
+**Depends on:**
+- Harness-local WUs (WU-068–WU-072, WU-075–WU-079): only WU-039 (protocol core messages).
+- Protocol client / streaming / session-aware WUs (WU-073, WU-074, WU-080+, WU-092): WU-039, WU-040, WU-041 (and, for WU-092, WU-091).
 **Can parallelize with:** Track A (BFF Server)
 
 ## Bubbletea Scaffold
@@ -24,9 +26,9 @@ NEW `internal/harness/statusbar.go` — renders: connection indicator (`[●]`/`
 ### WU-070: Input Area Component
 **Size:** Medium | **Dependencies:** WU-068 | **Parallelizes with:** WU-069, WU-071
 
-NEW `internal/harness/input.go` — multi-line text input (Bubbletea textarea). Configurable submit key. Command detection (`/` prefix). `@file` syntax detection. Drag-and-drop path detection. Input history traversal. Paste size threshold detection.
+NEW `internal/harness/input.go` — multi-line text input (Bubbletea textarea). Configurable submit key. Command detection (`/` prefix). `@file` syntax detection. Drag-and-drop path detection. Up/down arrow keybindings for history traversal (history source is supplied by WU-092; this WU only wires the keybindings and rendering). Paste size threshold detection.
 
-**Done:** Multi-line works. Submit triggers callback. `/` commands detected. `@file` detected. Large paste detected.
+**Done:** Multi-line works. Submit triggers callback. `/` commands detected. `@file` detected. History arrow keybindings wired with pluggable source interface. Large paste detected.
 
 ### WU-071: Conversation Viewport Component
 **Size:** Medium | **Dependencies:** WU-068 | **Parallelizes with:** WU-069, WU-070
@@ -111,7 +113,14 @@ NEW `internal/harness/modes.go` — mode state. `/plan`, `/build`, `/auto` comma
 
 NEW `internal/harness/mcp.go` — MCP client (stdio). Connects at startup. Discovers tools. Maps to protocol catalog (`mcp:<server>` namespace). `capabilities.update` on connect/disconnect. Config parsing.
 
-**Done:** Connects. Discovery works. Namespace correct. Dynamic update works. Config parses.
+**Startup behavior (degraded mode):** MCP discovery is **not** startup-blocking. The harness launches and connects to the BFF using only the built-in tool catalog if MCP is unavailable or slow. Per-server semantics:
+
+- Each configured MCP server is launched asynchronously with a configurable start timeout (default: 5s).
+- On success, the server's tools are added to the catalog and a `capabilities.update` is sent to the BFF.
+- On failure or timeout, the harness renders a transient banner (`MCP server <name> failed: <reason>`) and continues without that server's tools. The connection manager retries in the background with exponential backoff.
+- `/mcp status` command lists configured servers with per-server state (connected, retrying, failed). `/mcp reconnect <name>` forces a retry.
+
+**Done:** Connects. Discovery works. Namespace correct. Dynamic update works. Config parses. MCP failures never block harness launch or BFF connection. Banner and `/mcp` commands behave as specified. Tests cover: all MCP servers healthy, one MCP server fails at startup, all MCP servers fail, successful late reconnect after startup failure.
 
 ### WU-082: File Context Management
 **Size:** Medium | **Dependencies:** WU-076, WU-070 | **Parallelizes with:** WU-080, WU-081
@@ -151,9 +160,28 @@ NEW `internal/harness/connux.go` — status bar connection states (green/yellow/
 ### WU-087: Harness Integration Tests with Mock Server
 **Size:** Large | **Dependencies:** all Track B
 
-NEW `internal/harness/integration_test.go` — E2E with mock BFF. Tests: launch, connect, register, turn with streaming, tool round-trips (all 13 tools), permission prompts, plan mode, session explorer, model display, compaction UI, connection states, diagnostics.
+NEW `internal/harness/integration_test.go` — E2E with mock BFF. Tests: launch, connect, register (version + project context), turn with streaming, tool round-trips (all 13 tools), permission prompts, plan mode, session explorer, model display, compaction UI, command history traversal, connection states, diagnostics.
 
 **Done:** Integration tests cover FEAT-0009 success criteria. Mock covers all protocol messages. All pass.
+
+## Command History (Harness Side)
+
+### WU-092: BFF-Sourced Command History Traversal
+**Size:** Medium | **Dependencies:** WU-070, WU-073, WU-091 | **Parallelizes with:** WU-080-086
+
+Required to satisfy FEAT-0009's "command history traversal (up/down arrows) sourced from the BFF (cross-session, cross-project)".
+
+Implements:
+
+- NEW `internal/harness/history.go` — client-side history controller.
+  - Fetches history on harness launch via `history.list` (default scope `user`, limit 200).
+  - Caches entries locally with cursor metadata; pages older entries on demand as the user arrows past the cache.
+  - Up/down arrow traversal integrates with WU-070 input area: arrows move through the cached window; typing over the current entry commits it as a new draft.
+  - Scope toggle: `/history project`, `/history session`, `/history user` commands change the server-side scope and refresh.
+  - On `turn.submit` the harness relies on the server's automatic append (WU-091); no client-side append is required.
+- Replaces the "local input history traversal" previously implied in WU-070: WU-070 wires the keybindings and renders the current entry, but the source of truth is WU-092.
+
+**Done:** Up/down arrows traverse BFF-sourced history across sessions and projects. Scope commands work. Paging older entries works. Works offline with an empty history (degrades gracefully if `history.list` unavailable). Tests with mock BFF cover scope switches, paging, and traversal wrap-around.
 
 ## Critical Path
 
@@ -163,4 +191,4 @@ NEW `internal/harness/integration_test.go` — E2E with mock BFF. Tests: launch,
 073 → 074 (protocol client → connection manager)
 ```
 
-Three parallel chains. Longest: scaffold → tools → features (~8 sequential WUs).
+Three parallel chains. Longest: scaffold → tools → features (~8 sequential WUs). WU-092 (command history) runs off WU-070/WU-073/WU-091 and does not extend the critical path.

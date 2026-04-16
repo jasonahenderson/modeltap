@@ -10,17 +10,22 @@ The two features can be built in parallel against a shared protocol contract (`i
 
 **Three tracks + integration:**
 - **Track 0** (7 WUs): Shared prerequisites — protocol types, ADR-0006 amendment, provider formatting, session storage
-- **Track A** (22 WUs): FEAT-0008 BFF Server
-- **Track B** (20 WUs): FEAT-0009 Terminal Harness
+- **Track A** (23 WUs): FEAT-0008 BFF Server (includes WU-091 command history)
+- **Track B** (21 WUs): FEAT-0009 Terminal Harness (includes WU-092 command history client)
 - **Integration** (3 WUs): End-to-end tests, CLI launch, docs
 
-**Total: 52 work units (WU-039 through WU-090)**
+**Total: 54 work units (WU-039 through WU-092; WU-091/092 added to satisfy FEAT-0009 command history)**
 
 ---
 
 ## Track 0: Shared Prerequisites
 
-Must complete before Track A or Track B begins.
+Track 0 is the shared contract foundation.
+
+- **Track A gate:** all of Track 0 (WU-039 through WU-045) must complete before any Track A work begins. The BFF needs the full protocol types, provider outbound formatting, and session storage schema before its internal work makes sense.
+- **Track B gate (relaxed):** harness-local Track B work may begin once **WU-039 (core protocol messages and framing)** is stable. This includes WU-068–WU-072 (Bubbletea scaffold, status bar, input area, viewport, markdown rendering) and WU-075–WU-079 (tool framework and the 13 tools), none of which depend on Track 0 output beyond WU-039. Track B work that touches the protocol client or session/streaming payloads (WU-073, WU-074, WU-080+) additionally requires WU-040 and WU-041.
+
+This relaxation avoids blocking harness-local progress behind provider formatting (WU-042–WU-044) and session storage (WU-045), neither of which the harness-local slice needs.
 
 | WU | Title | Dependencies | Size | Parallelizes With |
 |----|-------|-------------|------|-------------------|
@@ -53,7 +58,7 @@ Must complete before Track A or Track B begins.
 | 046 | JSON-RPC transport layer | 039-041 | M | Track B |
 | 047 | Protocol endpoint: socket and TLS listeners | 046 | M | 048 |
 | 048 | Connection lifecycle state machine (9 states) | 046 | M | 047 |
-| 049 | Capability registration and tool catalog | 046, 041 | S | 047, 048 |
+| 049 | Capability registration, version negotiation, project context | 046, 041, 045 | M | 047, 048 |
 
 ### Sessions and conversation state
 
@@ -94,9 +99,10 @@ Must complete before Track A or Track B begins.
 
 | WU | Title | Dependencies | Size | Parallelizes With |
 |----|-------|-------------|------|-------------------|
-| 065 | CLI: serve, server status, session unlock | 047, 048, 050, 063 | M | 064 |
+| 065 | CLI: serve, server status, server sessions, session unlock | 047, 048, 050, 063 | M | 064 |
 | 066 | Ollama provider adapter (full interface with formatting) | 042 | M | any from 052+ |
 | 067 | BFF server integration tests | all Track A | L | — |
+| 091 | Command history: storage and protocol | 045, 046, 050 | M | 092 |
 
 **Track A critical path:** 046 → 050 → 051 → 052 → 053 → 055 → 061 and 052 → 059 → 060.
 
@@ -143,6 +149,7 @@ Must complete before Track A or Track B begins.
 | 085 | Model commands and multi-model branch display | 073, 071 | M | 084 |
 | 086 | Connection UX: states, banners, diagnostics | 074, 069 | M | 084, 085 |
 | 087 | Harness integration tests with mock server | all Track B | L | — |
+| 092 | Command history: BFF-sourced traversal | 070, 073, 091 | M | 080-086 |
 
 **Track B critical path:** 068 → 075 → 076 → 082 → 084 (tools → features).
 
@@ -163,10 +170,10 @@ Must complete before Track A or Track B begins.
 | Track | WUs | Count | Key Deliverable |
 |-------|-----|-------|----------------|
 | 0 (Shared) | 039-045 | 7 | Protocol types, provider formatting, session storage |
-| A (BFF) | 046-067 | 22 | Server: transport, sessions, routing, streaming, compaction, diagnostics |
-| B (Harness) | 068-087 | 20 | UI: Bubbletea, 13 tools, modes, MCP, session explorer, connection UX |
+| A (BFF) | 046-067, 091 | 23 | Server: transport, sessions, routing, streaming, compaction, diagnostics, command history |
+| B (Harness) | 068-087, 092 | 21 | UI: Bubbletea, 13 tools, modes, MCP, session explorer, connection UX, command history |
 | Integration | 088-090 | 3 | E2E tests, CLI launch, docs |
-| **Total** | **039-090** | **52** | |
+| **Total** | **039-092** | **54** | |
 
 ## Serialization Option
 
