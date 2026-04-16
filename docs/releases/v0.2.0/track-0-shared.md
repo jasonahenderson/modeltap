@@ -23,7 +23,7 @@ Implements `internal/protocol/`:
 
 **Size:** Medium | **Dependencies:** WU-039 | **Parallelizes with:** WU-041, WU-042 | **Review tier:** C (protocol contract + cross-track)
 
-**Decision required (inherited from WU-039 design review A-04):** WU-040 must settle whether server→harness streaming events are modeled as JSON-RPC 2.0 Notification frames (no `id` field) or as a dedicated `Notification` type parallel to `Request`. If the former, add a doc comment on `protocol.Request.ID` warning that callers must set `ID` for non-notification requests. If the latter, introduce the `Notification` type in `internal/protocol/events.go` and document the distinction. Either choice must be captured in the WU-040 design doc and reflected in WU-046 dispatch logic.
+**Envelope decision resolved (post Codex peer-review of WU-039):** server→harness streaming events use the `protocol.Notification` type introduced in WU-039 (JSON-RPC 2.0 notification; no `id` field). Harness→server frames always use `protocol.Request`. WU-040 implementations wrap streaming event payloads (`TokenDelta`, `ToolCall`, `TurnComplete`, etc.) in `Notification` at marshal time.
 
 Implements `internal/protocol/events.go`:
 - All server→harness streaming event types: `TokenDelta`, `BranchStarted`, `BranchComplete`, `BranchError`, `ToolCall`, `StatusUpdate`, `KnowledgeHit`, `CostUpdate`, `CompactPlan`, `CompactSuggest`, `CompactNotice`, `TurnComplete`, `ModelSelected`, `Error`

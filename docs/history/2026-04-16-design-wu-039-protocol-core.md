@@ -9,7 +9,7 @@
 WU-039 delivers the **core messages + framing** slice of `internal/protocol/`:
 
 - `internal/protocol/protocol.go` — protocol version constants, JSON-RPC 2.0 envelope types, NDJSON framing reader/writer, `Mode` type, canonical field-name doc.
-- `internal/protocol/messages.go` — 19 harness→server request types and their method-name constants.
+- `internal/protocol/messages.go` — 20 harness→server request types and their method-name constants.
 - `internal/protocol/protocol_test.go` — round-trip marshal/unmarshal for every message type, framing tests, Mode tests.
 
 **Out of scope (handled in later WUs):**
@@ -23,7 +23,7 @@ WU-039 delivers the **core messages + framing** slice of `internal/protocol/`:
 ```
 internal/protocol/
 ├── protocol.go   # envelope, framing, version, Mode, field-name doc
-├── messages.go   # 19 harness→server request types
+├── messages.go   # 20 harness→server request types
 └── protocol_test.go
 ```
 
@@ -60,6 +60,16 @@ type ErrorObject struct {
 ```
 
 `json.RawMessage` preserves params/result for deferred decoding into the correct typed struct based on `Method`. Keeping the envelope dumb decouples WU-039 from dispatch (WU-046).
+
+**D2.1 — `Notification` is a separate envelope (added post-Codex peer-review):**
+
+FEAT-0008 §"Correlation" (line 54) requires every harness→server request to include an `id`. Allowing `Request` to serialize without `id` (via `omitempty`) would silently permit harness frames that violate the correlation requirement. To encode the invariant at the type layer:
+
+- `Request.ID` has no `omitempty`. Every `Request` emits an `id` key on the wire; a nil `ID` serializes as `"id":null`, which WU-046 transport validation rejects because it defeats correlation.
+- `Notification` is a separate envelope (no `id` field by design) used exclusively for **server→harness** fire-and-forget frames — streaming events introduced in WU-040 (`token.delta`, `tool.call`, `turn.complete`, `cost.update`, etc.).
+- Harness→server frames MUST use `Request`, never `Notification`. The transport layer rejects harness-sourced frames that lack an `id` as a protocol violation.
+
+This closes the A-04 deferred decision from the pre-review lint: WU-040 uses `Notification` for streaming events; there is no longer an open choice between "Request with optional id" and "dedicated Notification type."
 
 ### D3. NDJSON framing
 Each JSON frame is a complete JSON object terminated by `\n`. `protocol.go` exposes:
@@ -183,7 +193,7 @@ type ToolDefinition struct {
 }
 ```
 
-### 19 request types
+### 20 request types
 
 | # | Go type | Method constant | JSON-RPC method |
 |---|---------|-----------------|------------------|
@@ -306,7 +316,7 @@ Exported as a string for wire use. `internal/bff/capabilities.go` (WU-049) will 
 ## Test Plan (`protocol_test.go`)
 
 ### T1. Round-trip per request type
-Table-driven test: for each of the 19 types, construct a representative instance with all fields populated (including optional), marshal, unmarshal back into a fresh instance of the same type, and `reflect.DeepEqual` the original and the reconstructed.
+Table-driven test: for each of the 20 types, construct a representative instance with all fields populated (including optional), marshal, unmarshal back into a fresh instance of the same type, and `reflect.DeepEqual` the original and the reconstructed.
 
 Two tables per type when optional fields exist:
 - **Full**: every field populated.
