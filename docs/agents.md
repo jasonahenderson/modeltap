@@ -164,54 +164,102 @@ This document defines the agent team responsible for designing, building, testin
 
 ## Workflow
 
-Each work unit follows this pipeline:
+Releases execute in three sequential phases. Phase boundaries are at the release level, not the WU level — all designs complete before any coding begins. This is a deliberate change from the per-WU end-to-end flow: contract-heavy releases benefit from seeing the complete design surface before fossilizing it in implementation. Catching cross-WU drift costs minutes at the design-doc layer and hours-per-WU once code is written.
 
 ```
-TPM assigns task (with default review tier)
-    |
-    v
-Design Engineer -> design doc (records final review tier in doc)
-    |
-    v
-(Optional for Tier B/C) Pre-review lint:
+===============================================================
+PHASE 1 — Design (all WUs in the release)
+===============================================================
+
+For each WU (or bundle of related WUs):
+    TPM assigns task (with default review tier)
+        |
+        v
+    Designer produces design doc
+    (Bundle related WUs into one design doc where they share a
+     contract surface — see "Bundled designs" below.)
+        |
+        v
+    Subagent pre-review lint (recommended for B and C)
     Claude subagent with fresh context reviews the design against
-    source specs; Designer triages findings, resolves cheap ones in-WU.
-    |                                  COMMIT: lint artifact
-    v
-Design Review per tier:
-    Tier A -> self-checklist passes
-    Tier B -> user reviews and approves
-    Tier C -> peer-model reviewer (different model family) produces
-              review artifact; Blocking findings addressed before
-              proceeding. Subagent review does NOT satisfy Tier C.
-    |                                  COMMIT: design + review artifact
-    v
-Test Engineer -> failing unit tests
-    |                                  COMMIT: tests (red phase)
-    +--------------------------+
-    |                          |
-    v                          v
-Backend Implementer      UI Implementer
-    |                          |
-    +--------------------------+
-    |                                  COMMIT: implementation (green phase)
-    v
-Integration Tester -> end-to-end tests
-    |
-    v
-Security Reviewer -> review (pass/fail)
-    |                    |
-    | (pass)             | (fail -> Implementer fixes -> re-review)
-    |                                  COMMIT: security fixes (if any)
-    v
-Documentation Specialist -> docs
-    |
-    v
-Infrastructure Engineer -> CI/build updates (if needed)
-    |                                  COMMIT: work unit complete
-    v
-TPM logs completion, updates status
+    source specs; Designer triages findings, resolves cheap ones.
+        |
+        v
+    COMMIT: design doc + lint artifact
+
+After ALL designs are complete, Phase 1 ends.
+
+===============================================================
+PHASE 2 — Peer review (opt-in, batched)
+===============================================================
+
+User identifies which WUs (or bundles) warrant external peer-model
+review beyond the subagent lint. Typically a minority: ADR-level
+decisions, externally-facing contracts, security-critical surfaces.
+
+Designer prepares ready-to-paste peer-review prompts for the
+flagged items. User runs them in one external-model session
+(bundled reviews preferred). Results committed.
+
+Designer processes findings across the batch; design docs revised
+as needed.
+
+    COMMIT: peer-review artifacts + design revisions
+
+Phase 2 may be skipped entirely for a release if the user decides
+the subagent lint is sufficient coverage.
+
+===============================================================
+PHASE 3 — Implementation (all WUs)
+===============================================================
+
+With all designs stable, implementation proceeds in any
+dependency-legal order. Per WU:
+
+    Test Engineer -> failing unit tests
+        |                              COMMIT: tests (red phase)
+        +--------------------------+
+        |                          |
+        v                          v
+    Backend Implementer      UI Implementer
+        |                          |
+        +--------------------------+
+        |                              COMMIT: implementation (green)
+        v
+    Integration Tester -> end-to-end tests
+        |
+        v
+    Security Reviewer -> review (pass/fail)
+        |                    |
+        | (pass)             | (fail -> Implementer fixes -> re-review)
+        |                              COMMIT: security fixes (if any)
+        v
+    Documentation Specialist -> docs
+        |
+        v
+    Infrastructure Engineer -> CI/build updates (if needed)
+        |                              COMMIT: work unit complete
+        v
+    TPM logs completion, updates status
+
+WUs may parallelize within Phase 3 subject to their dependency
+graph.
 ```
+
+### Bundled designs
+
+Where multiple WUs share a contract surface, produce ONE design doc covering them all. The bundle's title lists the WU range (e.g., `design-protocol-types-040-041-093.md`). Each constituent WU's status line references the bundle doc.
+
+Bundle when WUs:
+- Share a Go package or file set
+- Share a protocol surface (message catalog, interface signature)
+- Are implementations of one conceptual subsystem where separating designs would force duplication
+
+Do NOT bundle when WUs have independent blast radius or when a design flaw in one wouldn't invalidate the others.
+
+### Phase selection per release
+
+A release's `plan.md` records which phase the release is in. Status updates move WUs within the current phase, and phase transitions are ADMIN commits that mark the boundary.
 
 ### Design Review
 
@@ -269,18 +317,22 @@ The Designer confirms in the design doc that each item holds. A failing item is 
 
 Designer publishes the design doc and pauses. The user reads, asks questions, and approves or requests changes before the Test Engineer proceeds. Approval is recorded in the design doc or in the commit message that promotes the WU to tests.
 
-#### Tier C — peer-model review
+#### Tier C — peer-model review (opt-in, batched in Phase 2)
 
-A reviewer **using a different model family from the Designer** produces a review artifact. This is definitional: Tier C exists to catch reasoning blind spots that a same-model reviewer cannot detect. A fresh-context instance of the Designer's own model shares the same training distribution, tokenizer, and reasoning heuristics, so it will miss the same patterns. Tier C is not about "fresh eyes," it is about **different eyes**.
+Tier C marks a WU as **eligible for peer-model review**. It does not automatically trigger one. The user decides in Phase 2 which Tier-C WUs (or bundles) warrant external peer review; the rest proceed on the strength of the subagent pre-review lint alone.
+
+Calibration rationale: 33 Tier-C WUs across v0.2.0 would require 33 user-mediated external-model sessions if every one triggered peer review. That is not practical. The tag identifies elevated risk; the Phase 2 opt-in preserves the review capability for the highest-stakes designs (typically 3-8 bundles per release).
+
+A peer-model reviewer uses a **different model family from the Designer**. This is definitional: Tier C exists to catch reasoning blind spots that a same-model reviewer cannot detect. A fresh-context instance of the Designer's own model shares the same training distribution and will miss the same patterns.
 
 Tier-C reviewer options:
 
-1. **External LLM via user-mediated submission** — Codex, Kimi, GPT-5, Gemini, or any other non-Claude model. Designer prepares a ready-to-paste peer-review prompt at `.reviews/wu-NNN/peer-review-prompt.md`; user runs it through their chosen model; artifact committed back. This is how plan reviews already work (`.reviews/codex-plan-review.md`, `.reviews/kimi-plan-review.md`).
+1. **External LLM via user-mediated submission** — Codex, Kimi, GPT-5, Gemini, or any other non-Claude model. Designer prepares a ready-to-paste peer-review prompt at `.reviews/<wu-or-bundle>/peer-review-prompt.md`; user runs it through their chosen model; artifact committed back. This is how plan reviews already work (`.reviews/codex-plan-review.md`, `.reviews/kimi-plan-review.md`).
 2. **Human maintainer** using a different model from the Designer's, or reasoning without model assistance.
 
-A Claude subagent with fresh context is **not** a Tier-C option. See "Pre-review lint" below for its actual role.
+A Claude subagent with fresh context is **not** a Tier-C option. See "Pre-review lint" below — subagent reviews are Phase 1 work, run on every Tier-C WU as part of design.
 
-Until Modeltap itself supports autonomous cross-model routing (FEAT-0008 + FEAT-0013 `review_*` roles), Tier-C reviews are user-driven: the Designer prepares the prompt and supporting artifacts; the user executes the review against their chosen external model; the result is committed.
+Until Modeltap itself supports autonomous cross-model routing (FEAT-0008 + FEAT-0013 `review_*` roles), Tier-C peer reviews are user-driven: the Designer prepares prompts in Phase 1 (if the WU is opted in), the user executes them in one Phase 2 session, and the batch of results is processed together.
 
 **Bundled reviews:** multiple related WUs sharing a contract surface should go through a single peer review to economize reviewer effort. The review artifact covers all WUs reviewed; each WU's design doc links to it. v0.2.0 bundle candidates:
 - Protocol types: WU-040 + WU-041 + WU-093
@@ -294,18 +346,18 @@ Until Modeltap itself supports autonomous cross-model routing (FEAT-0008 + FEAT-
 
 Aggressive bundling collapses 33 Tier-C WUs to ~10-12 peer reviews across v0.2.0.
 
-#### Pre-review lint (optional, not a tier)
+#### Pre-review lint (Phase 1, standard on Tier B and C)
 
-Before handing a Tier-B or Tier-C design off for review, the Designer may run a **pre-review lint**: a Claude subagent with fresh context that reads the design doc and (if applicable) the implementation against source specs. The lint catches mechanical issues cheaply — missing fields, spec drift, cross-WU inconsistency, scope gaps, undocumented assumptions — so the reviewer's attention (your time, or the external model's context window) is spent on things the lint can't reach.
+A **pre-review lint** is a Claude subagent with fresh context that reads the design doc and (if applicable) source specs for drift, scope gaps, missing fields, and undocumented assumptions. It runs as part of Phase 1 design, after the Designer produces the doc and before moving to the next WU.
 
-The lint is **not a tier**. It does not satisfy Tier B or Tier C. It is a Designer tool that runs before the tier review.
+The lint is **not a tier**. It runs on every Tier-B and Tier-C design as the default coverage. It does not satisfy Tier C peer review — it catches mechanical drift, not Claude-family reasoning blind spots. For WUs the user opts into Phase 2 peer review, the lint artifact is referenced in the peer-review prompt so the peer reviewer doesn't waste attention rediscovering lint findings.
 
-Artifact: `docs/releases/<version>/.reviews/wu-NNN/claude-subagent-pre-review.md`. The Designer triages the lint's findings, resolves Blocking items in-WU, and commits the lint artifact before requesting the tier review. The peer-review prompt should reference the lint artifact so the peer reviewer doesn't rediscover already-resolved findings.
+Artifact: `docs/releases/<version>/.reviews/<wu-or-bundle>/claude-subagent-pre-review.md`. The Designer triages the lint's findings, resolves Blocking items in the design doc before closing the WU's Phase 1 design, and commits the lint artifact.
 
-Recommended usage:
-- **Tier C:** run the lint. The cost is low and the lint catches spec drift cheaply.
-- **Tier B:** lint is optional; use judgment based on WU complexity.
-- **Tier A:** skip the lint. Tier A is already a self-check; adding a subagent is overkill.
+Per-tier usage:
+- **Tier C:** lint runs on every WU. No exception — this is the substitute for automatic external peer review.
+- **Tier B:** lint runs by default; Designer may skip for trivially simple designs with rationale.
+- **Tier A:** lint skipped. Tier A is a self-check by the Designer using the checklist; adding a subagent is overkill.
 
 #### Review artifact location and naming
 
