@@ -1,0 +1,95 @@
+[
+  {
+    "id": "F1",
+    "summary": "FEAT-0009 does not yet accept or render the connectivity lifecycle that FEAT-0008 now requires.",
+    "reviewer": "Connectivity Integration",
+    "severity": "blocking",
+    "affected_sections": [
+      "FEAT-0008 Connection Lifecycle and Self-Recovery",
+      "FEAT-0008 Diagnostic Taxonomy",
+      "FEAT-0009 CLI Integration",
+      "FEAT-0009 Success Criteria"
+    ],
+    "detail": "FEAT-0008 now defines managed connection states, auto-start behavior, heartbeat, readiness, connection.health, connection.ready, session.sync, and structured MT-CONN diagnostics. FEAT-0009 still treats connection as a single success criterion: connect, register capabilities, establish a session. It does not specify how the TUI renders discovering, starting, degraded, reconnecting, or failed; how it displays automatic repair attempts; how it exposes server status or unlock diagnostics in-session; or how it recovers UI state after session.sync.",
+    "recommendation": "Add a Connection UX and Recovery section to FEAT-0009 defining status bar states, transient banners, retry progress, diagnostic rendering, reconnect behavior during an active stream, and user actions for MT-CONN failures. Add success criteria proving the harness renders and acts on FEAT-0008 connection lifecycle events.",
+    "disposition": null,
+    "disposition_rationale": null
+  },
+  {
+    "id": "F2",
+    "summary": "The tool catalog contract is not precise enough for FEAT-0009's built-in and MCP tool behavior.",
+    "reviewer": "Protocol Contract",
+    "severity": "blocking",
+    "affected_sections": [
+      "FEAT-0008 Capability and tool registration",
+      "FEAT-0008 Tool call round-trips",
+      "FEAT-0009 Tool Execution",
+      "FEAT-0009 Permission Model"
+    ],
+    "detail": "FEAT-0008 requires capabilities.register to declare available tools with name, description, input schema, and permission level. FEAT-0009 defines many built-in tools but then says the model sees a unified Read tool while the harness internally dispatches to PDF, DOCX, image, spreadsheet, and text readers. FEAT-0009 also says permissions are entirely harness-enforced and the BFF has no knowledge of the current permission level, while FEAT-0008 says permission level is part of capability registration. The specs do not define the canonical tool schema, whether permission metadata is static capability metadata or dynamic policy, how MCP tools are namespaced, or how model capabilities like vision affect the tool catalog.",
+    "recommendation": "Define a shared tool catalog schema in FEAT-0008 and have FEAT-0009 conform to it. Separate static tool risk metadata from dynamic permission state. Specify namespacing for MCP tools, unified Read dispatch semantics, per-tool input/output envelopes, rejection/error payloads, and how capability changes trigger capabilities.update.",
+    "disposition": null,
+    "disposition_rationale": null
+  },
+  {
+    "id": "F3",
+    "summary": "FEAT-0009's large-paste summarization path can require BFF model routing before turn.submit, but FEAT-0008 has no pre-turn summarization protocol.",
+    "reviewer": "Pre-Turn Workflow",
+    "severity": "blocking",
+    "affected_sections": [
+      "FEAT-0008 Harness Protocol",
+      "FEAT-0008 Model Routing Policy",
+      "FEAT-0009 Large Paste Handling"
+    ],
+    "detail": "FEAT-0009 says large paste summarization is performed harness-side before submission, using a local model or the BFF's cheap routing target. If the harness calls a local model directly, it violates the core FEAT-0008 premise that the harness never speaks provider/model protocols. If it asks the BFF to summarize before turn.submit, FEAT-0008 needs a protocol method for pre-turn transformations that captures raw content, routes to a cheap model, returns transformed content, and avoids polluting the main conversation as a user turn.",
+    "recommendation": "Add a BFF method such as content.transform or context.summarize for pre-turn summarization, with capture semantics and cost attribution. Alternatively, change FEAT-0009 so large-paste summarization is deferred until after turn.submit, with the BFF owning summarization entirely.",
+    "disposition": null,
+    "disposition_rationale": null
+  },
+  {
+    "id": "F4",
+    "summary": "Multi-model stream display in FEAT-0009 depends on branch-level stream semantics that FEAT-0008 only sketches.",
+    "reviewer": "Streaming and Recovery",
+    "severity": "blocking",
+    "affected_sections": [
+      "FEAT-0008 Model Transparency",
+      "FEAT-0008 In-Flight Turn Recovery",
+      "FEAT-0009 Multi-model review display",
+      "FEAT-0009 Success Criteria"
+    ],
+    "detail": "FEAT-0008 says multi-model roles emit interleaved token.delta events tagged with reviewer_id, and FEAT-0009 describes progressive per-reviewer display. But the shared contract does not define branch lifecycle events, branch completion/error semantics, aggregate turn.complete behavior, cancellation of one branch versus all branches, cost updates per branch, or session.sync output for partially completed multi-model turns. Without that, FEAT-0009 cannot implement reliable progressive rendering or reconnect recovery.",
+    "recommendation": "Extend FEAT-0008's protocol event schema for multi-model turns: branch.started, branch-tagged token.delta, branch-tagged cost.update, branch.complete, branch.error, aggregate turn.complete, and branch-aware session.sync. FEAT-0009 should reference those events explicitly in the multi-model display section and success criteria.",
+    "disposition": null,
+    "disposition_rationale": null
+  },
+  {
+    "id": "F5",
+    "summary": "Project root and project-instruction handoff are not specified in the harness/BFF protocol.",
+    "reviewer": "Project Context Boundary",
+    "severity": "significant",
+    "affected_sections": [
+      "FEAT-0008 Project instructions",
+      "FEAT-0008 Session List and Details",
+      "FEAT-0009 Project Awareness",
+      "FEAT-0009 CLI Integration"
+    ],
+    "detail": "FEAT-0009 says modeltap --project <path> scopes the session and file operations are relative to the project root. FEAT-0008 says the server loads .modeltap.yaml or MODELTAP.md from the harness's project root and includes it in the system prompt. But the protocol tables do not define how the harness transmits the project root, how the BFF validates or stores it, whether it receives file paths as absolute or project-relative, or how project config updates interact with session resume.",
+    "recommendation": "Add project context fields to session.resume, new-session creation, and turn.submit as needed. Define canonical project identity, path normalization rules, security boundaries for file access, and whether the server reads project instruction files itself or receives their contents from the harness.",
+    "disposition": null,
+    "disposition_rationale": null
+  },
+  {
+    "id": "F6",
+    "summary": "FEAT-0009 acceptance criteria exercise behaviors that FEAT-0008 does not yet list as BFF acceptance gates.",
+    "reviewer": "Acceptance Alignment",
+    "severity": "significant",
+    "affected_sections": [
+      "FEAT-0008 Success Criteria",
+      "FEAT-0009 Success Criteria"
+    ],
+    "detail": "FEAT-0009 success criteria require /models, session explorer, session details, compaction UI, model routing indicators, model override persistence, MCP capability updates, multi-model review display, and context command behavior. FEAT-0008 supports much of this in body text, but its success criteria still stop at broad connection, turn streaming, persistence, routing, cost, compaction, and concurrent connection behavior. The BFF feature can technically pass while leaving key harness requirements unproven.",
+    "recommendation": "Add FEAT-0008 success criteria that explicitly cover model.list, model.selected, session.list, session.details, compact.plan, compact.apply, capabilities.update, connection health, and branch-aware multi-model stream events. Then FEAT-0009 can depend on those behaviors as tested BFF contracts.",
+    "disposition": null,
+    "disposition_rationale": null
+  }
+]
