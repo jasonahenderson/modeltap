@@ -103,9 +103,10 @@ Startup behavior (non-blocking per WU-081 track spec):
 ```go
 // internal/harness/context.go
 
-// ContextManager handles @file loading, glob expansion, and drag-drop.
+// ContextManager handles @file loading, glob expansion, drag-drop, and /context display.
 type ContextManager struct {
     readTool  tools.Tool
+    conn      *ConnectionManager // for context.list RPC (resolves BLOCKING-03)
     state     *AppState
 }
 
@@ -114,6 +115,9 @@ type ContextManager struct {
 func (cm *ContextManager) ProcessAttachments(refs []string) ([]protocol.Attachment, error)
 
 // HandleContextCommand processes /context (list) and /drop <file> (remove).
+// /context sends context.list RPC to BFF → renders files, knowledge injections,
+// token budget, context_pct, system_prompt_tokens. Local attachment state
+// supplements the server response. /drop removes a file from local context.
 func (cm *ContextManager) HandleContextCommand(cmd, args string) tea.Cmd
 ```
 
