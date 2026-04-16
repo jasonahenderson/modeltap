@@ -63,7 +63,7 @@ Flow:
       ```go
       conn.transport.SendNotification(&protocol.Notification{
           Method: "token.delta",
-          Params: marshal(TokenDelta{TurnID: turnID, BranchID: branchID, Content: chunk}),
+          Params: marshal(TokenDelta{TurnID: turnID, BranchID: branchID, Text: chunk}),
       })
       ```
    b. **Tool call** → accumulate tool call, emit `tool.call` notification
@@ -304,12 +304,12 @@ func (pe *PromptEngine) Assemble(mode protocol.Mode, session *ActiveSession) (st
 
 #### D4.4. Trimming strategy
 
-Trim order (first to be reduced/removed):
+Trim order per FEAT-0008 "preserving Layers 1-5" (resolves BLOCKING-02):
 1. Layer 6 (knowledge) — trim first since it's supplementary
 2. Layer 7 (session state) — trim second (compaction summaries first, then pinned items)
-3. Layer 4 (project instructions) — trim third
-4. Layer 3 (domain config) — trim fourth
-5. Layers 1, 2, 5 — never trimmed (core behavioral, tools, mode)
+3. Layers 1-5 — NEVER trimmed (core behavioral, tool-use, domain, project, mode)
+
+If the system prompt exceeds budget after trimming layers 6 and 7, return as-is with a warning log. The design already handles the "pinned exceeds budget" case this way. Layers 3 (domain) and 4 (project) are essential for behavior quality per FEAT-0008 and must not be dropped.
 
 ```go
 func (pe *PromptEngine) trim(layers []PromptLayer, budget int) []PromptLayer {
@@ -326,7 +326,7 @@ func (pe *PromptEngine) trim(layers []PromptLayer, budget int) []PromptLayer {
     }
     
     remaining := budget - pinnedTokens
-    trimOrder := []int{6, 7, 4, 3} // layer numbers to try trimming
+    trimOrder := []int{6, 7} // only layers 6 and 7 are trimmable per FEAT-0008
     
     for _, layerNum := range trimOrder {
         if sumTokens(layers) <= budget {
