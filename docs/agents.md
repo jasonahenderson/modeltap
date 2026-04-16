@@ -166,15 +166,13 @@ This document defines the agent team responsible for designing, building, testin
 
 ### Prime directives — DO NOT VIOLATE
 
-1. **Phases are release-level, not WU-level.** A release moves through Phase 1 → Phase 2 → Phase 3 in strict order. You do not interleave them.
-2. **Phase 1 is design for ALL WUs in the release.** Finish every design doc (with subagent pre-review lint on Tier B and Tier C) before Phase 2 begins. No coding in Phase 1. No peer reviews in Phase 1.
-3. **Phase 2 is one batched peer-review pass.** The user flags which designs need external peer review; the batch runs in one session. No new designs, no coding in Phase 2. Phase 2 is skippable if the user decides pre-review lint coverage is sufficient.
-4. **Phase 3 is implementation for ALL WUs.** Red → green → security → docs per WU, in any dependency-legal order. No new design work in Phase 3 — if implementation reveals a design flaw, file a patch or revise the design doc explicitly, don't silently improvise.
-5. **The current phase lives in `docs/releases/<version>/plan.md` §"Phased Execution".** Any action that does not match the current phase is wrong. If you are asked to code during Phase 1, STOP and check the phase.
-6. **Pre-review lint is NOT Tier C.** A Claude subagent with fresh context catches mechanical drift; it does not catch Claude-family reasoning blind spots. Tier C is peer-model (different model family) review, user-driven, batched in Phase 2. A subagent never satisfies Tier C.
-7. **Peer-review handoff is chat-only — no committed prompt file.** The Designer announces the request in chat (WU/bundle ID + file paths); the user chooses their external model and frames the review themselves. Prescriptive prompts bias the outcome.
+1. **Phases are release-level, not WU-level.** Phase 1 → Phase 2 → Phase 3, strict order, no interleaving.
+2. **Phase 1 = design ALL WUs.** No coding. No reviews. Just design docs (with optional pre-review lint).
+3. **Phase 2 = review.** User decides what to review and how. No new designs. No coding.
+4. **Phase 3 = implement ALL WUs.** No new designs. If implementation reveals a design flaw, revise the design doc explicitly — don't silently improvise.
+5. **Current phase lives in `docs/releases/<version>/plan.md`.** Any action outside the current phase is wrong.
 
-If any instruction anywhere else in this document or the codebase contradicts these prime directives, the prime directives win. File an ADMIN commit to reconcile.
+If any instruction elsewhere contradicts these, the prime directives win.
 
 ### Why release-level phases
 
@@ -186,7 +184,7 @@ PHASE 1 — Design (all WUs in the release)
 ===============================================================
 
 For each WU (or bundle of related WUs):
-    TPM assigns task (with default review tier)
+    TPM assigns task
         |
         v
     Designer produces design doc
@@ -284,118 +282,34 @@ A release's `plan.md` records which phase the release is in. Status updates move
 
 ### Design Review
 
-Design errors are cheapest to fix before tests cement them. Every WU receives a design review during Phase 1, before Phase 3 implementation begins. Depth scales with the WU's risk tier.
+Design errors are cheapest to fix before code cements them. Phase 1 produces the designs; Phase 2 reviews them.
 
-#### Tier assignment
+#### Phase 2 review — user's call
 
-The TPM assigns a **default tier** when writing the WU spec in the track file (see `docs/releases/<version>/track-*.md`). The Designer re-evaluates against the rules below after completing the design doc and records the **final tier** at the top of the doc.
+The user decides what to review, how to review it, and when it's sufficient:
 
-Designers may **escalate** (A → B → C) with a recorded reason. Downgrades are not permitted — if a Designer thinks the default is too conservative, they ask the TPM to change the rules rather than skipping review on a specific WU.
+- Read and approve designs directly
+- Send designs to an external model (Codex, Kimi, GPT-5, Gemini, etc.)
+- Both
+- Skip Phase 2 entirely
 
-#### Tier rules
+There is no tiering system. There are no mandatory review gates. The user owns the risk judgment.
 
-Apply top-down. First matching rule wins. A WU is Tier C if **any** C rule fires; otherwise Tier B if any B rule fires; otherwise Tier A.
+Review artifacts committed at `docs/releases/<version>/.reviews/<wu-or-bundle>/<reviewer>-review.md` using the reviewer-first naming convention.
 
-**Tier C — external peer review required** if any of:
-- Creates or modifies files in `internal/protocol/`, `internal/bff/{transport,server,connection,capabilities}.go`, or any other package imported by both Track A and Track B.
-- Creates or modifies a protocol message type, a shared Go interface, a stable on-disk schema, or an ADR.
-- Touches credentials, tokens, TLS config, model-supplied file-path input, shell invocation, network listeners, permission policy, or tool execution.
-- Appears as a dependency of another track beyond Track 0 (cross-track surface).
+#### Pre-review lint (optional designer tool)
 
-**Tier B — user review required** if any of (and not already C):
-- Size = L per `plan.md`.
-- Creates ≥3 new `.go` files.
-- Modifies `internal/config/config.go` or adds new config keys.
-- Adds a new Cobra command.
-- Defines UI component layout or key bindings.
+A **pre-review lint** is a Claude subagent with fresh context that reads a design doc against source specs, checking for mechanical drift, scope gaps, missing fields, and undocumented assumptions. The Designer decides when it's worth running — it is not mandatory.
 
-**Tier A — self-checklist only** otherwise.
+The lint catches spec-drift and mechanical issues. It does **not** catch reasoning blind spots specific to the Designer's model family — only a different model or human reviewer can do that.
 
-#### Design doc header
+Artifact: `docs/releases/<version>/.reviews/<wu-or-bundle>/claude-subagent-pre-review.md`.
 
-Every design doc begins with:
+#### Finding severity (for any review)
 
-```markdown
-## Review Tier
-**Assigned:** <A | B | C>
-**Basis:** <which rule(s) fired>
-**Plan default:** <tier from WU spec>
-**Escalation reason:** <required only if assigned > plan default>
-```
-
-#### Tier A — self-checklist
-
-The Designer confirms in the design doc that each item holds. A failing item is a blocker until fixed.
-
-1. Every input (ADR, feature spec, dependency WU) is referenced and its relevant constraints captured.
-2. Every field from the source spec is enumerated; required/optional labels match the source.
-3. Cross-WU types (names, shapes) are consistent with the WUs that produce or consume them.
-4. Package and naming conventions (`gofmt`, effective Go, snake_case on the wire) are followed.
-5. At least one "what could go wrong" case is listed with mitigation.
-6. Scope boundaries are explicit: what is in, what is deferred.
-
-#### Tier B — user review
-
-Designer publishes the design doc and pauses. The user reads, asks questions, and approves or requests changes before the Test Engineer proceeds. Approval is recorded in the design doc or in the commit message that promotes the WU to tests.
-
-#### Tier C — peer-model review (opt-in, batched in Phase 2)
-
-Tier C marks a WU as **eligible for peer-model review**. It does not automatically trigger one. The user decides in Phase 2 which Tier-C WUs (or bundles) warrant external peer review; the rest proceed on the strength of the subagent pre-review lint alone.
-
-Calibration rationale: 33 Tier-C WUs across v0.2.0 would require 33 user-mediated external-model sessions if every one triggered peer review. That is not practical. The tag identifies elevated risk; the Phase 2 opt-in preserves the review capability for the highest-stakes designs (typically 3-8 bundles per release).
-
-A peer-model reviewer uses a **different model family from the Designer**. This is definitional: Tier C exists to catch reasoning blind spots that a same-model reviewer cannot detect. A fresh-context instance of the Designer's own model shares the same training distribution and will miss the same patterns.
-
-Tier-C reviewer options:
-
-1. **External LLM via user-mediated submission** — Codex, Kimi, GPT-5, Gemini, or any other non-Claude model. Designer announces the review request in chat (WU/bundle identifier + file paths); the user supplies whatever framing they prefer to the external model; the resulting artifact is committed. No committed prompt file — a trusted external reviewer decides their own approach, and prescriptive prompts bias the outcome. This matches how plan reviews already work (`.reviews/codex-plan-review.md`, `.reviews/kimi-plan-review.md`).
-2. **Human maintainer** using a different model from the Designer's, or reasoning without model assistance.
-
-A Claude subagent with fresh context is **not** a Tier-C option. See "Pre-review lint" below — subagent reviews are Phase 1 work, run on every Tier-C WU as part of design.
-
-Until Modeltap itself supports autonomous cross-model routing (FEAT-0008 + FEAT-0013 `review_*` roles), Tier-C peer reviews are user-driven and batched in Phase 2.
-
-**Bundled reviews:** multiple related WUs sharing a contract surface should go through a single peer review to economize reviewer effort. The review artifact covers all WUs reviewed; each WU's design doc links to it. v0.2.0 bundle candidates:
-- Protocol types: WU-040 + WU-041 + WU-093
-- Provider formatting: WU-042 + WU-043 + WU-044
-- Storage: WU-045 + WU-091 + WU-096
-- Connection: WU-046 + WU-047 + WU-048 + WU-049
-- Session: WU-050 + WU-051 + WU-064
-- Streaming: WU-052 + WU-053 + WU-060
-- Routing: WU-057 + WU-058 + WU-059
-- Tools: WU-076 + WU-077 + WU-078 + WU-079
-
-Aggressive bundling collapses 33 Tier-C WUs to ~10-12 peer reviews across v0.2.0.
-
-#### Pre-review lint (Phase 1, standard on Tier B and C)
-
-A **pre-review lint** is a Claude subagent with fresh context that reads the design doc and (if applicable) source specs for drift, scope gaps, missing fields, and undocumented assumptions. It runs as part of Phase 1 design, after the Designer produces the doc and before the WU's Phase 1 design is considered complete.
-
-The lint is **not a tier**. It runs on every Tier-B and Tier-C design as the default coverage. It does not satisfy Tier C peer review — it catches mechanical drift, not Claude-family reasoning blind spots. For WUs the user opts into Phase 2 peer review, the lint artifact is referenced in the peer-review prompt so the peer reviewer doesn't waste attention rediscovering lint findings.
-
-Artifact: `docs/releases/<version>/.reviews/<wu-or-bundle>/claude-subagent-pre-review.md`. The Designer triages the lint's findings, resolves Blocking items in the design doc before closing the WU's Phase 1 design, and commits the lint artifact.
-
-Per-tier usage:
-- **Tier C:** lint runs on every WU. No exception — this is the substitute for automatic external peer review.
-- **Tier B:** lint runs by default; Designer may skip for trivially simple designs with rationale.
-- **Tier A:** lint skipped. Tier A is a self-check by the Designer using the checklist; adding a subagent is overkill.
-
-#### Review artifact location and naming
-
-Path: `docs/releases/<version>/.reviews/wu-NNN/<reviewer>-design-review.md`
-For bundled reviews: `docs/releases/<version>/.reviews/<wu-range-or-topic>/<reviewer>-design-review.md`.
-
-Reviewer name prefixes follow the existing plan-review convention (`codex-`, `kimi-`, `gpt5-`, `gemini-`, `claude-subagent-`, etc.). Reviewer-first naming matches `CLAUDE.md` §"Review Artifact Naming".
-
-#### Finding severity and handling
-
-Reviewers bucket findings as:
-
-- **Blocking** — must be resolved before the Test Engineer begins. Design doc is updated; commit references the finding.
-- **Attention** — should be addressed unless there is a documented reason not to. Can be handled in the same WU or deferred to a named follow-up WU or patch.
-- **Nit** — optional. Designer's call.
-
-The Designer updates the design doc in response to Blocking/Attention findings and records the disposition in the review artifact (or a short reply appended to it).
+- **Blocking** — must resolve before Phase 3 implementation.
+- **Attention** — should address unless documented reason not to.
+- **Nit** — optional.
 
 ### Commit Points
 

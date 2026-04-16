@@ -6,7 +6,7 @@
 
 ## WU-088: End-to-End — Harness → BFF → Mock Provider
 
-**Size:** Large | **Dependencies:** WU-067, WU-087 | **Parallelizes with:** WU-089 | **Review tier:** C (validates cross-track surface + size L)
+**Size:** Large | **Dependencies:** WU-067, WU-087 | **Parallelizes with:** WU-089
 
 NEW `internal/integration/harness_bff_test.go` — full stack integration tests. Real BFF server + real harness client (headless Bubbletea or direct protocol client) + mock provider (httptest).
 
@@ -27,7 +27,7 @@ Tests:
 
 ## WU-089: CLI and Harness Launch Integration
 
-**Size:** Medium | **Dependencies:** WU-067, WU-087 | **Parallelizes with:** WU-088 | **Review tier:** B (new Cobra flags on root command)
+**Size:** Medium | **Dependencies:** WU-067, WU-087 | **Parallelizes with:** WU-088
 
 Updates to `internal/cli/root.go`:
 - `modeltap` (no subcommand) launches the harness
@@ -44,7 +44,7 @@ Updates to `internal/cli/root.go`:
 
 ## WU-090: Documentation and Config Schema Updates
 
-**Size:** Medium | **Dependencies:** WU-088, WU-089 | **Review tier:** A (docs; derived from existing WUs)
+**Size:** Medium | **Dependencies:** WU-088, WU-089
 
 Updates:
 - `docs/usage-guide.md` — harness usage, BFF server config, session management, tool descriptions, model config, routing policy, MCP server config
@@ -58,7 +58,7 @@ Updates:
 
 ## WU-094: Security Review Suite
 
-**Size:** Large | **Dependencies:** WU-067, WU-087 | **Parallelizes with:** WU-088, WU-089, WU-095 | **Review tier:** C (definitional — covers every security-sensitive surface)
+**Size:** Large | **Dependencies:** WU-067, WU-087 | **Parallelizes with:** WU-088, WU-089, WU-095
 
 Formal OWASP-style security review pass per the Security Reviewer role in `docs/agents.md`. This WU is **both** a test-writing exercise and a formal review; deliverables include tests colocated with the code under review and a published review document.
 
@@ -97,7 +97,7 @@ Deliverables:
 
 ## WU-095: Performance Benchmarks and Budgets
 
-**Size:** Medium | **Dependencies:** WU-067, WU-087 | **Parallelizes with:** WU-088, WU-089, WU-094 | **Review tier:** B (establishes canonical budgets; touches multiple packages)
+**Size:** Medium | **Dependencies:** WU-067, WU-087 | **Parallelizes with:** WU-088, WU-089, WU-094
 
 Satisfies FEAT-0008 ("zero added latency" claim for streaming) and FEAT-0009 (interactive TUI responsiveness) with concrete, measured budgets rather than subjective evaluation.
 

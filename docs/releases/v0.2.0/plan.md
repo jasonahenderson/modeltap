@@ -183,27 +183,11 @@ This relaxation avoids blocking harness-local progress behind provider formattin
 
 Per `docs/agents.md` §"Workflow", v0.2.0 executes in three release-level phases:
 
-- **Phase 1 — Design (current):** All WU designs produced, with subagent pre-review lint on every Tier-B/Tier-C design. WU-039 predates this phase and shipped under the earlier per-WU workflow.
+- **Phase 1 — Design (current):** All WU designs produced, with optional pre-review lint. WU-039 predates this phase and shipped under the earlier per-WU workflow.
 - **Phase 2 — Peer review (opt-in, batched):** User selects high-stakes designs for external-model peer review. Designer prepares bundled prompts; user runs in one external-model session.
 - **Phase 3 — Implementation:** Red → green → security review → docs per WU, in any dependency-legal order.
 
 Current phase: **Phase 1** (57 WU designs pending; WU-039 already shipped).
-
-## Design Review Tiers
-
-Every WU has a default review tier recorded in its spec (`**Review tier:** A | B | C`). The tiering rules, procedures, and artifact conventions live in `docs/agents.md` §"Design Review".
-
-Tier distribution for v0.2.0:
-
-| Track | C | B | A | Total |
-|-------|---|---|---|-------|
-| 0 (shared) | 9 | 0 | 0 | 9 |
-| A (BFF) | 11 | 8 | 4 | 23 |
-| B (Harness) | 11 | 8 | 2 | 21 |
-| Integration | 2 | 2 | 1 | 5 |
-| **Total** | **33** | **18** | **7** | **58** |
-
-Tier-C WUs require external peer review (preferred via an external LLM like Codex/Kimi/GPT-5/Gemini; Claude subagent is a fallback but is not cross-model). Bundled reviews are encouraged for closely related WUs (e.g., WU-040+041+093 protocol-types bundle; WU-076–079 tools bundle; WU-045+091+096 storage bundle).
 
 ## Serialization Option
 

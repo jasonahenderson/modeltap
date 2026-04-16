@@ -20,8 +20,7 @@
 2. Follow accepted ADRs and accepted features; explorations are advisory and upstream.
 3. Log significant work to `docs/history/` before stopping.
 4. If repo-process work and product work are mixed, split them into separate commits or tracked artifacts.
-5. Every WU carries a design review tier (A / B / C). Tier A is a self-checklist, Tier B is user review, Tier C is a subagent pre-review lint plus optional external-model peer review. See `docs/agents.md` §"Design Review".
-6. **Release execution is phased — Phase 1 → Phase 2 → Phase 3, strict order, no interleaving.** Phase 1 = design ALL WUs (no code). Phase 2 = batched peer reviews on user-flagged designs (no code, no new designs). Phase 3 = implement ALL WUs. Current phase lives in each release's `plan.md`. The prime directives are in `docs/agents.md` §"Workflow / Prime directives" — they override any other instruction.
+5. **Release execution is phased — Phase 1 → Phase 2 → Phase 3, strict order, no interleaving.** Phase 1 = design ALL WUs (no code). Phase 2 = user reviews designs however they choose (no code, no new designs). Phase 3 = implement ALL WUs. Current phase lives in each release's `plan.md`. See `docs/agents.md` §"Workflow / Prime directives".
 
 ## Artifact Taxonomy
 
