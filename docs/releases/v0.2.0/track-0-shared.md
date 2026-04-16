@@ -2,7 +2,9 @@
 
 **Release:** v0.2.0
 **WU Range:** WU-039 through WU-045 (7 work units)
-**Must complete before:** Track A (BFF Server) and Track B (Terminal Harness)
+**Gates:**
+- Track A (BFF Server): all of Track 0 (WU-039–WU-045) must complete before Track A begins.
+- Track B (Terminal Harness): harness-local work (WU-068–WU-072, WU-075–WU-079) may begin after WU-039 alone is stable. Track B work that touches the protocol client or streaming/session payloads (WU-073, WU-074, WU-080+) additionally requires WU-040 and WU-041.
 
 ## WU-039: Protocol Types — Core Messages and Framing
 
@@ -101,8 +103,65 @@ Implements `FormatMessages` and `FormatToolDefinitions` for the OpenAI adapter:
 
 Implements:
 - New `sessions` and `turns` tables in `internal/storage/sqlite.go` (migration v2)
-- New types in `internal/storage/store.go`: `Session`, `Turn`, `SessionFilter`
-- New `Store` interface methods: `CreateSession`, `GetSession`, `UpdateSession`, `ListSessions`, `CreateTurn`, `GetTurn`, `ListTurns`, `GetSessionTurns`, `DeleteSessionsBefore`
+- New types in `internal/storage/store.go`: `Session`, `Turn`, `SessionFilter`, `ServerEvent`
+- New `Store` interface methods: `CreateSession`, `GetSession`, `UpdateSession`, `ListSessions`, `CreateTurn`, `GetTurn`, `ListTurns`, `GetSessionTurns`, `AppendServerEvent`, `ListServerEvents`, `DeleteSessionsBefore`
 - SQLite implementation for all new methods
 
-**Definition of done:** Migration creates tables without breaking existing schema. All new CRUD methods have table-driven tests. Existing storage tests still pass. `go build ./...` passes.
+**`sessions` table** (fields required to satisfy FEAT-0008 `session.list` and `session.details` payloads):
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `id` | TEXT PK | Session UUID |
+| `user_id` | TEXT | Owner (FEAT-0010 isolation) |
+| `project` | TEXT | Project root / identifier (session scoping) |
+| `summary` | TEXT | Auto-generated short title |
+| `active_model` | TEXT | Currently selected model |
+| `model_override` | TEXT NULL | Session-level model override, if set |
+| `routing_overrides` | JSON | Per-session routing overrides |
+| `pinned_items` | JSON | User-pinned context items |
+| `compaction_state` | JSON | Current compaction state (categorized buckets, thresholds hit, last auto-compact summary) |
+| `total_cost` | REAL | Running session cost |
+| `total_input_tokens` | INTEGER | Running input token total |
+| `total_output_tokens` | INTEGER | Running output token total |
+| `context_pct` | REAL | Last observed context usage ratio (for `session.list`) |
+| `status` | TEXT | active, suspended, completed |
+| `lock_owner` | TEXT NULL | Harness holding the session lock |
+| `lock_expires_at` | TIMESTAMP NULL | Lock grace deadline |
+| `created_at` | TIMESTAMP | Session creation time |
+| `updated_at` | TIMESTAMP | Last activity time |
+
+**`turns` table** (per FEAT-0008 Session and Turn Storage Model):
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `id` | TEXT PK | Turn UUID |
+| `session_id` | TEXT FK | Parent session |
+| `sequence` | INTEGER | Turn order within session |
+| `role` | TEXT | user, assistant |
+| `content` | TEXT (JSON) | Canonical message content |
+| `model` | TEXT | Model used for this turn |
+| `provider` | TEXT | Provider used |
+| `input_tokens` | INTEGER | Input tokens for this turn |
+| `output_tokens` | INTEGER | Output tokens for this turn |
+| `cost` | REAL | Cost for this turn |
+| `latency_ms` | INTEGER | Provider response latency |
+| `tool_calls` | JSON | Tool calls made in this turn |
+| `files_touched` | JSON | File paths read in this turn |
+| `files_modified` | JSON | File paths written/edited in this turn |
+| `compacted` | BOOLEAN | Whether this turn has been compacted |
+| `compacted_summary` | TEXT | Summary if compacted |
+| `original_turns` | JSON | Sequence IDs collapsed into a compacted turn |
+| `created_at` | TIMESTAMP | Turn timestamp |
+
+**`session_events` table** (supports `session.details.server_events` and resume notifications):
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `id` | INTEGER PK | Event ID |
+| `session_id` | TEXT FK | Parent session |
+| `type` | TEXT | `auto_compact`, `server_restart`, etc. |
+| `detail` | TEXT | Human-readable description |
+| `payload` | JSON | Type-specific fields (e.g., `freed_tokens`) |
+| `at` | TIMESTAMP | Event time |
+
+**Definition of done:** Migration creates all three tables without breaking existing schema. All enumerated fields are present. Store methods cover CRUD for sessions, turns, and server events, including derivation helpers for `session.list` (summary + context_pct + files_touched aggregate) and `session.details` (timeline including compacted turns, pinned items, files touched/modified, server events). All new methods have table-driven tests. Existing storage tests still pass. `go build ./...` passes.
