@@ -33,6 +33,7 @@ const (
 	MethodCapabilitiesUpdate   = "capabilities.update"
 	MethodConnectionPing       = "connection.ping"
 	MethodConnectionHealth     = "connection.health"
+	MethodConnectionReady      = "connection.ready"
 )
 
 // -----------------------------------------------------------------------
@@ -40,6 +41,12 @@ const (
 // -----------------------------------------------------------------------
 
 // Attachment is a harness-supplied file carried in turn.submit.
+//
+// All five fields are required for a well-formed attachment — FEAT-0008
+// §"Protocol Payload Schemas" describes the full payload, and WU-076 /
+// WU-082 rely on all fields being present when an attachment is emitted.
+// Omitting any field is a spec violation and WU-046 transport validation
+// should reject it.
 type Attachment struct {
 	Path        string `json:"path"`
 	Raw         string `json:"raw"`
@@ -49,6 +56,10 @@ type Attachment struct {
 }
 
 // Paste is the payload for a large paste in turn.submit.
+//
+// All three fields are required. Raw preserves the captured input per
+// ADR-0005; Content carries whatever the harness chose to send to the
+// model (full / truncated / summarized); Intent tags that choice.
 type Paste struct {
 	Raw     string `json:"raw"`
 	Content string `json:"content"`
@@ -58,6 +69,10 @@ type Paste struct {
 // ToolResult is a tool-execution result. The nested form is embedded in
 // turn.submit; the standalone form is a dedicated request (see
 // ToolResultRequest, which is an alias of this type).
+//
+// Error is required only when Status == "error".
+// Reason is required only when Status == "rejected".
+// All other fields are always required.
 type ToolResult struct {
 	ToolCallID string `json:"tool_call_id"`
 	Status     string `json:"status"`
@@ -67,8 +82,18 @@ type ToolResult struct {
 	Reason     string `json:"reason,omitempty"`
 }
 
-// ToolResultRequest is the standalone tool.result request payload. It
-// shares the wire shape of ToolResult.
+// ToolResultRequest is the standalone tool.result request payload.
+//
+// PROTOCOL-FREEZE CONTRACT: this alias encodes a wire-identity guarantee.
+// The standalone tool.result request and each element of
+// TurnSubmit.ToolResults[] MUST remain wire-identical — they are the same
+// logical payload submitted via two transports (inline with a new turn or
+// asynchronously after a tool.call).
+//
+// Any field added to ToolResult in WU-041 or later MUST apply to both
+// forms and be reflected through this alias. Splitting the alias into
+// two distinct types is a breaking protocol change that requires a
+// FEAT-0008 amendment and a WU-093 fixture update.
 type ToolResultRequest = ToolResult
 
 // ProjectContext describes the harness-side project scope supplied on
@@ -207,3 +232,10 @@ type ConnectionPing struct{}
 
 // ConnectionHealth requests structured dependency status. No params.
 type ConnectionHealth struct{}
+
+// ConnectionReady is a simplified boolean readiness check used during
+// auto-start probing (FEAT-0008 §"Local service auto-start"). It is
+// distinct from ConnectionHealth: Ready returns a single bool indicating
+// the server has completed startup and is accepting requests; Health
+// returns full dependency status. No params.
+type ConnectionReady struct{}

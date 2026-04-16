@@ -80,7 +80,7 @@ var ErrFrameTooLarge = errors.New("protocol: frame exceeds max size")
 var ErrInvalidFrame  = errors.New("protocol: invalid frame")
 ```
 
-**Rationale for 10 MB cap:** `turn.submit` may carry attachments (base64-encoded raw bytes + extracted content) and `paste` payloads. A 10 MB cap covers typical docs, images, and spreadsheets without allowing trivial memory exhaustion. Enforced on the reader side to prevent malformed input from bloating buffers. Revisit if field traffic exceeds this.
+**Rationale for 10 MiB cap:** `turn.submit` may carry attachments (base64-encoded raw bytes + extracted content) and `paste` payloads. A 10 MiB cap (binary megabytes, `10 * 1024 * 1024` bytes) covers typical docs, images, and spreadsheets without allowing trivial memory exhaustion. Enforced on the reader side to prevent malformed input from bloating buffers. **Open item:** FEAT-0008 does not ratify this cap (review finding A-05). A follow-up amendment should either bless this default or expose it in the capability handshake (WU-049) so the harness can refuse oversize attachments before serializing.
 
 `FrameReader` uses a `bufio.Reader` with a per-read `io.LimitedReader` of `MaxFrameSize`; exceeding the cap returns `ErrFrameTooLarge` (the connection should be terminated by higher layers, not by this package).
 
@@ -131,9 +131,11 @@ Dispatch (WU-046) will consume these constants; WU-039 does not itself dispatch.
 ### D7. No runtime validation
 Per WU-039 DoD: "only types and serialization — no business logic." Beyond `Mode.Valid()` (a trivial enum check that belongs with the type), there is no validation in this package. A missing required field, an unknown `Mode` value, or a bad UUID round-trips cleanly in WU-039; WU-046 (transport) and handler-layer WUs are responsible for rejecting malformed requests with the correct diagnostic codes.
 
-## Type Catalog — 19 Harness→Server Request Types
+## Type Catalog — 20 Harness→Server Request Types
 
 All types live in `messages.go`. Method-name constants are colocated.
+
+> Revision: updated from 19 to 20 after B-01 finding in the retroactive review added `ConnectionReady` (FEAT-0008 line 211 classifies `connection.ready` as harness→server; the WU-039 spec in track-0-shared.md line 15 lists it; earlier draft dropped it during catalog compilation).
 
 ### Shared nested types (also in `messages.go`)
 
@@ -204,6 +206,7 @@ type ToolDefinition struct {
 | 17 | `CapabilitiesUpdate` | `MethodCapabilitiesUpdate` | `capabilities.update` |
 | 18 | `ConnectionPing` | `MethodConnectionPing` | `connection.ping` |
 | 19 | `ConnectionHealth` | `MethodConnectionHealth` | `connection.health` |
+| 20 | `ConnectionReady` | `MethodConnectionReady` | `connection.ready` |
 
 **Naming note — `ToolResultRequest`:** the standalone message `tool.result` uses the same payload shape as the `ToolResult` nested object in `TurnSubmit.ToolResults`. To keep one wire shape but avoid a naming clash, WU-039 names the nested struct `ToolResult` and the standalone request `ToolResultRequest` (a type alias in Go: `type ToolResultRequest = ToolResult`). This documents the semantic equivalence while allowing distinct method-name routing.
 
@@ -287,6 +290,10 @@ Exhaustive per-type field list below. Required/optional marked (R) or (O). All J
 
 #### ConnectionHealth
 - No params. `type ConnectionHealth struct{}`.
+
+#### ConnectionReady
+- No params. `type ConnectionReady struct{}`.
+- Simplified boolean readiness probe used during local auto-start (FEAT-0008 §"Local service auto-start"). Distinct from `ConnectionHealth`: `Ready` is a single bool, `Health` is a full dependency status.
 
 ### Protocol version constant
 

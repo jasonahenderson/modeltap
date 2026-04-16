@@ -16,6 +16,11 @@ NEW `internal/bff/transport.go` — NDJSON JSON-RPC 2.0 reader/writer over `net.
 
 **Security requirement (inherited from WU-039 review SR-039-01):** on `protocol.ErrFrameTooLarge` from `FrameReader.ReadFrame`, the transport MUST close the connection immediately. The reader is left mid-frame and cannot be safely resynchronized against attacker-controlled bytes. Tests must cover the close-on-oversize path.
 
+**Validation requirements (inherited from WU-039 design review A-01, A-02):**
+- Reject `turn.submit` whose raw JSON omits the required `sequence` field. The protocol types use a plain `int` (design D5); at the transport edge, use a strict decoder (`DisallowUnknownFields` equivalent) or a presence check that distinguishes "omitted" from "sent as zero".
+- On decode, reject `turn.submit` frames whose `mode` value fails `protocol.Mode.Valid()`. The protocol types deliberately round-trip unknown modes; the transport must police them.
+- Tests must cover both rejection paths.
+
 ### WU-047: Protocol Endpoint — Socket and TLS Listeners
 **Size:** Medium | **Dependencies:** WU-046 | **Parallelizes with:** WU-048 | **Review tier:** C (network listener + TLS config)
 
@@ -41,6 +46,8 @@ Both values are exposed as constants in `internal/bff/connection.go` and documen
 
 ### WU-049: Capability Registration, Version Negotiation, and Project Context
 **Size:** Medium | **Dependencies:** WU-046, WU-041, WU-045 | **Parallelizes with:** WU-047, WU-048 | **Review tier:** C (capabilities.go — listed C target + SR-039-05 follow-up on InputSchema validation)
+
+**Additional surface (inherited from WU-039 design review A-05):** expose the current NDJSON `MaxFrameSize` and the max-attachment-size limit in the capability handshake so the harness can refuse oversize attachments before serializing. WU-041 `errors.go` should add a diagnostic code (e.g., `MT-CONN-013`) for "attachment too large" so the harness renders an actionable message. Coordinate with a FEAT-0008 amendment that ratifies the cap value.
 
 NEW `internal/bff/capabilities.go` — handles `capabilities.register`, `capabilities.update`, `capabilities.request`. Per-connection ownership of:
 
