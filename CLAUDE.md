@@ -88,23 +88,15 @@ This ensures continuity across sessions even for planning, review, or ad-hoc con
 5. Pick next task from "Up Next" within the current phase
 6. Log plan before starting, summary after completion
 
-### Release Execution — PRIME DIRECTIVES
+### Release Execution
 
-Releases execute in three sequential phases at the **release level, not the WU level**. Do not interleave phases. The canonical version of this lives in `docs/agents.md` §"Workflow / Prime directives"; this is the Claude-facing digest.
+Releases execute in three sequential phases at the **release level, not the WU level**. Do not interleave. Full rules in `docs/agents.md` §"Workflow / Prime directives".
 
-1. **Phase 1 — Design ALL WUs.** For every WU in the release, produce a design doc. Tier-B and Tier-C WUs also get a subagent pre-review lint (Claude with fresh context) that checks for spec drift and scope gaps. No coding in Phase 1. No peer reviews in Phase 1. Finish every WU's design before Phase 2.
-2. **Phase 2 — Batched peer review (opt-in, skippable).** User flags which designs warrant cross-model peer review; the batch runs in one external-model session. No new designs, no coding. Phase 2 can be skipped entirely if subagent lint coverage is deemed sufficient.
-3. **Phase 3 — Implement ALL WUs.** Red → green → security → docs per WU, in any dependency-legal order. No new design work during Phase 3 (revise design doc explicitly or file a patch if implementation reveals a flaw).
+1. **Phase 1 — Design ALL WUs.** Produce design docs. Optional: run pre-review lint (Claude subagent, fresh context) to catch mechanical drift. No coding. No reviews.
+2. **Phase 2 — Review.** User decides what to review and how (read directly, send to external model, both, or skip). No new designs. No coding.
+3. **Phase 3 — Implement ALL WUs.** Red → green → security → docs per WU, any dependency-legal order. No new designs; revise explicitly if implementation reveals a flaw.
 
-**Subagent pre-review lint is NOT Tier C.** A Claude subagent shares Claude's training distribution; it cannot catch Claude-family reasoning blind spots. Tier C requires a *different* model family (Codex, Kimi, GPT-5, Gemini, or a human maintainer) — user-driven, batched in Phase 2.
-
-**Peer-review handoff is chat-only — no committed prompt file.** The Designer announces the request in chat with the WU/bundle identifier and file paths; the user supplies their own framing to the external model. Prescriptive prompts bias the outcome.
-
-**Current phase lives in `docs/releases/<version>/plan.md` §"Phased Execution".** Check it on resumption. Any action that doesn't match the current phase is wrong.
-
-**Phase transitions are ADMIN commits** that bump the phase marker in plan.md and (optionally) announce readiness for the next phase.
-
-Every WU carries a **review tier** (A / B / C) in its track-file spec. Tier rules and per-tier procedures live in `docs/agents.md` §"Design Review". Tier C marks a WU as *eligible* for Phase 2 peer review; it does not automatically trigger one.
+Current phase lives in `docs/releases/<version>/plan.md`. Phase transitions are ADMIN commits.
 
 ### Commit Policy
 

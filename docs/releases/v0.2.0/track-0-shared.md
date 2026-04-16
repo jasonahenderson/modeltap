@@ -8,7 +8,7 @@
 
 ## WU-039: Protocol Types — Core Messages and Framing
 
-**Size:** Medium | **Dependencies:** None | **Review tier:** C (protocol contract + cross-track)
+**Size:** Medium | **Dependencies:** None
 
 Implements `internal/protocol/`:
 - `protocol.go` — protocol version constants, NDJSON framing helpers, `Mode` type (`plan`/`build`/`auto`), canonical field name documentation
@@ -21,7 +21,7 @@ Implements `internal/protocol/`:
 
 ## WU-040: Protocol Types — Streaming Events
 
-**Size:** Medium | **Dependencies:** WU-039 | **Parallelizes with:** WU-041, WU-042 | **Review tier:** C (protocol contract + cross-track)
+**Size:** Medium | **Dependencies:** WU-039 | **Parallelizes with:** WU-041, WU-042
 
 **Envelope decision resolved (post Codex peer-review of WU-039):** server→harness streaming events use the `protocol.Notification` type introduced in WU-039 (JSON-RPC 2.0 notification; no `id` field). Harness→server frames always use `protocol.Request`. WU-040 implementations wrap streaming event payloads (`TokenDelta`, `ToolCall`, `TurnComplete`, etc.) in `Notification` at marshal time.
 
@@ -36,7 +36,7 @@ Implements `internal/protocol/events.go`:
 
 ## WU-041: Protocol Types — Tools, Sessions, Models, Health, Errors
 
-**Size:** Medium | **Dependencies:** WU-039 | **Parallelizes with:** WU-040, WU-042 | **Review tier:** C (protocol contract + cross-track)
+**Size:** Medium | **Dependencies:** WU-039 | **Parallelizes with:** WU-040, WU-042
 
 Implements:
 - `tools.go` — `ToolDefinition` (name, namespace, description, input_schema, output_envelope, risk_level, capabilities_required), `ToolCatalog`
@@ -53,7 +53,7 @@ Implements:
 
 ## WU-042: ADR-0006 Amendment — Provider Outbound Formatting Interface
 
-**Size:** Small | **Dependencies:** WU-039 | **Parallelizes with:** WU-040, WU-041 | **Review tier:** C (ADR + shared interface)
+**Size:** Small | **Dependencies:** WU-039 | **Parallelizes with:** WU-040, WU-041
 
 Implements:
 - ADR amendment document: `docs/adr/0006-amendment-001-outbound-formatting.md`
@@ -69,7 +69,7 @@ Implements:
 
 ## WU-043: Anthropic Outbound Formatting
 
-**Size:** Medium | **Dependencies:** WU-042 | **Parallelizes with:** WU-044, WU-045 | **Review tier:** C (shared interface implementation; cross-provider contract)
+**Size:** Medium | **Dependencies:** WU-042 | **Parallelizes with:** WU-044, WU-045
 
 Implements `FormatMessages` and `FormatToolDefinitions` for the Anthropic adapter:
 - Translate canonical message history → Anthropic Messages API format
@@ -85,7 +85,7 @@ Implements `FormatMessages` and `FormatToolDefinitions` for the Anthropic adapte
 
 ## WU-044: OpenAI Outbound Formatting
 
-**Size:** Medium | **Dependencies:** WU-042 | **Parallelizes with:** WU-043, WU-045 | **Review tier:** C (shared interface implementation; cross-provider contract)
+**Size:** Medium | **Dependencies:** WU-042 | **Parallelizes with:** WU-043, WU-045
 
 Implements `FormatMessages` and `FormatToolDefinitions` for the OpenAI adapter:
 - Translate canonical messages → OpenAI Chat Completions format
@@ -101,7 +101,7 @@ Implements `FormatMessages` and `FormatToolDefinitions` for the OpenAI adapter:
 
 ## WU-045: Session and Turn Storage Schema
 
-**Size:** Large | **Dependencies:** WU-039 | **Parallelizes with:** WU-043, WU-044 | **Review tier:** C (stable on-disk schema + cross-track session contract)
+**Size:** Large | **Dependencies:** WU-039 | **Parallelizes with:** WU-043, WU-044
 
 Implements:
 - New `sessions` and `turns` tables in `internal/storage/sqlite.go` (migration v2)
@@ -172,7 +172,7 @@ Implements:
 
 ## WU-093: Protocol Contract — Shared Golden Fixtures and Cross-Track Conformance
 
-**Size:** Medium | **Dependencies:** WU-039, WU-040, WU-041 | **Parallelizes with:** WU-042, WU-043, WU-044, WU-045 | **Review tier:** C (protocol contract + cross-track)
+**Size:** Medium | **Dependencies:** WU-039, WU-040, WU-041 | **Parallelizes with:** WU-042, WU-043, WU-044, WU-045
 
 Satisfies FEAT-0008 §"Interface Definition" ("the protocol should be extracted into a standalone interface definition ... to enable automated contract testing"). Round-trip tests inside WU-039/040/041 catch *self-consistency*; this WU catches *drift* between Tracks A and B.
 
@@ -200,7 +200,7 @@ Implements:
 
 ## WU-096: Storage Migration v1→v2 Upgrade Tests from Real Fixtures
 
-**Size:** Medium | **Dependencies:** WU-045 | **Parallelizes with:** WU-043, WU-044, any Track A WU after WU-045 | **Review tier:** C (on-disk schema correctness; migration is a one-shot contract)
+**Size:** Medium | **Dependencies:** WU-045 | **Parallelizes with:** WU-043, WU-044, any Track A WU after WU-045
 
 WU-045's DoD covers *creating* the v2 schema on a fresh DB. This WU covers *upgrading an existing v1 database* with live capture data, metrics state, and retention state — the actual user-upgrade path. A bricked user DB on upgrade is a worst-case v0.2.0 failure mode.
 

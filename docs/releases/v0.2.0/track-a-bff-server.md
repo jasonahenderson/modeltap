@@ -8,7 +8,7 @@
 ## Foundation
 
 ### WU-046: JSON-RPC Transport Layer
-**Size:** Medium | **Dependencies:** WU-039, WU-040, WU-041 | **Review tier:** C (transport — listed C target)
+**Size:** Medium | **Dependencies:** WU-039, WU-040, WU-041
 
 NEW `internal/bff/transport.go` — NDJSON JSON-RPC 2.0 reader/writer over `net.Conn`. Message dispatch (method routing). Request/response correlation by `id`. Error response formatting. Tests with in-memory pipes.
 
@@ -22,14 +22,14 @@ NEW `internal/bff/transport.go` — NDJSON JSON-RPC 2.0 reader/writer over `net.
 - Tests must cover both rejection paths.
 
 ### WU-047: Protocol Endpoint — Socket and TLS Listeners
-**Size:** Medium | **Dependencies:** WU-046 | **Parallelizes with:** WU-048 | **Review tier:** C (network listener + TLS config)
+**Size:** Medium | **Dependencies:** WU-046 | **Parallelizes with:** WU-048
 
 NEW `internal/bff/server.go` — BFF server struct with Unix socket and TLS listeners. Accept connections, hand off to transport. Graceful shutdown. Config integration (`server.socket`, `server.address`, `server.tls`). Update `modeltap serve` to start BFF alongside proxy.
 
 **Done:** Server listens on Unix socket. Server listens on TLS. Graceful shutdown. Integration with `modeltap serve`.
 
 ### WU-048: Connection Lifecycle State Machine
-**Size:** Medium | **Dependencies:** WU-046 | **Parallelizes with:** WU-047 | **Review tier:** C (connection.go — listed C target)
+**Size:** Medium | **Dependencies:** WU-046 | **Parallelizes with:** WU-047
 
 NEW `internal/bff/connection.go` — 9 states (discovering → starting → connecting → authenticating → registering → ready → degraded → reconnecting → failed). Transitions. Per-connection state tracking. Heartbeat handler (ping/pong). Health check handler (connection.health, connection.ready). Timeout and grace-period logic.
 
@@ -45,7 +45,7 @@ Both values are exposed as constants in `internal/bff/connection.go` and documen
 **Done:** State machine tests cover all valid transitions. Heartbeat round-trip works (ping every 15s, timeout at 30s). Health response returns structured status. Session lock releases at exactly 40s after last pong in tests (10s grace applied). Reconnect inside the grace window keeps the lock.
 
 ### WU-049: Capability Registration, Version Negotiation, and Project Context
-**Size:** Medium | **Dependencies:** WU-046, WU-041, WU-045 | **Parallelizes with:** WU-047, WU-048 | **Review tier:** C (capabilities.go — listed C target + SR-039-05 follow-up on InputSchema validation)
+**Size:** Medium | **Dependencies:** WU-046, WU-041, WU-045 | **Parallelizes with:** WU-047, WU-048
 
 **Additional surface (inherited from WU-039 design review A-05):** expose the current NDJSON `MaxFrameSize` and the max-attachment-size limit in the capability handshake so the harness can refuse oversize attachments before serializing. WU-041 `errors.go` should add a diagnostic code (e.g., `MT-CONN-013`) for "attachment too large" so the harness renders an actionable message. Coordinate with a FEAT-0008 amendment that ratifies the cap value.
 
@@ -60,7 +60,7 @@ NEW `internal/bff/capabilities.go` — handles `capabilities.register`, `capabil
 ## Sessions and Conversation
 
 ### WU-050: Session Management
-**Size:** Large | **Dependencies:** WU-045, WU-046 | **Parallelizes with:** WU-049 | **Review tier:** C (session lock contract consumed cross-track)
+**Size:** Large | **Dependencies:** WU-045, WU-046 | **Parallelizes with:** WU-049
 
 NEW `internal/bff/session.go` — session manager using storage layer. `session.resume` (restore conversation, check lock, project context). `session.list` (filter by project, summaries). `session.details` (timeline, compacted turns, pinned items, server events). Session creation on first `turn.submit`. `session.clear`, `session.fork`. Auto-generated session summaries.
 
@@ -73,14 +73,14 @@ NEW `internal/bff/session.go` — session manager using storage layer. `session.
 **Done:** Create, resume, list, details all work. Lock prevents concurrent access. Lock auto-releases at 40s after last pong. Lock survives reconnection inside the grace window. Fork creates independent copy. Clear preserves in storage. Tests cover the grace-window case (reconnect at 35s keeps the lock; reconnect at 45s is rejected with `MT-CONN-008`) and force-release via the admin handler.
 
 ### WU-051: Conversation State — Canonical Format and Persistence
-**Size:** Medium | **Dependencies:** WU-050, WU-042 | **Review tier:** C (canonical format is a stable on-disk shape)
+**Size:** Medium | **Dependencies:** WU-050, WU-042
 
 NEW `internal/bff/conversation.go` — stores turns in canonical format. Appends user messages from `turn.submit`, assistant messages from provider responses. Tool call/result correlation. Attachment and paste storage. Persists to `turns` table. Restores on resume. Turn sequence tracking.
 
 **Done:** Conversation builds correctly across turns. Tool calls correlate. Attachments stored. Restores from DB.
 
 ### WU-052: Provider Format Translation — Turn Dispatch
-**Size:** Medium | **Dependencies:** WU-051, WU-043, WU-044 | **Review tier:** C (cross-provider dispatch contract)
+**Size:** Medium | **Dependencies:** WU-051, WU-043, WU-044
 
 NEW `internal/bff/dispatch.go` — takes canonical conversation, selects provider adapter, calls `FormatMessages`, sends HTTP request. Returns raw response for streaming relay. Handles non-streaming. Error wrapping with diagnostic codes.
 
@@ -89,28 +89,28 @@ NEW `internal/bff/dispatch.go` — takes canonical conversation, selects provide
 ## Streaming, Prompts, Cost
 
 ### WU-053: Streaming Relay — SSE to Protocol Events
-**Size:** Large | **Dependencies:** WU-052 | **Parallelizes with:** WU-054 | **Review tier:** C (protocol event emission; cross-track streaming contract)
+**Size:** Large | **Dependencies:** WU-052 | **Parallelizes with:** WU-054
 
 NEW `internal/bff/streaming.go` — receives SSE from provider, parses via adapter's `ReassembleStream`, emits `token.delta` to harness, accumulates full response, emits `turn.complete`. Handles `turn.cancel`. Background logging after stream completes.
 
 **Done:** SSE chunks → `token.delta` events. `turn.complete` has correct tokens/cost. Cancellation stops forwarding.
 
 ### WU-054: System Prompt Engine — Layers 1-5
-**Size:** Medium | **Dependencies:** WU-049, WU-046 | **Parallelizes with:** WU-053 | **Review tier:** B (Layer 3 pulls domain config; prompt behavior warrants user eyes)
+**Size:** Medium | **Dependencies:** WU-049, WU-046 | **Parallelizes with:** WU-053
 
 NEW `internal/bff/prompt.go` — Layer 1 (core behavioral, bundled asset), Layer 2 (tool-use from catalog), Layer 3 (domain from config), Layer 4 (project instructions from harness), Layer 5 (mode: plan/build/auto). Token counting.
 
 **Done:** 5 layers assemble correctly. Mode switching changes Layer 5. Tool instructions from catalog. Project from harness content.
 
 ### WU-055: System Prompt Engine — Layers 6-7 and Assembly
-**Size:** Medium | **Dependencies:** WU-054, WU-051 | **Review tier:** B (assembly trimming policy has model-observable effects)
+**Size:** Medium | **Dependencies:** WU-054, WU-051
 
 Layer 6 stub (knowledge injection placeholder for FEAT-0011). Layer 7 (session state: pinned items, plan, compaction summaries, files, model override). Full assembly pipeline with trimming (Layer 6 first, then Layer 7 when over budget). Per-turn reassembly.
 
 **Done:** 7-layer assembly works. Trimming tested. Pinned items, plan, summaries included. Budget respected.
 
 ### WU-056: Cost Tracking and Metrics Integration
-**Size:** Small | **Dependencies:** WU-051, WU-053 | **Parallelizes with:** WU-055 | **Review tier:** A (self-checklist — no shared contract change)
+**Size:** Small | **Dependencies:** WU-051, WU-053 | **Parallelizes with:** WU-055
 
 NEW `internal/bff/cost.go` — per-turn cost from token counts + pricing table. Session total. `cost.update` events. Turn cost in `turns` table, session total in `sessions` table. Feeds existing aggregation tables.
 
@@ -119,28 +119,28 @@ NEW `internal/bff/cost.go` — per-turn cost from token counts + pricing table. 
 ## Model Config and Routing
 
 ### WU-057: Three-Layer Model Config — Provider Endpoints
-**Size:** Medium | **Dependencies:** WU-046 | **Parallelizes with:** WU-050, WU-054 | **Review tier:** B (new config keys)
+**Size:** Medium | **Dependencies:** WU-046 | **Parallelizes with:** WU-050, WU-054
 
 NEW `internal/bff/providers.go` — config parsing for provider endpoints (type, api_key, host, discover). Health checking (startup validation, periodic Ollama/MLX discovery). Status tracking. Multiple endpoints of same type. Extends `internal/config/config.go`.
 
 **Done:** Multiple endpoints parsed. Health detects availability. Ollama discovery polls `/api/tags`. Status tracked.
 
 ### WU-058: Three-Layer Model Config — Model Registry
-**Size:** Medium | **Dependencies:** WU-057 | **Review tier:** A (registry data structure only)
+**Size:** Medium | **Dependencies:** WU-057
 
 NEW `internal/bff/registry.go` — auto-discovery + manual config. Built-in catalog for cloud providers. Manual overrides. Registry fields. Duplicate resolution. Periodic refresh.
 
 **Done:** Registry populates from discovery and config. Built-in catalog covers major models. Overrides take precedence. Duplicates resolved.
 
 ### WU-059: Three-Layer Model Config — Hierarchical Routing Policy
-**Size:** Large | **Dependencies:** WU-058, WU-050 | **Review tier:** B (size L + new config keys; routing is user-visible)
+**Size:** Large | **Dependencies:** WU-058, WU-050
 
 NEW `internal/bff/routing.go` — hierarchical routing with dot-path resolution (category.role → category.default → default). Single-model and multi-model roles. `model.list` handler. `model.switch` handler (set/clear override). `model.selected` event emission.
 
 **Done:** Hierarchical resolution tested for all spec cases. Multi-model returns arrays. Override persists. `model.list` and `model.selected` work.
 
 ### WU-060: Multi-Model Branching — Parallel Provider Calls
-**Size:** Large | **Dependencies:** WU-059, WU-053 | **Parallelizes with:** WU-061 | **Review tier:** C (session.sync state shape consumed cross-track)
+**Size:** Large | **Dependencies:** WU-059, WU-053 | **Parallelizes with:** WU-061
 
 NEW `internal/bff/branch.go` — parallel goroutines per model. `branch_id` tagging. `branch.started`, branch-tagged events, `branch.complete`/`branch.error`, aggregate `turn.complete`. Branch state for `session.sync`. `turn.cancel` cancels all branches.
 
@@ -149,7 +149,7 @@ NEW `internal/bff/branch.go` — parallel goroutines per model. `branch_id` tagg
 ## Context, Diagnostics, Recovery
 
 ### WU-061: Context Window Management and Interactive Compaction
-**Size:** Large | **Dependencies:** WU-055, WU-051 | **Parallelizes with:** WU-060 | **Review tier:** B (new config keys; size L; compaction behavior user-facing)
+**Size:** Large | **Dependencies:** WU-055, WU-051 | **Parallelizes with:** WU-060
 
 NEW `internal/bff/compact.go` — token counting. Pressure warnings (`compact.suggest`). Context categorization (architecture, debugging, testing, files, planning, tool metadata, knowledge). Value scoring. Compaction plan generation (`compact.plan`). Apply logic (`compact.apply`). Auto-compaction at configurable threshold. `compact.notice`.
 
@@ -168,21 +168,21 @@ Defaults (0.78 / 0.92, compact_model empty → cheap routing role resolved at ca
 **Done:** Token counting accurate. Warning fires at configured `pressure_warning_threshold`. Auto-compact fires at configured `auto_compact_threshold`. `compact_model` config is honored: empty resolves via routing, explicit model ID routes directly to the named model. Changing config and restarting the server changes the thresholds and the compaction model. Categories scored. Plan generated. Apply works. Originals retained. Tests cover custom thresholds, explicit `compact_model`, and empty `compact_model` fallback.
 
 ### WU-062: Content Transform
-**Size:** Small | **Dependencies:** WU-052, WU-059 | **Parallelizes with:** WU-061 | **Review tier:** A (implementation of already-defined protocol method)
+**Size:** Small | **Dependencies:** WU-052, WU-059 | **Parallelizes with:** WU-061
 
 NEW `internal/bff/transform.go` — handles `content.transform` (e.g., summarize). Routes to cheap model. Captures raw per ADR-0005. Returns result with cost attribution.
 
 **Done:** Transform routes to cheap model. Raw captured. Cost attributed separately.
 
 ### WU-063: Diagnostic Taxonomy
-**Size:** Medium | **Dependencies:** WU-048, WU-041 | **Parallelizes with:** WU-050, WU-054 | **Review tier:** C (MT-CONN-* codes consumed cross-track + SR-039-04 follow-up on ErrorObject.Data shapes)
+**Size:** Medium | **Dependencies:** WU-048, WU-041 | **Parallelizes with:** WU-050, WU-054
 
 NEW `internal/bff/diagnostics.go` — all 12 codes (MT-CONN-001 through 012). Structured error events. Integration with connection lifecycle.
 
 **Done:** All 12 codes implemented. Tests for each scenario.
 
 ### WU-064: In-Flight Recovery — Idempotency and session.sync
-**Size:** Medium | **Dependencies:** WU-050, WU-053, WU-060 | **Parallelizes with:** WU-061 | **Review tier:** C (session.sync response consumed by harness)
+**Size:** Medium | **Dependencies:** WU-050, WU-053, WU-060 | **Parallelizes with:** WU-061
 
 NEW `internal/bff/recovery.go` — `turn.submit` idempotency by `turn_id`. `tool.result` idempotency by `tool_call_id`. `session.sync` handler: active turn status, pending tools, completed tokens, branch states. No token replay (summary instead).
 
@@ -191,7 +191,7 @@ NEW `internal/bff/recovery.go` — `turn.submit` idempotency by `turn_id`. `tool
 ## CLI and Providers
 
 ### WU-065: CLI — serve, server status, server sessions, session unlock
-**Size:** Medium | **Dependencies:** WU-047, WU-048, WU-050, WU-063 | **Parallelizes with:** WU-064 | **Review tier:** B (new Cobra commands)
+**Size:** Medium | **Dependencies:** WU-047, WU-048, WU-050, WU-063 | **Parallelizes with:** WU-064
 
 Updates to `internal/cli/`:
 
@@ -206,14 +206,14 @@ New Cobra commands under the existing `server` group plus top-level `session` gr
 **Done:** `serve` starts BFF. `server status` shows health. `server sessions` lists sessions with the fields above. `server session <id>` renders session details. `session unlock` releases lock. Help updated for all new commands. Smoke tests verify each subcommand against a running BFF.
 
 ### WU-066: Ollama Provider Adapter
-**Size:** Medium | **Dependencies:** WU-042 | **Parallelizes with:** any from WU-052+ | **Review tier:** A (provider adapter; interface defined in WU-042)
+**Size:** Medium | **Dependencies:** WU-042 | **Parallelizes with:** any from WU-052+
 
 NEW `internal/provider/ollama.go` — full `Provider` interface including `FormatMessages` and `FormatToolDefinitions`. Ollama message format. NDJSON streaming. Tool use support. `Detect` by host pattern.
 
 **Done:** Full interface implemented. Format translation tested. Stream parsing tested. Tool definitions formatted.
 
 ### WU-067: BFF Server Integration Tests
-**Size:** Large | **Dependencies:** all Track A | **Review tier:** B (validates the Track A surface; size L)
+**Size:** Large | **Dependencies:** all Track A
 
 NEW `internal/bff/integration_test.go` — E2E with real BFF + in-memory storage. Tests: connect, register (including version negotiation and project context), turn with streaming, tool round-trip, session CRUD, `server sessions`/`server session <id>` payloads, model switch, compaction, multi-model, command history append/list, health, diagnostics.
 
@@ -222,7 +222,7 @@ NEW `internal/bff/integration_test.go` — E2E with real BFF + in-memory storage
 ## Command History (Server Side)
 
 ### WU-091: Command History Storage and Protocol
-**Size:** Medium | **Dependencies:** WU-045, WU-046, WU-050 | **Parallelizes with:** WU-092 | **Review tier:** C (cross-track contract + new stable schema)
+**Size:** Medium | **Dependencies:** WU-045, WU-046, WU-050 | **Parallelizes with:** WU-092
 
 Required to satisfy FEAT-0009's cross-session, cross-project command history traversal (sourced from the BFF).
 
