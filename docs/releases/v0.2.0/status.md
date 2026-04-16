@@ -4,12 +4,12 @@
 2026-04-16
 
 ## Current Phase
-Planning revised after review; implementation not yet started
+Planning revised after test-coverage gap review; implementation not yet started
 
 ## Planned
 See `plan.md`, `track-0-shared.md`, `track-a-bff-server.md`, `track-b-terminal-harness.md`, `track-integration.md`.
 
-54 work units total: WU-039 through WU-092.
+58 work units total: WU-039 through WU-096.
 
 ## Completed
 (none yet)
@@ -25,11 +25,15 @@ WU-039: Protocol types — core messages and framing (Track 0)
 
 ## Notes
 - Tracks A and B can run in parallel or be serialized (server-first recommended)
-- Track 0 gate for Track A: all of WU-039–WU-045 must complete
+- Track 0 gate for Track A: all of WU-039–WU-045 must complete before Track A foundation begins
 - Track 0 gate for Track B (relaxed): harness-local WUs (068-072, 075-079) may start after WU-039; protocol-client and session-aware WUs additionally require WU-040/041
-- Integration track (WU-088-090) runs after both tracks complete
+- WU-093 (protocol contract fixtures) is a prerequisite for WU-067 and WU-087 (integration suites), not for Track A/B foundation WUs
+- WU-096 (migration upgrade tests) parallelizes with WU-043/044 and any Track A WU after WU-045
+- Integration track (WU-088-090, 094, 095) runs after both tracks complete
 - WU-091 and WU-092 were added 2026-04-16 from the plan review to cover cross-session command history (FEAT-0009)
+- WU-093, WU-094, WU-095, WU-096 were added 2026-04-16 from the test-coverage gap review
 
 ## Plan Review History
 - 2026-04-16 — first round of plan reviews processed; see `.reviews/codex-plan-review.md` and `.reviews/kimi-plan-review.md`, and `docs/history/2026-04-16-release-v0.2.0-plan-review-processed.md`
 - 2026-04-16 — feature-gaps review processed; see `.reviews/kimi-plan-review-feat-gaps.md` and `docs/history/2026-04-16-release-v0.2.0-feat-gaps-review-processed.md` (4 blocking items already fixed; 3 attention items applied to WU-048, WU-050, WU-061, WU-081)
+- 2026-04-16 — test-coverage gap review: added WU-093 (protocol contract fixtures), WU-094 (security review suite), WU-095 (performance benchmarks and budgets), WU-096 (storage migration upgrade tests); see `docs/history/2026-04-16-release-v0.2.0-test-coverage-gap-review.md`
