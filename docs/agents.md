@@ -197,9 +197,16 @@ User identifies which WUs (or bundles) warrant external peer-model
 review beyond the subagent lint. Typically a minority: ADR-level
 decisions, externally-facing contracts, security-critical surfaces.
 
-Designer prepares ready-to-paste peer-review prompts for the
-flagged items. User runs them in one external-model session
-(bundled reviews preferred). Results committed.
+Designer announces the flagged items in chat — WU or bundle
+identifier, plus paths to the design doc, pre-review artifact, and
+relevant source specs. No prompt file is produced: the external
+reviewer is trusted to decide their own framing, and over-prescribing
+the review biases the outcome.
+
+User runs the reviews through their chosen external model in one
+session. Results committed at
+`.reviews/<wu-or-bundle>/<reviewer>-design-review.md` using the
+reviewer-first naming convention.
 
 Designer processes findings across the batch; design docs revised
 as needed.
@@ -327,12 +334,12 @@ A peer-model reviewer uses a **different model family from the Designer**. This 
 
 Tier-C reviewer options:
 
-1. **External LLM via user-mediated submission** — Codex, Kimi, GPT-5, Gemini, or any other non-Claude model. Designer prepares a ready-to-paste peer-review prompt at `.reviews/<wu-or-bundle>/peer-review-prompt.md`; user runs it through their chosen model; artifact committed back. This is how plan reviews already work (`.reviews/codex-plan-review.md`, `.reviews/kimi-plan-review.md`).
+1. **External LLM via user-mediated submission** — Codex, Kimi, GPT-5, Gemini, or any other non-Claude model. Designer announces the review request in chat (WU/bundle identifier + file paths); the user supplies whatever framing they prefer to the external model; the resulting artifact is committed. No committed prompt file — a trusted external reviewer decides their own approach, and prescriptive prompts bias the outcome. This matches how plan reviews already work (`.reviews/codex-plan-review.md`, `.reviews/kimi-plan-review.md`).
 2. **Human maintainer** using a different model from the Designer's, or reasoning without model assistance.
 
 A Claude subagent with fresh context is **not** a Tier-C option. See "Pre-review lint" below — subagent reviews are Phase 1 work, run on every Tier-C WU as part of design.
 
-Until Modeltap itself supports autonomous cross-model routing (FEAT-0008 + FEAT-0013 `review_*` roles), Tier-C peer reviews are user-driven: the Designer prepares prompts in Phase 1 (if the WU is opted in), the user executes them in one Phase 2 session, and the batch of results is processed together.
+Until Modeltap itself supports autonomous cross-model routing (FEAT-0008 + FEAT-0013 `review_*` roles), Tier-C peer reviews are user-driven and batched in Phase 2.
 
 **Bundled reviews:** multiple related WUs sharing a contract surface should go through a single peer review to economize reviewer effort. The review artifact covers all WUs reviewed; each WU's design doc links to it. v0.2.0 bundle candidates:
 - Protocol types: WU-040 + WU-041 + WU-093
