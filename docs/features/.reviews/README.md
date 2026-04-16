@@ -15,6 +15,11 @@ Plan reviews — reviews of implementation plans derived from a feature spec, te
 
 - `docs/features/.reviews/plan-reviews/`
 
+When the reviewing model or harness is known, include it in the plan-review filename:
+
+- `docs/features/.reviews/plan-reviews/codex-0008-bff-server-connectivity-review.md`
+- `docs/features/.reviews/plan-reviews/codex-0008-bff-server-connectivity-review.json`
+
 Cross-feature syntheses (baseline crosswalks, prereviews spanning a group of features, design-thoughts reviews) live under:
 
 - `docs/features/.reviews/syntheses/`

@@ -17,6 +17,15 @@ This document defines the agent team responsible for designing, building, testin
 - `docs/adr/` holds architectural decisions with future constraint value.
 - `ADMIN:` work covers repo process and instruction changes such as `CLAUDE.md`, `AGENTS.md`, prompts, hooks, or documentation structure.
 
+## Review Artifact Naming
+
+- Canonical per-doc findings keep their stable names: `{stem}-findings.md` and `{stem}-findings.json`.
+- Non-canonical work-plan reviews should include the reviewing model or harness name in the filename when known.
+- Prefer reviewer-first names for those plan-review artifacts, for example:
+  - `codex-plan-review.md`
+  - `codex-0008-bff-server-connectivity-review.md`
+  - `gpt5-0001-openai-responses-api-support-plan-review.md`
+
 ## Agents
 
 ### TPM (Technical Program Manager)

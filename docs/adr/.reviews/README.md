@@ -15,6 +15,11 @@ Plan reviews — reviews of implementation plans derived from an ADR or narrower
 
 - `docs/adr/.reviews/plan-reviews/`
 
+When the reviewing model or harness is known, include it in the plan-review filename:
+
+- `docs/adr/.reviews/plan-reviews/codex-0006-provider-formatting-plan-review.md`
+- `docs/adr/.reviews/plan-reviews/codex-0006-provider-formatting-plan-review.json`
+
 Cross-cutting syntheses (multi-ADR reviews, baseline crosswalks, supersession analyses) live under:
 
 - `docs/adr/.reviews/syntheses/`

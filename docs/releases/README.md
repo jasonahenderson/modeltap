@@ -17,9 +17,28 @@ Each release directory contains:
 vX.Y.Z/
 ├── plan.md                    # Implementation plan — overview, tracks, WU summary
 ├── track-*.md                 # Per-track WU details (for parallel agent teams)
+├── .reviews/                  # Release-local review artifacts
 ├── status.md                  # WU completion tracking (created when implementation begins)
 └── changelog.md               # What shipped (created at release time)
 ```
+
+## Review Artifacts
+
+Formal review artifacts for a release live inside that release directory:
+
+- `docs/releases/vX.Y.Z/.reviews/`
+
+When a work-plan or release review is authored by a specific model, harness, or agent, include that name in the filename when known:
+
+- `docs/releases/vX.Y.Z/.reviews/codex-plan-review.md`
+
+Use this location for:
+
+- plan reviews
+- release-readiness reviews
+- post-ship release reviews
+
+`docs/history/` remains the work-log location, but it should point to the canonical review artifact rather than serving as the review artifact itself.
 
 ## Versioning Policy
 

@@ -10,6 +10,7 @@
 - `docs/features/` — behavior-scoped feature specs
 - `docs/patches/` — implementation-scoped work authorization docs
 - `docs/adr/` — architectural decision records
+- `docs/releases/` — release-scoped plans, status, changelogs, and release-local reviews
 - `docs/history/` — status, plans, and session/work logs
 - `docs/agents.md` — detailed agent-team workflow and roles
 
@@ -49,6 +50,15 @@ Crystal-clear rules:
   - a patch when the work is implementation-scoped
   - an ADR when an architectural choice is needed
 - When promoting an exploration, keep the exploration file and add `promoted-to` references rather than deleting upstream context.
+
+## Release Reviews
+
+- Release planning and delivery artifacts live in `docs/releases/` under versioned directories like `docs/releases/v0.2.0/`.
+- Formal review artifacts for a release live in that release directory's `.reviews/` subdirectory, not in `docs/history/`.
+- Use release-local review files for plan reviews, readiness reviews, and post-ship release reviews.
+- For non-canonical work-plan review artifacts, include the reviewing model or harness name in the filename when known (for example `codex-plan-review.md` or `codex-0008-bff-server-connectivity-review.md`).
+- Keep canonical `{stem}-findings.md` and `{stem}-findings.json` filenames unchanged for per-doc findings artifacts.
+- `docs/history/` should still record that the review happened and point at the canonical artifact path.
 
 ## Commit Requirements
 
