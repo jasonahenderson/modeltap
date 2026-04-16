@@ -133,11 +133,15 @@ func NewFrameReader(r io.Reader) *FrameReader {
 //
 // On success, returns the raw JSON bytes of the frame, without the trailing
 // newline. Returns io.EOF if the stream ended cleanly between frames.
-// Returns ErrInvalidFrame (wrapped around io.ErrUnexpectedEOF) if the
-// stream ends mid-frame. Returns ErrFrameTooLarge if the frame would
-// exceed MaxFrameSize; in that case, as many bytes as possible are
-// discarded up to the next newline (best-effort) so the caller may close
-// the connection cleanly.
+// Returns ErrInvalidFrame (joined with io.ErrUnexpectedEOF) if the stream
+// ends mid-frame. Returns ErrFrameTooLarge without consuming more than
+// MaxFrameSize bytes if the frame would exceed the cap.
+//
+// On ErrFrameTooLarge the caller MUST close the connection; the underlying
+// reader is left positioned mid-frame and cannot be resynchronized safely
+// (finding SR-039-01). This package deliberately does not attempt to
+// drain the oversize frame, because an attacker controls when the next
+// newline appears and could block the reader indefinitely.
 func (fr *FrameReader) ReadFrame() ([]byte, error) {
 	var buf bytes.Buffer
 	for {
@@ -159,28 +163,9 @@ func (fr *FrameReader) ReadFrame() ([]byte, error) {
 			return out, nil
 		}
 		if buf.Len() >= MaxFrameSize {
-			// Drain until next newline or EOF so the connection can be
-			// closed without leaving garbage in the buffer; discard bytes
-			// rather than buffering them.
-			drainUntilNewline(fr.br)
 			return nil, ErrFrameTooLarge
 		}
 		buf.WriteByte(b)
-	}
-}
-
-// drainUntilNewline reads and discards bytes from br up to and including
-// the next newline, or until EOF. Errors are ignored: the caller has
-// already decided to abandon the frame.
-func drainUntilNewline(br *bufio.Reader) {
-	for {
-		b, err := br.ReadByte()
-		if err != nil {
-			return
-		}
-		if b == '\n' {
-			return
-		}
 	}
 }
 
