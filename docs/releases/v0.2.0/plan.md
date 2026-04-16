@@ -189,6 +189,27 @@ Per `docs/agents.md` §"Workflow", v0.2.0 executes in three release-level phases
 
 Current phase: **Phase 1** (57 WU designs pending; WU-039 already shipped).
 
+### Phase 1 Completion Checklist
+
+Phase 1 is NOT complete until every line below is checked. Phase 2 begins only when the user confirms.
+
+- [x] Track 0 designs: Bundles 1-3 (WU-040, 041, 042, 043, 044, 045, 093, 096)
+- [ ] Track A designs: BFF Foundation (WU-046, 047, 048, 049)
+- [ ] Track A designs: Sessions & Conversation (WU-050, 051, 052)
+- [ ] Track A designs: Streaming, Prompts, Cost (WU-053, 054, 055, 056)
+- [ ] Track A designs: Model Config & Routing (WU-057, 058, 059, 060)
+- [ ] Track A designs: Context, Diagnostics, Recovery (WU-061, 062, 063, 064)
+- [ ] Track A designs: CLI, Ollama Provider, Command History (WU-065, 066, 091)
+- [ ] Track A designs: BFF Integration Tests (WU-067)
+- [ ] Track B designs: Bubbletea Scaffold (WU-068, 069, 070, 071, 072)
+- [ ] Track B designs: Protocol Client (WU-073, 074)
+- [ ] Track B designs: Tool Framework + Tools (WU-075, 076, 077, 078, 079)
+- [ ] Track B designs: Harness Features (WU-080, 081, 082, 083, 084, 085, 086, 092)
+- [ ] Track B designs: Harness Integration Tests (WU-087)
+- [ ] Integration Track designs (WU-088, 089, 090, 094, 095)
+
+Design order follows dependency graph: foundation → sessions/routing → streaming/context → CLI/features → integration tests → integration track.
+
 ## Serialization Option
 
 If serializing rather than parallelizing:

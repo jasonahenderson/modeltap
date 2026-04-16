@@ -92,11 +92,11 @@ This ensures continuity across sessions even for planning, review, or ad-hoc con
 
 Releases execute in three sequential phases at the **release level, not the WU level**. Do not interleave. Full rules in `docs/agents.md` §"Workflow / Prime directives".
 
-1. **Phase 1 — Design ALL WUs.** Produce design docs. Optional: run pre-review lint (Claude subagent, fresh context) to catch mechanical drift. No coding. No reviews.
-2. **Phase 2 — Review.** User decides what to review and how (read directly, send to external model, both, or skip). No new designs. No coding.
-3. **Phase 3 — Implement ALL WUs.** Red → green → security → docs per WU, any dependency-legal order. No new designs; revise explicitly if implementation reveals a flaw.
+1. **Phase 1 — Design ALL WUs across ALL tracks.** Produce design docs. Optional: run pre-review lint (Claude subagent, fresh context) to catch mechanical drift. No coding. No reviews. Phase 1 is not complete until every track has designs for every WU.
+2. **Phase 2 — Review.** User decides what to review and how (read directly, send to external model, both, or skip). No new designs. No coding. Begins only when user confirms Phase 1 complete.
+3. **Phase 3 — Implement ALL WUs.** Red → green → security → docs per WU, any dependency-legal order. No new designs; revise explicitly if implementation reveals a flaw. Begins only after Phase 2 findings are processed.
 
-Current phase lives in `docs/releases/<version>/plan.md`. Phase transitions are ADMIN commits.
+Current phase lives in `docs/releases/<version>/plan.md`. Phase transitions are explicit ADMIN commits — never implicit.
 
 ### Commit Policy
 

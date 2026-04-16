@@ -167,10 +167,10 @@ This document defines the agent team responsible for designing, building, testin
 ### Prime directives — DO NOT VIOLATE
 
 1. **Phases are release-level, not WU-level.** Phase 1 → Phase 2 → Phase 3, strict order, no interleaving.
-2. **Phase 1 = design ALL WUs.** No coding. No reviews. Just design docs (with optional pre-review lint).
-3. **Phase 2 = review.** User decides what to review and how. No new designs. No coding.
-4. **Phase 3 = implement ALL WUs.** No new designs. If implementation reveals a design flaw, revise the design doc explicitly — don't silently improvise.
-5. **Current phase lives in `docs/releases/<version>/plan.md`.** Any action outside the current phase is wrong.
+2. **Phase 1 = design ALL WUs across ALL tracks.** No coding. No reviews. Just design docs (with optional pre-review lint). Phase 1 is not complete until every track (0, A, B, Integration) has design docs for every WU. Completing one track's designs does not authorize advancing to Phase 2 or 3.
+3. **Phase 2 = review.** User decides what to review and how. No new designs. No coding. Phase 2 begins only after the user confirms Phase 1 is complete.
+4. **Phase 3 = implement ALL WUs.** No new designs. If implementation reveals a design flaw, revise the design doc explicitly — don't silently improvise. Phase 3 begins only after Phase 2 findings are processed.
+5. **Current phase lives in `docs/releases/<version>/plan.md`.** Any action outside the current phase is wrong. Phase transitions are explicit ADMIN commits — never implicit.
 
 If any instruction elsewhere contradicts these, the prime directives win.
 

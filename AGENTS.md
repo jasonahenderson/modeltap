@@ -20,7 +20,7 @@
 2. Follow accepted ADRs and accepted features; explorations are advisory and upstream.
 3. Log significant work to `docs/history/` before stopping.
 4. If repo-process work and product work are mixed, split them into separate commits or tracked artifacts.
-5. **Release execution is phased — Phase 1 → Phase 2 → Phase 3, strict order, no interleaving.** Phase 1 = design ALL WUs (no code). Phase 2 = user reviews designs however they choose (no code, no new designs). Phase 3 = implement ALL WUs. Current phase lives in each release's `plan.md`. See `docs/agents.md` §"Workflow / Prime directives".
+5. **Release execution is phased — Phase 1 → Phase 2 → Phase 3, strict order, no interleaving.** Phase 1 = design ALL WUs across ALL tracks (no code, no reviews). Phase 1 is not complete until every track has designs for every WU. Phase 2 = user reviews designs however they choose (no code, no new designs); begins only when user confirms Phase 1 complete. Phase 3 = implement ALL WUs; begins only after Phase 2 findings are processed. Phase transitions are explicit ADMIN commits. Current phase lives in each release's `plan.md`. See `docs/agents.md` §"Workflow / Prime directives".
 
 ## Artifact Taxonomy
 

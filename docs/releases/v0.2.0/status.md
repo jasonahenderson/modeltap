@@ -4,7 +4,15 @@
 2026-04-16
 
 ## Current Phase
-**Release Phase 1 — Design.** WU-039 shipped under the earlier per-WU workflow (complete). Track 0 Phase 1 design complete (3 bundles). Tracks A, B, and Integration Phase 1 remaining.
+**Release Phase 1 — Design (ALL tracks, ALL WUs).** Phase 1 is not complete until every track has designs for every WU. Phase 2 begins only when the user confirms Phase 1 complete.
+
+**Phase 1 progress:**
+- [x] Track 0: 3/3 bundles designed (WU-040–045, 093, 096)
+- [ ] Track A: 0/7 bundles designed (WU-046–067, 091)
+- [ ] Track B: 0/5 bundles designed (WU-068–087, 092)
+- [ ] Integration: 0/1 bundle designed (WU-088–090, 094, 095)
+
+See `plan.md` §"Phase 1 Completion Checklist" for the full checklist.
 
 ## Planned
 See `plan.md`, `track-0-shared.md`, `track-a-bff-server.md`, `track-b-terminal-harness.md`, `track-integration.md`.
