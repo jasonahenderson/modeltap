@@ -134,8 +134,12 @@ type ServerCapabilities struct {
     ProtocolVersion      string   `json:"protocol_version"`
     ProtocolVersionRange string   `json:"protocol_version_range,omitempty"` // e.g., "1-3"
     SupportedTransforms  []string `json:"supported_transforms,omitempty"`   // e.g., ["summarize"]
+    MaxFrameSize         int      `json:"max_frame_size"`                   // bytes; currently protocol.MaxFrameSize (10 MiB)
+    MaxAttachmentSize    int      `json:"max_attachment_size"`              // bytes; configurable, default 5 MiB
 }
 ```
+
+**Amendment (2026-04-16, post-Bundle 4 pre-review):** `MaxFrameSize` and `MaxAttachmentSize` added per WU-039 review finding A-05. The harness uses these to refuse oversize attachments before serializing. Both fields are required (not omitempty) — the harness needs them at registration time.
 
 Additional fields can be added by later WUs with fixture updates; forward-compat is preserved because `encoding/json` tolerates unknown fields on decode.
 
@@ -319,7 +323,7 @@ Go types for each field are listed explicitly. `string` unless otherwise stated;
 | `DependencyStatus` | Reused for auth/storage/capabilities/routing. | `status` (enum: ready/unavailable/degraded/error), `method` (O), `path` (O), `reason` (O) |
 | `ProviderStatus` | Element of `HealthResponse.providers`. | `status` (enum: ready/unavailable/error), `error` (O), `models` (O, int) |
 | `ActiveSessionInfo` | Nested. | `id`, `owner` |
-| `ServerCapabilities` | Returned in `CapabilitiesRegisterResponse`. (Per D8.) | `protocol_version`, `protocol_version_range` (O), `supported_transforms` (O) |
+| `ServerCapabilities` | Returned in `CapabilitiesRegisterResponse`. (Per D8.) | `protocol_version`, `protocol_version_range` (O), `supported_transforms` (O), `max_frame_size` (R), `max_attachment_size` (R) |
 
 ### errors.go — WU-041 diagnostic types
 
