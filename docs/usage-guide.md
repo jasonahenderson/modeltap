@@ -85,6 +85,89 @@ cp ./bin/modeltap /usr/local/bin/
    modeltap dashboard
    ```
 
+## Connecting AI Coding Tools
+
+modeltap is a transparent reverse proxy: any client that lets you override its API base URL can be pointed at it. The general pattern is the same for every tool — set the base URL to `http://localhost:8080`, leave your API key alone, and traffic flows through modeltap on its way to the upstream provider.
+
+The examples below assume modeltap is running with provider-specific upstream routing configured:
+
+```yaml
+# ~/.config/modeltap/config.yaml
+providers:
+  anthropic:
+    upstream: https://api.anthropic.com
+  openai:
+    upstream: https://api.openai.com
+```
+
+With that config in place, modeltap routes Anthropic-shaped requests to Anthropic and OpenAI-shaped requests to OpenAI based on automatic detection, so a single proxy address works for both.
+
+### Claude Code
+
+Claude Code reads its API endpoint from the `ANTHROPIC_BASE_URL` environment variable. Set it before launching `claude`:
+
+```sh
+export ANTHROPIC_BASE_URL=http://localhost:8080
+export ANTHROPIC_API_KEY=sk-ant-...   # your existing key, unchanged
+claude
+```
+
+To make this permanent, add the export to your shell profile (`~/.zshrc`, `~/.bashrc`, etc.). All Claude Code traffic will then appear in `modeltap logs --provider anthropic`.
+
+### Codex (OpenAI Codex CLI)
+
+The Codex CLI honors `OPENAI_BASE_URL` for its default OpenAI provider:
+
+```sh
+export OPENAI_BASE_URL=http://localhost:8080/v1
+export OPENAI_API_KEY=sk-...
+codex
+```
+
+You can also configure this persistently in `~/.codex/config.toml` by setting the `base_url` for the `openai` provider:
+
+```toml
+[model_providers.openai]
+base_url = "http://localhost:8080/v1"
+```
+
+**Caveat:** Codex sends some traffic to OpenAI's Responses API (`/v1/responses`) rather than Chat Completions (`/v1/chat/completions`). modeltap's v1 OpenAI adapter only detects and parses `/v1/chat/completions`, so Responses-API calls will still be proxied through unchanged but may be captured with empty model/token metadata. Adding a Responses-API parser is tracked as future work.
+
+### OpenCode
+
+OpenCode supports custom provider endpoints via its config file (`~/.config/opencode/opencode.json` or the project-local equivalent). Override the base URL for whichever provider you want to capture:
+
+```json
+{
+  "provider": {
+    "anthropic": {
+      "options": {
+        "baseURL": "http://localhost:8080"
+      }
+    },
+    "openai": {
+      "options": {
+        "baseURL": "http://localhost:8080/v1"
+      }
+    }
+  }
+}
+```
+
+OpenCode also respects the standard `ANTHROPIC_BASE_URL` and `OPENAI_BASE_URL` environment variables for the corresponding built-in providers, so you can use the same env-var approach shown above for Claude Code and Codex if you prefer not to edit the config file.
+
+### Verifying the connection
+
+After pointing a tool at modeltap and making one request, confirm the capture:
+
+```sh
+modeltap logs --limit 5
+```
+
+You should see a row for the tool's request with the correct provider label, model name, and token counts. If the row is missing, the tool is bypassing the proxy — double-check the env var or config field name.
+
+If the row is present but the model and tokens are empty, the request is reaching modeltap but using an endpoint the v1 adapters don't yet parse (for example, OpenAI's Responses API). The raw request and response are still captured in full and can be inspected with `modeltap show <id>`.
+
 ## Configuration
 
 ### Config file location
