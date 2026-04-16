@@ -179,6 +179,22 @@ This relaxation avoids blocking harness-local progress behind provider formattin
 | Integration | 088-090, 094, 095 | 5 | E2E tests, CLI launch, docs, security review, performance budgets |
 | **Total** | **039-096** | **58** | |
 
+## Design Review Tiers
+
+Every WU has a default review tier recorded in its spec (`**Review tier:** A | B | C`). The tiering rules, procedures, and artifact conventions live in `docs/agents.md` §"Design Review".
+
+Tier distribution for v0.2.0:
+
+| Track | C | B | A | Total |
+|-------|---|---|---|-------|
+| 0 (shared) | 9 | 0 | 0 | 9 |
+| A (BFF) | 11 | 8 | 4 | 23 |
+| B (Harness) | 11 | 8 | 2 | 21 |
+| Integration | 2 | 2 | 1 | 5 |
+| **Total** | **33** | **18** | **7** | **58** |
+
+Tier-C WUs require external peer review (preferred via an external LLM like Codex/Kimi/GPT-5/Gemini; Claude subagent is a fallback but is not cross-model). Bundled reviews are encouraged for closely related WUs (e.g., WU-040+041+093 protocol-types bundle; WU-076–079 tools bundle; WU-045+091+096 storage bundle).
+
 ## Serialization Option
 
 If serializing rather than parallelizing:
