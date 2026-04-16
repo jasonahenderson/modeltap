@@ -173,11 +173,17 @@ TPM assigns task (with default review tier)
 Design Engineer -> design doc (records final review tier in doc)
     |
     v
+(Optional for Tier B/C) Pre-review lint:
+    Claude subagent with fresh context reviews the design against
+    source specs; Designer triages findings, resolves cheap ones in-WU.
+    |                                  COMMIT: lint artifact
+    v
 Design Review per tier:
     Tier A -> self-checklist passes
     Tier B -> user reviews and approves
-    Tier C -> external/subagent reviewer produces review artifact;
-              blocking findings addressed before proceeding
+    Tier C -> peer-model reviewer (different model family) produces
+              review artifact; Blocking findings addressed before
+              proceeding. Subagent review does NOT satisfy Tier C.
     |                                  COMMIT: design + review artifact
     v
 Test Engineer -> failing unit tests
@@ -263,17 +269,43 @@ The Designer confirms in the design doc that each item holds. A failing item is 
 
 Designer publishes the design doc and pauses. The user reads, asks questions, and approves or requests changes before the Test Engineer proceeds. Approval is recorded in the design doc or in the commit message that promotes the WU to tests.
 
-#### Tier C — external peer review
+#### Tier C — peer-model review
 
-A reviewer **independent of the Designer** produces a review artifact. Options in priority order:
+A reviewer **using a different model family from the Designer** produces a review artifact. This is definitional: Tier C exists to catch reasoning blind spots that a same-model reviewer cannot detect. A fresh-context instance of the Designer's own model shares the same training distribution, tokenizer, and reasoning heuristics, so it will miss the same patterns. Tier C is not about "fresh eyes," it is about **different eyes**.
 
-1. **External LLM via user-mediated submission** — Codex, Kimi, GPT-5, Gemini, etc. Designer prepares the prompt; user runs it through their chosen model; artifact committed back. Best option: catches blind spots specific to any one model's reasoning style. This is how plan reviews already work (`.reviews/codex-plan-review.md`, `.reviews/kimi-plan-review.md`).
-2. **Claude subagent with fresh context** — via the Agent tool. Useful for catching undocumented assumptions, spec drift, and scope gaps. **Not a substitute for #1** — it is same-model-different-session and shares Claude's blind spots with the Designer.
-3. **Another human maintainer** when available.
+Tier-C reviewer options:
 
-A subagent review is *same-model, fresh-context* and should be clearly labeled as such. It does not replace an external-model review when one is practical. Until Modeltap itself supports cross-model routing (FEAT-0008 + FEAT-0013), external-model reviews are user-driven.
+1. **External LLM via user-mediated submission** — Codex, Kimi, GPT-5, Gemini, or any other non-Claude model. Designer prepares a ready-to-paste peer-review prompt at `.reviews/wu-NNN/peer-review-prompt.md`; user runs it through their chosen model; artifact committed back. This is how plan reviews already work (`.reviews/codex-plan-review.md`, `.reviews/kimi-plan-review.md`).
+2. **Human maintainer** using a different model from the Designer's, or reasoning without model assistance.
 
-**Bundled reviews:** multiple related WUs sharing a contract surface may go through a single review. The review artifact covers all WUs reviewed; each WU's design doc links to it. Example: WU-040, WU-041, WU-093 could share one protocol-types design review.
+A Claude subagent with fresh context is **not** a Tier-C option. See "Pre-review lint" below for its actual role.
+
+Until Modeltap itself supports autonomous cross-model routing (FEAT-0008 + FEAT-0013 `review_*` roles), Tier-C reviews are user-driven: the Designer prepares the prompt and supporting artifacts; the user executes the review against their chosen external model; the result is committed.
+
+**Bundled reviews:** multiple related WUs sharing a contract surface should go through a single peer review to economize reviewer effort. The review artifact covers all WUs reviewed; each WU's design doc links to it. v0.2.0 bundle candidates:
+- Protocol types: WU-040 + WU-041 + WU-093
+- Provider formatting: WU-042 + WU-043 + WU-044
+- Storage: WU-045 + WU-091 + WU-096
+- Connection: WU-046 + WU-047 + WU-048 + WU-049
+- Session: WU-050 + WU-051 + WU-064
+- Streaming: WU-052 + WU-053 + WU-060
+- Routing: WU-057 + WU-058 + WU-059
+- Tools: WU-076 + WU-077 + WU-078 + WU-079
+
+Aggressive bundling collapses 33 Tier-C WUs to ~10-12 peer reviews across v0.2.0.
+
+#### Pre-review lint (optional, not a tier)
+
+Before handing a Tier-B or Tier-C design off for review, the Designer may run a **pre-review lint**: a Claude subagent with fresh context that reads the design doc and (if applicable) the implementation against source specs. The lint catches mechanical issues cheaply — missing fields, spec drift, cross-WU inconsistency, scope gaps, undocumented assumptions — so the reviewer's attention (your time, or the external model's context window) is spent on things the lint can't reach.
+
+The lint is **not a tier**. It does not satisfy Tier B or Tier C. It is a Designer tool that runs before the tier review.
+
+Artifact: `docs/releases/<version>/.reviews/wu-NNN/claude-subagent-pre-review.md`. The Designer triages the lint's findings, resolves Blocking items in-WU, and commits the lint artifact before requesting the tier review. The peer-review prompt should reference the lint artifact so the peer reviewer doesn't rediscover already-resolved findings.
+
+Recommended usage:
+- **Tier C:** run the lint. The cost is low and the lint catches spec drift cheaply.
+- **Tier B:** lint is optional; use judgment based on WU complexity.
+- **Tier A:** skip the lint. Tier A is already a self-check; adding a subagent is overkill.
 
 #### Review artifact location and naming
 
