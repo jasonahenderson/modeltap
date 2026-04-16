@@ -4,7 +4,7 @@
 2026-04-16
 
 ## Current Phase
-**Release Phase 1 — Design.** WU-039 shipped under the earlier per-WU workflow (complete). All remaining 57 WUs are in the design phase. See `plan.md` §"Phased Execution" and `docs/agents.md` §"Workflow" for phase semantics.
+**Release Phase 1 — Design.** WU-039 shipped under the earlier per-WU workflow (complete). Track 0 Phase 1 design complete (3 bundles). Tracks A, B, and Integration Phase 1 remaining.
 
 ## Planned
 See `plan.md`, `track-0-shared.md`, `track-a-bff-server.md`, `track-b-terminal-harness.md`, `track-integration.md`.
@@ -13,6 +13,11 @@ See `plan.md`, `track-0-shared.md`, `track-a-bff-server.md`, `track-b-terminal-h
 
 ## Completed
 - [x] WU-039: Protocol types — core messages and framing (2026-04-16) — commits `28213eb` (red), `1aa3830` (green), `50febd0` (security fix SR-039-01). Tests, design doc, and security review doc in `docs/history/`.
+
+### Phase 1 Design Artifacts (Track 0)
+- [x] Bundle 1 — Protocol types (WU-040 + 041 + 093) — design `docs/history/2026-04-16-design-protocol-types-040-041-093.md`; pre-review `docs/releases/v0.2.0/.reviews/protocol-types-040-041-093/claude-subagent-pre-review.md`. Commit `f9429e4`.
+- [x] Bundle 2 — Provider formatting (WU-042 + 043 + 044) — design `docs/history/2026-04-16-design-provider-formatting-042-043-044.md`; pre-review `docs/releases/v0.2.0/.reviews/provider-formatting-042-043-044/claude-subagent-pre-review.md`. Commit `3fb9588`.
+- [x] Bundle 3 — Storage (WU-045 + 091 + 096) — design `docs/history/2026-04-16-design-storage-045-091-096.md`; pre-review `docs/releases/v0.2.0/.reviews/storage-045-091-096/claude-subagent-pre-review.md`. Commit `99c724e`.
 
 ## In Progress
 (none yet)
