@@ -9,11 +9,20 @@
 // Dispatch, validation, and business logic live in higher-level packages
 // (internal/bff and internal/harness).
 //
-// Scope for WU-039: protocol version constants, JSON-RPC 2.0 envelope,
-// NDJSON framing reader/writer, the Mode enum, and the 20 harness->server
-// request types (declared in messages.go). Server->harness streaming events,
-// session/tool/model/health/error/compact payloads, and cross-track
-// conformance fixtures are added by WU-040, WU-041, and WU-093 respectively.
+// Scope for WU-039: protocol version constants, JSON-RPC 2.0 envelope
+// (Request / Response / Notification / ErrorObject), NDJSON framing
+// reader/writer, the Mode enum, and the 20 harness->server request types
+// (declared in messages.go). Server->harness streaming events, session /
+// tool / model / health / error / compact payloads, and cross-track
+// conformance fixtures are added by WU-040, WU-041, and WU-093
+// respectively.
+//
+// Directionality of envelope types:
+//   - Request: harness -> server. Every request has a non-null id
+//     (FEAT-0008 §"Correlation").
+//   - Response: server -> harness, in reply to a Request with the same id.
+//   - Notification: server -> harness, fire-and-forget streaming event
+//     (WU-040). No id field. Harness frames MUST NOT use this type.
 //
 // Canonical field names (snake_case):
 //
@@ -72,14 +81,41 @@ var ErrInvalidFrame = errors.New("protocol: invalid frame")
 // literal newline byte, so callers must not supply pre-indented JSON.
 var ErrEmbeddedNewline = errors.New("protocol: frame contains embedded newline")
 
-// Request is the JSON-RPC 2.0 request envelope.
+// Request is the JSON-RPC 2.0 request envelope used for harness->server
+// messages. Every harness request MUST carry an ID per FEAT-0008 §"Protocol
+// Specification" / "Correlation": "every request from the harness includes
+// a `id` field (JSON-RPC standard). The server's response or error carries
+// the same `id`."
 //
-// Method selects the handler; Params is the method-specific payload held as
-// raw JSON so callers can decode into the correct typed struct. ID is raw
-// JSON because JSON-RPC permits string, number, or null identifiers.
+// The ID field has no `omitempty` tag so that the wire form always emits
+// an `id` key; a zero-value (nil) Request.ID serializes as `"id":null`,
+// which is a legal JSON-RPC id but is rejected by the transport layer
+// (WU-046) because it defeats request/response correlation. Callers must
+// set ID to a real value (string, number, or pre-encoded JSON). Use
+// Notification (below) for server->harness frames that deliberately omit
+// the id (streaming events introduced in WU-040).
+//
+// Method selects the handler; Params is the method-specific payload held
+// as raw JSON so callers can decode into the correct typed struct. ID is
+// raw JSON because JSON-RPC permits string, number, or null identifiers.
 type Request struct {
 	JSONRPC string          `json:"jsonrpc"`
-	ID      json.RawMessage `json:"id,omitempty"`
+	ID      json.RawMessage `json:"id"`
+	Method  string          `json:"method"`
+	Params  json.RawMessage `json:"params,omitempty"`
+}
+
+// Notification is the JSON-RPC 2.0 notification envelope. Notifications
+// carry no id and therefore cannot be correlated with a response. They
+// are used for server->harness streaming events (introduced in WU-040:
+// token.delta, tool.call, turn.complete, cost.update, and similar).
+//
+// Harness->server frames MUST use Request, not Notification. FEAT-0008
+// requires correlation on every harness request; a frame without an id
+// from the harness side is a protocol violation and will be rejected by
+// the transport layer (WU-046).
+type Notification struct {
+	JSONRPC string          `json:"jsonrpc"`
 	Method  string          `json:"method"`
 	Params  json.RawMessage `json:"params,omitempty"`
 }

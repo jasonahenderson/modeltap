@@ -376,6 +376,59 @@ func TestResponse_RoundTrip_Result(t *testing.T) {
 	}
 }
 
+// Pins Codex finding #1 / #2: FEAT-0008 requires every harness request to
+// carry an id. Accidental reintroduction of `omitempty` on Request.ID, or
+// elision of the id field by any future refactor, must fail this test.
+func TestRequest_IDAlwaysEmitted(t *testing.T) {
+	// Zero-value Request with ID unset. On the wire, the id key MUST be
+	// present even if the value is null (JSON-RPC permits null id; our
+	// transport layer rejects it per WU-046, but WU-039 types must not
+	// elide the key).
+	req := Request{JSONRPC: "2.0", Method: MethodTurnSubmit}
+	b, err := json.Marshal(req)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	s := string(b)
+	if !strings.Contains(s, `"id"`) {
+		t.Errorf("Request marshaled without id key: %s — this violates FEAT-0008 correlation requirement", s)
+	}
+
+	// Request with an explicit id also emits the key.
+	req2 := Request{JSONRPC: "2.0", ID: json.RawMessage(`"req-1"`), Method: MethodTurnSubmit}
+	b2, err := json.Marshal(req2)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if !strings.Contains(string(b2), `"id":"req-1"`) {
+		t.Errorf("Request with explicit ID did not emit id value: %s", string(b2))
+	}
+}
+
+// Pins the complementary invariant for Notification: the id key MUST NOT
+// appear on the wire. Notifications are the server->harness fire-and-forget
+// envelope (streaming events in WU-040); harness->server frames must use
+// Request instead.
+func TestNotification_RoundTrip_NoID(t *testing.T) {
+	n := Notification{JSONRPC: "2.0", Method: "token.delta", Params: json.RawMessage(`{"turn_id":"t1","text":"hi"}`)}
+	b, err := json.Marshal(n)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	s := string(b)
+	if strings.Contains(s, `"id"`) {
+		t.Errorf("Notification marshaled with an id key: %s — notifications must not carry id", s)
+	}
+
+	var out Notification
+	if err := json.Unmarshal(b, &out); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if out.Method != "token.delta" {
+		t.Errorf("notification method round-trip: got %q", out.Method)
+	}
+}
+
 func TestResponse_RoundTrip_Error(t *testing.T) {
 	resp := Response{
 		JSONRPC: "2.0",
