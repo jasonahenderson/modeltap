@@ -82,10 +82,23 @@ This ensures continuity across sessions even for planning, review, or ad-hoc con
 ### Resumption Protocol
 
 1. Read `docs/releases/<current-version>/status.md` (check `docs/releases/README.md` for the current release)
-2. Check if any "In Progress" items are actually complete (files exist, tests pass)
-3. Update status accordingly
-4. Pick next task from "Up Next"
-5. Log plan before starting, summary after completion
+2. Check what release phase is active (Phase 1 design / Phase 2 peer review / Phase 3 implementation — see `plan.md` and `docs/agents.md` §"Workflow")
+3. Check if any "In Progress" items are actually complete (files exist, tests pass)
+4. Update status accordingly
+5. Pick next task from "Up Next" within the current phase
+6. Log plan before starting, summary after completion
+
+### Release Execution
+
+Releases execute in three sequential phases at the release level, not the WU level:
+
+- **Phase 1 — Design.** All WUs for the release get design docs. Tier-B and Tier-C WUs also get a subagent pre-review lint that checks the design for spec drift and scope gaps.
+- **Phase 2 — Peer review (opt-in, batched).** The user flags a subset of Tier-C WUs/bundles for external-model peer review. Designer announces them in chat with file paths; user runs the reviews against their chosen external model; results are committed.
+- **Phase 3 — Implementation.** All WUs move to red → green → security → docs in any dependency-legal order.
+
+Phase transitions are ADMIN commits. Current phase is tracked in `docs/releases/<version>/plan.md` §"Phased Execution".
+
+Every WU carries a **review tier** (A / B / C) in its track-file spec. Tier rules and per-tier procedures live in `docs/agents.md` §"Design Review".
 
 ### Commit Policy
 

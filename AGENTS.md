@@ -20,6 +20,8 @@
 2. Follow accepted ADRs and accepted features; explorations are advisory and upstream.
 3. Log significant work to `docs/history/` before stopping.
 4. If repo-process work and product work are mixed, split them into separate commits or tracked artifacts.
+5. Every WU carries a design review tier (A / B / C). Tier A is a self-checklist, Tier B is user review, Tier C is a subagent pre-review lint plus optional external-model peer review. See `docs/agents.md` §"Design Review".
+6. Releases execute in three sequential phases at the release level: Phase 1 (design all WUs), Phase 2 (opt-in external peer reviews, batched), Phase 3 (implementation). Current phase lives in each release's `plan.md`.
 
 ## Artifact Taxonomy
 
