@@ -60,6 +60,15 @@ Prime directives:
 5. The current phase lives in `docs/releases/<version>/plan.md`.
 6. Phase transitions are explicit `ADMIN:` commits, never implicit.
 
+## Design Artifact Placement
+
+- Design docs live under the active release directory's `designs/`
+  subdirectory: `docs/releases/<version>/designs/`.
+- One file per design bundle. Bundle related WUs that share a contract surface.
+- File naming: `<date>-design-<short-name>-<wu-range>.md`.
+- Design docs are release deliverables, not session history. `docs/history/`
+  records sessions and work logs; `designs/` holds the designs themselves.
+
 ## Review Artifact Placement
 
 - Release planning and delivery reviews live under the active release
