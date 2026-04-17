@@ -270,7 +270,7 @@ func TestCapabilitiesRegister_RoundTrip(t *testing.T) {
 				InputSchema:          []byte(`{"type":"object"}`),
 				OutputEnvelope:       "text",
 				RiskLevel:            "read_only",
-				CapabilitiesRequired: []string{},
+				CapabilitiesRequired: []string{"fs"},
 			},
 		},
 		Project: ProjectContext{Root: "/p", ConfigFile: ".modeltap.yaml", ConfigContent: "---"},
@@ -635,7 +635,7 @@ func TestCanonicalFieldNames(t *testing.T) {
 			CapabilitiesRegister{
 				ProtocolVersion: "1", HarnessVersion: "0.2.0", HarnessPlatform: "darwin",
 				Tools: []ToolDefinition{
-					{Name: "Read", Namespace: "builtin", Description: "", InputSchema: []byte(`{}`), OutputEnvelope: "text", RiskLevel: "read_only", CapabilitiesRequired: []string{}},
+					{Name: "Read", Namespace: "builtin", Description: "", InputSchema: []byte(`{}`), OutputEnvelope: "text", RiskLevel: "read_only", CapabilitiesRequired: []string{"fs"}},
 				},
 				Project: ProjectContext{Root: "/p", ConfigFile: ".f", ConfigContent: "c"},
 			},
