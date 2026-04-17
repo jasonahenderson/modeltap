@@ -23,23 +23,23 @@ See `plan.md`, `track-0-shared.md`, `track-a-bff-server.md`, `track-b-terminal-h
 - [x] WU-039: Protocol types — core messages and framing (2026-04-16) — commits `28213eb` (red), `1aa3830` (green), `50febd0` (security fix SR-039-01). Tests, design doc, and security review doc in `docs/history/`.
 
 ### Phase 1 Design Artifacts (Track 0)
-- [x] Bundle 1 — Protocol types (WU-040 + 041 + 093) — design `docs/history/2026-04-16-design-protocol-types-040-041-093.md`; pre-review `docs/releases/v0.2.0/.reviews/protocol-types-040-041-093/`. Commit `f9429e4`.
-- [x] Bundle 2 — Provider formatting (WU-042 + 043 + 044) — design `docs/history/2026-04-16-design-provider-formatting-042-043-044.md`; pre-review `docs/releases/v0.2.0/.reviews/provider-formatting-042-043-044/`. Commit `3fb9588`.
-- [x] Bundle 3 — Storage (WU-045 + 091 + 096) — design `docs/history/2026-04-16-design-storage-045-091-096.md`; pre-review `docs/releases/v0.2.0/.reviews/storage-045-091-096/`. Commit `99c724e`.
+- [x] Bundle 1 — Protocol types (WU-040 + 041 + 093) — design `designs/2026-04-16-design-protocol-types-040-041-093.md`; pre-review `docs/releases/v0.2.0/.reviews/protocol-types-040-041-093/`. Commit `f9429e4`.
+- [x] Bundle 2 — Provider formatting (WU-042 + 043 + 044) — design `designs/2026-04-16-design-provider-formatting-042-043-044.md`; pre-review `docs/releases/v0.2.0/.reviews/provider-formatting-042-043-044/`. Commit `3fb9588`.
+- [x] Bundle 3 — Storage (WU-045 + 091 + 096) — design `designs/2026-04-16-design-storage-045-091-096.md`; pre-review `docs/releases/v0.2.0/.reviews/storage-045-091-096/`. Commit `99c724e`.
 
 ### Phase 1 Design Artifacts (Tracks A, B, Integration)
-- [x] Bundle 4 — BFF Foundation (WU-046-049) — design `docs/history/2026-04-16-design-bff-foundation-046-047-048-049.md`; pre-review + fixes. Commits `f636403`, `4baa5fc`.
-- [x] Bundle 5 — Bubbletea Scaffold (WU-068-072) — design `docs/history/2026-04-16-design-bubbletea-scaffold-068-069-070-071-072.md`; pre-review + fixes. Commit `f636403`.
-- [x] Bundle 6 — Protocol Client (WU-073-074) — design `docs/history/2026-04-16-design-protocol-client-073-074.md`; pre-review + fixes. Commit `f636403`.
-- [x] Bundle 7 — Tool Framework + Tools (WU-075-079) — design `docs/history/2026-04-16-design-tool-framework-075-076-077-078-079.md`; pre-review + fixes. Commits `f636403`, `2fc6e30`.
-- [x] Bundle 8 — Sessions & Conversation (WU-050-052) — design `docs/history/2026-04-16-design-sessions-conversation-050-051-052.md`; pre-review + fixes. Commits `2fd809b`, `4baa5fc`.
-- [x] Bundle 9 — Model Config & Routing (WU-057-060) — design `docs/history/2026-04-16-design-model-config-routing-057-058-059-060.md`; pre-review + fixes. Commits `2fd809b`, `4baa5fc`.
-- [x] Bundle 10 — Streaming, Prompts, Cost (WU-053-056) — design `docs/history/2026-04-16-design-streaming-prompts-cost-053-054-055-056.md`; pre-review + fixes. Commits `2fd809b`, `2fc6e30`.
-- [x] Bundle 11 — Context, Diagnostics, Recovery (WU-061-064) — design `docs/history/2026-04-16-design-context-diagnostics-recovery-061-062-063-064.md`; pre-review. Commit `2fd809b`.
-- [x] Bundle 12 — CLI, Ollama, Command History (WU-065, 066, 091) — design `docs/history/2026-04-16-design-cli-ollama-history-065-066-091.md`; pre-review. Commit `2fd809b`.
-- [x] Bundle 13 — Harness Features (WU-080-086, 092) — design `docs/history/2026-04-16-design-harness-features-080-086-092.md`; pre-review + fixes. Commits `2fd809b`, `2fc6e30`.
-- [x] Bundle 14 — Track Integration Tests (WU-067, 087) — design `docs/history/2026-04-16-design-track-integration-tests-067-087.md`; pre-review. Commit `2fd809b`.
-- [x] Bundle 15 — Integration Track (WU-088-090, 094, 095) — design `docs/history/2026-04-16-design-integration-track-088-090-094-095.md`; pre-review. Commit `2fd809b`.
+- [x] Bundle 4 — BFF Foundation (WU-046-049) — design `designs/2026-04-16-design-bff-foundation-046-047-048-049.md`; pre-review + fixes. Commits `f636403`, `4baa5fc`.
+- [x] Bundle 5 — Bubbletea Scaffold (WU-068-072) — design `designs/2026-04-16-design-bubbletea-scaffold-068-069-070-071-072.md`; pre-review + fixes. Commit `f636403`.
+- [x] Bundle 6 — Protocol Client (WU-073-074) — design `designs/2026-04-16-design-protocol-client-073-074.md`; pre-review + fixes. Commit `f636403`.
+- [x] Bundle 7 — Tool Framework + Tools (WU-075-079) — design `designs/2026-04-16-design-tool-framework-075-076-077-078-079.md`; pre-review + fixes. Commits `f636403`, `2fc6e30`.
+- [x] Bundle 8 — Sessions & Conversation (WU-050-052) — design `designs/2026-04-16-design-sessions-conversation-050-051-052.md`; pre-review + fixes. Commits `2fd809b`, `4baa5fc`.
+- [x] Bundle 9 — Model Config & Routing (WU-057-060) — design `designs/2026-04-16-design-model-config-routing-057-058-059-060.md`; pre-review + fixes. Commits `2fd809b`, `4baa5fc`.
+- [x] Bundle 10 — Streaming, Prompts, Cost (WU-053-056) — design `designs/2026-04-16-design-streaming-prompts-cost-053-054-055-056.md`; pre-review + fixes. Commits `2fd809b`, `2fc6e30`.
+- [x] Bundle 11 — Context, Diagnostics, Recovery (WU-061-064) — design `designs/2026-04-16-design-context-diagnostics-recovery-061-062-063-064.md`; pre-review. Commit `2fd809b`.
+- [x] Bundle 12 — CLI, Ollama, Command History (WU-065, 066, 091) — design `designs/2026-04-16-design-cli-ollama-history-065-066-091.md`; pre-review. Commit `2fd809b`.
+- [x] Bundle 13 — Harness Features (WU-080-086, 092) — design `designs/2026-04-16-design-harness-features-080-086-092.md`; pre-review + fixes. Commits `2fd809b`, `2fc6e30`.
+- [x] Bundle 14 — Track Integration Tests (WU-067, 087) — design `designs/2026-04-16-design-track-integration-tests-067-087.md`; pre-review. Commit `2fd809b`.
+- [x] Bundle 15 — Integration Track (WU-088-090, 094, 095) — design `designs/2026-04-16-design-integration-track-088-090-094-095.md`; pre-review. Commit `2fd809b`.
 
 ### Pre-Review Blocking Findings (all resolved)
 - Bundles 4-6: 10 blockers (heartbeat direction, CapabilitiesRegisterResponse type, ConnectionPong fields, capabilities.request, ConnState strings, Mode type, connection states, mode rendering, degradation threshold, Notify removal)

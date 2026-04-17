@@ -55,7 +55,7 @@ This document defines the agent team responsible for designing, building, testin
 - Write design docs that are specific enough for the Implementation Engineer to code from
 
 **Inputs:** Accepted ADRs, feature docs, TPM task assignment
-**Outputs:** Design document in `docs/history/<timestamp>-design-<component>.md`
+**Outputs:** Design document in `docs/releases/<version>/designs/<date>-design-<component>.md`
 
 ### Test Engineer
 
