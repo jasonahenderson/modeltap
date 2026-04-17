@@ -44,12 +44,27 @@ type SessionManager struct {
 // ActiveSession tracks the in-memory state of a session that is currently
 // bound to a connection. Complements the persisted storage.Session.
 type ActiveSession struct {
-    ID           string
-    Conversation *Conversation     // in-memory conversation state
-    ConnID       string            // owning connection ID
-    LockExpiry   time.Time
-    GraceCancel  context.CancelFunc // cancel grace-period release (from WU-048)
+    ID            string
+    Conversation  *Conversation     // in-memory conversation state
+    ConnID        string            // owning connection ID
+    LockExpiry    time.Time
+    GraceCancel   context.CancelFunc // cancel grace-period release (from WU-048)
+    ModelOverride string            // set by model.switch (WU-059); empty = use routing policy
+    TotalCost     float64           // running session cost total
+    TotalInputTokens  int64
+    TotalOutputTokens int64
+    ContextPct    float64           // last observed context pressure
+    ActiveTurn    *ActiveTurnInfo   // non-nil during streaming; used by session.sync (WU-064)
+    BranchManager *BranchManager   // non-nil during multi-model turn (WU-060)
 }
+
+type ActiveTurnInfo struct {
+    TurnID          string
+    Status          string // "streaming", "pending_tool_result", etc.
+    CompletedTokens int
+}
+
+func (at *ActiveTurnInfo) Summary() string
 
 func NewSessionManager(store storage.Store) *SessionManager
 
@@ -138,12 +153,14 @@ func handleSessionFork(ctx context.Context, conn *Connection, params json.RawMes
 ```
 
 Creates an independent copy of the session:
-1. Create new session with new ID
-2. Copy all turns from source session
-3. Copy pinned items and compaction state
-4. Do NOT copy lock (new session is unlocked)
-5. Bind the new session to the current connection (release lock on old session)
-6. Return new session ID
+1. Create new session with new ID, new `created_at`/`updated_at`
+2. Copy turns: all turns duplicated with new session_id, same sequence numbers
+3. Copy fields: `summary`, `active_model`, `pinned_items`, `compaction_state`
+4. Reset fields: `total_cost=0`, `total_input_tokens=0`, `total_output_tokens=0`, `context_pct=0`, `status="active"`
+5. Do NOT copy: `lock_owner`, `lock_expires_at`, `model_override`, `routing_overrides`
+6. Bind the new session to the current connection (release lock on old session)
+7. Append `session_events` entry of type `"fork"` to the source session
+8. Return `protocol.SessionForkResponse{NewSessionID, OriginalSessionID}`
 
 #### D2.8. Session lock mechanics
 
@@ -169,7 +186,7 @@ func (sm *SessionManager) updateSummary(session *ActiveSession, turn *storage.Tu
         if len(summary) > 100 {
             summary = summary[:100] + "..."
         }
-        session.store.UpdateSession(&storage.Session{ID: session.ID, Summary: summary})
+        sm.store.UpdateSession(ctx, &storage.Session{ID: session.ID, Summary: summary})
     }
 }
 ```
@@ -317,12 +334,15 @@ type TurnMetadata struct {
 ```go
 // TurnDispatcher translates canonical conversation to provider-specific format
 // and sends HTTP requests to provider endpoints.
+// Uses ProviderRegistry (WU-057) for thread-safe provider lookup — not a static map.
+// This ensures runtime discovery changes (Ollama models appearing/disappearing)
+// are visible to dispatch without restart.
 type TurnDispatcher struct {
-    providers map[string]provider.Provider // keyed by provider name
+    registry   *ProviderRegistry // thread-safe; from WU-057
     httpClient *http.Client
 }
 
-func NewTurnDispatcher(providers map[string]provider.Provider) *TurnDispatcher
+func NewTurnDispatcher(registry *ProviderRegistry) *TurnDispatcher
 ```
 
 #### D4.2. Dispatch flow
@@ -341,6 +361,7 @@ type DispatchOpts struct {
     MaxTokens    int                        // output token cap
     Temperature  *float64
     Tools        []protocol.ToolDefinition  // from capability manager
+    Capabilities []string                   // e.g., ["vision", "tool_use"] — gates image handling in FormatMessages
     Stream       bool                       // always true for turn.submit; false for content.transform
     WindowSize   int                        // context window budget
 }

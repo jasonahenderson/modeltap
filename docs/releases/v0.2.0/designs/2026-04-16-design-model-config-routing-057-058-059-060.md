@@ -295,14 +295,19 @@ Value parsing: each tree value is either a JSON string (single model) or a JSON 
 
 ```go
 // ResolveForTurn determines which model(s) to use for a turn.
-// Checks session override first, then routing policy by mode.
+// Checks session override first, then routing policy.
+//
+// v1 simplification: uses mode name ("plan", "build", "auto") as the routing path.
+// FEAT-0008 envisions domain roles (coding.review, infrastructure.code) which
+// would require task-classification logic not yet implemented. For v1, the mode
+// name serves as a simple routing key. Domain-based routing is deferred.
 func (rp *RoutingPolicy) ResolveForTurn(session *ActiveSession, mode protocol.Mode) (models []string, isMulti bool) {
     // 1. Session-level override (from model.switch)
     if session.ModelOverride != "" {
         return []string{session.ModelOverride}, false
     }
     
-    // 2. Route by mode
+    // 2. Route by mode as routing path (v1 simplification)
     path := string(mode) // "plan", "build", "auto"
     models, isMulti, found := rp.Resolve(path)
     if found {
@@ -368,14 +373,9 @@ func NewBranchManager(conn *Connection, dispatcher *TurnDispatcher) *BranchManag
 func (bm *BranchManager) ExecuteMultiModel(ctx context.Context, opts MultiModelOpts) (*AggregateResult, error)
 
 type MultiModelOpts struct {
-    Models       []string // model names to dispatch to
-    Conversation *Conversation
-    SystemPrompt string
-    Tools        []protocol.ToolDefinition
+    DispatchOpts          // embedded — shares Conversation, SystemPrompt, Tools, etc.
+    Models       []string // model names to dispatch to (overrides DispatchOpts.Model)
     TurnID       string
-    MaxTokens    int
-    Temperature  *float64
-    WindowSize   int
 }
 
 type AggregateResult struct {
