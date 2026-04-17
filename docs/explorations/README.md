@@ -11,6 +11,7 @@ Explorations are upstream product and design artifacts. They capture problem fra
 | [EXP-0005](0005-apprenticeship.md) | Apprenticeship Program | exploring |
 | [EXP-0007](0007-multi-model-orchestration.md) | Multi-Model Orchestration | exploring |
 | [EXP-0008](0008-integrated-harness.md) | Integrated Harness — Modeltap as Professional AI Environment | exploring |
+| [EXP-0009](0009-harness-prompt-architecture.md) | Harness Prompt Architecture — Lessons from the Claude Code Leak | exploring |
 
 ## Lifecycle
 
