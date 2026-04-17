@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+
+	"github.com/jasonahenderson/modeltap/internal/protocol"
 )
 
 // OpenAIProvider implements the Provider interface for OpenAI's API.
@@ -173,4 +175,16 @@ func (p *OpenAIProvider) ReassembleStream(chunks []StreamChunk) (*ResponseMetada
 	}
 
 	return meta, contentBuilder.String(), nil
+}
+
+// FormatMessages is a stub that returns ErrNotImplemented.
+// Full implementation lands in WU-044.
+func (p *OpenAIProvider) FormatMessages(opts FormatMessagesOpts) ([]byte, error) {
+	return nil, ErrNotImplemented
+}
+
+// FormatToolDefinitions is a stub that returns ErrNotImplemented.
+// Full implementation lands in WU-044.
+func (p *OpenAIProvider) FormatToolDefinitions(tools []protocol.ToolDefinition) ([]byte, error) {
+	return nil, ErrNotImplemented
 }

@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/jasonahenderson/modeltap/internal/protocol"
 )
 
 // mockProvider implements Provider for testing purposes.
@@ -31,6 +33,14 @@ func (m *mockProvider) ParseResponse(body []byte, headers http.Header, statusCod
 
 func (m *mockProvider) ReassembleStream(chunks []StreamChunk) (*ResponseMetadata, string, error) {
 	return &ResponseMetadata{}, "", nil
+}
+
+func (m *mockProvider) FormatMessages(opts FormatMessagesOpts) ([]byte, error) {
+	return nil, ErrNotImplemented
+}
+
+func (m *mockProvider) FormatToolDefinitions(tools []protocol.ToolDefinition) ([]byte, error) {
+	return nil, ErrNotImplemented
 }
 
 func TestNewRegistry(t *testing.T) {
