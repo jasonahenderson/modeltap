@@ -2,8 +2,8 @@ package protocol
 
 import "encoding/json"
 
-// This file declares the 20 harness->server request types defined by
-// FEAT-0008 for v0.2.0 (WU-039). Each type is the params payload of a
+// This file declares the 22 harness->server request types defined by
+// FEAT-0008 for v0.2.0 (WU-039, amended for WU-091 command history). Each type is the params payload of a
 // JSON-RPC 2.0 method call; the transport wraps it in a Request envelope
 // (protocol.go). Harness requests always carry an id; server->harness
 // streaming events use the separate Notification envelope (WU-040).
@@ -35,6 +35,8 @@ const (
 	MethodConnectionPing       = "connection.ping"
 	MethodConnectionHealth     = "connection.health"
 	MethodConnectionReady      = "connection.ready"
+	MethodHistoryAppend        = "history.append"
+	MethodHistoryList          = "history.list"
 )
 
 // -----------------------------------------------------------------------
@@ -240,3 +242,18 @@ type ConnectionHealth struct{}
 // the server has completed startup and is accepting requests; Health
 // returns full dependency status. No params.
 type ConnectionReady struct{}
+
+// HistoryAppend records a user command in the cross-session command history.
+// The server also auto-appends on every turn.submit (idempotent by content+timestamp).
+// This method is for recording unsent drafts.
+type HistoryAppend struct {
+	Content   string `json:"content"`
+	SessionID string `json:"session_id,omitempty"`
+}
+
+// HistoryList requests command history entries with scoping.
+type HistoryList struct {
+	Scope  string `json:"scope"`            // "user", "project", "session"
+	Limit  int    `json:"limit,omitempty"`   // default: 50
+	Before string `json:"before,omitempty"`  // pagination cursor (opaque)
+}

@@ -57,8 +57,9 @@ func NewCompactionEngine(store storage.Store, router *RoutingPolicy, registry *M
 
 ```go
 // CheckPressure computes current context usage and emits warnings.
-// Called after each turn completes.
-func (ce *CompactionEngine) CheckPressure(conn *Connection, session *ActiveSession) {
+// Called after each turn completes. turnID is the just-completed turn
+// (required by CompactSuggest and CompactNotice event types).
+func (ce *CompactionEngine) CheckPressure(conn *Connection, session *ActiveSession, turnID string) {
     windowSize := ce.registry.Get(session.ActiveModel).Info.ContextWindow
     usedTokens := ce.estimateContextTokens(session)
     pct := float64(usedTokens) / float64(windowSize)

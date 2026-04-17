@@ -337,15 +337,15 @@ Returns `protocol.ModelListResponse` with:
 func handleModelSwitch(ctx context.Context, conn *Connection, params json.RawMessage) (any, error)
 ```
 
-Params: `protocol.ModelSwitch{Model, Action}` where `Action` is `"set"` or `"clear"`.
+Params: `protocol.ModelSwitch{SessionID, Model}`. `Model` set to `"auto"` means clear override (per FEAT-0009 `/model auto`). No `Action` field — the sentinel value is sufficient.
 
 Flow:
-1. If `Action == "set"`:
+1. If `Model == "auto"`:
+   - Clear `session.ModelOverride`
+   - Persist to `store.UpdateSession()`
+2. Otherwise:
    - Verify model exists in registry → `CodeModelUnavailable` with `MT-CONN-011` if not
    - Set `session.ModelOverride = model`
-   - Persist to `store.UpdateSession()`
-2. If `Action == "clear"`:
-   - Clear `session.ModelOverride`
    - Persist
 3. Emit `model.selected` notification with the resolved model and reason
 4. Return `protocol.ModelSwitchResponse`

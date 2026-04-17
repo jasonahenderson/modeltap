@@ -171,9 +171,13 @@ The protocol client provides typed helpers for common streaming patterns:
 // Streaming events arrive via the EventHandler, not through this call.
 func (c *ProtocolClient) SubmitTurn(ctx context.Context, submit *protocol.TurnSubmit) (*TurnSubmitAck, error)
 
+// TurnSubmitAck mirrors protocol.TurnSubmitResponse (WU-041).
+// Sync is populated when the turn was already submitted (idempotent replay
+// returns current state as an implicit session.sync).
 type TurnSubmitAck struct {
-    TurnID string `json:"turn_id"`
-    Status string `json:"status"`
+    TurnID string          `json:"turn_id"`
+    Status string          `json:"status"` // accepted | in_flight | complete | error | cancelled
+    Sync   json.RawMessage `json:"sync,omitempty"` // SessionSyncResponse on replay
 }
 
 // SendToolResult sends a tool.result request.
@@ -412,6 +416,12 @@ missedPongs int
 ```
 
 Note: the BFF server-side design (Bundle 4) was amended to use passive heartbeat monitoring (server does NOT initiate pings). The harness is the sole ping initiator, matching FEAT-0008.
+
+**Connection closure detection (resolves timing mismatch):** The harness has two disconnection detection paths:
+1. **Read loop EOF** — when the server closes the connection (timeout, crash, shutdown), the ProtocolClient's read loop receives io.EOF and closes `Done()`. The ConnectionManager watches `Done()` and immediately transitions to `StateReconnecting` — no pong-counting delay.
+2. **Missed pongs** — the slower path (3 missed = 45s → degraded, 5 missed = 75s → reconnecting) handles the case where the connection stays open but the server stops responding to pings (degraded upstream).
+
+In practice, server-side connection timeout (30s heartbeat timeout) closes the TCP connection, triggering path 1 within milliseconds. The session lock grace period (10s after close = 40s total) is sufficient because the harness detects closure via EOF and starts reconnecting immediately — well before the lock expires.
 
 #### D3.6. Exponential backoff reconnection
 

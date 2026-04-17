@@ -118,13 +118,17 @@ Flow:
 func handleSessionList(ctx context.Context, conn *Connection, params json.RawMessage) (any, error)
 ```
 
-Params: `protocol.SessionList{Project, Status, Limit, Offset}` (from WU-039 `messages.go`).
+Params: `protocol.SessionList{}` (empty struct — no params per WU-039).
 
 Flow:
-1. Build `storage.SessionFilter` from params + `conn.capabilities.ProjectContext().Root`
-2. `UserID` always set from connection auth context (enforces user isolation)
-3. Call `store.SessionSummaries(filter)`
-4. Return `protocol.SessionListResponse{Sessions: summaries}`
+1. Build `storage.SessionFilter` from connection state:
+   - `UserID`: from connection auth context (enforces user isolation)
+   - `Project`: from `conn.capabilities.ProjectContext().Root` (scopes to current project)
+   - `Status`, `Limit`, `Offset`: defaults (`""`, `50`, `0`)
+2. Call `store.SessionSummaries(filter)`
+3. Return `protocol.SessionListResponse{Sessions: summaries}`
+
+Note: `SessionList` has no params because the server derives all filter criteria from the connection context. If per-request filtering is needed later, fields can be added to the struct without breaking existing clients (empty JSON object `{}` is forward-compatible).
 
 #### D2.5. Session details handler
 
