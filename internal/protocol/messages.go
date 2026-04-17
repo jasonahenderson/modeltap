@@ -1,12 +1,13 @@
 package protocol
 
-import "encoding/json"
-
 // This file declares the 22 harness->server request types defined by
-// FEAT-0008 for v0.2.0 (WU-039, amended for WU-091 command history). Each type is the params payload of a
-// JSON-RPC 2.0 method call; the transport wraps it in a Request envelope
-// (protocol.go). Harness requests always carry an id; server->harness
-// streaming events use the separate Notification envelope (WU-040).
+// FEAT-0008 for v0.2.0 (WU-039, amended for WU-091 command history),
+// plus their paired response types (WU-041). Each request type is the
+// params payload of a JSON-RPC 2.0 method call; the transport wraps it
+// in a Request envelope (protocol.go). Response types are the result
+// payload of a JSON-RPC 2.0 Response. Harness requests always carry an
+// id; server->harness streaming events use the separate Notification
+// envelope (WU-040).
 //
 // Canonical field naming is snake_case (see FEAT-0008 "Canonical Field
 // Names"). Every field carries an explicit JSON tag so that default
@@ -107,19 +108,10 @@ type ProjectContext struct {
 	ConfigContent string `json:"config_content"`
 }
 
-// ToolDefinition is a harness-registered tool catalog entry. Full schema
-// details live in FEAT-0008 "Tool Catalog Schema"; extension types (e.g.,
-// server-side tool routing) land in WU-041. InputSchema is a
-// json.RawMessage so JSON Schema payloads pass through without interpretation.
-type ToolDefinition struct {
-	Name                 string          `json:"name"`
-	Namespace            string          `json:"namespace"`
-	Description          string          `json:"description"`
-	InputSchema          json.RawMessage `json:"input_schema"`
-	OutputEnvelope       string          `json:"output_envelope"`
-	RiskLevel            string          `json:"risk_level"`
-	CapabilitiesRequired []string        `json:"capabilities_required"`
-}
+// ToolDefinition is declared in tools.go (same package). Moved there
+// in WU-041 to co-locate with ToolCatalog and related types.
+// Wire shape unchanged; all references within this package use the
+// bare name.
 
 // -----------------------------------------------------------------------
 // 20 harness -> server request types
@@ -256,4 +248,62 @@ type HistoryList struct {
 	Scope  string `json:"scope"`            // "user", "project", "session"
 	Limit  int    `json:"limit,omitempty"`   // default: 50
 	Before string `json:"before,omitempty"`  // pagination cursor (opaque)
+}
+
+// -----------------------------------------------------------------------
+// WU-041: Response types paired with requests above
+// -----------------------------------------------------------------------
+
+// TurnSubmitResponse acknowledges a turn.submit. Status is "accepted" on
+// first submission; on an idempotent replay, status reflects the current
+// turn state and Sync is populated.
+type TurnSubmitResponse struct {
+	TurnID string               `json:"turn_id"`
+	Status string               `json:"status"`
+	Sync   *SessionSyncResponse `json:"sync,omitempty"`
+}
+
+// TurnCancelResponse confirms the cancel request was recorded.
+type TurnCancelResponse struct {
+	TurnID   string `json:"turn_id"`
+	Accepted bool   `json:"accepted"`
+}
+
+// ToolResultResponse confirms receipt of a tool execution result.
+type ToolResultResponse struct {
+	ToolCallID string `json:"tool_call_id"`
+	Accepted   bool   `json:"accepted"`
+}
+
+// ContentTransformResponse is the response to content.transform.
+type ContentTransformResponse struct {
+	Content   string  `json:"content"`
+	ModelUsed string  `json:"model_used"`
+	Cost      float64 `json:"cost"`
+}
+
+// CapabilitiesUpdateResponse is the response to capabilities.update.
+type CapabilitiesUpdateResponse struct {
+	AddedCount   int    `json:"added_count"`
+	RemovedCount int    `json:"removed_count"`
+	UpdatedAt    string `json:"updated_at"`
+}
+
+// HistoryAppendResponse is the response to history.append.
+type HistoryAppendResponse struct {
+	Accepted bool `json:"accepted"`
+}
+
+// HistoryEntry is an element of HistoryListResponse.Entries.
+type HistoryEntry struct {
+	Content   string `json:"content"`
+	SessionID string `json:"session_id,omitempty"`
+	Timestamp string `json:"timestamp"`
+}
+
+// HistoryListResponse is the response to history.list.
+type HistoryListResponse struct {
+	Entries []HistoryEntry `json:"entries"`
+	HasMore bool           `json:"has_more"`
+	Cursor  string         `json:"cursor,omitempty"`
 }
