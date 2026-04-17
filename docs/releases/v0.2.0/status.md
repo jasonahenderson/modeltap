@@ -4,7 +4,7 @@
 2026-04-16
 
 ## Current Phase
-**Release Phase 1 — DESIGN COMPLETE.** All 15 design bundles written, pre-review linted, and blocking findings resolved. Awaiting user confirmation to transition to Phase 2 (review).
+**Phase 3 — Implementation.** Phase 1 (design) and Phase 2 (review + cross-flow audit) complete. All 22 blocking, 28 attention, 2 critical, and 11 important findings resolved across pre-review lints and cross-flow audit.
 
 **Phase 1 progress:**
 - [x] Track 0: 3/3 bundles designed (WU-040–045, 093, 096) — Bundles 1-3
@@ -50,7 +50,7 @@ See `plan.md`, `track-0-shared.md`, `track-a-bff-server.md`, `track-b-terminal-h
 (none)
 
 ## Up Next
-**Phase 2 — Review.** User decides what to review and how. Awaiting user confirmation to begin.
+**Phase 3 — Implementation.** Track 0 WUs first (WU-040–045, 093, 096), then Track A and B in parallel or serialized (server-first recommended).
 
 ## Blocked
 (none)

@@ -187,7 +187,7 @@ Per `docs/agents.md` §"Workflow", v0.2.0 executes in three release-level phases
 - **Phase 2 — Peer review (opt-in, batched):** User selects high-stakes designs for external-model peer review. Designer prepares bundled prompts; user runs in one external-model session.
 - **Phase 3 — Implementation:** Red → green → security review → docs per WU, in any dependency-legal order.
 
-Current phase: **Phase 1 — DESIGN COMPLETE.** Awaiting user confirmation to transition to Phase 2.
+Current phase: **Phase 3 — Implementation.** Phases 1 and 2 complete (2026-04-17).
 
 ### Phase 1 Completion Checklist
 
