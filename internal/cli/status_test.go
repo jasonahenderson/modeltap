@@ -37,6 +37,9 @@ func (m *statusMockProvider) FormatMessages(_ provider.FormatMessagesOpts) ([]by
 func (m *statusMockProvider) FormatToolDefinitions(_ []protocol.ToolDefinition) ([]byte, error) {
 	return nil, nil
 }
+func (m *statusMockProvider) ParseStreamEvent(_ []byte) (*provider.StreamEvent, error) {
+	return nil, nil
+}
 
 // seedStatusTestStore creates an in-memory SQLite store populated with test data.
 func seedStatusTestStore(t *testing.T, count int) storage.Store {

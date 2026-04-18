@@ -43,6 +43,10 @@ func (m *mockProvider) FormatToolDefinitions(tools []protocol.ToolDefinition) ([
 	return nil, ErrNotImplemented
 }
 
+func (m *mockProvider) ParseStreamEvent(data []byte) (*StreamEvent, error) {
+	return nil, ErrNotImplemented
+}
+
 func TestNewRegistry(t *testing.T) {
 	r := NewRegistry()
 	if r == nil {

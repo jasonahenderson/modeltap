@@ -42,6 +42,9 @@ func (a *stubAdapter) FormatMessages(_ provider.FormatMessagesOpts) ([]byte, err
 func (a *stubAdapter) FormatToolDefinitions(_ []protocol.ToolDefinition) ([]byte, error) {
 	return []byte("[]"), nil
 }
+func (a *stubAdapter) ParseStreamEvent(_ []byte) (*provider.StreamEvent, error) {
+	return nil, nil
+}
 
 func newDispatchServer(t *testing.T, handler http.HandlerFunc) (*TurnDispatcher, *ProviderEndpoint, *httptest.Server) {
 	t.Helper()
