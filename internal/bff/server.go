@@ -69,6 +69,11 @@ type ServerConfig struct {
 	HeartbeatInterval time.Duration
 	HeartbeatTimeout  time.Duration
 	GracePeriod       time.Duration
+
+	// MaxAttachmentSize is advertised in CapabilitiesRegisterResponse.
+	// Harness-side attachments larger than this must be rejected before
+	// transmission. Default 5 MiB per FEAT-0008 (WU-039 review A-05).
+	MaxAttachmentSize int
 }
 
 // DefaultServerConfig returns the FEAT-0008 default timing (heartbeat
@@ -81,6 +86,7 @@ func DefaultServerConfig() ServerConfig {
 		HeartbeatInterval: 15 * time.Second,
 		HeartbeatTimeout:  30 * time.Second,
 		GracePeriod:       10 * time.Second,
+		MaxAttachmentSize: 5 * 1024 * 1024,
 	}
 }
 

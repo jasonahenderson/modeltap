@@ -104,6 +104,9 @@ type Connection struct {
 
 	sessionID string
 
+	// Capabilities — populated on capabilities.register (WU-049).
+	capabilities *CapabilityManager
+
 	// Heartbeat. lastPing is initialized to creation time so the monitor
 	// does not flag a freshly-created connection as timed-out before the
 	// harness has a chance to send its first ping (design D4.5).
@@ -137,11 +140,18 @@ func NewConnection(id string, transport *FrameTransport, server *Server, require
 		state:        ConnConnecting,
 		visited:      map[ConnState]bool{ConnConnecting: true},
 		lastPing:     now,
+		capabilities: NewCapabilityManager(),
 		ctx:          ctx,
 		cancel:       cancel,
 		done:         make(chan struct{}),
 	}
 	return c
+}
+
+// Capabilities returns the per-connection capability manager. Populated
+// on capabilities.register and refreshed on session.resume.
+func (c *Connection) Capabilities() *CapabilityManager {
+	return c.capabilities
 }
 
 // ID returns the connection's unique identifier.
