@@ -1,0 +1,8 @@
+{
+  "code": "MT-CONN-007",
+  "category": "storage",
+  "cause": "SQLite database is locked by another process",
+  "auto_repair_attempted": true,
+  "repair_result": "retry_failed",
+  "path_or_endpoint": "/Users/dev/.config/modeltap/modeltap.db"
+}

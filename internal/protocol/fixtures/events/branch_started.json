@@ -1,0 +1,6 @@
+{
+  "turn_id": "turn-abc-123",
+  "branch_id": "branch-001",
+  "model": "claude-opus-4-6",
+  "provider": "anthropic"
+}

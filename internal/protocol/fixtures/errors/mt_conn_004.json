@@ -1,0 +1,7 @@
+{
+  "code": "MT-CONN-004",
+  "category": "protocol",
+  "cause": "Server protocol version 2 is not compatible with harness version 1",
+  "auto_repair_attempted": false,
+  "suggested_command": "modeltap upgrade"
+}

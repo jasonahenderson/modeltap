@@ -1,0 +1,6 @@
+{
+  "turn_id": "turn-abc-123",
+  "context_pct": 87.5,
+  "threshold": 80.0,
+  "message": "Context window usage exceeds threshold; consider compacting"
+}

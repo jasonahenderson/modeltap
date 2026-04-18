@@ -1,0 +1,6 @@
+{
+  "turn_id": "turn-abc-123",
+  "model": "claude-opus-4-6",
+  "provider": "anthropic",
+  "reason": "default routing policy"
+}

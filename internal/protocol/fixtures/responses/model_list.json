@@ -1,0 +1,22 @@
+{
+  "models": [
+    {
+      "name": "claude-opus-4-6",
+      "provider": "anthropic",
+      "roles": ["code", "plan", "review"],
+      "capabilities": ["tool_use", "vision"],
+      "context_window": 200000,
+      "cost_per_1k_input": 0.015,
+      "cost_per_1k_output": 0.075,
+      "description": "Most capable Anthropic model",
+      "status": "available",
+      "access": "api_key"
+    }
+  ],
+  "current_override": "claude-opus-4-6",
+  "routing_policy": {
+    "code": "claude-opus-4-6",
+    "plan": "claude-opus-4-6",
+    "review": ["claude-opus-4-6", "llama-3.1-70b"]
+  }
+}

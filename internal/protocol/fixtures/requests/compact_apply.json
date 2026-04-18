@@ -1,0 +1,9 @@
+{
+  "session_id": "sess-def-456",
+  "actions": {
+    "architecture": "keep",
+    "debugging": "summarize",
+    "files": "drop",
+    "planning": "pin"
+  }
+}

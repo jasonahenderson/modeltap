@@ -1,0 +1,6 @@
+{
+  "turn_id": "turn-abc-123",
+  "phase": "routing",
+  "detail": "Selecting optimal provider based on model capabilities",
+  "timestamp": "2026-04-16T10:30:00Z"
+}

@@ -1,0 +1,29 @@
+{
+  "categories": [
+    {
+      "name": "architecture",
+      "token_count": 3500,
+      "value_score": 0.95,
+      "suggested_action": "keep"
+    },
+    {
+      "name": "debugging",
+      "token_count": 8000,
+      "value_score": 0.3,
+      "suggested_action": "summarize",
+      "summary_preview": "Investigated and resolved SQLite locking issue..."
+    }
+  ],
+  "files_breakdown": [
+    {
+      "path": "internal/storage/sqlite.go",
+      "token_count": 1200,
+      "attached_turn": 2,
+      "stale": false,
+      "suggested_action": "keep"
+    }
+  ],
+  "estimated_tokens_freed": 6500,
+  "context_pct_before": 87.5,
+  "context_pct_after": 52.0
+}

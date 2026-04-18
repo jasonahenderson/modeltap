@@ -1,0 +1,14 @@
+{
+  "session_id": "sess-def-456",
+  "added_tools": [
+    {
+      "name": "Grep",
+      "namespace": "builtin",
+      "description": "Search file contents",
+      "input_schema": {"type": "object"},
+      "output_envelope": "text",
+      "risk_level": "read_only"
+    }
+  ],
+  "removed_tools": ["Glob"]
+}

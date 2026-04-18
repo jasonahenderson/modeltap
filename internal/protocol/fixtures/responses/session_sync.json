@@ -1,0 +1,33 @@
+{
+  "session_id": "sess-001",
+  "active_turn": {
+    "turn_id": "turn-abc-123",
+    "status": "pending_tool_result",
+    "pending_tool_calls": [
+      {
+        "tool_call_id": "tc-001",
+        "tool": "read_file",
+        "status": "awaiting_result"
+      }
+    ],
+    "completed_tokens": 500,
+    "token_replay_available": true,
+    "summary": "Reading file to analyze architecture"
+  },
+  "multi_model": {
+    "reviewers": [
+      {
+        "model": "claude-opus-4-6",
+        "status": "streaming",
+        "tokens": 350,
+        "branch_id": "branch-001"
+      },
+      {
+        "model": "llama-3.1-70b",
+        "status": "pending",
+        "tokens": 0,
+        "branch_id": "branch-002"
+      }
+    ]
+  }
+}
