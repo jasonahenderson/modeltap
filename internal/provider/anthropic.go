@@ -155,14 +155,249 @@ func (a *AnthropicProvider) ReassembleStream(chunks []StreamChunk) (*ResponseMet
 	return meta, textBuilder.String(), nil
 }
 
-// FormatMessages is a stub that returns ErrNotImplemented.
-// Full implementation lands in WU-043.
+// FormatMessages translates a canonical conversation into an Anthropic
+// Messages API request body. It handles system prompts, tool calls/results,
+// image attachments, vision gating, and context window truncation.
 func (a *AnthropicProvider) FormatMessages(opts FormatMessagesOpts) ([]byte, error) {
-	return nil, ErrNotImplemented
+	if len(opts.Messages) == 0 {
+		return nil, ErrEmptyMessages
+	}
+
+	// Truncate if a window size is specified.
+	msgs := opts.Messages
+	if opts.WindowSize > 0 {
+		truncated, err := Truncate(msgs, opts.SystemPrompt, opts.WindowSize)
+		if err != nil {
+			return nil, err
+		}
+		msgs = truncated
+	}
+
+	hasVision := false
+	for _, cap := range opts.Capabilities {
+		if cap == "vision" {
+			hasVision = true
+			break
+		}
+	}
+
+	// Build the messages array.
+	wireMsgs := make([]anthropicMessage, 0, len(msgs))
+	for _, m := range msgs {
+		switch {
+		case m.Role == "tool" || (m.Role == "user" && len(m.ToolResults) > 0):
+			// Tool results are emitted under "user" role in Anthropic.
+			blocks := make([]any, 0, len(m.ToolResults))
+			for _, r := range m.ToolResults {
+				blocks = append(blocks, a.formatToolResult(r))
+			}
+			// If there's also text content on the message, add it.
+			if m.Content != "" {
+				blocks = append([]any{anthropicTextBlock{Type: "text", Text: m.Content}}, blocks...)
+			}
+			wireMsgs = append(wireMsgs, anthropicMessage{Role: "user", Content: blocks})
+
+		case m.Role == "assistant":
+			blocks := a.formatAssistantContent(m, hasVision)
+			wireMsgs = append(wireMsgs, anthropicMessage{Role: "assistant", Content: blocks})
+
+		case m.Role == "user":
+			blocks := a.formatUserContent(m, hasVision)
+			wireMsgs = append(wireMsgs, anthropicMessage{Role: "user", Content: blocks})
+
+		default:
+			// Skip system messages here; handled via top-level system field.
+		}
+	}
+
+	// Build the request body.
+	body := anthropicRequestBody{
+		Model:     opts.Model,
+		MaxTokens: opts.MaxTokens,
+		Messages:  wireMsgs,
+	}
+
+	if opts.SystemPrompt != "" {
+		body.System = &opts.SystemPrompt
+	}
+
+	if opts.Temperature != nil {
+		body.Temperature = opts.Temperature
+	}
+
+	if opts.Stream {
+		body.Stream = &opts.Stream
+	}
+
+	// Splice tools if provided.
+	if len(opts.Tools) > 0 {
+		toolDefs := a.buildToolDefinitions(opts.Tools)
+		body.Tools = toolDefs
+	}
+
+	return json.Marshal(body)
 }
 
-// FormatToolDefinitions is a stub that returns ErrNotImplemented.
-// Full implementation lands in WU-043.
+// FormatToolDefinitions translates a canonical tool catalog into the
+// Anthropic tool-definitions wire shape. Returns nil for empty/nil input.
 func (a *AnthropicProvider) FormatToolDefinitions(tools []protocol.ToolDefinition) ([]byte, error) {
-	return nil, ErrNotImplemented
+	if len(tools) == 0 {
+		return nil, nil
+	}
+	defs := a.buildToolDefinitions(tools)
+	return json.Marshal(defs)
+}
+
+// --- Anthropic wire format types ---
+
+type anthropicRequestBody struct {
+	Model       string             `json:"model"`
+	MaxTokens   int                `json:"max_tokens"`
+	System      *string            `json:"system,omitempty"`
+	Tools       []anthropicTool    `json:"tools,omitempty"`
+	Messages    []anthropicMessage `json:"messages"`
+	Temperature *float64           `json:"temperature,omitempty"`
+	Stream      *bool              `json:"stream,omitempty"`
+}
+
+type anthropicMessage struct {
+	Role    string `json:"role"`
+	Content any    `json:"content"` // []any of content blocks
+}
+
+type anthropicTextBlock struct {
+	Type string `json:"type"`
+	Text string `json:"text"`
+}
+
+type anthropicToolUseBlock struct {
+	Type  string          `json:"type"`
+	ID    string          `json:"id"`
+	Name  string          `json:"name"`
+	Input json.RawMessage `json:"input"`
+}
+
+type anthropicToolResultBlock struct {
+	Type      string `json:"type"`
+	ToolUseID string `json:"tool_use_id"`
+	Content   string `json:"content"`
+	IsError   bool   `json:"is_error,omitempty"`
+}
+
+type anthropicImageBlock struct {
+	Type   string               `json:"type"`
+	Source anthropicImageSource `json:"source"`
+}
+
+type anthropicImageSource struct {
+	Type      string `json:"type"`
+	MediaType string `json:"media_type"`
+	Data      string `json:"data"`
+}
+
+type anthropicTool struct {
+	Name        string          `json:"name"`
+	Description string          `json:"description"`
+	InputSchema json.RawMessage `json:"input_schema"`
+}
+
+// --- Helper methods ---
+
+func (a *AnthropicProvider) formatUserContent(m Message, hasVision bool) []any {
+	blocks := make([]any, 0, 1+len(m.Attachments))
+
+	if m.Content != "" {
+		blocks = append(blocks, anthropicTextBlock{Type: "text", Text: m.Content})
+	}
+
+	for _, att := range m.Attachments {
+		blocks = append(blocks, a.formatAttachment(att, hasVision))
+	}
+
+	if len(blocks) == 0 {
+		blocks = append(blocks, anthropicTextBlock{Type: "text", Text: ""})
+	}
+
+	return blocks
+}
+
+func (a *AnthropicProvider) formatAssistantContent(m Message, hasVision bool) []any {
+	blocks := make([]any, 0, 1+len(m.ToolCalls))
+
+	if m.Content != "" {
+		blocks = append(blocks, anthropicTextBlock{Type: "text", Text: m.Content})
+	}
+
+	for _, call := range m.ToolCalls {
+		blocks = append(blocks, anthropicToolUseBlock{
+			Type:  "tool_use",
+			ID:    call.ID,
+			Name:  call.Name,
+			Input: call.Input,
+		})
+	}
+
+	if len(blocks) == 0 {
+		blocks = append(blocks, anthropicTextBlock{Type: "text", Text: ""})
+	}
+
+	return blocks
+}
+
+func (a *AnthropicProvider) formatToolResult(r ToolResult) anthropicToolResultBlock {
+	content := r.Output
+	isError := false
+
+	switch r.Status {
+	case "error":
+		isError = true
+		content = "[error: " + r.Error + "] " + r.Output
+	case "rejected":
+		isError = true
+		content = "[rejected: " + r.Reason + "] " + r.Output
+	}
+
+	return anthropicToolResultBlock{
+		Type:      "tool_result",
+		ToolUseID: r.ToolCallID,
+		Content:   content,
+		IsError:   isError,
+	}
+}
+
+func (a *AnthropicProvider) formatAttachment(att Attachment, hasVision bool) any {
+	if strings.HasPrefix(att.ContentType, "image/") {
+		if !hasVision {
+			return anthropicTextBlock{
+				Type: "text",
+				Text: "[image omitted: model lacks vision capability]",
+			}
+		}
+		return anthropicImageBlock{
+			Type: "image",
+			Source: anthropicImageSource{
+				Type:      "base64",
+				MediaType: att.ContentType,
+				Data:      att.Raw,
+			},
+		}
+	}
+
+	// Text attachment — use extracted Content.
+	return anthropicTextBlock{
+		Type: "text",
+		Text: att.Content,
+	}
+}
+
+func (a *AnthropicProvider) buildToolDefinitions(tools []protocol.ToolDefinition) []anthropicTool {
+	defs := make([]anthropicTool, len(tools))
+	for i, t := range tools {
+		defs[i] = anthropicTool{
+			Name:        t.Name,
+			Description: t.Description,
+			InputSchema: t.InputSchema,
+		}
+	}
+	return defs
 }

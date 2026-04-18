@@ -7,14 +7,14 @@ import (
 	"github.com/jasonahenderson/modeltap/internal/protocol"
 )
 
-func TestProvider_FormatMessages_Stub_Anthropic(t *testing.T) {
+func TestProvider_FormatMessages_Anthropic_EmptyMessages(t *testing.T) {
 	p := NewAnthropicProvider()
 	got, err := p.FormatMessages(FormatMessagesOpts{})
 	if got != nil {
 		t.Errorf("FormatMessages() returned non-nil bytes: %s", got)
 	}
-	if !errors.Is(err, ErrNotImplemented) {
-		t.Errorf("FormatMessages() error = %v, want ErrNotImplemented", err)
+	if !errors.Is(err, ErrEmptyMessages) {
+		t.Errorf("FormatMessages() error = %v, want ErrEmptyMessages", err)
 	}
 }
 
@@ -29,14 +29,14 @@ func TestProvider_FormatMessages_Stub_OpenAI(t *testing.T) {
 	}
 }
 
-func TestProvider_FormatToolDefinitions_Stub_Anthropic(t *testing.T) {
+func TestProvider_FormatToolDefinitions_Anthropic_Empty(t *testing.T) {
 	p := NewAnthropicProvider()
 	got, err := p.FormatToolDefinitions([]protocol.ToolDefinition{})
 	if got != nil {
 		t.Errorf("FormatToolDefinitions() returned non-nil bytes: %s", got)
 	}
-	if !errors.Is(err, ErrNotImplemented) {
-		t.Errorf("FormatToolDefinitions() error = %v, want ErrNotImplemented", err)
+	if err != nil {
+		t.Errorf("FormatToolDefinitions() error = %v, want nil", err)
 	}
 }
 
