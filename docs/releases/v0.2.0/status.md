@@ -24,6 +24,10 @@ See `plan.md`, `track-0-shared.md`, `track-a-bff-server.md`, `track-b-terminal-h
 - [x] WU-040+041: Protocol streaming events and response types (2026-04-17) — commit `206a720`
 - [x] WU-042: Provider outbound formatting interface (2026-04-17) — commit `546bcea`
 - [x] WU-045: Session and turn storage schema, migration v2 (2026-04-17) — commit `20eb095`
+- [x] WU-043: Anthropic outbound formatting (2026-04-17) — commit `c29f904`
+- [x] WU-044: OpenAI outbound formatting (2026-04-17) — commit `ccdef69`
+- [x] WU-093: Protocol contract golden fixtures + conformance tests (2026-04-17) — commit `3068586`
+- [x] WU-096: Storage migration v1→v2 upgrade tests (2026-04-17) — commit `45fdd4a`
 
 ### Phase 1 Design Artifacts (Track 0)
 - [x] Bundle 1 — Protocol types (WU-040 + 041 + 093) — design `designs/2026-04-16-design-protocol-types-040-041-093.md`; pre-review `docs/releases/v0.2.0/.reviews/protocol-types-040-041-093/`. Commit `f9429e4`.
@@ -50,13 +54,10 @@ See `plan.md`, `track-0-shared.md`, `track-a-bff-server.md`, `track-b-terminal-h
 - Bundles 7/10/13: 6 blockers (RiskLevel conversion, ToolCallID flow, history types, TokenDelta field name, prompt trimming order, context.list RPC)
 
 ## In Progress
-- WU-043: Anthropic outbound formatting (FormatMessages)
-- WU-044: OpenAI outbound formatting (FormatMessages)
-- WU-093: Protocol contract golden fixtures + conformance tests
-- WU-096: Storage migration v1→v2 upgrade tests
+(none)
 
 ## Up Next
-Track A foundation (WU-046–049) — after Track 0 completes.
+**Track 0 complete.** Next: Track A foundation (WU-046–049) and Track B scaffold (WU-068–072), parallelizable.
 
 ## Blocked
 (none)
