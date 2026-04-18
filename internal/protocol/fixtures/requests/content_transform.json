@@ -1,0 +1,6 @@
+{
+  "transform": "summarize",
+  "raw_content": "A very long document about proxy architecture and design patterns...",
+  "content_type": "text/plain",
+  "max_output_tokens": 500
+}

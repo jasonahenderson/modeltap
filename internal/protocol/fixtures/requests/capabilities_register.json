@@ -1,0 +1,21 @@
+{
+  "protocol_version": "1",
+  "harness_version": "0.2.0",
+  "harness_platform": "darwin",
+  "tools": [
+    {
+      "name": "Read",
+      "namespace": "builtin",
+      "description": "Read a file from disk",
+      "input_schema": {"type": "object", "properties": {"path": {"type": "string"}}},
+      "output_envelope": "text",
+      "risk_level": "read_only",
+      "capabilities_required": ["fs"]
+    }
+  ],
+  "project": {
+    "root": "/Users/dev/myproject",
+    "config_file": ".modeltap.yaml",
+    "config_content": "model: claude-opus-4-6"
+  }
+}

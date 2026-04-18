@@ -1,0 +1,8 @@
+{
+  "turn_id": "turn-abc-123",
+  "branch_id": "branch-001",
+  "final_input_tokens": 1500,
+  "final_output_tokens": 800,
+  "model": "claude-opus-4-6",
+  "provider": "anthropic"
+}

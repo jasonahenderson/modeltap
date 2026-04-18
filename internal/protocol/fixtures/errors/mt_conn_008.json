@@ -1,0 +1,7 @@
+{
+  "code": "MT-CONN-008",
+  "category": "session",
+  "cause": "Session is locked by another harness connection",
+  "auto_repair_attempted": false,
+  "suggested_command": "modeltap session unlock sess-001"
+}

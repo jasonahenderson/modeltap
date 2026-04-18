@@ -1,0 +1,6 @@
+{
+  "turn_id": "turn-abc-123",
+  "triggered_by": "threshold_exceeded",
+  "tokens_freed": 5000,
+  "summary": "Compacted 3 debugging turns into a single summary"
+}

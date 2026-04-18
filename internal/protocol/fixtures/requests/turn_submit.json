@@ -1,0 +1,29 @@
+{
+  "turn_id": "turn-abc-123",
+  "session_id": "sess-def-456",
+  "sequence": 3,
+  "mode": "build",
+  "content": "Explain the proxy architecture",
+  "attachments": [
+    {
+      "path": "README.md",
+      "raw": "IyBNb2RlbHRhcA==",
+      "content": "# Modeltap\nReverse proxy for AI/ML clients.",
+      "content_type": "text/markdown",
+      "transform": "none"
+    }
+  ],
+  "paste": {
+    "raw": "very long paste content here...",
+    "content": "summarized paste",
+    "intent": "summarized"
+  },
+  "tool_results": [
+    {
+      "tool_call_id": "tc-001",
+      "status": "success",
+      "output": "file contents here",
+      "output_type": "text"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "turn_id": "turn-abc-123",
+  "final_input_tokens": 2000,
+  "final_output_tokens": 1200,
+  "total_cost": 0.108,
+  "model": "claude-opus-4-6",
+  "provider": "anthropic",
+  "latency_ms": 3456,
+  "cancelled": false
+}

@@ -1,0 +1,6 @@
+{
+  "applied": true,
+  "tokens_freed": 6500,
+  "context_pct_after": 52.0,
+  "summary": "Summarized 3 debugging turns, dropped stale file references"
+}

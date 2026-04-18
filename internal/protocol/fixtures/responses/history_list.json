@@ -1,0 +1,15 @@
+{
+  "entries": [
+    {
+      "content": "git status",
+      "session_id": "sess-001",
+      "timestamp": "2026-04-16T10:00:00Z"
+    },
+    {
+      "content": "explain the proxy architecture",
+      "timestamp": "2026-04-16T09:55:00Z"
+    }
+  ],
+  "has_more": true,
+  "cursor": "cursor-next-page-abc"
+}

@@ -1,0 +1,6 @@
+{
+  "turn_id": "turn-abc-123",
+  "summary": "Found relevant ADR about SQLite WAL mode configuration",
+  "source_date": "2026-03-15",
+  "relevance": 0.92
+}

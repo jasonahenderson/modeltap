@@ -1,0 +1,9 @@
+{
+  "turn_id": "turn-abc-123",
+  "branch_id": "branch-002",
+  "error": "provider_timeout",
+  "message": "Provider did not respond within 30 seconds",
+  "diagnostic_code": "MT-CONN-009",
+  "model": "llama-3.1-70b",
+  "provider": "ollama"
+}

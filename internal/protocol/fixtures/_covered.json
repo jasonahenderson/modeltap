@@ -1,0 +1,15 @@
+{
+  "description": "Registry of all exported protocol types and their fixture coverage. Types listed under 'skipped' have no dedicated fixture file and must include a justification.",
+  "skipped": {
+    "Mode": "Typed string enum; tested via Mode.Valid() round-trip tests in protocol_test.go",
+    "ToolResultRequest": "Type alias for ToolResult; wire-identical, tested via ToolResult fixture",
+    "RoutingPolicy": "map[string]json.RawMessage; tested inline in ModelListResponse fixture",
+    "DiagnosticCode": "Typed string enum; tested via Diagnostic fixtures (errors/mt_conn_*.json)",
+    "Request": "JSON-RPC envelope; tested in protocol_test.go (TestRequest_RoundTrip)",
+    "Response": "JSON-RPC envelope; tested in protocol_test.go (TestResponse_RoundTrip_Result)",
+    "Notification": "JSON-RPC envelope; tested in protocol_test.go (TestNotification_RoundTrip_NoID)",
+    "ErrorObject": "JSON-RPC envelope; tested in protocol_test.go (TestResponse_RoundTrip_Error)",
+    "FrameReader": "I/O type, not a wire payload; tested in protocol_test.go framing tests",
+    "FrameWriter": "I/O type, not a wire payload; tested in protocol_test.go framing tests"
+  }
+}

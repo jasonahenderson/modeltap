@@ -1,0 +1,7 @@
+{
+  "code": "MT-CONN-006",
+  "category": "auth",
+  "cause": "API key expired or revoked",
+  "auto_repair_attempted": false,
+  "suggested_command": "modeltap auth refresh"
+}

@@ -1,0 +1,5 @@
+{
+  "scope": "project",
+  "limit": 25,
+  "before": "cursor-abc-123"
+}
