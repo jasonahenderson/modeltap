@@ -1,7 +1,7 @@
 # v0.2.0 Status
 
 ## Last Updated
-2026-04-17
+2026-04-18
 
 ## Current Phase
 **Phase 3 — Implementation.** Phase 1 (design) and Phase 2 (review + cross-flow audit) complete. All 22 blocking, 28 attention, 2 critical, and 11 important findings resolved across pre-review lints and cross-flow audit.
@@ -31,6 +31,15 @@ See `plan.md`, `track-0-shared.md`, `track-a-bff-server.md`, `track-b-terminal-h
 - [x] WU-041 follow-on: MT-CONN-013 attachment-too-large diagnostic (2026-04-17) — commit `e88a6d4`
 - [x] WU-046: JSON-RPC transport layer for BFF (2026-04-17) — commit `9c39877`
 - [x] WU-048: Connection lifecycle state machine (2026-04-17) — commit `3242ce8`
+- [x] WU-045 follow-on: Store.Ping for BFF health handler (2026-04-18) — commit `2d40469`
+- [x] WU-047: BFF server listeners, accept loop, health/ready handlers (2026-04-18) — commit `30fe4bf`
+- [x] WU-049: Capability registration, version negotiation, project context (2026-04-18) — commit `01e8169`
+- [x] PATCH: statusMockProvider implements new Provider interface methods (2026-04-18) — commit `311c33c`
+
+### Bundle 4 (BFF Foundation) complete
+All four WUs in `internal/bff/` landed race-clean. WU-046 transport, WU-048
+connection state machine, WU-047 server + listeners + health/ready handlers,
+WU-049 capabilities manager + register/update handlers.
 
 ### Phase 1 Design Artifacts (Track 0)
 - [x] Bundle 1 — Protocol types (WU-040 + 041 + 093) — design `designs/2026-04-16-design-protocol-types-040-041-093.md`; pre-review `docs/releases/v0.2.0/.reviews/protocol-types-040-041-093/`. Commit `f9429e4`.
@@ -60,7 +69,7 @@ See `plan.md`, `track-0-shared.md`, `track-a-bff-server.md`, `track-b-terminal-h
 (none)
 
 ## Up Next
-**Track A foundation in progress.** WU-046 + WU-048 done. Next: WU-047 (server/listener + handlers wired) and WU-049 (capabilities). Track B scaffold (WU-068–072) parallelizable.
+**Bundle 4 (BFF Foundation) complete.** Track A moves to sessions & conversation (WU-050–052, Bundle 8) and streaming/prompts/cost (WU-053–056, Bundle 10), or integrate `modeltap serve` with the BFF server (WU-047 D3.5). Track B scaffold (WU-068–072) remains parallelizable.
 
 ## Blocked
 (none)
