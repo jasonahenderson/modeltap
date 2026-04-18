@@ -157,6 +157,16 @@ func (c *Connection) Capabilities() *CapabilityManager {
 // ID returns the connection's unique identifier.
 func (c *Connection) ID() string { return c.id }
 
+// SoloUserID is the placeholder user identifier used for the solo
+// profile (no auth). Auth WUs will add a real UserID() that draws from
+// the authenticated principal; until then handlers scope data by this
+// sentinel so storage constraints (user_id NOT NULL) are satisfied.
+const SoloUserID = "local"
+
+// UserID returns the authenticated user identifier for this connection.
+// Currently always returns SoloUserID; will be extended by the auth WU.
+func (c *Connection) UserID() string { return SoloUserID }
+
 // State returns the current connection state.
 func (c *Connection) State() ConnState {
 	c.mu.RLock()
