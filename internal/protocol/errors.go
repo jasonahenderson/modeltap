@@ -17,6 +17,7 @@ const (
 	DiagCapabilityRegistrationFailed DiagnosticCode = "MT-CONN-010"
 	DiagModelUnavailable             DiagnosticCode = "MT-CONN-011"
 	DiagHeartbeatTimeout             DiagnosticCode = "MT-CONN-012"
+	DiagAttachmentTooLarge           DiagnosticCode = "MT-CONN-013"
 )
 
 // Diagnostic carries structured error details in ErrorObject.Data or
