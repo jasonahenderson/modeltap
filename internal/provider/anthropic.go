@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+
+	"github.com/jasonahenderson/modeltap/internal/protocol"
 )
 
 // AnthropicProvider implements the Provider interface for the Anthropic Messages API.
@@ -151,4 +153,16 @@ func (a *AnthropicProvider) ReassembleStream(chunks []StreamChunk) (*ResponseMet
 	}
 
 	return meta, textBuilder.String(), nil
+}
+
+// FormatMessages is a stub that returns ErrNotImplemented.
+// Full implementation lands in WU-043.
+func (a *AnthropicProvider) FormatMessages(opts FormatMessagesOpts) ([]byte, error) {
+	return nil, ErrNotImplemented
+}
+
+// FormatToolDefinitions is a stub that returns ErrNotImplemented.
+// Full implementation lands in WU-043.
+func (a *AnthropicProvider) FormatToolDefinitions(tools []protocol.ToolDefinition) ([]byte, error) {
+	return nil, ErrNotImplemented
 }
