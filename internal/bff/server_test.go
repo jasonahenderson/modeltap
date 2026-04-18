@@ -406,12 +406,21 @@ func TestServer_RegistersConnectionHandlers(t *testing.T) {
 // Helpers
 // -----------------------------------------------------------------------
 
-// nopConn returns a net.Conn whose read blocks forever and whose write
-// is discarded. Useful for constructing a FrameTransport purely to reach
-// a handler under test.
+// nopConn returns a net.Conn whose writes are continuously drained by
+// a background goroutine. Useful for constructing a FrameTransport
+// purely to reach a handler under test without a real peer; handlers
+// that emit notifications (model.switch, etc.) won't block on write.
 func nopConn() net.Conn {
-	c1, _ := net.Pipe()
-	return c1
+	server, client := net.Pipe()
+	go func() {
+		buf := make([]byte, 4096)
+		for {
+			if _, err := client.Read(buf); err != nil {
+				return
+			}
+		}
+	}()
+	return server
 }
 
 // generateSelfSignedCert writes a fresh self-signed ECDSA cert and key
