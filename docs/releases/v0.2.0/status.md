@@ -37,16 +37,22 @@ See `plan.md`, `track-0-shared.md`, `track-a-bff-server.md`, `track-b-terminal-h
 - [x] PATCH: statusMockProvider implements new Provider interface methods (2026-04-18) — commit `311c33c`
 - [x] WU-051: Conversation canonical-format persistence (2026-04-18) — commit `fb8f320`
 - [x] WU-050: Session management (resume/list/details/clear/fork) (2026-04-18) — commit `f5b5628`
+- [x] WU-057: Provider endpoints registry and health checks (2026-04-18) — commit `03dd6dc`
+- [x] WU-058: Model registry (2026-04-18) — commit `359dca8`
+- [x] WU-059: Routing policy + model.list/switch handlers (2026-04-18) — commit `ee1e903`
+- [x] WU-052: TurnDispatcher provider format translation (2026-04-18) — commit `4738539`
 
 ### Bundle 4 (BFF Foundation) complete
 All four WUs in `internal/bff/` landed race-clean. WU-046 transport, WU-048
 connection state machine, WU-047 server + listeners + health/ready handlers,
 WU-049 capabilities manager + register/update handlers.
 
-### Bundle 8 (Sessions & Conversation): 2 of 3 WUs complete
-WU-050 session handlers and WU-051 Conversation are landed. WU-052 (provider
-format translation and dispatch) is deferred because it depends on
-ProviderRegistry from WU-057 (Bundle 9).
+### Bundle 8 (Sessions & Conversation) complete
+All three WUs landed. WU-050 sessions, WU-051 Conversation, WU-052 dispatch.
+
+### Bundle 9 (Model Config & Routing): 3 of 4 WUs complete
+WU-057 providers, WU-058 registry, WU-059 routing landed. WU-060
+multi-model branching deferred — depends on WU-053 streaming relay.
 
 ### Phase 1 Design Artifacts (Track 0)
 - [x] Bundle 1 — Protocol types (WU-040 + 041 + 093) — design `designs/2026-04-16-design-protocol-types-040-041-093.md`; pre-review `docs/releases/v0.2.0/.reviews/protocol-types-040-041-093/`. Commit `f9429e4`.
@@ -76,13 +82,9 @@ ProviderRegistry from WU-057 (Bundle 9).
 (none)
 
 ## Up Next
-**Bundles 4 + most of 8 done.** Track A needs ProviderRegistry from Bundle 9
-(WU-057 model config) before WU-052 dispatch can land. Alternatives:
-
-- Bundle 9 — Model config & routing (WU-057–060). Unlocks WU-052.
-- Bundle 10 — Streaming/prompts/cost (WU-053–056). Partly blocked on WU-052.
-- Track B scaffold (Bundle 5: WU-068–072). Parallelizable; depends only on
-  WU-039 (done). Good candidate for a worktree-isolated agent.
+**Bundles 4, 8 done; Bundle 9 partial.** Next: Bundle 10 (streaming + prompts
++ cost, WU-053–056), which unblocks WU-060 and the full turn.submit handler
+wiring. Track B scaffold (Bundle 5, WU-068–072) remains parallelizable.
 
 ## Blocked
 (none)
