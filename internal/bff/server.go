@@ -135,6 +135,7 @@ func NewServer(store storage.Store, config ServerConfig) *Server {
 	s.dispatcher.Register(protocol.MethodHistoryAppend, handleHistoryAppend)
 	s.dispatcher.Register(protocol.MethodHistoryList, handleHistoryList)
 	s.dispatcher.Register(protocol.MethodSessionSync, handleSessionSync)
+	s.dispatcher.Register(protocol.MethodContentTransform, handleContentTransform)
 	return s
 }
 
