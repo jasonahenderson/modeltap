@@ -1,7 +1,7 @@
 # v0.2.0 Status
 
 ## Last Updated
-2026-04-16
+2026-04-17
 
 ## Current Phase
 **Phase 3 — Implementation.** Phase 1 (design) and Phase 2 (review + cross-flow audit) complete. All 22 blocking, 28 attention, 2 critical, and 11 important findings resolved across pre-review lints and cross-flow audit.
@@ -28,6 +28,8 @@ See `plan.md`, `track-0-shared.md`, `track-a-bff-server.md`, `track-b-terminal-h
 - [x] WU-044: OpenAI outbound formatting (2026-04-17) — commit `ccdef69`
 - [x] WU-093: Protocol contract golden fixtures + conformance tests (2026-04-17) — commit `3068586`
 - [x] WU-096: Storage migration v1→v2 upgrade tests (2026-04-17) — commit `45fdd4a`
+- [x] WU-041 follow-on: MT-CONN-013 attachment-too-large diagnostic (2026-04-17) — commit `e88a6d4`
+- [x] WU-046: JSON-RPC transport layer for BFF (2026-04-17) — commit `9c39877`
 
 ### Phase 1 Design Artifacts (Track 0)
 - [x] Bundle 1 — Protocol types (WU-040 + 041 + 093) — design `designs/2026-04-16-design-protocol-types-040-041-093.md`; pre-review `docs/releases/v0.2.0/.reviews/protocol-types-040-041-093/`. Commit `f9429e4`.
@@ -57,7 +59,7 @@ See `plan.md`, `track-0-shared.md`, `track-a-bff-server.md`, `track-b-terminal-h
 (none)
 
 ## Up Next
-**Track 0 complete.** Next: Track A foundation (WU-046–049) and Track B scaffold (WU-068–072), parallelizable.
+**Track A foundation in progress.** WU-046 done. Next: WU-048 (connection state machine), then WU-047 (server/listener), then WU-049 (capabilities). Track B scaffold (WU-068–072) parallelizable.
 
 ## Blocked
 (none)
