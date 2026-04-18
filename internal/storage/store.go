@@ -194,6 +194,7 @@ type Store interface {
 	QueryHourlyMetrics(ctx context.Context, filter MetricsFilter) ([]UsageMetrics, error)
 	QueryDailyMetrics(ctx context.Context, filter MetricsFilter) ([]UsageMetrics, error)
 	RebuildMetrics(ctx context.Context) error
+	Ping(ctx context.Context) error
 	Close() error
 
 	// Session CRUD
