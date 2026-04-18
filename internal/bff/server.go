@@ -37,6 +37,9 @@ type Server struct {
 	config     ServerConfig
 	startTime  time.Time
 	sessions   *SessionManager
+	providers  *ProviderRegistry
+	models     *ModelRegistry
+	routing    *RoutingPolicy
 
 	mu    sync.Mutex
 	conns map[*Connection]struct{}
@@ -108,10 +111,24 @@ func NewServer(store storage.Store, config ServerConfig) *Server {
 		cancel:     cancel,
 	}
 	s.sessions = NewSessionManager(store)
+	s.providers = NewProviderRegistry()
+	s.models = NewModelRegistry(s.providers)
+	s.routing = NewRoutingPolicy()
 	s.registerCoreHandlers()
 	s.sessions.Register(s.dispatcher)
+	s.dispatcher.Register(protocol.MethodModelList, handleModelList)
+	s.dispatcher.Register(protocol.MethodModelSwitch, handleModelSwitch)
 	return s
 }
+
+// Providers returns the server's provider endpoint registry.
+func (s *Server) Providers() *ProviderRegistry { return s.providers }
+
+// Models returns the server's model registry.
+func (s *Server) Models() *ModelRegistry { return s.models }
+
+// Routing returns the server's routing policy.
+func (s *Server) Routing() *RoutingPolicy { return s.routing }
 
 // Sessions returns the server's session manager. Exposed for downstream
 // WUs (e.g., WU-064 session.sync) and tests.
