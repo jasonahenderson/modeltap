@@ -35,11 +35,18 @@ See `plan.md`, `track-0-shared.md`, `track-a-bff-server.md`, `track-b-terminal-h
 - [x] WU-047: BFF server listeners, accept loop, health/ready handlers (2026-04-18) — commit `30fe4bf`
 - [x] WU-049: Capability registration, version negotiation, project context (2026-04-18) — commit `01e8169`
 - [x] PATCH: statusMockProvider implements new Provider interface methods (2026-04-18) — commit `311c33c`
+- [x] WU-051: Conversation canonical-format persistence (2026-04-18) — commit `fb8f320`
+- [x] WU-050: Session management (resume/list/details/clear/fork) (2026-04-18) — commit `f5b5628`
 
 ### Bundle 4 (BFF Foundation) complete
 All four WUs in `internal/bff/` landed race-clean. WU-046 transport, WU-048
 connection state machine, WU-047 server + listeners + health/ready handlers,
 WU-049 capabilities manager + register/update handlers.
+
+### Bundle 8 (Sessions & Conversation): 2 of 3 WUs complete
+WU-050 session handlers and WU-051 Conversation are landed. WU-052 (provider
+format translation and dispatch) is deferred because it depends on
+ProviderRegistry from WU-057 (Bundle 9).
 
 ### Phase 1 Design Artifacts (Track 0)
 - [x] Bundle 1 — Protocol types (WU-040 + 041 + 093) — design `designs/2026-04-16-design-protocol-types-040-041-093.md`; pre-review `docs/releases/v0.2.0/.reviews/protocol-types-040-041-093/`. Commit `f9429e4`.
@@ -69,7 +76,13 @@ WU-049 capabilities manager + register/update handlers.
 (none)
 
 ## Up Next
-**Bundle 4 (BFF Foundation) complete.** Track A moves to sessions & conversation (WU-050–052, Bundle 8) and streaming/prompts/cost (WU-053–056, Bundle 10), or integrate `modeltap serve` with the BFF server (WU-047 D3.5). Track B scaffold (WU-068–072) remains parallelizable.
+**Bundles 4 + most of 8 done.** Track A needs ProviderRegistry from Bundle 9
+(WU-057 model config) before WU-052 dispatch can land. Alternatives:
+
+- Bundle 9 — Model config & routing (WU-057–060). Unlocks WU-052.
+- Bundle 10 — Streaming/prompts/cost (WU-053–056). Partly blocked on WU-052.
+- Track B scaffold (Bundle 5: WU-068–072). Parallelizable; depends only on
+  WU-039 (done). Good candidate for a worktree-isolated agent.
 
 ## Blocked
 (none)
