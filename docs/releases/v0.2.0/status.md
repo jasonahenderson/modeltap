@@ -41,6 +41,16 @@ See `plan.md`, `track-0-shared.md`, `track-a-bff-server.md`, `track-b-terminal-h
 - [x] WU-058: Model registry (2026-04-18) — commit `359dca8`
 - [x] WU-059: Routing policy + model.list/switch handlers (2026-04-18) — commit `ee1e903`
 - [x] WU-052: TurnDispatcher provider format translation (2026-04-18) — commit `4738539`
+- [x] WU-042 amend: ParseStreamEvent on Provider interface (2026-04-18) — commit `e70e9d9`
+- [x] WU-053: Streaming relay (SSE → protocol notifications) (2026-04-18) — commit `bcfbd57`
+- [x] WU-056: Cost tracking + cost.update events (2026-04-18) — commit `a25454d`
+- [x] WU-054 + WU-055: PromptEngine 7-layer assembly (2026-04-18) — commit `d597207`
+- [x] WU-052/053 wire-up: handleTurnSubmit + turn.cancel + tool.result (2026-04-18) — commit `ea9d115`
+- [x] WU-091: history.append + history.list handlers (2026-04-18) — commit `3619996`
+- [x] WU-064: session.sync recovery handler (2026-04-18) — commit `6cb938c`
+- [x] WU-063: diagnostic taxonomy helpers (2026-04-18) — commit `199cd24`
+- [x] WU-062: content.transform handler (2026-04-18) — commit `924835e`
+- [x] WU-066: Ollama provider adapter (2026-04-18) — commit `fedad7b`
 
 ### Bundle 4 (BFF Foundation) complete
 All four WUs in `internal/bff/` landed race-clean. WU-046 transport, WU-048
@@ -52,7 +62,34 @@ All three WUs landed. WU-050 sessions, WU-051 Conversation, WU-052 dispatch.
 
 ### Bundle 9 (Model Config & Routing): 3 of 4 WUs complete
 WU-057 providers, WU-058 registry, WU-059 routing landed. WU-060
-multi-model branching deferred — depends on WU-053 streaming relay.
+multi-model branching deferred — handleTurnSubmit currently rejects
+multi-model routing with a clear error rather than picking the first
+model silently.
+
+### Bundle 10 (Streaming, Prompts, Cost) complete
+WU-053 streaming relay, WU-054+055 prompt engine (7-layer assembly with
+trim policy), WU-056 cost tracking with cost.update events. The
+Provider interface gained ParseStreamEvent (WU-042 amend, commit
+e70e9d9) — implemented for Anthropic, OpenAI, and now Ollama.
+
+### Bundle 11 (Context, Diagnostics, Recovery): 3 of 4 WUs complete
+WU-062 content.transform, WU-063 diagnostic taxonomy helpers, WU-064
+session.sync recovery handler. WU-061 compaction is deferred — its
+design touches Conversation truncation + the harness compaction UX,
+warranting an explicit design pass before implementation.
+
+### handleTurnSubmit pipeline complete
+turn.submit now end-to-end: validate → session ensure/create → user
+turn append + persist → command-history append → routing resolve →
+prompt assemble → dispatch → stream relay → cost tracker. turn.cancel
+and tool.result handlers join the dispatcher. The BFF is functionally
+useful end-to-end for single-model turns against any registered
+provider.
+
+### Provider adapters
+Three first-party adapters implement the full Provider interface:
+Anthropic (`internal/provider/anthropic.go`), OpenAI
+(`internal/provider/openai.go`), Ollama (`internal/provider/ollama.go`).
 
 ### Phase 1 Design Artifacts (Track 0)
 - [x] Bundle 1 — Protocol types (WU-040 + 041 + 093) — design `designs/2026-04-16-design-protocol-types-040-041-093.md`; pre-review `docs/releases/v0.2.0/.reviews/protocol-types-040-041-093/`. Commit `f9429e4`.
@@ -82,9 +119,23 @@ multi-model branching deferred — depends on WU-053 streaming relay.
 (none)
 
 ## Up Next
-**Bundles 4, 8 done; Bundle 9 partial.** Next: Bundle 10 (streaming + prompts
-+ cost, WU-053–056), which unblocks WU-060 and the full turn.submit handler
-wiring. Track B scaffold (Bundle 5, WU-068–072) remains parallelizable.
+
+The BFF server side is now substantially complete for single-model
+turns. Remaining Track A work:
+
+- **WU-060** multi-model branching — needs explicit design review for
+  the per-branch event tagging + aggregate scoring contract.
+- **WU-061** compaction (`session.compact` / `compact.apply`) — needs
+  design review for the trim heuristic + harness UX coordination.
+- **WU-065** CLI integration — wire `modeltap serve` to start the BFF
+  alongside the proxy.
+- **WU-067** BFF integration tests — end-to-end test harness driving
+  the BFF over its socket.
+
+Track B (FEAT-0009 terminal harness) is not started — Bundle 5 (WU-068–072
+Bubbletea scaffold) is parallelizable and depends only on WU-039 (done).
+Track B is a different domain (Bubbletea, terminal rendering, file
+context UX) and warrants a dedicated session.
 
 ## Blocked
 (none)
