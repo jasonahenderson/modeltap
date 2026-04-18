@@ -1,0 +1,288 @@
+package bff
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"sync"
+	"time"
+
+	"github.com/jasonahenderson/modeltap/internal/protocol"
+	"github.com/jasonahenderson/modeltap/internal/provider"
+	"github.com/jasonahenderson/modeltap/internal/storage"
+)
+
+// inFlightTurn tracks the goroutine driving a streaming turn so it can
+// be cancelled by tool.cancel.
+type inFlightTurn struct {
+	turnID string
+	cancel context.CancelFunc
+}
+
+// turnTracker is owned by Server and lets handleTurnCancel find the
+// goroutine that owns a given turn id.
+type turnTracker struct {
+	mu       sync.Mutex
+	byTurnID map[string]context.CancelFunc
+}
+
+func newTurnTracker() *turnTracker {
+	return &turnTracker{byTurnID: make(map[string]context.CancelFunc)}
+}
+
+func (tt *turnTracker) register(turnID string, cancel context.CancelFunc) {
+	tt.mu.Lock()
+	defer tt.mu.Unlock()
+	tt.byTurnID[turnID] = cancel
+}
+
+func (tt *turnTracker) cancel(turnID string) bool {
+	tt.mu.Lock()
+	defer tt.mu.Unlock()
+	c, ok := tt.byTurnID[turnID]
+	if !ok {
+		return false
+	}
+	c()
+	delete(tt.byTurnID, turnID)
+	return true
+}
+
+func (tt *turnTracker) deregister(turnID string) {
+	tt.mu.Lock()
+	defer tt.mu.Unlock()
+	delete(tt.byTurnID, turnID)
+}
+
+// handleTurnSubmit is the central orchestration handler per Bundle 8
+// design D4.5. It validates the request, ensures (or creates) a
+// session, appends the user turn to the conversation, persists the
+// user turn, resolves the model via routing policy, dispatches to the
+// upstream provider, and runs the streaming relay in a background
+// goroutine while returning an immediate accept response.
+//
+// The streaming relay runs on a goroutine launched here; cancellation
+// is wired through the server's turnTracker so that turn.cancel can
+// abort an in-flight stream.
+func handleTurnSubmit(_ context.Context, conn *Connection, params json.RawMessage) (any, error) {
+	submit, err := ValidateTurnSubmit(params)
+	if err != nil {
+		return nil, err
+	}
+	if submit.SessionID == "" {
+		return nil, &TransportError{Code: CodeInvalidParams, Message: "session_id is required"}
+	}
+
+	srv := conn.server
+	ctx := context.Background()
+
+	// Ensure the session exists in storage; create on first turn (design D2.2).
+	sess, _ := srv.store.GetSession(ctx, submit.SessionID)
+	if sess == nil {
+		sess = &storage.Session{
+			ID:        submit.SessionID,
+			UserID:    conn.UserID(),
+			Project:   conn.Capabilities().ProjectContext().Root,
+			Status:    "active",
+			CreatedAt: time.Now().UTC(),
+			UpdatedAt: time.Now().UTC(),
+		}
+		if err := srv.store.CreateSession(ctx, sess); err != nil {
+			return nil, &TransportError{Code: CodeInternalError, Message: "create session: " + err.Error()}
+		}
+		expiry := time.Now().Add(SessionLockTTL)
+		if _, _, err := srv.store.AcquireSessionLock(ctx, sess.ID, conn.ID(), expiry); err != nil {
+			return nil, &TransportError{Code: CodeInternalError, Message: "acquire lock: " + err.Error()}
+		}
+	}
+
+	// Bind the connection if it isn't already.
+	if conn.SessionID() == "" {
+		conn.SetSessionID(submit.SessionID)
+	}
+	active := srv.sessions.EnsureActive(submit.SessionID, conn)
+	if active.UserID == "" {
+		active.UserID = sess.UserID
+	}
+	if active.Project == "" {
+		active.Project = sess.Project
+	}
+
+	// Append the user turn to the in-memory conversation and persist.
+	userTurn, err := active.Conversation.AppendUserTurn(submit)
+	if err != nil {
+		return nil, err
+	}
+	if err := srv.store.CreateTurn(ctx, userTurn); err != nil {
+		return nil, &TransportError{Code: CodeInternalError, Message: "persist user turn: " + err.Error()}
+	}
+	// Append to command history (best-effort; auto-append per WU-091).
+	_ = srv.store.AppendCommandHistory(ctx, &storage.CommandHistoryEntry{
+		UserID:    active.UserID,
+		Project:   active.Project,
+		SessionID: stringPtr(active.ID),
+		Content:   submit.Content,
+		CreatedAt: time.Now().UTC(),
+	})
+
+	// Resolve the model via routing.
+	models, isMulti := srv.routing.ResolveForTurn(active, submit.Mode)
+	if len(models) == 0 {
+		return nil, &TransportError{
+			Code:    CodeModelUnavailable,
+			Message: "no model resolved by routing policy and no session override set",
+		}
+	}
+	if isMulti {
+		// Multi-model is WU-060 territory; surface a clear error rather
+		// than silently picking the first model.
+		return nil, &TransportError{
+			Code:    CodeProviderError,
+			Message: "multi-model turns are not yet implemented (WU-060)",
+		}
+	}
+	modelName := models[0]
+	entry := srv.models.Get(modelName)
+	if entry == nil {
+		return nil, &TransportError{
+			Code:    CodeModelUnavailable,
+			Message: fmt.Sprintf("model %q not in registry", modelName),
+		}
+	}
+
+	// Build dispatch options. The system prompt is reassembled per turn.
+	var prompt string
+	var promptTokens int
+	if srv.prompts != nil {
+		srv.prompts.SetWindowSize(entry.Info.ContextWindow)
+		prompt, promptTokens = srv.prompts.Assemble(conn.Capabilities(), active, submit.Mode)
+	}
+	_ = promptTokens
+
+	dispatchOpts := DispatchOpts{
+		Conversation: active.Conversation,
+		SystemPrompt: prompt,
+		Model:        modelName,
+		EndpointName: entry.Provider,
+		Tools:        conn.Capabilities().Tools(),
+		Stream:       true,
+		WindowSize:   entry.Info.ContextWindow,
+	}
+
+	// Provider dispatch (synchronous: returns the streaming response).
+	resp, err := srv.dispatch.Dispatch(ctx, dispatchOpts)
+	if err != nil {
+		return nil, err
+	}
+
+	// Hand off to the streaming relay on a background goroutine. The
+	// caller's response (TurnSubmitResponse) returns immediately with
+	// status="accepted"; events flow asynchronously via notifications.
+	relayCtx, cancel := context.WithCancel(ctx)
+	srv.turns.register(submit.TurnID, cancel)
+
+	relay := NewStreamRelay(conn, active, submit.TurnID, "", modelName, entry.Provider)
+	go func() {
+		defer srv.turns.deregister(submit.TurnID)
+		turn, _ := relay.Relay(relayCtx, resp.Body, srv.adapterFor(entry.Provider))
+		if turn != nil && srv.cost != nil {
+			srv.cost.UpdateAfterTurn(ctx, conn, active, turn)
+		}
+	}()
+
+	return &protocol.TurnSubmitResponse{
+		TurnID: submit.TurnID,
+		Status: "accepted",
+	}, nil
+}
+
+// handleTurnCancel cancels an in-flight turn. Returns accepted=false
+// when the turn is unknown — typically because it has already
+// completed or never existed.
+func handleTurnCancel(_ context.Context, conn *Connection, params json.RawMessage) (any, error) {
+	var req protocol.TurnCancel
+	if err := json.Unmarshal(params, &req); err != nil {
+		return nil, &TransportError{Code: CodeInvalidParams, Message: "decode turn.cancel: " + err.Error()}
+	}
+	if req.TurnID == "" {
+		return nil, &TransportError{Code: CodeInvalidParams, Message: "turn_id is required"}
+	}
+	cancelled := conn.server.turns.cancel(req.TurnID)
+	return &protocol.TurnCancelResponse{TurnID: req.TurnID, Accepted: cancelled}, nil
+}
+
+// handleToolResult records a tool result on the active session. The
+// result is appended to the conversation as a user-role message
+// carrying the ToolResult; the assistant's next turn includes the
+// tool result in its context. (For a v1 simplification, results are
+// treated as inline pieces of the next turn.submit; the standalone
+// tool.result method just stages them.)
+func handleToolResult(_ context.Context, conn *Connection, params json.RawMessage) (any, error) {
+	var req protocol.ToolResultRequest
+	if err := json.Unmarshal(params, &req); err != nil {
+		return nil, &TransportError{Code: CodeInvalidParams, Message: "decode tool.result: " + err.Error()}
+	}
+	if req.ToolCallID == "" {
+		return nil, &TransportError{Code: CodeInvalidParams, Message: "tool_call_id is required"}
+	}
+
+	srv := conn.server
+	if conn.SessionID() == "" {
+		return nil, &TransportError{Code: CodeNotReady, Message: "no active session bound to this connection"}
+	}
+	active := srv.sessions.GetActiveSession(conn.SessionID())
+	if active == nil {
+		return nil, &TransportError{Code: CodeSessionNotFound, Message: "active session not found"}
+	}
+	if _, ok := active.Conversation.MatchToolResult(req.ToolCallID); !ok {
+		return nil, &TransportError{
+			Code:    CodeInvalidParams,
+			Message: fmt.Sprintf("tool_call_id %q does not match any pending call", req.ToolCallID),
+		}
+	}
+	// Stage the result for the next turn by appending a user-role message.
+	next := protocol.TurnSubmit{
+		TurnID:      newID(),
+		SessionID:   conn.SessionID(),
+		Sequence:    active.Conversation.Sequence() + 1,
+		Mode:        protocol.ModeBuild,
+		Content:     "",
+		ToolResults: []protocol.ToolResult{req},
+	}
+	turn, err := active.Conversation.AppendUserTurn(&next)
+	if err != nil {
+		return nil, err
+	}
+	if err := srv.store.CreateTurn(context.Background(), turn); err != nil {
+		return nil, &TransportError{Code: CodeInternalError, Message: "persist tool result turn: " + err.Error()}
+	}
+	return &protocol.ToolResultResponse{ToolCallID: req.ToolCallID, Accepted: true}, nil
+}
+
+func stringPtr(s string) *string { return &s }
+
+// newID is a small wrapper so handlers can mint UUIDs without each
+// growing its own import.
+func newID() string {
+	return fmt.Sprintf("turn-%d", time.Now().UnixNano())
+}
+
+// adapterFor returns the registered Provider adapter for the given
+// endpoint name, or nil when the endpoint is unknown. Wired on Server.
+// This is used by the streaming relay path to find the per-event
+// parser.
+func (s *Server) adapterFor(endpointName string) provider.Provider {
+	if s == nil || s.providers == nil || s.adapters == nil {
+		return nil
+	}
+	ep := s.providers.Get(endpointName)
+	if ep == nil {
+		return nil
+	}
+	return s.adapters.Get(ep.Type)
+}
+
+// Pull errors into the package's import surface so future error
+// constants land consistently.
+var _ = errors.New

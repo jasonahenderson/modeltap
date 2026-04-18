@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jasonahenderson/modeltap/internal/protocol"
+	"github.com/jasonahenderson/modeltap/internal/provider"
 	"github.com/jasonahenderson/modeltap/internal/storage"
 )
 
@@ -38,8 +39,13 @@ type Server struct {
 	startTime  time.Time
 	sessions   *SessionManager
 	providers  *ProviderRegistry
+	adapters   *provider.Registry
 	models     *ModelRegistry
 	routing    *RoutingPolicy
+	prompts    *PromptEngine
+	dispatch   *TurnDispatcher
+	cost       *CostTracker
+	turns      *turnTracker
 
 	mu    sync.Mutex
 	conns map[*Connection]struct{}
@@ -112,14 +118,35 @@ func NewServer(store storage.Store, config ServerConfig) *Server {
 	}
 	s.sessions = NewSessionManager(store)
 	s.providers = NewProviderRegistry()
+	s.adapters = provider.NewRegistry()
 	s.models = NewModelRegistry(s.providers)
 	s.routing = NewRoutingPolicy()
+	s.prompts = NewPromptEngine(PromptEngineOpts{})
+	s.dispatch = NewTurnDispatcher(s.providers, s.adapters)
+	s.cost = NewCostTracker(s.models, s.store)
+	s.turns = newTurnTracker()
 	s.registerCoreHandlers()
 	s.sessions.Register(s.dispatcher)
 	s.dispatcher.Register(protocol.MethodModelList, handleModelList)
 	s.dispatcher.Register(protocol.MethodModelSwitch, handleModelSwitch)
+	s.dispatcher.Register(protocol.MethodTurnSubmit, handleTurnSubmit)
+	s.dispatcher.Register(protocol.MethodTurnCancel, handleTurnCancel)
+	s.dispatcher.Register(protocol.MethodToolResult, handleToolResult)
 	return s
 }
+
+// Adapters returns the provider-adapter registry. Callers (e.g., CLI
+// startup) populate it with the in-tree Anthropic / OpenAI / Ollama
+// adapters before serving.
+func (s *Server) Adapters() *provider.Registry { return s.adapters }
+
+// Prompts returns the system-prompt engine. Exposed so tests and CLI
+// can override the default behavioral text or domain config.
+func (s *Server) Prompts() *PromptEngine { return s.prompts }
+
+// Dispatch returns the turn dispatcher. Mainly for tests that want to
+// inject a stubbed HTTP client.
+func (s *Server) Dispatch() *TurnDispatcher { return s.dispatch }
 
 // Providers returns the server's provider endpoint registry.
 func (s *Server) Providers() *ProviderRegistry { return s.providers }
