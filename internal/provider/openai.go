@@ -177,6 +177,87 @@ func (p *OpenAIProvider) ReassembleStream(chunks []StreamChunk) (*ResponseMetada
 	return meta, contentBuilder.String(), nil
 }
 
+// ParseStreamEvent decodes a single OpenAI SSE data payload. The "[DONE]"
+// sentinel maps to StreamEventDone; otherwise the chunk is parsed for
+// content/tool_call deltas and final usage stats. Returns (nil, nil)
+// for chunks with no useful payload.
+func (p *OpenAIProvider) ParseStreamEvent(data []byte) (*StreamEvent, error) {
+	trimmed := strings.TrimSpace(string(data))
+	if trimmed == "[DONE]" {
+		return &StreamEvent{Type: StreamEventDone}, nil
+	}
+
+	var sc struct {
+		Choices []struct {
+			Delta struct {
+				Content   string `json:"content"`
+				ToolCalls []struct {
+					Index    int    `json:"index"`
+					ID       string `json:"id"`
+					Function struct {
+						Name      string `json:"name"`
+						Arguments string `json:"arguments"`
+					} `json:"function"`
+				} `json:"tool_calls"`
+			} `json:"delta"`
+			FinishReason *string `json:"finish_reason"`
+		} `json:"choices"`
+		Usage *struct {
+			PromptTokens     int `json:"prompt_tokens"`
+			CompletionTokens int `json:"completion_tokens"`
+		} `json:"usage"`
+	}
+	if err := json.Unmarshal(data, &sc); err != nil {
+		return nil, fmt.Errorf("openai: parse stream event: %w", err)
+	}
+
+	// Usage statistics arrive on a final chunk (with `stream_options:
+	// {"include_usage": true}` enabled in the request).
+	if sc.Usage != nil {
+		return &StreamEvent{
+			Type: StreamEventUsage,
+			Usage: &StreamUsage{
+				InputTokens:  sc.Usage.PromptTokens,
+				OutputTokens: sc.Usage.CompletionTokens,
+			},
+		}, nil
+	}
+
+	if len(sc.Choices) == 0 {
+		return nil, nil
+	}
+	choice := sc.Choices[0]
+
+	if len(choice.Delta.ToolCalls) > 0 {
+		tc := choice.Delta.ToolCalls[0]
+		// OpenAI emits tool calls in pieces: the first chunk has id+name,
+		// subsequent chunks add to arguments. Discriminate via id presence.
+		if tc.ID != "" {
+			return &StreamEvent{
+				Type: StreamEventToolCallStart,
+				ToolCall: &StreamToolCall{
+					ID:    tc.ID,
+					Name:  tc.Function.Name,
+					Input: tc.Function.Arguments,
+				},
+			}, nil
+		}
+		return &StreamEvent{
+			Type:     StreamEventToolCallDelta,
+			ToolCall: &StreamToolCall{Input: tc.Function.Arguments},
+		}, nil
+	}
+
+	if choice.Delta.Content != "" {
+		return &StreamEvent{Type: StreamEventText, Content: choice.Delta.Content}, nil
+	}
+
+	if choice.FinishReason != nil {
+		return &StreamEvent{Type: StreamEventToolCallEnd}, nil
+	}
+	return nil, nil
+}
+
 // useMaxCompletionTokens returns true for model families that require
 // max_completion_tokens instead of max_tokens (o1/o3/o4 reasoning models
 // and gpt-5 family).

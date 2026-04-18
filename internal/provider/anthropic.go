@@ -155,6 +155,124 @@ func (a *AnthropicProvider) ReassembleStream(chunks []StreamChunk) (*ResponseMet
 	return meta, textBuilder.String(), nil
 }
 
+// ParseStreamEvent decodes a single Anthropic SSE data payload. The
+// JSON object's "type" field discriminates between message_start,
+// content_block_start, content_block_delta, message_delta, and
+// message_stop. Returns (nil, nil) for events the relay should skip
+// (ping, message_start without useful info, content_block_stop).
+func (a *AnthropicProvider) ParseStreamEvent(data []byte) (*StreamEvent, error) {
+	// Probe the type field first; everything else is conditional.
+	var probe struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(data, &probe); err != nil {
+		return nil, fmt.Errorf("anthropic: parse stream event: %w", err)
+	}
+
+	switch probe.Type {
+	case "content_block_delta":
+		var ev struct {
+			Index int `json:"index"`
+			Delta struct {
+				Type        string `json:"type"`
+				Text        string `json:"text"`
+				PartialJSON string `json:"partial_json"`
+			} `json:"delta"`
+		}
+		if err := json.Unmarshal(data, &ev); err != nil {
+			return nil, fmt.Errorf("anthropic: content_block_delta: %w", err)
+		}
+		switch ev.Delta.Type {
+		case "text_delta":
+			if ev.Delta.Text == "" {
+				return nil, nil
+			}
+			return &StreamEvent{Type: StreamEventText, Content: ev.Delta.Text}, nil
+		case "input_json_delta":
+			return &StreamEvent{
+				Type:     StreamEventToolCallDelta,
+				ToolCall: &StreamToolCall{Input: ev.Delta.PartialJSON},
+			}, nil
+		}
+		return nil, nil
+
+	case "content_block_start":
+		var ev struct {
+			Index        int `json:"index"`
+			ContentBlock struct {
+				Type  string `json:"type"`
+				ID    string `json:"id"`
+				Name  string `json:"name"`
+				Input json.RawMessage `json:"input"`
+			} `json:"content_block"`
+		}
+		if err := json.Unmarshal(data, &ev); err != nil {
+			return nil, fmt.Errorf("anthropic: content_block_start: %w", err)
+		}
+		if ev.ContentBlock.Type != "tool_use" {
+			return nil, nil
+		}
+		return &StreamEvent{
+			Type: StreamEventToolCallStart,
+			ToolCall: &StreamToolCall{
+				ID:    ev.ContentBlock.ID,
+				Name:  ev.ContentBlock.Name,
+				Input: string(ev.ContentBlock.Input),
+			},
+		}, nil
+
+	case "content_block_stop":
+		// We can't tell from this event alone whether the block was a
+		// tool_use or text. The relay tracks active tool calls itself.
+		return &StreamEvent{Type: StreamEventToolCallEnd}, nil
+
+	case "message_delta":
+		var ev struct {
+			Delta struct {
+				StopReason string `json:"stop_reason"`
+			} `json:"delta"`
+			Usage struct {
+				OutputTokens int `json:"output_tokens"`
+			} `json:"usage"`
+		}
+		if err := json.Unmarshal(data, &ev); err != nil {
+			return nil, fmt.Errorf("anthropic: message_delta: %w", err)
+		}
+		return &StreamEvent{
+			Type:  StreamEventUsage,
+			Usage: &StreamUsage{OutputTokens: ev.Usage.OutputTokens},
+		}, nil
+
+	case "message_start":
+		var ev struct {
+			Message struct {
+				Usage struct {
+					InputTokens int `json:"input_tokens"`
+				} `json:"usage"`
+			} `json:"message"`
+		}
+		if err := json.Unmarshal(data, &ev); err != nil {
+			return nil, fmt.Errorf("anthropic: message_start: %w", err)
+		}
+		if ev.Message.Usage.InputTokens == 0 {
+			return nil, nil
+		}
+		return &StreamEvent{
+			Type:  StreamEventUsage,
+			Usage: &StreamUsage{InputTokens: ev.Message.Usage.InputTokens},
+		}, nil
+
+	case "message_stop":
+		return &StreamEvent{Type: StreamEventDone}, nil
+
+	case "ping", "":
+		return nil, nil
+	}
+
+	// Forward-compatible: unknown event types are skipped.
+	return nil, nil
+}
+
 // FormatMessages translates a canonical conversation into an Anthropic
 // Messages API request body. It handles system prompts, tool calls/results,
 // image attachments, vision gating, and context window truncation.

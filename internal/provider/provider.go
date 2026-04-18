@@ -42,6 +42,59 @@ type Provider interface {
 	// provider-specific tool-definitions wire shape. Returns the bytes of
 	// what would be emitted as the "tools" field value (a JSON array).
 	FormatToolDefinitions(tools []protocol.ToolDefinition) ([]byte, error)
+
+	// ParseStreamEvent decodes one provider-specific SSE data payload
+	// into a canonical StreamEvent. data is the bytes after `data: ` on
+	// a single SSE line, with no trailing newline. Returns (nil, nil)
+	// for events that should be skipped (heartbeats, no-op deltas).
+	//
+	// Used by the BFF streaming relay (WU-053) to translate streamed
+	// tokens / tool calls / usage stats into protocol notifications in
+	// real time. Distinct from ReassembleStream, which buffers a full
+	// response for the v0.1 capture path; ParseStreamEvent is the
+	// per-event semantic parser.
+	ParseStreamEvent(data []byte) (*StreamEvent, error)
+}
+
+// StreamEvent is the canonical per-event payload emitted while a
+// provider response streams. Exactly one of Content / ToolCall / Usage /
+// Error is populated, depending on Type.
+type StreamEvent struct {
+	Type     StreamEventType
+	Content  string         // populated for StreamEventText
+	ToolCall *StreamToolCall // populated for StreamEventToolCall*
+	Usage    *StreamUsage   // populated for StreamEventUsage and StreamEventDone
+	Error    string         // populated for StreamEventError
+}
+
+// StreamEventType discriminates StreamEvent payloads.
+type StreamEventType string
+
+const (
+	StreamEventText          StreamEventType = "text"
+	StreamEventToolCallStart StreamEventType = "tool_call_start"
+	StreamEventToolCallDelta StreamEventType = "tool_call_delta"
+	StreamEventToolCallEnd   StreamEventType = "tool_call_end"
+	StreamEventUsage         StreamEventType = "usage"
+	StreamEventDone          StreamEventType = "done"
+	StreamEventError         StreamEventType = "error"
+)
+
+// StreamToolCall carries an in-progress or completed tool call from
+// streaming events. ID and Name appear on the start event; Input is
+// accumulated across delta events; the end event signals completion.
+type StreamToolCall struct {
+	ID    string
+	Name  string
+	Input string // raw JSON; may be partial during deltas
+}
+
+// StreamUsage carries token-count usage stats. Providers emit this on
+// the final stream event (Anthropic's message_delta, OpenAI's last
+// chunk with usage attached).
+type StreamUsage struct {
+	InputTokens  int
+	OutputTokens int
 }
 
 // RequestMetadata holds provider-agnostic fields extracted from an LLM API request.
