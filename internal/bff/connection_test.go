@@ -23,6 +23,7 @@ type recordingStore struct {
 
 	mu       sync.Mutex
 	released []releaseCall
+	pingErr  error
 }
 
 type releaseCall struct {
@@ -35,6 +36,18 @@ func (s *recordingStore) ReleaseSessionLock(_ context.Context, sessionID, owner 
 	defer s.mu.Unlock()
 	s.released = append(s.released, releaseCall{sessionID: sessionID, owner: owner})
 	return nil
+}
+
+func (s *recordingStore) Ping(_ context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.pingErr
+}
+
+func (s *recordingStore) setPingErr(err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.pingErr = err
 }
 
 func (s *recordingStore) releases() []releaseCall {
