@@ -132,6 +132,8 @@ func NewServer(store storage.Store, config ServerConfig) *Server {
 	s.dispatcher.Register(protocol.MethodTurnSubmit, handleTurnSubmit)
 	s.dispatcher.Register(protocol.MethodTurnCancel, handleTurnCancel)
 	s.dispatcher.Register(protocol.MethodToolResult, handleToolResult)
+	s.dispatcher.Register(protocol.MethodHistoryAppend, handleHistoryAppend)
+	s.dispatcher.Register(protocol.MethodHistoryList, handleHistoryList)
 	return s
 }
 
