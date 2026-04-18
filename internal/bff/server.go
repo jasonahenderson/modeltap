@@ -36,6 +36,7 @@ type Server struct {
 	dispatcher *Dispatcher
 	config     ServerConfig
 	startTime  time.Time
+	sessions   *SessionManager
 
 	mu    sync.Mutex
 	conns map[*Connection]struct{}
@@ -106,9 +107,15 @@ func NewServer(store storage.Store, config ServerConfig) *Server {
 		ctx:        ctx,
 		cancel:     cancel,
 	}
+	s.sessions = NewSessionManager(store)
 	s.registerCoreHandlers()
+	s.sessions.Register(s.dispatcher)
 	return s
 }
+
+// Sessions returns the server's session manager. Exposed for downstream
+// WUs (e.g., WU-064 session.sync) and tests.
+func (s *Server) Sessions() *SessionManager { return s.sessions }
 
 // registerCoreHandlers registers the connection-lifecycle handlers the
 // Server owns directly. Application handlers are registered by their
