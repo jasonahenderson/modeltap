@@ -103,6 +103,7 @@ func allFixtureCases() []fixtureCase {
 		{"errors/mt_conn_010.json", new(Diagnostic), "Diagnostic_MT-CONN-010"},
 		{"errors/mt_conn_011.json", new(Diagnostic), "Diagnostic_MT-CONN-011"},
 		{"errors/mt_conn_012.json", new(Diagnostic), "Diagnostic_MT-CONN-012"},
+		{"errors/mt_conn_013.json", new(Diagnostic), "Diagnostic_MT-CONN-013"},
 	}
 }
 
@@ -273,6 +274,7 @@ func TestDiagnosticCodeFixtureCoverage(t *testing.T) {
 		DiagCapabilityRegistrationFailed,
 		DiagModelUnavailable,
 		DiagHeartbeatTimeout,
+		DiagAttachmentTooLarge,
 	}
 
 	for _, code := range codes {

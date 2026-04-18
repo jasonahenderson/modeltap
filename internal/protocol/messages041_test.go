@@ -869,6 +869,7 @@ func TestDiagnosticCode_Constants(t *testing.T) {
 		{DiagCapabilityRegistrationFailed, "MT-CONN-010"},
 		{DiagModelUnavailable, "MT-CONN-011"},
 		{DiagHeartbeatTimeout, "MT-CONN-012"},
+		{DiagAttachmentTooLarge, "MT-CONN-013"},
 	}
 	for _, tc := range codes {
 		if string(tc.code) != tc.want {

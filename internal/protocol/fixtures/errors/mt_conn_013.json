@@ -1,0 +1,7 @@
+{
+  "code": "MT-CONN-013",
+  "category": "protocol",
+  "cause": "Attachment exceeds max_attachment_size advertised in capabilities.register response",
+  "auto_repair_attempted": false,
+  "suggested_command": "shrink or omit the attachment, then retry"
+}
