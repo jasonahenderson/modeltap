@@ -204,6 +204,17 @@ type PasteSummarizeRequestMsg struct {
 	Content string
 }
 
+// TurnSubmittedMsg fires after App.Update has dispatched a free-form
+// submit through the ConnSurface. TurnID is the server-assigned id
+// from the turn.submit ack; Err is non-nil if the dispatch failed
+// (connection down, timeout, malformed params). The streaming
+// viewport keys its "thinking" spinner on TurnID; the status bar
+// surfaces Err via a transient banner.
+type TurnSubmittedMsg struct {
+	TurnID string
+	Err    error
+}
+
 // TickMsg is the periodic tick driving the call duration display in
 // the status bar.
 type TickMsg time.Time

@@ -1,12 +1,20 @@
 package harness
 
 import (
+	"context"
+	"encoding/json"
+	"errors"
 	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jasonahenderson/modeltap/internal/protocol"
+)
+
+var (
+	errNoConnection = errors.New("no connection wired")
+	errNotConnected = errors.New("not connected to BFF")
 )
 
 // AppOptions configures App construction.
@@ -17,6 +25,12 @@ type AppOptions struct {
 	// InitialMode sets the starting execution mode. Empty defaults to
 	// protocol.ModeBuild.
 	InitialMode protocol.Mode
+	// Conn, when non-nil, wires the App's slash commands and
+	// PasteSummarizeRequestMsg path through to a ConnectionManager.
+	// Left nil (e.g. in tests) the App degrades gracefully: /status
+	// reports "no connection", /reconnect is a no-op banner, and
+	// paste-summarize resolves as a cancel with an error banner.
+	Conn ConnSurface
 }
 
 // App is the top-level Bubbletea model for the modeltap harness. It
@@ -33,6 +47,7 @@ type App struct {
 	keys      KeyMap
 	connUX    *ConnectionUX
 	paste     *PasteHandler
+	conn      ConnSurface
 
 	width  int
 	height int
@@ -56,8 +71,14 @@ func NewApp(opts AppOptions) App {
 		keys:      DefaultKeyMap(opts.SubmitKey),
 		connUX:    NewConnectionUX(state),
 		paste:     NewPasteHandler(),
+		conn:      opts.Conn,
 	}
 }
+
+// SetConn wires an App to a ConnSurface after construction. Primary
+// callers: CLI launch paths that build the App first and bolt on the
+// manager once its config is resolved, and tests that swap in a fake.
+func (a *App) SetConn(c ConnSurface) { a.conn = c }
 
 // State exposes the shared state pointer for tests and for downstream
 // integration code (connection manager, protocol client).
@@ -200,6 +221,36 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.paste.Complete()
 		}
 		return a, func() tea.Msg { return BannerClearMsg{} }
+
+	case PasteSummarizeRequestMsg:
+		return a, a.dispatchPasteSummarize(msg)
+
+	case SubmitMsg:
+		return a, a.handleSubmit(msg)
+
+	case TurnSubmittedMsg:
+		if msg.Err != nil {
+			return a, func() tea.Msg {
+				return BannerMsg{
+					Text:     "Turn submit failed: " + msg.Err.Error(),
+					Duration: 4 * time.Second,
+				}
+			}
+		}
+		return a, nil
+
+	case pasteSummarizeFailureMsg:
+		// Expand into (banner, cancel-resolve). Batch so both fire in
+		// the same tick and the overlay clears before the next key.
+		banner := BannerMsg{
+			Text:     "Summarize failed: " + msg.reason,
+			Duration: 5 * time.Second,
+		}
+		resolve := PasteResolvedMsg{Strategy: PasteStrategyCancel, Original: msg.original}
+		return a, tea.Batch(
+			func() tea.Msg { return banner },
+			func() tea.Msg { return resolve },
+		)
 	}
 	return a, nil
 }
@@ -310,6 +361,142 @@ func (a *App) dispatchSubmit() tea.Cmd {
 		}
 	}
 	return func() tea.Msg { return msg }
+}
+
+// dispatchPasteSummarize issues a content.transform call for the
+// pasted content via the wired ConnSurface. The returned tea.Cmd
+// emits a PasteResolvedMsg with PasteStrategySummarize and the
+// server-returned summary on success, or a BannerMsg + cancel
+// resolution on failure. When no ConnSurface is wired the summarize
+// path degrades to a cancel resolution with an explanatory banner —
+// the app remains usable even without a running BFF.
+func (a *App) dispatchPasteSummarize(msg PasteSummarizeRequestMsg) tea.Cmd {
+	conn := a.conn
+	return func() tea.Msg {
+		if conn == nil {
+			return pasteSummarizeFail(msg.Content, "no connection wired")
+		}
+		client := conn.Client()
+		if client == nil {
+			return pasteSummarizeFail(msg.Content, "not connected to BFF")
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		raw, err := client.ContentTransform(ctx, &protocol.ContentTransform{
+			Transform:   "summarize",
+			RawContent:  msg.Content,
+			ContentType: "text/plain",
+		})
+		if err != nil {
+			return pasteSummarizeFail(msg.Content, err.Error())
+		}
+		var resp protocol.ContentTransformResponse
+		if err := json.Unmarshal(raw, &resp); err != nil {
+			return pasteSummarizeFail(msg.Content, "decode: "+err.Error())
+		}
+		return PasteResolvedMsg{
+			Strategy: PasteStrategySummarize,
+			Content:  resp.Content,
+			Original: msg.Content,
+		}
+	}
+}
+
+// pasteSummarizeFail is the uniform failure envelope for the summarize
+// path — it resolves the overlay (cancel strategy) and surfaces the
+// failure via a banner the runtime queues right after the resolve.
+// Returning a single tea.Msg isn't enough (we need two), so this
+// returns a BatchedPasteFailureMsg sentinel the Update loop expands.
+func pasteSummarizeFail(original, reason string) tea.Msg {
+	return pasteSummarizeFailureMsg{original: original, reason: reason}
+}
+
+// pasteSummarizeFailureMsg is the internal marker expanded by Update
+// into (BannerMsg, PasteResolvedMsg{cancel}). Keeps the fallback path
+// in one place.
+type pasteSummarizeFailureMsg struct {
+	original string
+	reason   string
+}
+
+// handleSubmit routes a SubmitMsg: slash commands go through the
+// conn-backed command handler; free-form text dispatches a turn.submit
+// via the wired ConnSurface. When no conn is wired, slash commands
+// emit informational banners and free-form submits error out.
+func (a *App) handleSubmit(msg SubmitMsg) tea.Cmd {
+	if msg.IsCommand {
+		return a.handleCommand(msg)
+	}
+	return a.dispatchTurnSubmit(msg)
+}
+
+// handleCommand handles the slash commands this patch wires:
+// /status (show connection state) and /reconnect (force reconnect).
+// Unknown commands produce a "unknown command" banner.
+func (a *App) handleCommand(msg SubmitMsg) tea.Cmd {
+	switch strings.ToLower(msg.Command) {
+	case "status":
+		state := "no connection wired"
+		if a.conn != nil {
+			state = a.conn.State()
+		}
+		banner := BannerMsg{Text: "Connection: " + state, Duration: 4 * time.Second}
+		return func() tea.Msg { return banner }
+
+	case "reconnect":
+		if a.conn == nil {
+			return func() tea.Msg {
+				return BannerMsg{Text: "Cannot reconnect: no connection wired", Duration: 4 * time.Second}
+			}
+		}
+		reconnectCmd := a.conn.Reconnect()
+		announce := BannerMsg{Text: "Reconnecting…", Duration: 0}
+		return tea.Batch(
+			func() tea.Msg { return announce },
+			reconnectCmd,
+		)
+	}
+	unknown := BannerMsg{
+		Text:     "Unknown command: /" + msg.Command,
+		Duration: 3 * time.Second,
+	}
+	return func() tea.Msg { return unknown }
+}
+
+// dispatchTurnSubmit translates a free-form SubmitMsg into a
+// turn.submit RPC. Runs the call on a background goroutine and emits
+// TurnSubmittedMsg with the ack's TurnID (or the error). Streaming
+// events for the turn flow in separately via the ConnectionManager's
+// event bridge.
+func (a *App) dispatchTurnSubmit(msg SubmitMsg) tea.Cmd {
+	if a.conn == nil {
+		return func() tea.Msg {
+			return TurnSubmittedMsg{Err: errNoConnection}
+		}
+	}
+	client := a.conn.Client()
+	if client == nil {
+		return func() tea.Msg {
+			return TurnSubmittedMsg{Err: errNotConnected}
+		}
+	}
+	sessionID := a.state.SessionID
+	seq := a.state.NextSequence()
+	content := msg.Content
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		ack, err := client.SubmitTurn(ctx, &protocol.TurnSubmit{
+			SessionID: sessionID,
+			Sequence:  seq,
+			Mode:      a.state.Mode,
+			Content:   content,
+		})
+		if err != nil {
+			return TurnSubmittedMsg{Err: err}
+		}
+		return TurnSubmittedMsg{TurnID: ack.TurnID}
+	}
 }
 
 // appendStreamingDelta records a streamed token chunk into the

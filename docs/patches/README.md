@@ -8,6 +8,7 @@ Implementation-scoped work authorization documents. Patches are the lightweight 
 |-------|-------|--------|
 | [PATCH-0001](0001-openai-responses-api-support.md) | OpenAI Responses API Support | proposed |
 | [PATCH-0002](0002-local-inference-support.md) | Local Inference Support | proposed |
+| [PATCH-0003](0003-harness-app-conn-mgr-wiring.md) | Harness App ↔ ConnectionManager Wiring | approved |
 
 ## When to Use a Patch
 
