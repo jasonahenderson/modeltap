@@ -149,8 +149,7 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, nil
 		}
 		if key.Matches(msg, a.keys.ToggleMode) {
-			a.cycleMode()
-			return a, nil
+			return a, a.setMode(a.cycleMode())
 		}
 		if key.Matches(msg, a.keys.Submit) && a.state.Focus == InputFocus {
 			cmd := a.dispatchSubmit()
@@ -437,20 +436,26 @@ func (a *App) bannerLines() int {
 	return count
 }
 
-// cycleMode advances Mode through plan → build → auto → plan…
-// per design D2.5 (Ctrl+P toggle). The full mode-toggle UX (banner
-// hint, status update) lands in WU-080.
-func (a *App) cycleMode() {
+// cycleMode implements the WU-080 design D1 Ctrl+P semantics:
+//
+//	plan  → build
+//	build → plan
+//	auto  → build  (always drops back to build from auto)
+//
+// This is intentionally different from a 3-way cycle — plan and build
+// are the two "active" states the user switches between, and Ctrl+P
+// is the quick toggle. Auto is entered explicitly via /auto and
+// leaves via Ctrl+P → build.
+func (a *App) cycleMode() protocol.Mode {
 	switch a.state.Mode {
 	case protocol.ModePlan:
-		a.state.Mode = protocol.ModeBuild
+		return protocol.ModeBuild
 	case protocol.ModeBuild:
-		a.state.Mode = protocol.ModeAuto
+		return protocol.ModePlan
 	case protocol.ModeAuto:
-		a.state.Mode = protocol.ModePlan
-	default:
-		a.state.Mode = protocol.ModeBuild
+		return protocol.ModeBuild
 	}
+	return protocol.ModeBuild
 }
 
 // maybeSwitchFocus implements the edge-driven focus transition rules
@@ -608,6 +613,9 @@ func (a *App) handleCommand(msg SubmitMsg) tea.Cmd {
 
 	case "context":
 		return a.handleContextCommand(msg)
+
+	case "plan", "build", "auto":
+		return a.handleModeCommand(msg)
 	}
 	unknown := BannerMsg{
 		Text:     "Unknown command: /" + msg.Command,

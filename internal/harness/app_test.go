@@ -53,15 +53,42 @@ func TestApp_QuitOnCtrlC(t *testing.T) {
 	}
 }
 
-func TestApp_ToggleMode_CyclesPlanBuildAuto(t *testing.T) {
-	app := NewApp(AppOptions{}) // default Build
-	want := []protocol.Mode{protocol.ModeAuto, protocol.ModePlan, protocol.ModeBuild}
-	for i, expect := range want {
-		model, _ := app.Update(tea.KeyMsg{Type: tea.KeyCtrlP})
+// TestApp_ToggleMode exercises the WU-080 design D1 Ctrl+P semantics:
+// plan↔build toggle, auto→build. cycleMode now returns the target and
+// the App dispatches ModeChangeMsg + a banner via tea.Batch, so the
+// test drains the batched messages back through Update.
+func TestApp_ToggleMode(t *testing.T) {
+	applyToggle := func(app App) App {
+		model, cmd := app.Update(tea.KeyMsg{Type: tea.KeyCtrlP})
 		app = model.(App)
-		if app.state.Mode != expect {
-			t.Errorf("toggle %d: mode = %q, want %q", i, app.state.Mode, expect)
+		if cmd == nil {
+			return app
 		}
+		for _, m := range flattenBatch(cmd()) {
+			if mc, ok := m.(ModeChangeMsg); ok {
+				model, _ := app.Update(mc)
+				app = model.(App)
+			}
+		}
+		return app
+	}
+
+	// default is Build. Ctrl+P → plan → build → plan …
+	app := NewApp(AppOptions{})
+	app = applyToggle(app)
+	if app.state.Mode != protocol.ModePlan {
+		t.Errorf("build→plan failed; got %q", app.state.Mode)
+	}
+	app = applyToggle(app)
+	if app.state.Mode != protocol.ModeBuild {
+		t.Errorf("plan→build failed; got %q", app.state.Mode)
+	}
+
+	// Enter auto explicitly, then Ctrl+P should drop to build.
+	app.state.Mode = protocol.ModeAuto
+	app = applyToggle(app)
+	if app.state.Mode != protocol.ModeBuild {
+		t.Errorf("auto→build failed; got %q", app.state.Mode)
 	}
 }
 
