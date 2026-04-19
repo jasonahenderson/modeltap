@@ -129,6 +129,13 @@ func (p *PermissionEnforcer) Check(tool Tool, input json.RawMessage) PermissionD
 		return PermPrompt
 
 	case RiskExecute:
+		// Git read-only subcommands (status / log / diff / …) are
+		// auto-allowed regardless of mode. Dangerous-git was already
+		// caught by alwaysPrompt above, so anything reaching here that
+		// classifies as read is safe.
+		if name == ToolNameGit && IsGitRead(gitCommandFromInput(input)) {
+			return PermAllow
+		}
 		// WebFetch handles per-domain approval below.
 		if name == ToolNameWebFetch {
 			if domainAllowed := p.checkWebFetchDomain(input); domainAllowed {
@@ -177,18 +184,8 @@ func alwaysPrompt(tool Tool, input json.RawMessage) bool {
 			}
 		}
 	case ToolNameGit:
-		var args struct {
-			Args []string `json:"args"`
-			Cmd  string   `json:"command"`
-		}
-		if err := json.Unmarshal(input, &args); err == nil {
-			combined := strings.Join(args.Args, " ")
-			if args.Cmd != "" {
-				combined = args.Cmd + " " + combined
-			}
-			if IsDangerousGit(combined) {
-				return true
-			}
+		if IsDangerousGit(gitCommandFromInput(input)) {
+			return true
 		}
 	case ToolNameWebFetch:
 		// Disallow internal/private hosts entirely (SSRF prevention).
@@ -199,6 +196,28 @@ func alwaysPrompt(tool Tool, input json.RawMessage) bool {
 		}
 	}
 	return false
+}
+
+// gitCommandFromInput extracts the git subcommand + args string from
+// the Git tool's JSON input. Accepts either `command` (single string,
+// preferred per WU-078 schema) or the legacy `args` array, joining
+// them with spaces. Returns "" on unmarshal failure.
+func gitCommandFromInput(input json.RawMessage) string {
+	var args struct {
+		Command string   `json:"command"`
+		Args    []string `json:"args"`
+	}
+	if err := json.Unmarshal(input, &args); err != nil {
+		return ""
+	}
+	combined := strings.Join(args.Args, " ")
+	if args.Command != "" {
+		if combined == "" {
+			return args.Command
+		}
+		combined = args.Command + " " + combined
+	}
+	return combined
 }
 
 // checkWebFetchDomain inspects WebFetch input for a previously-

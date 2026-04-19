@@ -37,8 +37,8 @@ var dangerousPatterns = []*DangerousPattern{
 // dangerousGitPatterns covers Git operations that are destructive
 // regardless of where in the command line they appear.
 var dangerousGitPatterns = []*DangerousPattern{
-	{Pattern: `\bpush\s+.*--force\b`, Desc: "force push"},
-	{Pattern: `\bpush\s+.*\s-f(\s|$)`, Desc: "force push (short flag)"},
+	{Pattern: `\bpush\b.*--force\b`, Desc: "force push"},
+	{Pattern: `\bpush\b.*(^|\s)-f(\s|$)`, Desc: "force push (short flag)"},
 	{Pattern: `\breset\s+--hard\b`, Desc: "hard reset"},
 	{Pattern: `\bclean\s+.*-f`, Desc: "force clean"},
 	{Pattern: `\bcheckout\s+.*--\s+\.`, Desc: "discard all changes"},
