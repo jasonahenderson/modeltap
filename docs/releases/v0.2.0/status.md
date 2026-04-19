@@ -1,7 +1,7 @@
 # v0.2.0 Status
 
 ## Last Updated
-2026-04-19 (WU-081 MCP client landed — Bundle 13 complete)
+2026-04-19 (WU-089 modeltap harness CLI command landed)
 
 ## Current Phase
 **Phase 3 — Implementation.** Phase 1 (design) and Phase 2 (review + cross-flow audit) complete. All 22 blocking, 28 attention, 2 critical, and 11 important findings resolved across pre-review lints and cross-flow audit.
@@ -73,6 +73,7 @@ See `plan.md`, `track-0-shared.md`, `track-a-bff-server.md`, `track-b-terminal-h
 - [x] WU-082: file context management (@file + /context) (2026-04-19) — commit `c1f8bd1`
 - [x] WU-080: Plan/Build/Auto commands + PlanAccumulator (2026-04-19) — commit `ba2f222`
 - [x] WU-081: MCP stdio client + manager + tool adapter (2026-04-19) — commit `cbff50f`
+- [x] WU-089: modeltap harness CLI command (2026-04-19) — commit `d6bf0e0`
 
 ### Bundle 4 (BFF Foundation) complete
 All four WUs in `internal/bff/` landed race-clean. WU-046 transport, WU-048
@@ -232,8 +233,9 @@ harness has working connection lifecycle and event bridge. Remaining:
   natural test driver.
 - **WU-087** harness integration tests — end-to-end against a mock
   BFF. Easier now that ConnectionManager + ProtocolClient exist.
-- **Integration track** (WU-088–095): end-to-end, CLI launch, docs,
-  security review, performance benchmarks.
+- **Integration track** (WU-088, 090, 094, 095): end-to-end tests,
+  user/dev docs, security review, performance benchmarks. WU-089
+  CLI launch landed 2026-04-19.
 - **WU-060** multi-model branching: deferred — superseded by FEAT-0013
   sub-agents.
 
