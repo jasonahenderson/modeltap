@@ -234,8 +234,11 @@ func TestApp_View_ContainsZones(t *testing.T) {
 	if !strings.Contains(view, "hello!") {
 		t.Errorf("View missing assistant content:\n%s", view)
 	}
-	if !strings.Contains(view, ConnStateReady) {
-		t.Errorf("View missing status bar state:\n%s", view)
+	// Status bar renders the ready state as a colored badge "[●]"
+	// (WU-069). Assert the badge is present rather than the literal
+	// state string.
+	if !strings.Contains(view, "[●]") {
+		t.Errorf("View missing status bar ready badge:\n%s", view)
 	}
 }
 
