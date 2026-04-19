@@ -31,6 +31,7 @@ type App struct {
 	input     InputArea
 	viewport  ConversationViewport
 	keys      KeyMap
+	connUX    *ConnectionUX
 
 	width  int
 	height int
@@ -52,6 +53,7 @@ func NewApp(opts AppOptions) App {
 		input:     NewInputArea(state),
 		viewport:  NewConversationViewport(state),
 		keys:      DefaultKeyMap(opts.SubmitKey),
+		connUX:    NewConnectionUX(state),
 	}
 }
 
@@ -139,6 +141,9 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case ConnStateMsg:
 		a.state.ConnState = msg.Info
+		if a.connUX != nil {
+			return a, a.connUX.HandleConnState(msg)
+		}
 		return a, nil
 
 	case ModelUpdateMsg:
