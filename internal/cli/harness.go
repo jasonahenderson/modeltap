@@ -36,19 +36,38 @@ func (d *deferredSender) Send(msg tea.Msg) {
 	p.Send(msg)
 }
 
+// harnessFlags captures the flag values shared between the
+// `modeltap harness` subcommand and the root-level default run
+// (WU-089 + "default subcommand launches harness" per design D2
+// of track-integration). Keeping one flag struct means the root
+// and the subcommand stay in lockstep without copy-paste.
+type harnessFlags struct {
+	socketPath  string
+	resumeID    string
+	project     string
+	modelName   string
+	noAutoStart bool
+}
+
+// bindHarnessFlags registers the harness CLI flags on a cobra
+// command. Called for both the harness subcommand and the root
+// command so `modeltap --model X` works identically to
+// `modeltap harness --model X`.
+func bindHarnessFlags(cmd *cobra.Command, f *harnessFlags) {
+	cmd.Flags().StringVar(&f.socketPath, "socket", "", "override the BFF socket path (defaults to config.bff.socket_path)")
+	cmd.Flags().StringVar(&f.resumeID, "resume", "", "resume the given session id at startup")
+	cmd.Flags().StringVar(&f.project, "project", "", "project directory (defaults to $PWD)")
+	cmd.Flags().StringVar(&f.modelName, "model", "", "initial model override for the session")
+	cmd.Flags().BoolVar(&f.noAutoStart, "no-auto-start", false, "do not auto-start modeltap start when the socket is absent")
+}
+
 // newHarnessCommand wires the terminal harness into the modeltap CLI
 // (WU-089). It composes the Bubbletea App (Bundle 5 + Bundle 7 tools
 // + Bundle 13 overlays) with a live ConnectionManager that speaks
 // JSON-RPC to the BFF, auto-starting `modeltap start` when the
 // configured socket is absent so the harness works from a cold boot.
 func newHarnessCommand() *cobra.Command {
-	var (
-		socketPath string
-		resumeID   string
-		project    string
-		modelName  string
-		noAutoStart bool
-	)
+	var flags harnessFlags
 
 	cmd := &cobra.Command{
 		Use:   "harness",
@@ -89,86 +108,88 @@ Slash commands available in-harness:
   # Point at a specific project directory (affects @file / tool scopes)
   modeltap harness --project /abs/path`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, _, err := config.LoadWithViper("")
-			if err != nil {
-				return fmt.Errorf("loading config: %w", err)
-			}
-
-			effectiveSocket := socketPath
-			if effectiveSocket == "" {
-				effectiveSocket = cfg.BFF.SocketPath
-			}
-			if effectiveSocket == "" {
-				effectiveSocket = config.DefaultBFFSocketPath()
-			}
-
-			effectiveProject := project
-			if effectiveProject == "" {
-				effectiveProject, _ = os.Getwd()
-			}
-			effectiveProject, _ = filepath.Abs(effectiveProject)
-
-			serverBinary, err := os.Executable()
-			if err != nil {
-				return fmt.Errorf("resolving modeltap binary: %w", err)
-			}
-
-			connCfg := harness.ConnectionConfig{
-				SocketPath:   effectiveSocket,
-				AutoStart:    !noAutoStart,
-				ServerBinary: serverBinary,
-				ServerArgs:   []string{"start"},
-				Registration: &protocol.CapabilitiesRegister{
-					ProtocolVersion: "1",
-					HarnessVersion:  cmd.Root().Version,
-					HarnessPlatform: "terminal",
-					Project:         protocol.ProjectContext{Root: effectiveProject},
-				},
-			}
-
-			// Build shared tool framework pieces so the harness can
-			// resolve @file attachments and (future) run local tools.
-			tracker := tools.NewFileTracker()
-
-			// Deferred sender lets the manager exist before the program,
-			// satisfying the NewConnectionManager(config, sender) API
-			// while the program is still being constructed around an
-			// App that already knows its ConnSurface.
-			sender := &deferredSender{}
-			cm := harness.NewConnectionManager(connCfg, sender)
-			defer cm.Disconnect()
-
-			app := harness.NewApp(harness.AppOptions{
-				Conn:     harness.WrapConnectionManager(cm),
-				Attacher: harness.NewContextManager(effectiveProject, tracker),
-			})
-			if resumeID != "" {
-				app.State().SessionID = resumeID
-			}
-			if modelName != "" {
-				app.State().ModelName = modelName
-				app.State().ModelOverride = true
-			}
-
-			program := tea.NewProgram(app, tea.WithAltScreen())
-			sender.program.Store(program)
-
-			// Trigger the lifecycle asynchronously so the UI renders
-			// immediately; ConnStateMsg events drive the banner.
-			go func() { _ = cm.ConnectSync(context.Background()) }()
-
-			if _, err := program.Run(); err != nil {
-				return fmt.Errorf("harness exited: %w", err)
-			}
-			return nil
+			return runHarness(cmd, &flags)
 		},
 	}
 
-	cmd.Flags().StringVar(&socketPath, "socket", "", "override the BFF socket path (defaults to config.bff.socket_path)")
-	cmd.Flags().StringVar(&resumeID, "resume", "", "resume the given session id at startup")
-	cmd.Flags().StringVar(&project, "project", "", "project directory (defaults to $PWD)")
-	cmd.Flags().StringVar(&modelName, "model", "", "initial model override for the session")
-	cmd.Flags().BoolVar(&noAutoStart, "no-auto-start", false, "do not auto-start modeltap start when the socket is absent")
-
+	bindHarnessFlags(cmd, &flags)
 	return cmd
+}
+
+// runHarness is the shared entry point used by both the harness
+// subcommand and the root default. It composes config → conn →
+// app → tea.Program and blocks until the program exits.
+func runHarness(cmd *cobra.Command, flags *harnessFlags) error {
+	cfg, _, err := config.LoadWithViper("")
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+
+	effectiveSocket := flags.socketPath
+	if effectiveSocket == "" {
+		effectiveSocket = cfg.BFF.SocketPath
+	}
+	if effectiveSocket == "" {
+		effectiveSocket = config.DefaultBFFSocketPath()
+	}
+
+	effectiveProject := flags.project
+	if effectiveProject == "" {
+		effectiveProject, _ = os.Getwd()
+	}
+	effectiveProject, _ = filepath.Abs(effectiveProject)
+
+	serverBinary, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("resolving modeltap binary: %w", err)
+	}
+
+	connCfg := harness.ConnectionConfig{
+		SocketPath:   effectiveSocket,
+		AutoStart:    !flags.noAutoStart,
+		ServerBinary: serverBinary,
+		ServerArgs:   []string{"start"},
+		Registration: &protocol.CapabilitiesRegister{
+			ProtocolVersion: "1",
+			HarnessVersion:  cmd.Root().Version,
+			HarnessPlatform: "terminal",
+			Project:         protocol.ProjectContext{Root: effectiveProject},
+		},
+	}
+
+	// Build shared tool framework pieces so the harness can
+	// resolve @file attachments and (future) run local tools.
+	tracker := tools.NewFileTracker()
+
+	// Deferred sender lets the manager exist before the program,
+	// satisfying the NewConnectionManager(config, sender) API
+	// while the program is still being constructed around an
+	// App that already knows its ConnSurface.
+	sender := &deferredSender{}
+	cm := harness.NewConnectionManager(connCfg, sender)
+	defer cm.Disconnect()
+
+	app := harness.NewApp(harness.AppOptions{
+		Conn:     harness.WrapConnectionManager(cm),
+		Attacher: harness.NewContextManager(effectiveProject, tracker),
+	})
+	if flags.resumeID != "" {
+		app.State().SessionID = flags.resumeID
+	}
+	if flags.modelName != "" {
+		app.State().ModelName = flags.modelName
+		app.State().ModelOverride = true
+	}
+
+	program := tea.NewProgram(app, tea.WithAltScreen())
+	sender.program.Store(program)
+
+	// Trigger the lifecycle asynchronously so the UI renders
+	// immediately; ConnStateMsg events drive the banner.
+	go func() { _ = cm.ConnectSync(context.Background()) }()
+
+	if _, err := program.Run(); err != nil {
+		return fmt.Errorf("harness exited: %w", err)
+	}
+	return nil
 }

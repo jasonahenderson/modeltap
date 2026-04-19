@@ -7,14 +7,18 @@ import (
 )
 
 func TestRootCommandExecutes(t *testing.T) {
+	// Bare `modeltap` invocation now launches the harness (WU-089).
+	// The harness needs a TTY, which `go test` doesn't provide, so
+	// this test verifies --help executes cleanly instead. Actual
+	// harness execution is covered by the integration tests in
+	// internal/integration.
 	cmd := NewRootCommand("test")
 	buf := new(bytes.Buffer)
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
-	cmd.SetArgs([]string{})
-	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("root command returned error: %v", err)
+	cmd.SetArgs([]string{"--help"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("root --help returned error: %v", err)
 	}
 }
 
