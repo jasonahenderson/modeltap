@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -27,11 +28,11 @@ type ProgramSender interface {
 
 // Default timing knobs per Bundle 6 design D3.1.
 const (
-	DefaultStartTimeout       = 5 * time.Second
-	DefaultHeartbeatInterval  = 15 * time.Second
-	DefaultHeartbeatTimeout   = 30 * time.Second
-	DefaultReconnectInitial   = 1 * time.Second
-	DefaultReconnectMax       = 30 * time.Second
+	DefaultStartTimeout        = 5 * time.Second
+	DefaultHeartbeatInterval   = 15 * time.Second
+	DefaultHeartbeatTimeout    = 30 * time.Second
+	DefaultReconnectInitial    = 1 * time.Second
+	DefaultReconnectMax        = 30 * time.Second
 	DefaultReconnectMaxRetries = 10
 
 	// Heartbeat degradation thresholds per FEAT-0008.
@@ -108,8 +109,8 @@ var validHarnessTransitions = map[string][]string{
 // disconnect detection, exponential-backoff reconnect, and the event
 // bridge that turns server notifications into Bubbletea messages.
 type ConnectionManager struct {
-	config  ConnectionConfig
-	sender  ProgramSender
+	config ConnectionConfig
+	sender ProgramSender
 
 	mu     sync.RWMutex
 	state  string
@@ -573,10 +574,10 @@ func (cm *ConnectionManager) HandleEvent(method string, params json.RawMessage) 
 		var ev protocol.TurnComplete
 		if err := json.Unmarshal(params, &ev); err == nil {
 			cm.sender.Send(StreamCompleteMsg{
-				TurnID: ev.TurnID,
-				Tokens: TokenInfo{Input: ev.FinalInputTokens, Output: ev.FinalOutputTokens},
-				Cost:   ev.TotalCost,
-				Model:  ev.Model,
+				TurnID:   ev.TurnID,
+				Tokens:   TokenInfo{Input: ev.FinalInputTokens, Output: ev.FinalOutputTokens},
+				Cost:     ev.TotalCost,
+				Model:    ev.Model,
 				Duration: time.Duration(ev.LatencyMs) * time.Millisecond,
 			})
 		}
@@ -599,9 +600,23 @@ func (cm *ConnectionManager) HandleEvent(method string, params json.RawMessage) 
 	case protocol.EventModelSelected:
 		var ev protocol.ModelSelected
 		if err := json.Unmarshal(params, &ev); err == nil {
-			var name string
-			_ = json.Unmarshal(ev.Model, &name)
-			cm.sender.Send(ModelUpdateMsg{Name: name, Routing: ev.Reason})
+			// Model is either a bare string (single-model turn) or a
+			// JSON array (multi-model). For single-model, hand the
+			// name to the status bar via ModelUpdateMsg. For
+			// multi-model we join the names so the user sees all
+			// branches at a glance; branch-started / branch-complete
+			// events drive the richer per-branch rendering.
+			if !ev.IsMulti() {
+				name, _, err := ev.SingleModel()
+				if err == nil {
+					cm.sender.Send(ModelUpdateMsg{Name: name, Routing: ev.Reason})
+				}
+			} else if models, _, err := ev.MultiModels(); err == nil {
+				cm.sender.Send(ModelUpdateMsg{
+					Name:    strings.Join(models, ", "),
+					Routing: ev.Reason,
+				})
+			}
 		}
 	case protocol.EventBranchStarted:
 		var ev protocol.BranchStarted
@@ -626,7 +641,57 @@ func (cm *ConnectionManager) HandleEvent(method string, params json.RawMessage) 
 			})
 		}
 	case protocol.EventCompactSuggest:
-		cm.sender.Send(BannerMsg{Text: "Context pressure — consider /compact"})
+		var ev protocol.CompactSuggest
+		text := "Context pressure — consider /compact"
+		if err := json.Unmarshal(params, &ev); err == nil {
+			if ev.Message != "" {
+				text = ev.Message
+			} else if ev.ContextPct > 0 {
+				text = fmt.Sprintf("Context at %.0f%% — consider /compact", ev.ContextPct*100)
+			}
+		}
+		cm.sender.Send(BannerMsg{Text: text, Duration: 8 * time.Second})
+
+	case protocol.EventCompactNotice:
+		var ev protocol.CompactNotice
+		text := "Context auto-compacted"
+		if err := json.Unmarshal(params, &ev); err == nil {
+			if ev.Summary != "" {
+				text = ev.Summary
+			} else if ev.TokensFreed > 0 {
+				text = fmt.Sprintf("Auto-compacted: freed %d tokens", ev.TokensFreed)
+			}
+		}
+		cm.sender.Send(BannerMsg{Text: text, Duration: 5 * time.Second})
+
+	case protocol.EventCompactPlan:
+		// Compaction plan UI is WU-061 territory (still in design);
+		// surface the event as a transient banner so the user at
+		// least knows a plan arrived.
+		cm.sender.Send(BannerMsg{Text: "Compaction plan available — /compact to apply", Duration: 8 * time.Second})
+
+	case protocol.EventKnowledgeHit:
+		var ev protocol.KnowledgeHit
+		if err := json.Unmarshal(params, &ev); err == nil && ev.Summary != "" {
+			cm.sender.Send(BannerMsg{
+				Text:     "Knowledge: " + ev.Summary,
+				Duration: 4 * time.Second,
+			})
+		}
+
+	case protocol.EventError:
+		var ev protocol.ServerError
+		if err := json.Unmarshal(params, &ev); err == nil {
+			text := ev.Message
+			if ev.Diagnostic.Code != "" {
+				text = string(ev.Diagnostic.Code) + ": " + text
+			}
+			if text == "" {
+				text = "Server error"
+			}
+			cm.sender.Send(BannerMsg{Text: text, Duration: 8 * time.Second})
+		}
+
 	case protocol.EventStatusUpdate:
 		var ev protocol.StatusUpdate
 		if err := json.Unmarshal(params, &ev); err == nil {
@@ -635,5 +700,10 @@ func (cm *ConnectionManager) HandleEvent(method string, params json.RawMessage) 
 	case protocol.EventCapabilitiesRequest:
 		// Server is asking us to re-register capabilities; a future
 		// task can wire this into a re-register flow.
+	case protocol.EventConnectionPong:
+		// Heartbeat responses flow through the RPC client's reply
+		// path, not this event bridge. Explicit no-op so unknown-
+		// method falls through cleanly to nothing (the default
+		// branch is intentionally absent).
 	}
 }

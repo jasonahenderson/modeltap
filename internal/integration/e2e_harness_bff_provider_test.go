@@ -164,6 +164,36 @@ data: {"type":"message_stop"}
 	case <-time.After(2 * time.Second):
 		t.Fatalf("upstream never saw a request (calls=%d)", gotCalls)
 	}
+
+	// Streaming events must reach the harness sender after the relay
+	// finishes parsing the mock SSE. Poll the recorder up to 2s for a
+	// StreamTokenMsg carrying the mock's "hi" delta plus a
+	// StreamCompleteMsg closing the turn. (model.selected is only
+	// emitted by /model switch today — not by every turn.submit — so
+	// we don't assert on it here.)
+	deadline := time.Now().Add(2 * time.Second)
+	var sawToken, sawComplete bool
+	for time.Now().Before(deadline) && !(sawToken && sawComplete) {
+		for _, m := range sender.snapshot() {
+			switch v := m.(type) {
+			case harness.StreamTokenMsg:
+				if v.TurnID == ack.TurnID && v.Delta == "hi" {
+					sawToken = true
+				}
+			case harness.StreamCompleteMsg:
+				if v.TurnID == ack.TurnID {
+					sawComplete = true
+				}
+			}
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+	if !sawToken {
+		t.Errorf("expected StreamTokenMsg(TurnID=%q, Delta=\"hi\") within 2s", ack.TurnID)
+	}
+	if !sawComplete {
+		t.Errorf("expected StreamCompleteMsg(TurnID=%q) within 2s", ack.TurnID)
+	}
 }
 
 // rawDefault marshals a single-model routing value (wire shape: a

@@ -265,6 +265,118 @@ func TestHandleEvent_CompactSuggest_BannerMsg(t *testing.T) {
 	}
 }
 
+func TestHandleEvent_ModelSelected_MultiModel(t *testing.T) {
+	sender := &recordingSender{}
+	cm := NewConnectionManager(ConnectionConfig{}, sender)
+
+	models, _ := json.Marshal([]string{"claude-opus-4-7", "gpt-5"})
+	providers, _ := json.Marshal([]string{"anthropic", "openai"})
+	raw, _ := json.Marshal(&protocol.ModelSelected{
+		Model: models, Provider: providers, Reason: "multi:review",
+	})
+	cm.HandleEvent(protocol.EventModelSelected, raw)
+
+	m := sender.waitFor(t, ModelUpdateMsg{}).(ModelUpdateMsg)
+	if m.Name != "claude-opus-4-7, gpt-5" {
+		t.Errorf("multi-model Name = %q", m.Name)
+	}
+	if m.Routing != "multi:review" {
+		t.Errorf("multi-model Routing = %q", m.Routing)
+	}
+}
+
+func TestHandleEvent_CompactSuggest_WithPayload(t *testing.T) {
+	sender := &recordingSender{}
+	cm := NewConnectionManager(ConnectionConfig{}, sender)
+
+	raw, _ := json.Marshal(&protocol.CompactSuggest{
+		TurnID: "t1", ContextPct: 0.85, Threshold: 0.8, Message: "",
+	})
+	cm.HandleEvent(protocol.EventCompactSuggest, raw)
+	m := sender.waitFor(t, BannerMsg{}).(BannerMsg)
+	if !contains(m.Text, "85%") {
+		t.Errorf("banner should reference context pct; got %q", m.Text)
+	}
+}
+
+func TestHandleEvent_CompactNotice(t *testing.T) {
+	sender := &recordingSender{}
+	cm := NewConnectionManager(ConnectionConfig{}, sender)
+
+	raw, _ := json.Marshal(&protocol.CompactNotice{
+		TurnID: "t", TriggeredBy: "auto", TokensFreed: 4200,
+	})
+	cm.HandleEvent(protocol.EventCompactNotice, raw)
+	m := sender.waitFor(t, BannerMsg{}).(BannerMsg)
+	if !contains(m.Text, "4200") {
+		t.Errorf("banner should reference tokens freed; got %q", m.Text)
+	}
+}
+
+func TestHandleEvent_CompactPlan(t *testing.T) {
+	sender := &recordingSender{}
+	cm := NewConnectionManager(ConnectionConfig{}, sender)
+
+	cm.HandleEvent(protocol.EventCompactPlan, json.RawMessage(`{}`))
+	m := sender.waitFor(t, BannerMsg{}).(BannerMsg)
+	if !contains(m.Text, "/compact") {
+		t.Errorf("banner should mention /compact; got %q", m.Text)
+	}
+}
+
+func TestHandleEvent_KnowledgeHit(t *testing.T) {
+	sender := &recordingSender{}
+	cm := NewConnectionManager(ConnectionConfig{}, sender)
+
+	raw, _ := json.Marshal(&protocol.KnowledgeHit{
+		TurnID: "t", Summary: "prior discussion of FEAT-0008 reconnect", Relevance: 0.82,
+	})
+	cm.HandleEvent(protocol.EventKnowledgeHit, raw)
+	m := sender.waitFor(t, BannerMsg{}).(BannerMsg)
+	if !contains(m.Text, "prior discussion") {
+		t.Errorf("banner should include summary; got %q", m.Text)
+	}
+}
+
+func TestHandleEvent_Error(t *testing.T) {
+	sender := &recordingSender{}
+	cm := NewConnectionManager(ConnectionConfig{}, sender)
+
+	raw, _ := json.Marshal(&protocol.ServerError{
+		Code:    "provider_error",
+		Message: "upstream refused",
+		Diagnostic: protocol.Diagnostic{
+			Code: protocol.DiagnosticCode("MT-PROV-001"),
+		},
+	})
+	cm.HandleEvent(protocol.EventError, raw)
+	m := sender.waitFor(t, BannerMsg{}).(BannerMsg)
+	if !contains(m.Text, "MT-PROV-001") || !contains(m.Text, "upstream refused") {
+		t.Errorf("banner should include diagnostic + message; got %q", m.Text)
+	}
+}
+
+func TestHandleEvent_ConnectionPong_NoMessage(t *testing.T) {
+	sender := &recordingSender{}
+	cm := NewConnectionManager(ConnectionConfig{}, sender)
+
+	cm.HandleEvent(protocol.EventConnectionPong, json.RawMessage(`{}`))
+	if got := sender.snapshot(); len(got) != 0 {
+		t.Errorf("pong should be no-op in HandleEvent; got %+v", got)
+	}
+}
+
+// contains is a tiny helper — strings.Contains via a thin wrapper so
+// the test file doesn't repeat the import for a one-token check.
+func contains(haystack, needle string) bool {
+	for i := 0; i+len(needle) <= len(haystack); i++ {
+		if haystack[i:i+len(needle)] == needle {
+			return true
+		}
+	}
+	return false
+}
+
 func TestHandleEvent_UnknownMethod_NoMessage(t *testing.T) {
 	sender := &recordingSender{}
 	cm := NewConnectionManager(ConnectionConfig{}, sender)
