@@ -85,6 +85,21 @@ func (i *InputArea) Value() string { return i.ta.Value() }
 // completion, and history traversal).
 func (i *InputArea) SetValue(v string) { i.ta.SetValue(v) }
 
+// ReplacePaste replaces the last occurrence of original in the
+// textarea with replacement. Used by the paste-handler resolution
+// flow (WU-083). No-op when original is empty or not found.
+func (i *InputArea) ReplacePaste(original, replacement string) {
+	if original == "" {
+		return
+	}
+	current := i.ta.Value()
+	idx := strings.LastIndex(current, original)
+	if idx < 0 {
+		return
+	}
+	i.ta.SetValue(current[:idx] + replacement + current[idx+len(original):])
+}
+
 // SetHistorySource plugs in a HistorySource. nil clears the source.
 func (i *InputArea) SetHistorySource(h HistorySource) { i.historySource = h }
 
