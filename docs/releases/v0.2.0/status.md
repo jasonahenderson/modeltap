@@ -1,7 +1,7 @@
 # v0.2.0 Status
 
 ## Last Updated
-2026-04-19 (WU-086 Connection UX landed)
+2026-04-19 (WU-083 paste handler landed)
 
 ## Current Phase
 **Phase 3 — Implementation.** Phase 1 (design) and Phase 2 (review + cross-flow audit) complete. All 22 blocking, 28 attention, 2 critical, and 11 important findings resolved across pre-review lints and cross-flow audit.
@@ -65,6 +65,7 @@ See `plan.md`, `track-0-shared.md`, `track-a-bff-server.md`, `track-b-terminal-h
 - [x] WU-079: Glob, Grep, WebSearch, WebFetch tools (2026-04-19) — commit `a92bba2`
 - [x] WU-076: Read tool (text, CSV, image, PDF, DOCX, XLSX) (2026-04-19) — commit `efc2cee`
 - [x] WU-086: Connection UX banner translator (2026-04-19) — commit `eee3b9e`
+- [x] WU-083: Large paste handler (summarize/full/truncate/cancel) (2026-04-19) — commit `818a360`
 
 ### Bundle 4 (BFF Foundation) complete
 All four WUs in `internal/bff/` landed race-clean. WU-046 transport, WU-048
@@ -207,10 +208,13 @@ harness has working connection lifecycle and event bridge. Remaining:
   swapped UniDoc/unioffice for stdlib `archive/zip` + `encoding/xml`
   DOCX extraction, and pdfcpu for `ledongthuc/pdf` (BSD-3) text
   extraction. Both are Apache-2.0-compatible per ADR-0010.
-- **Track B Bundle 13** (WU-080–085, WU-092): mode toggle / MCP /
-  file context / paste handling / session explorer / model commands
-  / cross-session command history. WU-086 connection UX landed
-  2026-04-19 as the first of this bundle's eight WUs.
+- **Track B Bundle 13** (WU-080, WU-081, WU-082, WU-084, WU-085,
+  WU-092): mode toggle / MCP / file context / session explorer /
+  model commands / cross-session command history. WU-086 connection
+  UX and WU-083 paste handler landed 2026-04-19 — 2 of Bundle 13's
+  8 WUs complete. Summarize path in WU-083 depends on the
+  ConnectionManager wiring (still outstanding) for the
+  content.transform round-trip.
 - **WU-061** compaction — server-side, still needs design discussion
   on the trim heuristic + harness UX flow.
 - **WU-067** BFF integration tests — end-to-end test harness driving
