@@ -446,6 +446,17 @@ func (c *ProtocolClient) SessionFork(ctx context.Context, sessionID string) (*pr
 	return &out, nil
 }
 
+// ContextList sends context.list and decodes the typed response. Used
+// by the WU-082 /context command to render files + knowledge
+// injections + token budget.
+func (c *ProtocolClient) ContextList(ctx context.Context, sessionID string) (*protocol.ContextListResponse, error) {
+	var out protocol.ContextListResponse
+	if err := c.CallInto(ctx, protocol.MethodContextList, &protocol.ContextList{SessionID: sessionID}, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 // ContentTransform sends content.transform.
 func (c *ProtocolClient) ContentTransform(ctx context.Context, req *protocol.ContentTransform) (json.RawMessage, error) {
 	return c.Call(ctx, protocol.MethodContentTransform, req)
