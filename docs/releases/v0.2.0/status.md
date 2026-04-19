@@ -1,7 +1,7 @@
 # v0.2.0 Status
 
 ## Last Updated
-2026-04-19 (WU-079 landed)
+2026-04-19 (Bundle 7 complete — WU-076 Read landed)
 
 ## Current Phase
 **Phase 3 — Implementation.** Phase 1 (design) and Phase 2 (review + cross-flow audit) complete. All 22 blocking, 28 attention, 2 critical, and 11 important findings resolved across pre-review lints and cross-flow audit.
@@ -63,6 +63,7 @@ See `plan.md`, `track-0-shared.md`, `track-a-bff-server.md`, `track-b-terminal-h
 - [x] WU-077: Write and Edit tools (2026-04-19) — commit `797f278`
 - [x] WU-078: Bash and Git tools (2026-04-19) — commit `96ec3b7`
 - [x] WU-079: Glob, Grep, WebSearch, WebFetch tools (2026-04-19) — commit `a92bba2`
+- [x] WU-076: Read tool (text, CSV, image, PDF, DOCX, XLSX) (2026-04-19) — commit `efc2cee`
 
 ### Bundle 4 (BFF Foundation) complete
 All four WUs in `internal/bff/` landed race-clean. WU-046 transport, WU-048
@@ -126,23 +127,30 @@ aware rendering, assistant header + footer with metrics).
 
 Charm dependencies added: bubbletea, bubbles, lipgloss, glamour.
 
-### Bundle 7 (Tools): 4 of 5 WUs complete
-WU-075 framework + permission model, WU-077 Write + Edit,
-WU-078 Bash + Git, and WU-079 Glob + Grep + WebSearch + WebFetch
-landed. BashTool runs via `sh -c` with projectRoot cwd,
-context-bound timeout (default 120s, cap 600s), combined
+### Bundle 7 (Tools) complete
+All five WUs landed. WU-075 framework + permission model, WU-077
+Write + Edit, WU-078 Bash + Git, WU-079 Glob + Grep + WebSearch
++ WebFetch, WU-076 Read. BashTool runs via `sh -c` with projectRoot
+cwd, context-bound timeout (default 120s, cap 600s), combined
 stdout/stderr, and 100KB-trailing-half output truncation. GitTool
-runs via `sh -c "git …"` with 60s default timeout and an in-tool
-`ClassifyGit` helper; the permission layer auto-allows reads
-(status / log / diff / show / …) in every mode, prompts mutations
-per the matrix, and routes dangerous forms (push --force, reset
---hard, branch -D, …) through `alwaysPrompt`. WU-079 adds Glob
-(doublestar/v4, mtime-sorted), Grep (stdlib regexp + WalkDir with
-content / files_with_matches / count modes, context lines,
-case-insensitive, glob filter, binary skip), WebSearch (Brave +
-SerpAPI engines with injectable base URLs), and WebFetch
+uses an in-tool `ClassifyGit` helper; the permission layer
+auto-allows reads (status / log / diff / show / …) in every mode,
+prompts mutations per the matrix, and routes dangerous forms (push
+--force, reset --hard, branch -D, …) through `alwaysPrompt`. WU-079
+adds Glob (doublestar/v4, mtime-sorted), Grep (stdlib regexp +
+WalkDir with content / files_with_matches / count modes, context
+lines, case-insensitive, glob filter, binary skip), WebSearch
+(Brave + SerpAPI with injectable base URLs), and WebFetch
 (net.IP-based SSRF defense-in-depth, HTML-to-text stripper, 100KB
-truncation). Remaining: WU-076 (Read — text/PDF/DOCX/image/xlsx).
+truncation). WU-076 Read auto-detects format by extension then
+magic bytes and dispatches to format readers: text (line-numbered,
+offset/limit), CSV (tab-separated table), Image (base64 +
+DetectContentType), XLSX (excelize/v2, BSD-3), DOCX (stdlib
+archive/zip + encoding/xml — no UniDoc/unioffice dep,
+ADR-0010-clean), PDF (ledongthuc/pdf BSD-3 with page-range parser,
+10-page threshold forces explicit range, 20-page per-call cap).
+Successful reads mark the FileTracker so Edit can mutate without
+a separate Read.
 
 ### Bundle 6 (Protocol client + Connection manager) complete
 WU-073 ProtocolClient: JSON-RPC over Unix socket / TLS with
@@ -192,11 +200,12 @@ the App already handles) and the tool framework (WU-075).
 Bundles 4, 5, 6, 8, 10 complete; Bundles 9 and 11 partial; the
 harness has working connection lifecycle and event bridge. Remaining:
 
-- **Track B Bundle 7** (WU-076): WU-075 framework, WU-077 Write +
-  Edit, WU-078 Bash + Git, and WU-079 Glob + Grep + WebSearch +
-  WebFetch landed. Remaining is Read (WU-076, Large — five file
-  types: text, PDF, DOCX, image, spreadsheet; external deps for
-  pdfcpu, unioffice, excelize).
+- **Track B Bundle 7** complete (WU-075, 077, 078, 079, 076).
+  All 13 built-in tools live under `internal/harness/tools/`.
+  Dep choices deviated from the original design for licensing:
+  swapped UniDoc/unioffice for stdlib `archive/zip` + `encoding/xml`
+  DOCX extraction, and pdfcpu for `ledongthuc/pdf` (BSD-3) text
+  extraction. Both are Apache-2.0-compatible per ADR-0010.
 - **Track B Bundle 13** (WU-080–086, WU-092): mode toggle / MCP /
   file context / paste handling / session explorer / model commands
   / connection UX banners / cross-session command history.
