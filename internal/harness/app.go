@@ -65,6 +65,7 @@ type App struct {
 	history   *HistoryController
 	attacher  FileAttacher
 	mcp       *MCPManager
+	plan      *PlanAccumulator
 
 	width  int
 	height int
@@ -91,6 +92,7 @@ func NewApp(opts AppOptions) App {
 		conn:      opts.Conn,
 		attacher:  opts.Attacher,
 		mcp:       opts.MCP,
+		plan:      NewPlanAccumulator(),
 	}
 	app.history = NewHistoryController(opts.Conn)
 	app.input.SetHistorySource(app.history)
@@ -110,6 +112,11 @@ func (a *App) SetConn(c ConnSurface) {
 
 // History exposes the history controller (tests and integration wiring).
 func (a App) History() *HistoryController { return a.history }
+
+// Plan exposes the plan accumulator so the CLI launch path can wire
+// it into the ToolDispatcher. Returns nil when no plan accumulator
+// has been attached (tests that don't exercise plan mode).
+func (a App) Plan() *PlanAccumulator { return a.plan }
 
 // State exposes the shared state pointer for tests and for downstream
 // integration code (connection manager, protocol client).
