@@ -90,6 +90,19 @@ type fakeClient struct {
 	contextListCalls []string
 	contextListResp  protocol.ContextListResponse
 	contextListErr   error
+
+	sessionCompactCalls []string
+	sessionCompactResp  protocol.CompactPlan
+	sessionCompactErr   error
+
+	compactApplyCalls []compactApplyCall
+	compactApplyResp  protocol.CompactApplyResponse
+	compactApplyErr   error
+}
+
+type compactApplyCall struct {
+	sessionID string
+	actions   map[string]string
 }
 
 func (f *fakeClient) ContentTransform(ctx context.Context, req *protocol.ContentTransform) (json.RawMessage, error) {
@@ -205,6 +218,30 @@ func (f *fakeClient) ContextList(ctx context.Context, sessionID string) (*protoc
 	f.contextListCalls = append(f.contextListCalls, sessionID)
 	err := f.contextListErr
 	resp := f.contextListResp
+	f.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (f *fakeClient) SessionCompact(ctx context.Context, sessionID string) (*protocol.CompactPlan, error) {
+	f.mu.Lock()
+	f.sessionCompactCalls = append(f.sessionCompactCalls, sessionID)
+	err := f.sessionCompactErr
+	resp := f.sessionCompactResp
+	f.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (f *fakeClient) CompactApply(ctx context.Context, sessionID string, actions map[string]string) (*protocol.CompactApplyResponse, error) {
+	f.mu.Lock()
+	f.compactApplyCalls = append(f.compactApplyCalls, compactApplyCall{sessionID: sessionID, actions: actions})
+	err := f.compactApplyErr
+	resp := f.compactApplyResp
 	f.mu.Unlock()
 	if err != nil {
 		return nil, err

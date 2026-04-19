@@ -66,6 +66,10 @@ type ConnProtocolClient interface {
 
 	// ContextList calls context.list. Used by WU-082 /context command.
 	ContextList(ctx context.Context, sessionID string) (*protocol.ContextListResponse, error)
+
+	// SessionCompact / CompactApply back the WU-061 /compact flow.
+	SessionCompact(ctx context.Context, sessionID string) (*protocol.CompactPlan, error)
+	CompactApply(ctx context.Context, sessionID string, actions map[string]string) (*protocol.CompactApplyResponse, error)
 }
 
 // connAdapter wraps *ConnectionManager so its Client() returns

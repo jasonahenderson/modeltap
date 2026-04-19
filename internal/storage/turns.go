@@ -171,3 +171,14 @@ FROM turns WHERE session_id = ? ORDER BY sequence`
 	}
 	return results, nil
 }
+
+// DeleteTurn removes a turn by id. Used by the compaction pipeline
+// (WU-061) to delete the originals after replacing them with a
+// summary row. Idempotent: deleting an absent id is not an error.
+func (s *SQLiteStore) DeleteTurn(ctx context.Context, id string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM turns WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("deleting turn %s: %w", id, err)
+	}
+	return nil
+}

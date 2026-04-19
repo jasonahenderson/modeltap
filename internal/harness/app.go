@@ -66,6 +66,7 @@ type App struct {
 	attacher  FileAttacher
 	mcp       *MCPManager
 	plan      *PlanAccumulator
+	compact   *CompactHandler
 
 	width  int
 	height int
@@ -93,6 +94,7 @@ func NewApp(opts AppOptions) App {
 		attacher:  opts.Attacher,
 		mcp:       opts.MCP,
 		plan:      NewPlanAccumulator(),
+		compact:   NewCompactHandler(),
 	}
 	app.history = NewHistoryController(opts.Conn)
 	app.input.SetHistorySource(app.history)
@@ -161,6 +163,13 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			// Unrelated key — swallow it so the input area doesn't
 			// grow while the user is still deciding.
+			return a, nil
+		}
+		// Compact handler captures keys with the same modal semantics.
+		if a.compact != nil && a.compact.Active() {
+			if cmd := a.compact.HandleKey(msg); cmd != nil {
+				return a, cmd
+			}
 			return a, nil
 		}
 		if key.Matches(msg, a.keys.ToggleMode) {
@@ -402,6 +411,33 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				Duration: 5 * time.Second,
 			}
 		}
+
+	case CompactPlanLoadedMsg:
+		return a, a.compact.Stage(msg.Plan)
+
+	case compactApplyRequestMsg:
+		return a, a.dispatchCompactApply(msg.actions)
+
+	case CompactAppliedMsg:
+		a.compact.Complete()
+		return a, tea.Batch(
+			func() tea.Msg { return BannerClearMsg{} },
+			func() tea.Msg {
+				return BannerMsg{Text: formatCompactApplied(msg.Response), Duration: 6 * time.Second}
+			},
+		)
+
+	case CompactErrMsg:
+		a.compact.Complete()
+		return a, tea.Batch(
+			func() tea.Msg { return BannerClearMsg{} },
+			func() tea.Msg {
+				return BannerMsg{
+					Text:     fmt.Sprintf("/%s failed: %v", msg.Command, msg.Err),
+					Duration: 5 * time.Second,
+				}
+			},
+		)
 
 	case pasteSummarizeFailureMsg:
 		// Expand into (banner, cancel-resolve). Batch so both fire in
@@ -652,6 +688,9 @@ func (a *App) handleCommand(msg SubmitMsg) tea.Cmd {
 
 	case "mcp":
 		return a.handleMCPCommand(msg)
+
+	case "compact":
+		return a.handleCompactCommand(msg)
 	}
 	unknown := BannerMsg{
 		Text:     "Unknown command: /" + msg.Command,
