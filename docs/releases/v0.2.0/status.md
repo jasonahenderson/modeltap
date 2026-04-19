@@ -1,7 +1,7 @@
 # v0.2.0 Status
 
 ## Last Updated
-2026-04-19 (WU-089 modeltap harness CLI command landed)
+2026-04-19 (WU-067 + WU-087 + WU-088 integration tests + WU-090 changelog landed)
 
 ## Current Phase
 **Phase 3 — Implementation.** Phase 1 (design) and Phase 2 (review + cross-flow audit) complete. All 22 blocking, 28 attention, 2 critical, and 11 important findings resolved across pre-review lints and cross-flow audit.
@@ -74,6 +74,12 @@ See `plan.md`, `track-0-shared.md`, `track-a-bff-server.md`, `track-b-terminal-h
 - [x] WU-080: Plan/Build/Auto commands + PlanAccumulator (2026-04-19) — commit `ba2f222`
 - [x] WU-081: MCP stdio client + manager + tool adapter (2026-04-19) — commit `cbff50f`
 - [x] WU-089: modeltap harness CLI command (2026-04-19) — commit `d6bf0e0`
+- [x] ADMIN: tools.Registry.Deregister + MCP reconnect cleanup (2026-04-19) — commit `a00bdc7`
+- [x] WU-067: BFF integration tests + register handshake wiring (2026-04-19) — commit `d381a3c`
+- [x] WU-087: harness ConnectionManager integration tests (2026-04-19) — commit `ff1f0f0`
+- [x] WU-088: end-to-end harness → BFF → mock provider (2026-04-19) — commit `b6c83e1`
+- [x] ADMIN: bare modeltap launches harness (2026-04-19) — commit `2ef1037`
+- [x] WU-090: v0.2.0 changelog (2026-04-19) — commit `6a04a4e`
 
 ### Bundle 4 (BFF Foundation) complete
 All four WUs in `internal/bff/` landed race-clean. WU-046 transport, WU-048
@@ -233,9 +239,10 @@ harness has working connection lifecycle and event bridge. Remaining:
   natural test driver.
 - **WU-087** harness integration tests — end-to-end against a mock
   BFF. Easier now that ConnectionManager + ProtocolClient exist.
-- **Integration track** (WU-088, 090, 094, 095): end-to-end tests,
-  user/dev docs, security review, performance benchmarks. WU-089
-  CLI launch landed 2026-04-19.
+- **Integration track** (WU-094, 095, full WU-090 usage guide):
+  security review, performance benchmarks, user-led doc sweep.
+  WU-067/087/088 integration tests and the changelog portion of
+  WU-090 landed 2026-04-19; WU-089 CLI launch landed 2026-04-19.
 - **WU-060** multi-model branching: deferred — superseded by FEAT-0013
   sub-agents.
 
