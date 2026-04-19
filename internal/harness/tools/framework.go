@@ -144,6 +144,26 @@ func (r *Registry) Get(name string) Tool {
 	return r.tools[name]
 }
 
+// Deregister removes a tool by name. Returns true when a tool was
+// actually removed, false when the name wasn't registered. Used by
+// the MCP manager (WU-081) on reconnect so old tool entries don't
+// linger in the registry.
+func (r *Registry) Deregister(name string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, ok := r.tools[name]; !ok {
+		return false
+	}
+	delete(r.tools, name)
+	for i, n := range r.order {
+		if n == name {
+			r.order = append(r.order[:i], r.order[i+1:]...)
+			break
+		}
+	}
+	return true
+}
+
 // Names returns registered tool names in insertion order.
 func (r *Registry) Names() []string {
 	r.mu.RLock()

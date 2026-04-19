@@ -285,11 +285,12 @@ func (m *MCPManager) unwireLocked(s *managedServer) {
 	if s.client != nil {
 		_ = s.client.Close()
 	}
-	// NOTE: the harness tools.Registry doesn't currently support
-	// Deregister. Re-registering on reconnect will see the old tool
-	// still present and hit the dup guard in runOnce. Fixing this is a
-	// small follow-up on the tools package; the MCP layer is
-	// structured to deregister cleanly once that lands.
+	if m.registry != nil {
+		for _, name := range s.toolNames {
+			m.registry.Deregister(name)
+		}
+	}
+	s.toolNames = nil
 	s.client = nil
 	s.stop = nil
 }

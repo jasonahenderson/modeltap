@@ -83,6 +83,37 @@ func TestRegistry_All_PreservesInsertionOrder(t *testing.T) {
 	}
 }
 
+func TestRegistry_Deregister(t *testing.T) {
+	r := NewRegistry()
+	r.Register(&stubTool{name: "a", risk: RiskReadOnly})
+	r.Register(&stubTool{name: "b", risk: RiskWrite})
+	r.Register(&stubTool{name: "c", risk: RiskExecute})
+
+	if !r.Deregister("b") {
+		t.Fatal("Deregister(b) should return true")
+	}
+	if r.Get("b") != nil {
+		t.Error("b should be absent after Deregister")
+	}
+	// Order preserved around the removed entry.
+	got := r.Names()
+	want := []string{"a", "c"}
+	for i, n := range want {
+		if got[i] != n {
+			t.Errorf("Names()[%d] = %q, want %q", i, got[i], n)
+		}
+	}
+	// Deregister of absent name is a no-op.
+	if r.Deregister("b") {
+		t.Error("second Deregister(b) should return false")
+	}
+	// Re-register after Deregister should succeed (no dup panic).
+	r.Register(&stubTool{name: "b", risk: RiskWrite})
+	if r.Get("b") == nil {
+		t.Error("b should be registered again")
+	}
+}
+
 func TestExecutor_NotFound(t *testing.T) {
 	r := NewRegistry()
 	exec := NewExecutor(r, NewPermissionEnforcer(PermAutonomous))
