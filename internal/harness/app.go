@@ -32,6 +32,7 @@ type App struct {
 	viewport  ConversationViewport
 	keys      KeyMap
 	connUX    *ConnectionUX
+	paste     *PasteHandler
 
 	width  int
 	height int
@@ -54,6 +55,7 @@ func NewApp(opts AppOptions) App {
 		viewport:  NewConversationViewport(state),
 		keys:      DefaultKeyMap(opts.SubmitKey),
 		connUX:    NewConnectionUX(state),
+		paste:     NewPasteHandler(),
 	}
 }
 
@@ -91,6 +93,16 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Global keys take precedence regardless of focus.
 		if key.Matches(msg, a.keys.Quit) {
 			return a, tea.Quit
+		}
+		// Pending paste choice captures keystrokes before the input area
+		// or focus-routing see them (WU-083 overlay semantics).
+		if a.paste != nil && a.paste.Active() {
+			if cmd := a.paste.HandleKey(msg); cmd != nil {
+				return a, cmd
+			}
+			// Unrelated key — swallow it so the input area doesn't
+			// grow while the user is still deciding.
+			return a, nil
 		}
 		if key.Matches(msg, a.keys.ToggleMode) {
 			a.cycleMode()
@@ -175,6 +187,19 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case StreamCompleteMsg:
 		a.finalizeStreaming(msg)
 		return a, nil
+
+	case PasteDetectedMsg:
+		if a.paste != nil {
+			return a, a.paste.HandlePaste(msg)
+		}
+		return a, nil
+
+	case PasteResolvedMsg:
+		a.input.ReplacePaste(msg.Original, msg.Content)
+		if a.paste != nil {
+			a.paste.Complete()
+		}
+		return a, func() tea.Msg { return BannerClearMsg{} }
 	}
 	return a, nil
 }

@@ -167,6 +167,43 @@ type PasteDetectedMsg struct {
 	Preview   string
 }
 
+// PasteStrategy is one of the user's disposition choices for a
+// detected large paste: full, truncate, summarize, or cancel.
+type PasteStrategy string
+
+const (
+	// PasteStrategyFull keeps the paste verbatim in the input.
+	PasteStrategyFull PasteStrategy = "full"
+	// PasteStrategyTruncate keeps only the leading portion (per the
+	// PasteHandler threshold) and drops the rest.
+	PasteStrategyTruncate PasteStrategy = "truncate"
+	// PasteStrategySummarize ships the paste through content.transform
+	// and replaces it with the returned summary.
+	PasteStrategySummarize PasteStrategy = "summarize"
+	// PasteStrategyCancel discards the paste entirely.
+	PasteStrategyCancel PasteStrategy = "cancel"
+)
+
+// PasteResolvedMsg is emitted by the PasteHandler once the user picks
+// a disposition for a pending large paste. Content holds the value
+// that should replace the paste in the input (empty for cancel).
+// Original holds the raw paste text the App should locate and replace
+// in the current input-area value.
+type PasteResolvedMsg struct {
+	Strategy PasteStrategy
+	Content  string
+	Original string
+}
+
+// PasteSummarizeRequestMsg is emitted when the user chooses
+// "summarize". The connection manager (once wired) should round-trip
+// the content through the BFF's content.transform handler and emit a
+// PasteResolvedMsg with PasteStrategySummarize and the summarized
+// content.
+type PasteSummarizeRequestMsg struct {
+	Content string
+}
+
 // TickMsg is the periodic tick driving the call duration display in
 // the status bar.
 type TickMsg time.Time
