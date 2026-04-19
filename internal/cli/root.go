@@ -55,6 +55,7 @@ Key capabilities:
 	// Register all subcommands.
 	rootCmd.AddCommand(
 		newStartCommand(),
+		newHarnessCommand(),
 		newLogsCommand(),
 		newShowCommand(),
 		newExportCommand(),
