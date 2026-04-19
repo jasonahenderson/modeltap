@@ -426,3 +426,23 @@ func (c *ProtocolClient) HistoryList(ctx context.Context, req *protocol.HistoryL
 	}
 	return &out, nil
 }
+
+// ModelList sends model.list and decodes the typed response. Used by
+// the WU-085 /models command and model-switch UX.
+func (c *ProtocolClient) ModelList(ctx context.Context) (*protocol.ModelListResponse, error) {
+	var out protocol.ModelListResponse
+	if err := c.CallInto(ctx, protocol.MethodModelList, &protocol.ModelList{}, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ModelSwitch sends model.switch. Pass "auto" as model to clear the
+// session-level override.
+func (c *ProtocolClient) ModelSwitch(ctx context.Context, req *protocol.ModelSwitch) (*protocol.ModelSwitchResponse, error) {
+	var out protocol.ModelSwitchResponse
+	if err := c.CallInto(ctx, protocol.MethodModelSwitch, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}

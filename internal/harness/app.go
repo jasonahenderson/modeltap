@@ -269,6 +269,30 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+	case ModelListLoadedMsg:
+		return a, func() tea.Msg {
+			return BannerMsg{Text: formatModelList(msg.Response), Duration: 8 * time.Second}
+		}
+
+	case ModelSwitchedMsg:
+		if msg.Response != nil {
+			a.state.ModelOverride = msg.Response.OverrideSet
+			if msg.Response.Model != "" {
+				a.state.ModelName = msg.Response.Model
+			}
+		}
+		return a, func() tea.Msg {
+			return BannerMsg{Text: formatModelSwitched(msg.Response), Duration: 4 * time.Second}
+		}
+
+	case ModelErrMsg:
+		return a, func() tea.Msg {
+			return BannerMsg{
+				Text:     fmt.Sprintf("/%s failed: %v", msg.Command, msg.Err),
+				Duration: 5 * time.Second,
+			}
+		}
+
 	case pasteSummarizeFailureMsg:
 		// Expand into (banner, cancel-resolve). Batch so both fire in
 		// the same tick and the overlay clears before the next key.
@@ -497,6 +521,9 @@ func (a *App) handleCommand(msg SubmitMsg) tea.Cmd {
 			return func() tea.Msg { return banner }
 		}
 		return a.history.SetScope(scope)
+
+	case "model", "models":
+		return a.handleModelCommand(msg)
 	}
 	unknown := BannerMsg{
 		Text:     "Unknown command: /" + msg.Command,

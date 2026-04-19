@@ -49,6 +49,13 @@ type ConnProtocolClient interface {
 	// to populate cross-session command history for arrow-up
 	// traversal.
 	HistoryList(ctx context.Context, req *protocol.HistoryList) (*protocol.HistoryListResponse, error)
+
+	// ModelList calls model.list. Used by WU-085 /models command to
+	// render the model catalog.
+	ModelList(ctx context.Context) (*protocol.ModelListResponse, error)
+
+	// ModelSwitch calls model.switch. Pass "auto" to clear an override.
+	ModelSwitch(ctx context.Context, req *protocol.ModelSwitch) (*protocol.ModelSwitchResponse, error)
 }
 
 // connAdapter wraps *ConnectionManager so its Client() returns

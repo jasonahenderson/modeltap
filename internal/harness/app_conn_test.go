@@ -62,6 +62,14 @@ type fakeClient struct {
 	historyCalls []*protocol.HistoryList
 	historyResp  protocol.HistoryListResponse
 	historyErr   error
+
+	modelListCalls int
+	modelListResp  protocol.ModelListResponse
+	modelListErr   error
+
+	modelSwitchCalls []*protocol.ModelSwitch
+	modelSwitchResp  protocol.ModelSwitchResponse
+	modelSwitchErr   error
 }
 
 func (f *fakeClient) ContentTransform(ctx context.Context, req *protocol.ContentTransform) (json.RawMessage, error) {
@@ -93,6 +101,30 @@ func (f *fakeClient) HistoryList(ctx context.Context, req *protocol.HistoryList)
 	f.historyCalls = append(f.historyCalls, req)
 	err := f.historyErr
 	resp := f.historyResp
+	f.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (f *fakeClient) ModelList(ctx context.Context) (*protocol.ModelListResponse, error) {
+	f.mu.Lock()
+	f.modelListCalls++
+	err := f.modelListErr
+	resp := f.modelListResp
+	f.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (f *fakeClient) ModelSwitch(ctx context.Context, req *protocol.ModelSwitch) (*protocol.ModelSwitchResponse, error) {
+	f.mu.Lock()
+	f.modelSwitchCalls = append(f.modelSwitchCalls, req)
+	err := f.modelSwitchErr
+	resp := f.modelSwitchResp
 	f.mu.Unlock()
 	if err != nil {
 		return nil, err
