@@ -1,7 +1,7 @@
 # v0.2.0 Status
 
 ## Last Updated
-2026-04-19 (WU-084 session commands landed)
+2026-04-19 (WU-082 file context management landed)
 
 ## Current Phase
 **Phase 3 — Implementation.** Phase 1 (design) and Phase 2 (review + cross-flow audit) complete. All 22 blocking, 28 attention, 2 critical, and 11 important findings resolved across pre-review lints and cross-flow audit.
@@ -70,6 +70,7 @@ See `plan.md`, `track-0-shared.md`, `track-a-bff-server.md`, `track-b-terminal-h
 - [x] WU-092: BFF-sourced command history traversal (2026-04-19) — commit `9d7c3ca`
 - [x] WU-085: /model and /models commands (2026-04-19) — commit `e880992`
 - [x] WU-084: /sessions and /session {resume|clear|fork} (2026-04-19) — commit `d359bce`
+- [x] WU-082: file context management (@file + /context) (2026-04-19) — commit `c1f8bd1`
 
 ### Bundle 4 (BFF Foundation) complete
 All four WUs in `internal/bff/` landed race-clean. WU-046 transport, WU-048
@@ -212,15 +213,16 @@ harness has working connection lifecycle and event bridge. Remaining:
   swapped UniDoc/unioffice for stdlib `archive/zip` + `encoding/xml`
   DOCX extraction, and pdfcpu for `ledongthuc/pdf` (BSD-3) text
   extraction. Both are Apache-2.0-compatible per ADR-0010.
-- **Track B Bundle 13** (WU-080, WU-081, WU-082): plan mode /
-  MCP / file context. WU-086 connection UX, WU-083 paste handler,
-  WU-092 history traversal, WU-085 model commands, and WU-084
-  session commands landed 2026-04-19 — 5 of Bundle 13's 8 WUs
-  complete. PATCH-0003 wired the App to an injectable ConnSurface,
-  so /status, /reconnect, /history {scope}, /model, /models,
-  /sessions, /session {resume|clear|fork}, paste summarize, and
-  free-form turn.submit now all have a live path from App → BFF
-  (when a manager is injected — CLI launch WU still outstanding).
+- **Track B Bundle 13** (WU-080, WU-081): plan mode / MCP client.
+  WU-086 connection UX, WU-083 paste handler, WU-092 history
+  traversal, WU-085 model commands, WU-084 session commands, and
+  WU-082 file context management landed 2026-04-19 — 6 of Bundle
+  13's 8 WUs complete. PATCH-0003 wired the App to an injectable
+  ConnSurface, so /status, /reconnect, /history {scope}, /model,
+  /models, /sessions, /session {resume|clear|fork}, /context,
+  @file attachment resolution, paste summarize, and free-form
+  turn.submit now all have a live path from App → BFF (when a
+  manager is injected — CLI launch WU still outstanding).
 - **WU-061** compaction — server-side, still needs design discussion
   on the trim heuristic + harness UX flow.
 - **WU-067** BFF integration tests — end-to-end test harness driving
