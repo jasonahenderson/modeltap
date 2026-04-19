@@ -140,11 +140,45 @@ NEW `internal/bff/routing.go` — hierarchical routing with dot-path resolution 
 **Done:** Hierarchical resolution tested for all spec cases. Multi-model returns arrays. Override persists. `model.list` and `model.selected` work.
 
 ### WU-060: Multi-Model Branching — Parallel Provider Calls
-**Size:** Large | **Dependencies:** WU-059, WU-053 | **Parallelizes with:** WU-061
 
-NEW `internal/bff/branch.go` — parallel goroutines per model. `branch_id` tagging. `branch.started`, branch-tagged events, `branch.complete`/`branch.error`, aggregate `turn.complete`. Branch state for `session.sync`. `turn.cancel` cancels all branches.
+**Status: DEFERRED — superseded by sub-agents (FEAT-0013).**
 
-**Done:** Parallel branches stream independently. Events tagged. Aggregate completion. Cancel stops all. Branch state available.
+Decided 2026-04-18 after the BFF pipeline (WU-046–059, WU-052/053
+streaming relay, WU-091/064/063/062 handlers) landed. The parallel
+fan-out + per-branch event tagging + cancellation + recovery
+semantics are structurally identical to what FEAT-0013 sub-agents
+must already provide. Building branch infrastructure in
+`internal/bff/branch.go` would be duplicate machinery with
+overlapping wire events and parallel state-tracking.
+
+**How the use case is satisfied instead:**
+
+- **Parallel model execution**: spawn N sub-agents, one per model
+  (FEAT-0013 §"flows" with `parallel:` block). Each sub-agent has
+  isolated context, can use tools naturally, and emits its own
+  results through the existing single-model streaming relay path.
+- **Routing-based ergonomic** (`coding.review: [opus, gpt-5]` in
+  config): preserved by a thin sub-agent flow that fans out from a
+  single user-facing role to N model-specific sub-agents. Defined
+  declaratively, not in BFF code.
+- **Reconciliation** (combining / picking from N results): out of
+  scope for the sub-agent feature itself. Implemented as either:
+  - a dedicated synthesizer sub-agent (the `research` flow pattern
+    in FEAT-0013 §"flow library"),
+  - a harness-side UI picker (panel-per-result, user clicks),
+  - or a discrete reconciliation primitive added later.
+  The choice depends on the use case; the sub-agent layer doesn't
+  prescribe one.
+
+**handleTurnSubmit behavior**: rejects multi-model routing with a
+clear error pointing at FEAT-0013 / sub-agents. The rejection is
+not a regression — the design exists, the alternative is documented.
+
+**Files NOT created**: `internal/bff/branch.go`, `branch_test.go`,
+the `BranchManager` type, the `MultiModelOpts` struct, the per-
+branch goroutine pool. The `branch_id` field on streaming events
+is retained — sub-agents may reuse it for their own per-agent
+tagging.
 
 ## Context, Diagnostics, Recovery
 

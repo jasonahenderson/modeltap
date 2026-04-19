@@ -135,11 +135,17 @@ func handleTurnSubmit(_ context.Context, conn *Connection, params json.RawMessag
 		}
 	}
 	if isMulti {
-		// Multi-model is WU-060 territory; surface a clear error rather
-		// than silently picking the first model.
+		// Multi-model fan-out is intentionally NOT implemented at the
+		// BFF level. The use case is handled by sub-agents (FEAT-0013):
+		// each model runs as its own sub-agent with isolated context;
+		// reconciliation (picking / synthesizing across results) is a
+		// separate concern handled by a synthesizer agent or a
+		// harness-side picker UI. See WU-060 in
+		// docs/releases/v0.2.0/track-a-bff-server.md for the deferral
+		// rationale.
 		return nil, &TransportError{
 			Code:    CodeProviderError,
-			Message: "multi-model turns are not yet implemented (WU-060)",
+			Message: "multi-model routing is not implemented at the BFF level; use sub-agents (FEAT-0013) for parallel model execution",
 		}
 	}
 	modelName := models[0]
