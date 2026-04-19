@@ -51,6 +51,7 @@ See `plan.md`, `track-0-shared.md`, `track-a-bff-server.md`, `track-b-terminal-h
 - [x] WU-063: diagnostic taxonomy helpers (2026-04-18) — commit `199cd24`
 - [x] WU-062: content.transform handler (2026-04-18) — commit `924835e`
 - [x] WU-066: Ollama provider adapter (2026-04-18) — commit `fedad7b`
+- [x] WU-065: Wire BFF server into modeltap start (2026-04-18) — commit `3d58416`
 
 ### Bundle 4 (BFF Foundation) complete
 All four WUs in `internal/bff/` landed race-clean. WU-046 transport, WU-048
