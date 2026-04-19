@@ -63,6 +63,9 @@ type ConnProtocolClient interface {
 	SessionResume(ctx context.Context, sessionID string, project protocol.ProjectContext) (*protocol.SessionResumeResponse, error)
 	SessionClear(ctx context.Context, sessionID string) (*protocol.SessionClearResponse, error)
 	SessionFork(ctx context.Context, sessionID string) (*protocol.SessionForkResponse, error)
+
+	// ContextList calls context.list. Used by WU-082 /context command.
+	ContextList(ctx context.Context, sessionID string) (*protocol.ContextListResponse, error)
 }
 
 // connAdapter wraps *ConnectionManager so its Client() returns

@@ -86,6 +86,10 @@ type fakeClient struct {
 	sessionForkCalls []string
 	sessionForkResp  protocol.SessionForkResponse
 	sessionForkErr   error
+
+	contextListCalls []string
+	contextListResp  protocol.ContextListResponse
+	contextListErr   error
 }
 
 func (f *fakeClient) ContentTransform(ctx context.Context, req *protocol.ContentTransform) (json.RawMessage, error) {
@@ -189,6 +193,18 @@ func (f *fakeClient) SessionFork(ctx context.Context, sessionID string) (*protoc
 	f.sessionForkCalls = append(f.sessionForkCalls, sessionID)
 	err := f.sessionForkErr
 	resp := f.sessionForkResp
+	f.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (f *fakeClient) ContextList(ctx context.Context, sessionID string) (*protocol.ContextListResponse, error) {
+	f.mu.Lock()
+	f.contextListCalls = append(f.contextListCalls, sessionID)
+	err := f.contextListErr
+	resp := f.contextListResp
 	f.mu.Unlock()
 	if err != nil {
 		return nil, err

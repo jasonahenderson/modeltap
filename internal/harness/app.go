@@ -32,6 +32,13 @@ type AppOptions struct {
 	// reports "no connection", /reconnect is a no-op banner, and
 	// paste-summarize resolves as a cancel with an error banner.
 	Conn ConnSurface
+
+	// Attacher resolves SubmitMsg.Attachments (raw @file refs) into
+	// typed protocol.Attachment values before turn.submit runs. When
+	// nil the App passes no attachments along — raw refs are
+	// effectively dropped, which is safe for a server that ignores
+	// them.
+	Attacher FileAttacher
 }
 
 // App is the top-level Bubbletea model for the modeltap harness. It
@@ -50,6 +57,7 @@ type App struct {
 	paste     *PasteHandler
 	conn      ConnSurface
 	history   *HistoryController
+	attacher  FileAttacher
 
 	width  int
 	height int
@@ -74,6 +82,7 @@ func NewApp(opts AppOptions) App {
 		connUX:    NewConnectionUX(state),
 		paste:     NewPasteHandler(),
 		conn:      opts.Conn,
+		attacher:  opts.Attacher,
 	}
 	app.history = NewHistoryController(opts.Conn)
 	app.input.SetHistorySource(app.history)
@@ -349,6 +358,19 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+	case ContextListLoadedMsg:
+		return a, func() tea.Msg {
+			return BannerMsg{Text: formatContextList(msg.Response), Duration: 10 * time.Second}
+		}
+
+	case ContextErrMsg:
+		return a, func() tea.Msg {
+			return BannerMsg{
+				Text:     fmt.Sprintf("/context failed: %v", msg.Err),
+				Duration: 5 * time.Second,
+			}
+		}
+
 	case pasteSummarizeFailureMsg:
 		// Expand into (banner, cancel-resolve). Batch so both fire in
 		// the same tick and the overlay clears before the next key.
@@ -583,6 +605,9 @@ func (a *App) handleCommand(msg SubmitMsg) tea.Cmd {
 
 	case "session", "sessions":
 		return a.handleSessionCommand(msg)
+
+	case "context":
+		return a.handleContextCommand(msg)
 	}
 	unknown := BannerMsg{
 		Text:     "Unknown command: /" + msg.Command,
@@ -611,14 +636,28 @@ func (a *App) dispatchTurnSubmit(msg SubmitMsg) tea.Cmd {
 	sessionID := a.state.SessionID
 	seq := a.state.NextSequence()
 	content := msg.Content
+	refs := msg.Attachments
+	attacher := a.attacher
+	mode := a.state.Mode
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
+
+		var attachments []protocol.Attachment
+		if attacher != nil && len(refs) > 0 {
+			resolved, err := attacher.Resolve(ctx, refs)
+			if err != nil {
+				return TurnSubmittedMsg{Err: err}
+			}
+			attachments = resolved
+		}
+
 		ack, err := client.SubmitTurn(ctx, &protocol.TurnSubmit{
-			SessionID: sessionID,
-			Sequence:  seq,
-			Mode:      a.state.Mode,
-			Content:   content,
+			SessionID:   sessionID,
+			Sequence:    seq,
+			Mode:        mode,
+			Content:     content,
+			Attachments: attachments,
 		})
 		if err != nil {
 			return TurnSubmittedMsg{Err: err}
