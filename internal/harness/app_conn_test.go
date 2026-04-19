@@ -70,6 +70,22 @@ type fakeClient struct {
 	modelSwitchCalls []*protocol.ModelSwitch
 	modelSwitchResp  protocol.ModelSwitchResponse
 	modelSwitchErr   error
+
+	sessionListCalls int
+	sessionListResp  protocol.SessionListResponse
+	sessionListErr   error
+
+	sessionResumeCalls []string
+	sessionResumeResp  protocol.SessionResumeResponse
+	sessionResumeErr   error
+
+	sessionClearCalls []string
+	sessionClearResp  protocol.SessionClearResponse
+	sessionClearErr   error
+
+	sessionForkCalls []string
+	sessionForkResp  protocol.SessionForkResponse
+	sessionForkErr   error
 }
 
 func (f *fakeClient) ContentTransform(ctx context.Context, req *protocol.ContentTransform) (json.RawMessage, error) {
@@ -125,6 +141,54 @@ func (f *fakeClient) ModelSwitch(ctx context.Context, req *protocol.ModelSwitch)
 	f.modelSwitchCalls = append(f.modelSwitchCalls, req)
 	err := f.modelSwitchErr
 	resp := f.modelSwitchResp
+	f.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (f *fakeClient) SessionList(ctx context.Context) (*protocol.SessionListResponse, error) {
+	f.mu.Lock()
+	f.sessionListCalls++
+	err := f.sessionListErr
+	resp := f.sessionListResp
+	f.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (f *fakeClient) SessionResume(ctx context.Context, sessionID string, project protocol.ProjectContext) (*protocol.SessionResumeResponse, error) {
+	f.mu.Lock()
+	f.sessionResumeCalls = append(f.sessionResumeCalls, sessionID)
+	err := f.sessionResumeErr
+	resp := f.sessionResumeResp
+	f.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (f *fakeClient) SessionClear(ctx context.Context, sessionID string) (*protocol.SessionClearResponse, error) {
+	f.mu.Lock()
+	f.sessionClearCalls = append(f.sessionClearCalls, sessionID)
+	err := f.sessionClearErr
+	resp := f.sessionClearResp
+	f.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (f *fakeClient) SessionFork(ctx context.Context, sessionID string) (*protocol.SessionForkResponse, error) {
+	f.mu.Lock()
+	f.sessionForkCalls = append(f.sessionForkCalls, sessionID)
+	err := f.sessionForkErr
+	resp := f.sessionForkResp
 	f.mu.Unlock()
 	if err != nil {
 		return nil, err

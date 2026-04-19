@@ -401,14 +401,49 @@ func (c *ProtocolClient) Health(ctx context.Context) (json.RawMessage, error) {
 	return c.Call(ctx, protocol.MethodConnectionHealth, &protocol.ConnectionHealth{})
 }
 
-// SessionResume sends session.resume.
-func (c *ProtocolClient) SessionResume(ctx context.Context, sessionID string, project protocol.ProjectContext) (json.RawMessage, error) {
-	return c.Call(ctx, protocol.MethodSessionResume, &protocol.SessionResume{SessionID: sessionID, Project: project})
+// SessionResume sends session.resume and decodes the typed response.
+func (c *ProtocolClient) SessionResume(ctx context.Context, sessionID string, project protocol.ProjectContext) (*protocol.SessionResumeResponse, error) {
+	var out protocol.SessionResumeResponse
+	if err := c.CallInto(ctx, protocol.MethodSessionResume, &protocol.SessionResume{SessionID: sessionID, Project: project}, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
 }
 
-// SessionList sends session.list.
-func (c *ProtocolClient) SessionList(ctx context.Context) (json.RawMessage, error) {
-	return c.Call(ctx, protocol.MethodSessionList, &protocol.SessionList{})
+// SessionList sends session.list and decodes the typed response.
+func (c *ProtocolClient) SessionList(ctx context.Context) (*protocol.SessionListResponse, error) {
+	var out protocol.SessionListResponse
+	if err := c.CallInto(ctx, protocol.MethodSessionList, &protocol.SessionList{}, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// SessionDetails sends session.details.
+func (c *ProtocolClient) SessionDetails(ctx context.Context, sessionID string) (*protocol.SessionDetail, error) {
+	var out protocol.SessionDetail
+	if err := c.CallInto(ctx, protocol.MethodSessionDetails, &protocol.SessionDetails{SessionID: sessionID}, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// SessionClear sends session.clear.
+func (c *ProtocolClient) SessionClear(ctx context.Context, sessionID string) (*protocol.SessionClearResponse, error) {
+	var out protocol.SessionClearResponse
+	if err := c.CallInto(ctx, protocol.MethodSessionClear, &protocol.SessionClear{SessionID: sessionID}, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// SessionFork sends session.fork.
+func (c *ProtocolClient) SessionFork(ctx context.Context, sessionID string) (*protocol.SessionForkResponse, error) {
+	var out protocol.SessionForkResponse
+	if err := c.CallInto(ctx, protocol.MethodSessionFork, &protocol.SessionFork{SessionID: sessionID}, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
 }
 
 // ContentTransform sends content.transform.

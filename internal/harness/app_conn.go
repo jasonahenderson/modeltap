@@ -56,6 +56,13 @@ type ConnProtocolClient interface {
 
 	// ModelSwitch calls model.switch. Pass "auto" to clear an override.
 	ModelSwitch(ctx context.Context, req *protocol.ModelSwitch) (*protocol.ModelSwitchResponse, error)
+
+	// SessionList, SessionResume, SessionClear, SessionFork back the
+	// WU-084 /sessions and /session {resume|clear|fork} commands.
+	SessionList(ctx context.Context) (*protocol.SessionListResponse, error)
+	SessionResume(ctx context.Context, sessionID string, project protocol.ProjectContext) (*protocol.SessionResumeResponse, error)
+	SessionClear(ctx context.Context, sessionID string) (*protocol.SessionClearResponse, error)
+	SessionFork(ctx context.Context, sessionID string) (*protocol.SessionForkResponse, error)
 }
 
 // connAdapter wraps *ConnectionManager so its Client() returns
