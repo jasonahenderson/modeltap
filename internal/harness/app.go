@@ -39,6 +39,11 @@ type AppOptions struct {
 	// effectively dropped, which is safe for a server that ignores
 	// them.
 	Attacher FileAttacher
+
+	// MCP, when non-nil, powers /mcp status and /mcp reconnect. Tool
+	// discovery / registration happens through MCPManager.Launch at
+	// construction or post-construct.
+	MCP *MCPManager
 }
 
 // App is the top-level Bubbletea model for the modeltap harness. It
@@ -58,6 +63,7 @@ type App struct {
 	conn      ConnSurface
 	history   *HistoryController
 	attacher  FileAttacher
+	mcp       *MCPManager
 
 	width  int
 	height int
@@ -83,6 +89,7 @@ func NewApp(opts AppOptions) App {
 		paste:     NewPasteHandler(),
 		conn:      opts.Conn,
 		attacher:  opts.Attacher,
+		mcp:       opts.MCP,
 	}
 	app.history = NewHistoryController(opts.Conn)
 	app.input.SetHistorySource(app.history)
@@ -370,6 +377,24 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+	case MCPStatusLoadedMsg:
+		return a, func() tea.Msg {
+			return BannerMsg{Text: formatMCPStatus(msg.Servers), Duration: 8 * time.Second}
+		}
+
+	case MCPReconnectedMsg:
+		return a, func() tea.Msg {
+			return BannerMsg{Text: "Reconnecting MCP server " + msg.Name + "…", Duration: 4 * time.Second}
+		}
+
+	case MCPErrMsg:
+		return a, func() tea.Msg {
+			return BannerMsg{
+				Text:     fmt.Sprintf("/%s failed: %v", msg.Command, msg.Err),
+				Duration: 5 * time.Second,
+			}
+		}
+
 	case pasteSummarizeFailureMsg:
 		// Expand into (banner, cancel-resolve). Batch so both fire in
 		// the same tick and the overlay clears before the next key.
@@ -616,6 +641,9 @@ func (a *App) handleCommand(msg SubmitMsg) tea.Cmd {
 
 	case "plan", "build", "auto":
 		return a.handleModeCommand(msg)
+
+	case "mcp":
+		return a.handleMCPCommand(msg)
 	}
 	unknown := BannerMsg{
 		Text:     "Unknown command: /" + msg.Command,
