@@ -119,7 +119,7 @@ Slash commands available in-harness:
 				ServerBinary: serverBinary,
 				ServerArgs:   []string{"start"},
 				Registration: &protocol.CapabilitiesRegister{
-					ProtocolVersion: "1.0",
+					ProtocolVersion: "1",
 					HarnessVersion:  cmd.Root().Version,
 					HarnessPlatform: "terminal",
 					Project:         protocol.ProjectContext{Root: effectiveProject},

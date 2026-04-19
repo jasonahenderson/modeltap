@@ -165,13 +165,19 @@ func (s *Server) Routing() *RoutingPolicy { return s.routing }
 // WUs (e.g., WU-064 session.sync) and tests.
 func (s *Server) Sessions() *SessionManager { return s.sessions }
 
-// registerCoreHandlers registers the connection-lifecycle handlers the
-// Server owns directly. Application handlers are registered by their
-// respective WUs.
+// registerCoreHandlers registers the connection-lifecycle and
+// capability-handshake handlers the Server owns directly.
+// Application handlers (session.*, turn.*, history.*, etc.) are
+// registered inline in NewServer; capabilities.register and
+// capabilities.update land here because they're prerequisites for
+// every other RPC — the server that accepts a connection must
+// answer the handshake.
 func (s *Server) registerCoreHandlers() {
 	s.dispatcher.Register(protocol.MethodConnectionPing, handleConnectionPing)
 	s.dispatcher.Register(protocol.MethodConnectionHealth, handleConnectionHealth)
 	s.dispatcher.Register(protocol.MethodConnectionReady, handleConnectionReady)
+	s.dispatcher.Register(protocol.MethodCapabilitiesRegister, handleCapabilitiesRegister)
+	s.dispatcher.Register(protocol.MethodCapabilitiesUpdate, handleCapabilitiesUpdate)
 }
 
 // Dispatcher returns the server's request dispatcher so downstream WUs
