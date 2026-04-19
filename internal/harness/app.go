@@ -293,6 +293,62 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+	case SessionListLoadedMsg:
+		return a, func() tea.Msg {
+			return BannerMsg{Text: formatSessionList(msg.Response), Duration: 10 * time.Second}
+		}
+
+	case SessionResumedMsg:
+		if msg.Response != nil {
+			a.state.SessionID = msg.Response.SessionID
+			if msg.Response.Model != "" {
+				a.state.ModelName = msg.Response.Model
+			}
+			a.state.ModelOverride = msg.Response.ModelOverride != ""
+		}
+		return a, func() tea.Msg {
+			id := ""
+			if msg.Response != nil {
+				id = msg.Response.SessionID
+			}
+			return BannerMsg{Text: "Resumed session " + id, Duration: 4 * time.Second}
+		}
+
+	case SessionClearedMsg:
+		cleared := 0
+		if msg.Response != nil {
+			cleared = msg.Response.ClearedTurns
+		}
+		return a, func() tea.Msg {
+			return BannerMsg{
+				Text:     fmt.Sprintf("Session context cleared (%d turns dropped).", cleared),
+				Duration: 4 * time.Second,
+			}
+		}
+
+	case SessionForkedMsg:
+		newID := ""
+		if msg.Response != nil {
+			newID = msg.Response.NewSessionID
+		}
+		if newID != "" {
+			a.state.SessionID = newID
+		}
+		return a, func() tea.Msg {
+			return BannerMsg{
+				Text:     "Forked session — now on " + nonEmpty(newID, "(unknown)"),
+				Duration: 4 * time.Second,
+			}
+		}
+
+	case SessionErrMsg:
+		return a, func() tea.Msg {
+			return BannerMsg{
+				Text:     fmt.Sprintf("/%s failed: %v", msg.Command, msg.Err),
+				Duration: 5 * time.Second,
+			}
+		}
+
 	case pasteSummarizeFailureMsg:
 		// Expand into (banner, cancel-resolve). Batch so both fire in
 		// the same tick and the overlay clears before the next key.
@@ -524,6 +580,9 @@ func (a *App) handleCommand(msg SubmitMsg) tea.Cmd {
 
 	case "model", "models":
 		return a.handleModelCommand(msg)
+
+	case "session", "sessions":
+		return a.handleSessionCommand(msg)
 	}
 	unknown := BannerMsg{
 		Text:     "Unknown command: /" + msg.Command,
