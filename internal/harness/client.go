@@ -457,6 +457,27 @@ func (c *ProtocolClient) ContextList(ctx context.Context, sessionID string) (*pr
 	return &out, nil
 }
 
+// SessionCompact asks the server for a compaction plan for the named
+// session. The returned CompactPlan enumerates categories the user
+// can choose to keep/summarize/drop/pin via CompactApply.
+func (c *ProtocolClient) SessionCompact(ctx context.Context, sessionID string) (*protocol.CompactPlan, error) {
+	var out protocol.CompactPlan
+	if err := c.CallInto(ctx, protocol.MethodSessionCompact, &protocol.SessionCompact{SessionID: sessionID}, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// CompactApply applies a compaction plan with the user-chosen action
+// map. Returns the apply summary (tokens freed + narrative).
+func (c *ProtocolClient) CompactApply(ctx context.Context, sessionID string, actions map[string]string) (*protocol.CompactApplyResponse, error) {
+	var out protocol.CompactApplyResponse
+	if err := c.CallInto(ctx, protocol.MethodCompactApply, &protocol.CompactApply{SessionID: sessionID, Actions: actions}, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 // ContentTransform sends content.transform.
 func (c *ProtocolClient) ContentTransform(ctx context.Context, req *protocol.ContentTransform) (json.RawMessage, error) {
 	return c.Call(ctx, protocol.MethodContentTransform, req)

@@ -213,6 +213,7 @@ type Store interface {
 	CreateTurn(ctx context.Context, t *Turn) error
 	GetTurn(ctx context.Context, id string) (*Turn, error)
 	ListTurns(ctx context.Context, sessionID string) ([]Turn, error)
+	DeleteTurn(ctx context.Context, id string) error
 
 	// Session aggregation helpers
 	SessionSummaries(ctx context.Context, filter SessionFilter) ([]SessionSummary, error)
