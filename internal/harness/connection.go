@@ -112,6 +112,12 @@ type ConnectionManager struct {
 	config ConnectionConfig
 	sender ProgramSender
 
+	// toolDispatcher, when non-nil, intercepts tool.call events
+	// before they become a ToolCallMsg. Applications that don't
+	// execute local tools (e.g. early smoke tests) can leave this
+	// unset and still receive ToolCallMsg on sender.
+	toolDispatcher *ToolDispatcher
+
 	mu     sync.RWMutex
 	state  string
 	client *ProtocolClient
@@ -141,6 +147,17 @@ func NewConnectionManager(config ConnectionConfig, sender ProgramSender) *Connec
 		sender: sender,
 		state:  ConnStateDiscovering,
 	}
+}
+
+// SetToolDispatcher installs a dispatcher that intercepts tool.call
+// notifications. When set, incoming tool.call events route through
+// the dispatcher (which runs the tool locally and posts a
+// tool.result back) instead of being emitted as a ToolCallMsg on
+// the program sender. Passing nil reverts to the ToolCallMsg path.
+func (cm *ConnectionManager) SetToolDispatcher(d *ToolDispatcher) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	cm.toolDispatcher = d
 }
 
 // State returns the current connection state.
@@ -583,7 +600,19 @@ func (cm *ConnectionManager) HandleEvent(method string, params json.RawMessage) 
 		}
 	case protocol.EventToolCall:
 		var ev protocol.ToolCall
-		if err := json.Unmarshal(params, &ev); err == nil {
+		if err := json.Unmarshal(params, &ev); err != nil {
+			return
+		}
+		// Prefer the dispatcher when one is wired — it owns tool
+		// execution + plan-mode interception. Fall back to emitting
+		// a ToolCallMsg for test paths and for future App-level
+		// handling (permission prompts etc.).
+		cm.mu.RLock()
+		d := cm.toolDispatcher
+		cm.mu.RUnlock()
+		if d != nil {
+			go func() { _ = d.HandleToolCall(ev) }()
+		} else {
 			cm.sender.Send(ToolCallMsg{
 				TurnID:     ev.TurnID,
 				ToolCallID: ev.ToolCallID,

@@ -233,6 +233,11 @@ func (e *Executor) SetPromptCallback(cb PromptCallback) { e.prompt = cb }
 // enforce "must Read before Edit" semantics).
 func (e *Executor) Tracker() *FileTracker { return e.tracker }
 
+// Registry returns the tool registry the executor dispatches through.
+// Exposed for callers (e.g., the harness ToolDispatcher) that need
+// to look up a tool's metadata before deciding how to route a call.
+func (e *Executor) Registry() *Registry { return e.registry }
+
 // Permissions returns the permission enforcer so callers can mutate
 // approvals (Approve / ApproveDomain) after a successful prompt.
 func (e *Executor) Permissions() *PermissionEnforcer { return e.permissions }

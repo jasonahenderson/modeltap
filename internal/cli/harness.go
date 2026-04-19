@@ -15,6 +15,45 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// registerBuiltinTools wires the 13 in-tree tools into registry so
+// the ToolDispatcher can resolve tool.call notifications from the
+// BFF. Read-only tools (Read/Glob/Grep/Git-read) are auto-allowed
+// by the permission layer; Write/Edit/Bash/WebFetch/WebSearch
+// prompt first-use under PermDefault.
+func registerBuiltinTools(registry *tools.Registry, projectRoot string, tracker *tools.FileTracker) {
+	registry.Register(tools.NewReadTool(projectRoot, tracker))
+	registry.Register(tools.NewWriteTool(projectRoot, tracker))
+	registry.Register(tools.NewEditTool(projectRoot, tracker))
+	registry.Register(tools.NewBashTool(projectRoot))
+	registry.Register(tools.NewGitTool(projectRoot))
+	registry.Register(tools.NewGlobTool(projectRoot))
+	registry.Register(tools.NewGrepTool(projectRoot))
+	registry.Register(tools.NewWebFetchTool())
+	// WebSearch is skipped in the default bundle because it needs an
+	// API key from config; wiring it here without one would register
+	// a tool that always errors. Users enable it explicitly once MCP
+	// / config surfaces grow an api_key input.
+}
+
+// toolResultSender adapts *ConnectionManager to the narrow
+// harness.ToolResultSender interface. Reads the live *ProtocolClient
+// on every call so the dispatcher survives reconnects.
+type toolResultSender struct {
+	cm *harness.ConnectionManager
+}
+
+func newToolResultSender(cm *harness.ConnectionManager) *toolResultSender {
+	return &toolResultSender{cm: cm}
+}
+
+func (t *toolResultSender) SendToolResult(ctx context.Context, result *protocol.ToolResult) error {
+	client := t.cm.Client()
+	if client == nil {
+		return fmt.Errorf("tool result dropped: no live BFF client")
+	}
+	return client.SendToolResult(ctx, result)
+}
+
 // deferredSender is a ProgramSender the CLI uses to break the
 // chicken-and-egg between ConnectionManager (needs a sender at
 // construction) and tea.Program (needs the App to pre-contain the
@@ -157,9 +196,15 @@ func runHarness(cmd *cobra.Command, flags *harnessFlags) error {
 		},
 	}
 
-	// Build shared tool framework pieces so the harness can
-	// resolve @file attachments and (future) run local tools.
+	// Build the shared tool framework pieces so the harness can
+	// resolve @file attachments and execute tool.call notifications
+	// from the server. Read-only auto-allowed by default; writes
+	// and exec prompt first-use (PermDefault).
 	tracker := tools.NewFileTracker()
+	registry := tools.NewRegistry()
+	registerBuiltinTools(registry, effectiveProject, tracker)
+	permissions := tools.NewPermissionEnforcer(tools.PermDefault)
+	executor := tools.NewExecutor(registry, permissions)
 
 	// Deferred sender lets the manager exist before the program,
 	// satisfying the NewConnectionManager(config, sender) API
@@ -173,6 +218,18 @@ func runHarness(cmd *cobra.Command, flags *harnessFlags) error {
 		Conn:     harness.WrapConnectionManager(cm),
 		Attacher: harness.NewContextManager(effectiveProject, tracker),
 	})
+
+	// Plan-mode interception is a policy decorator on the
+	// dispatcher: when the App's mode == plan, mutating tool.calls
+	// get queued onto the PlanAccumulator and a synthetic
+	// tool.result comes back instead of executing.
+	dispatcher := harness.NewToolDispatcher(
+		executor,
+		newToolResultSender(cm),
+		app.Plan(),
+		app.State(),
+	)
+	cm.SetToolDispatcher(dispatcher)
 	if flags.resumeID != "" {
 		app.State().SessionID = flags.resumeID
 	}
