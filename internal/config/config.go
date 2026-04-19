@@ -25,9 +25,61 @@ type DashboardConfig struct {
 	Bind    string `yaml:"bind" mapstructure:"bind"`
 }
 
-// ProviderConfig holds per-provider settings.
+// ProviderConfig holds per-provider settings. Fields fall into two
+// groups:
+//
+//   - Upstream is used by the v0.1 reverse proxy (`modeltap start`)
+//     when this entry's key matches a well-known provider name
+//     ("anthropic", "openai", ...).
+//   - Type / APIKey / Host / Discover are used by the v0.2 BFF
+//     server's ProviderRegistry. The map key is the user-assigned
+//     endpoint name (e.g., "anthropic-prod").
+//
+// Both groups can coexist in one `providers:` map; the proxy uses
+// entries with Upstream set, the BFF uses entries with Type set.
 type ProviderConfig struct {
-	Upstream string `yaml:"upstream" mapstructure:"upstream"`
+	Upstream string `yaml:"upstream,omitempty" mapstructure:"upstream"`
+
+	// BFF endpoint fields (WU-057).
+	Type     string `yaml:"type,omitempty" mapstructure:"type"`
+	APIKey   string `yaml:"api_key,omitempty" mapstructure:"api_key"`
+	Host     string `yaml:"host,omitempty" mapstructure:"host"`
+	Discover bool   `yaml:"discover,omitempty" mapstructure:"discover"`
+}
+
+// ModelOverrideConfig is one entry in BFFConfig.Models, applied as a
+// manual catalog override on the BFF's ModelRegistry per WU-058.
+type ModelOverrideConfig struct {
+	Provider      string   `yaml:"provider" mapstructure:"provider"`
+	ContextWindow int      `yaml:"context_window" mapstructure:"context_window"`
+	Capabilities  []string `yaml:"capabilities,omitempty" mapstructure:"capabilities"`
+	Description   string   `yaml:"description,omitempty" mapstructure:"description"`
+}
+
+// BFFConfig holds settings for the v0.2 BFF JSON-RPC server.
+//
+// Listener fields default to a Unix socket only; TLS is opt-in by
+// setting TLSAddress + cert/key paths.
+type BFFConfig struct {
+	SocketPath        string `yaml:"socket_path,omitempty" mapstructure:"socket_path"`
+	SocketMode        uint32 `yaml:"socket_mode,omitempty" mapstructure:"socket_mode"`
+	TLSAddress        string `yaml:"tls_address,omitempty" mapstructure:"tls_address"`
+	TLSCertFile       string `yaml:"tls_cert_file,omitempty" mapstructure:"tls_cert_file"`
+	TLSKeyFile        string `yaml:"tls_key_file,omitempty" mapstructure:"tls_key_file"`
+	MaxConnections    int    `yaml:"max_connections,omitempty" mapstructure:"max_connections"`
+	MaxAttachmentSize int    `yaml:"max_attachment_size,omitempty" mapstructure:"max_attachment_size"`
+
+	// Models adds manual catalog overrides on top of the built-in
+	// catalog and discovered Ollama/MLX models. Map key is the model
+	// name (e.g., "llama-3.1-8b").
+	Models map[string]ModelOverrideConfig `yaml:"models,omitempty" mapstructure:"models"`
+
+	// Routing is the hierarchical routing tree per WU-059. Values may
+	// be a single model name string or an array of names (multi-model).
+	// Stored as map[string]any so YAML loading handles both shapes; the
+	// CLI converts each value to json.RawMessage when handing the tree
+	// to the BFF's RoutingPolicy.
+	Routing map[string]any `yaml:"routing,omitempty" mapstructure:"routing"`
 }
 
 // Config holds all modeltap configuration values.
@@ -40,6 +92,7 @@ type Config struct {
 	Dashboard     DashboardConfig           `yaml:"dashboard" mapstructure:"dashboard"`
 	Providers     map[string]ProviderConfig `yaml:"providers" mapstructure:"providers"`
 	Pricing       PricingConfig             `yaml:"pricing" mapstructure:"pricing"`
+	BFF           BFFConfig                 `yaml:"bff" mapstructure:"bff"`
 }
 
 // DefaultConfigDir returns the default configuration directory path.
@@ -54,6 +107,20 @@ func DefaultConfigDir() string {
 // DefaultConfigPath returns the default config file path.
 func DefaultConfigPath() string {
 	return filepath.Join(DefaultConfigDir(), "config.yaml")
+}
+
+// DefaultBFFSocketPath returns the canonical Unix-domain socket path
+// for the BFF JSON-RPC listener. Falls back to the user's home dir
+// when XDG_DATA_HOME is unset.
+func DefaultBFFSocketPath() string {
+	if xdg := os.Getenv("XDG_DATA_HOME"); xdg != "" {
+		return filepath.Join(xdg, "modeltap", "server.sock")
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		home = "~"
+	}
+	return filepath.Join(home, ".local", "share", "modeltap", "server.sock")
 }
 
 // expandHome expands a leading ~ in a path to the user's home directory.
@@ -83,6 +150,10 @@ func Load(configPath string) (*Config, error) {
 	v.SetDefault("dashboard.enabled", false)
 	v.SetDefault("dashboard.port", 8081)
 	v.SetDefault("dashboard.bind", "127.0.0.1")
+	v.SetDefault("bff.socket_path", DefaultBFFSocketPath())
+	v.SetDefault("bff.socket_mode", uint32(0o600))
+	v.SetDefault("bff.max_connections", 100)
+	v.SetDefault("bff.max_attachment_size", 5*1024*1024)
 
 	// Set up config file.
 	if configPath == "" {
@@ -116,6 +187,9 @@ func Load(configPath string) (*Config, error) {
 
 	// Expand ~ in paths.
 	cfg.DBPath = expandHome(cfg.DBPath)
+	cfg.BFF.SocketPath = expandHome(cfg.BFF.SocketPath)
+	cfg.BFF.TLSCertFile = expandHome(cfg.BFF.TLSCertFile)
+	cfg.BFF.TLSKeyFile = expandHome(cfg.BFF.TLSKeyFile)
 
 	return &cfg, nil
 }
@@ -134,6 +208,10 @@ func LoadWithViper(configPath string) (*Config, *viper.Viper, error) {
 	v.SetDefault("dashboard.enabled", false)
 	v.SetDefault("dashboard.port", 8081)
 	v.SetDefault("dashboard.bind", "127.0.0.1")
+	v.SetDefault("bff.socket_path", DefaultBFFSocketPath())
+	v.SetDefault("bff.socket_mode", uint32(0o600))
+	v.SetDefault("bff.max_connections", 100)
+	v.SetDefault("bff.max_attachment_size", 5*1024*1024)
 
 	// Set up config file.
 	if configPath == "" {
@@ -166,6 +244,9 @@ func LoadWithViper(configPath string) (*Config, *viper.Viper, error) {
 
 	// Expand ~ in paths.
 	cfg.DBPath = expandHome(cfg.DBPath)
+	cfg.BFF.SocketPath = expandHome(cfg.BFF.SocketPath)
+	cfg.BFF.TLSCertFile = expandHome(cfg.BFF.TLSCertFile)
+	cfg.BFF.TLSKeyFile = expandHome(cfg.BFF.TLSKeyFile)
 
 	return &cfg, v, nil
 }
@@ -178,6 +259,9 @@ func UnmarshalFrom(v *viper.Viper) (*Config, error) {
 		return nil, fmt.Errorf("unmarshalling config: %w", err)
 	}
 	cfg.DBPath = expandHome(cfg.DBPath)
+	cfg.BFF.SocketPath = expandHome(cfg.BFF.SocketPath)
+	cfg.BFF.TLSCertFile = expandHome(cfg.BFF.TLSCertFile)
+	cfg.BFF.TLSKeyFile = expandHome(cfg.BFF.TLSKeyFile)
 	return &cfg, nil
 }
 
