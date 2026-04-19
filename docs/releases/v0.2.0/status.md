@@ -1,7 +1,7 @@
 # v0.2.0 Status
 
 ## Last Updated
-2026-04-19
+2026-04-19 (WU-079 landed)
 
 ## Current Phase
 **Phase 3 — Implementation.** Phase 1 (design) and Phase 2 (review + cross-flow audit) complete. All 22 blocking, 28 attention, 2 critical, and 11 important findings resolved across pre-review lints and cross-flow audit.
@@ -62,6 +62,7 @@ See `plan.md`, `track-0-shared.md`, `track-a-bff-server.md`, `track-b-terminal-h
 - [x] WU-075: Tool framework + permission model (2026-04-18) — commit `0ed8846`
 - [x] WU-077: Write and Edit tools (2026-04-19) — commit `797f278`
 - [x] WU-078: Bash and Git tools (2026-04-19) — commit `96ec3b7`
+- [x] WU-079: Glob, Grep, WebSearch, WebFetch tools (2026-04-19) — commit `a92bba2`
 
 ### Bundle 4 (BFF Foundation) complete
 All four WUs in `internal/bff/` landed race-clean. WU-046 transport, WU-048
@@ -125,19 +126,23 @@ aware rendering, assistant header + footer with metrics).
 
 Charm dependencies added: bubbletea, bubbles, lipgloss, glamour.
 
-### Bundle 7 (Tools): 3 of 5 WUs complete
-WU-075 framework + permission model, WU-077 Write + Edit, and
-WU-078 Bash + Git landed. BashTool runs via `sh -c` with
-projectRoot cwd, context-bound timeout (default 120s, cap 600s),
-combined stdout/stderr, and 100KB-trailing-half output truncation.
-GitTool runs via `sh -c "git …"` with 60s default timeout and an
-in-tool `ClassifyGit` helper; the permission layer auto-allows
-reads (status / log / diff / show / …) in every mode, prompts
-mutations per the matrix, and routes dangerous forms (push
---force, reset --hard, branch -D, …) through `alwaysPrompt`. A
-latent short-flag regex bug (`push -f` as first arg) was fixed in
-`dangerous.go` while wiring this WU. Remaining: WU-076 (Read),
-WU-079 (Glob + Grep + WebSearch + WebFetch).
+### Bundle 7 (Tools): 4 of 5 WUs complete
+WU-075 framework + permission model, WU-077 Write + Edit,
+WU-078 Bash + Git, and WU-079 Glob + Grep + WebSearch + WebFetch
+landed. BashTool runs via `sh -c` with projectRoot cwd,
+context-bound timeout (default 120s, cap 600s), combined
+stdout/stderr, and 100KB-trailing-half output truncation. GitTool
+runs via `sh -c "git …"` with 60s default timeout and an in-tool
+`ClassifyGit` helper; the permission layer auto-allows reads
+(status / log / diff / show / …) in every mode, prompts mutations
+per the matrix, and routes dangerous forms (push --force, reset
+--hard, branch -D, …) through `alwaysPrompt`. WU-079 adds Glob
+(doublestar/v4, mtime-sorted), Grep (stdlib regexp + WalkDir with
+content / files_with_matches / count modes, context lines,
+case-insensitive, glob filter, binary skip), WebSearch (Brave +
+SerpAPI engines with injectable base URLs), and WebFetch
+(net.IP-based SSRF defense-in-depth, HTML-to-text stripper, 100KB
+truncation). Remaining: WU-076 (Read — text/PDF/DOCX/image/xlsx).
 
 ### Bundle 6 (Protocol client + Connection manager) complete
 WU-073 ProtocolClient: JSON-RPC over Unix socket / TLS with
@@ -187,11 +192,11 @@ the App already handles) and the tool framework (WU-075).
 Bundles 4, 5, 6, 8, 10 complete; Bundles 9 and 11 partial; the
 harness has working connection lifecycle and event bridge. Remaining:
 
-- **Track B Bundle 7** (WU-076, 079): WU-075 framework, WU-077
-  Write + Edit, and WU-078 Bash + Git landed; remaining are Read
-  (WU-076, Large — 5 file types + external deps) and Glob + Grep +
-  WebSearch + WebFetch (WU-079, Medium — 4 tools). Both
-  parallelize.
+- **Track B Bundle 7** (WU-076): WU-075 framework, WU-077 Write +
+  Edit, WU-078 Bash + Git, and WU-079 Glob + Grep + WebSearch +
+  WebFetch landed. Remaining is Read (WU-076, Large — five file
+  types: text, PDF, DOCX, image, spreadsheet; external deps for
+  pdfcpu, unioffice, excelize).
 - **Track B Bundle 13** (WU-080–086, WU-092): mode toggle / MCP /
   file context / paste handling / session explorer / model commands
   / connection UX banners / cross-session command history.
