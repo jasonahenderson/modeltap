@@ -60,6 +60,7 @@ See `plan.md`, `track-0-shared.md`, `track-a-bff-server.md`, `track-b-terminal-h
 - [x] WU-073: Harness JSON-RPC protocol client (2026-04-18) — commit `0a7a1db`
 - [x] WU-074: Harness connection manager (2026-04-18) — commit `9e2a97b`
 - [x] WU-075: Tool framework + permission model (2026-04-18) — commit `0ed8846`
+- [x] WU-077: Write and Edit tools (2026-04-19) — commit `797f278`
 
 ### Bundle 4 (BFF Foundation) complete
 All four WUs in `internal/bff/` landed race-clean. WU-046 transport, WU-048
@@ -123,16 +124,15 @@ aware rendering, assistant header + footer with metrics).
 
 Charm dependencies added: bubbletea, bubbles, lipgloss, glamour.
 
-### Bundle 7 (Tools): 1 of 5 WUs complete
-WU-075 tool framework + permission model landed in
-`internal/harness/tools/` — Tool interface, Registry (insertion-
-order-stable), Executor with permission gate + first-use approval
-memory, PermissionEnforcer with three levels (Default / AcceptEdits
-/ Autonomous) and risk-tier decision matrix, dangerous-command
-catalog (Bash + Git), FileTracker for the "Read before mutate"
-contract, and WebFetch private-network SSRF block. Remaining:
-WU-076 (Read), WU-077 (Write + Edit), WU-078 (Bash + Git), WU-079
-(Glob + Grep + WebSearch + WebFetch).
+### Bundle 7 (Tools): 2 of 5 WUs complete
+WU-075 framework + permission model and WU-077 Write + Edit landed.
+WriteTool creates/overwrites with a pre-write snapshot, resolves
+paths against the project root, and marks the FileTracker so Edit
+can follow up without a separate Read. EditTool enforces the
+Read-before-mutate contract via `FileTracker.HasRead` and applies
+exact-string replacement with uniqueness check (or `replace_all`).
+Remaining: WU-076 (Read), WU-078 (Bash + Git), WU-079 (Glob + Grep
++ WebSearch + WebFetch).
 
 ### Bundle 6 (Protocol client + Connection manager) complete
 WU-073 ProtocolClient: JSON-RPC over Unix socket / TLS with
@@ -182,10 +182,10 @@ the App already handles) and the tool framework (WU-075).
 Bundles 4, 5, 6, 8, 10 complete; Bundles 9 and 11 partial; the
 harness has working connection lifecycle and event bridge. Remaining:
 
-- **Track B Bundle 7** (WU-076–079): WU-075 framework + permission
-  model landed; remaining are Read (WU-076), Write + Edit (WU-077),
-  Bash + Git (WU-078), Glob + Grep + WebSearch + WebFetch (WU-079).
-  All parallelize.
+- **Track B Bundle 7** (WU-076, 078, 079): WU-075 framework and
+  WU-077 Write + Edit landed; remaining are Read (WU-076), Bash +
+  Git (WU-078), Glob + Grep + WebSearch + WebFetch (WU-079). All
+  parallelize.
 - **Track B Bundle 13** (WU-080–086, WU-092): mode toggle / MCP /
   file context / paste handling / session explorer / model commands
   / connection UX banners / cross-session command history.
