@@ -415,3 +415,14 @@ func (c *ProtocolClient) SessionList(ctx context.Context) (json.RawMessage, erro
 func (c *ProtocolClient) ContentTransform(ctx context.Context, req *protocol.ContentTransform) (json.RawMessage, error) {
 	return c.Call(ctx, protocol.MethodContentTransform, req)
 }
+
+// HistoryList sends history.list and decodes the typed response. Used
+// by the harness HistoryController (WU-092) to populate cross-session
+// command history for input-area arrow-up traversal.
+func (c *ProtocolClient) HistoryList(ctx context.Context, req *protocol.HistoryList) (*protocol.HistoryListResponse, error) {
+	var out protocol.HistoryListResponse
+	if err := c.CallInto(ctx, protocol.MethodHistoryList, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}

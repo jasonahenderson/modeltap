@@ -58,6 +58,10 @@ type fakeClient struct {
 	submitCalls []*protocol.TurnSubmit
 	submitAck   TurnSubmitAck
 	submitErr   error
+
+	historyCalls []*protocol.HistoryList
+	historyResp  protocol.HistoryListResponse
+	historyErr   error
 }
 
 func (f *fakeClient) ContentTransform(ctx context.Context, req *protocol.ContentTransform) (json.RawMessage, error) {
@@ -82,6 +86,18 @@ func (f *fakeClient) SubmitTurn(ctx context.Context, submit *protocol.TurnSubmit
 		return nil, err
 	}
 	return &ack, nil
+}
+
+func (f *fakeClient) HistoryList(ctx context.Context, req *protocol.HistoryList) (*protocol.HistoryListResponse, error) {
+	f.mu.Lock()
+	f.historyCalls = append(f.historyCalls, req)
+	err := f.historyErr
+	resp := f.historyResp
+	f.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
 }
 
 func drainCmdAny(cmd tea.Cmd) tea.Msg {
