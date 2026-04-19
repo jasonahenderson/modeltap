@@ -52,6 +52,11 @@ See `plan.md`, `track-0-shared.md`, `track-a-bff-server.md`, `track-b-terminal-h
 - [x] WU-062: content.transform handler (2026-04-18) — commit `924835e`
 - [x] WU-066: Ollama provider adapter (2026-04-18) — commit `fedad7b`
 - [x] WU-065: Wire BFF server into modeltap start (2026-04-18) — commit `3d58416`
+- [x] WU-068: Bubbletea app scaffold (2026-04-18) — commit `ce633c9`
+- [x] WU-069: Status bar component (2026-04-18) — commit `9aec280`
+- [x] WU-070: Input area component (2026-04-18) — commit `aab2aab`
+- [x] WU-072: Streaming markdown rendering (2026-04-18) — commit `7392d5f`
+- [x] WU-071: Conversation viewport component (2026-04-18) — commit `966e80a`
 
 ### Bundle 4 (BFF Foundation) complete
 All four WUs in `internal/bff/` landed race-clean. WU-046 transport, WU-048
@@ -102,6 +107,19 @@ Three first-party adapters implement the full Provider interface:
 Anthropic (`internal/provider/anthropic.go`), OpenAI
 (`internal/provider/openai.go`), Ollama (`internal/provider/ollama.go`).
 
+### Bundle 5 (Track B Bubbletea scaffold) complete
+All five WUs landed in `internal/harness/` (race-clean):
+WU-068 App + AppState + layout + KeyMap + Bubbletea Msg types,
+WU-069 status bar (connection indicator / mode / model / context
+pressure / cost / call timer), WU-070 textarea-based input area
+(submit + command parse + @file extraction + history traversal +
+paste detection), WU-072 Glamour markdown wrapper (streaming-
+tolerant heal pass + 50ms debounce + per-render width handling),
+WU-071 conversation viewport (auto-scroll with snap-back, role-
+aware rendering, assistant header + footer with metrics).
+
+Charm dependencies added: bubbletea, bubbles, lipgloss, glamour.
+
 ### Phase 1 Design Artifacts (Track 0)
 - [x] Bundle 1 — Protocol types (WU-040 + 041 + 093) — design `designs/2026-04-16-design-protocol-types-040-041-093.md`; pre-review `docs/releases/v0.2.0/.reviews/protocol-types-040-041-093/`. Commit `f9429e4`.
 - [x] Bundle 2 — Provider formatting (WU-042 + 043 + 044) — design `designs/2026-04-16-design-provider-formatting-042-043-044.md`; pre-review `docs/releases/v0.2.0/.reviews/provider-formatting-042-043-044/`. Commit `3fb9588`.
@@ -131,22 +149,20 @@ Anthropic (`internal/provider/anthropic.go`), OpenAI
 
 ## Up Next
 
-The BFF server side is now substantially complete for single-model
-turns. Remaining Track A work:
+Server side: substantially complete for single-model turns. Track B
+foundation (Bundle 5) landed. Remaining work:
 
-- **WU-060** multi-model branching — needs explicit design review for
-  the per-branch event tagging + aggregate scoring contract.
 - **WU-061** compaction (`session.compact` / `compact.apply`) — needs
   design review for the trim heuristic + harness UX coordination.
-- **WU-065** CLI integration — wire `modeltap serve` to start the BFF
-  alongside the proxy.
 - **WU-067** BFF integration tests — end-to-end test harness driving
   the BFF over its socket.
-
-Track B (FEAT-0009 terminal harness) is not started — Bundle 5 (WU-068–072
-Bubbletea scaffold) is parallelizable and depends only on WU-039 (done).
-Track B is a different domain (Bubbletea, terminal rendering, file
-context UX) and warrants a dedicated session.
+- **Track B Bundle 6** (WU-073/074): protocol client + connection
+  manager. Needed to actually connect the harness UI to the BFF.
+- **Track B Bundle 7** (WU-075–079): tool framework + the 13 tools.
+- **Track B Bundle 13** (WU-080–086): mode toggle, MCP, file context,
+  paste handling, session explorer, model commands, connection UX.
+- **WU-060** multi-model branching: deferred — superseded by FEAT-0013
+  sub-agents.
 
 ## Blocked
 (none)
