@@ -1,7 +1,7 @@
 # v0.2.0 Status
 
 ## Last Updated
-2026-04-19 (Bundle 7 complete — WU-076 Read landed)
+2026-04-19 (WU-086 Connection UX landed)
 
 ## Current Phase
 **Phase 3 — Implementation.** Phase 1 (design) and Phase 2 (review + cross-flow audit) complete. All 22 blocking, 28 attention, 2 critical, and 11 important findings resolved across pre-review lints and cross-flow audit.
@@ -64,6 +64,7 @@ See `plan.md`, `track-0-shared.md`, `track-a-bff-server.md`, `track-b-terminal-h
 - [x] WU-078: Bash and Git tools (2026-04-19) — commit `96ec3b7`
 - [x] WU-079: Glob, Grep, WebSearch, WebFetch tools (2026-04-19) — commit `a92bba2`
 - [x] WU-076: Read tool (text, CSV, image, PDF, DOCX, XLSX) (2026-04-19) — commit `efc2cee`
+- [x] WU-086: Connection UX banner translator (2026-04-19) — commit `eee3b9e`
 
 ### Bundle 4 (BFF Foundation) complete
 All four WUs in `internal/bff/` landed race-clean. WU-046 transport, WU-048
@@ -206,9 +207,10 @@ harness has working connection lifecycle and event bridge. Remaining:
   swapped UniDoc/unioffice for stdlib `archive/zip` + `encoding/xml`
   DOCX extraction, and pdfcpu for `ledongthuc/pdf` (BSD-3) text
   extraction. Both are Apache-2.0-compatible per ADR-0010.
-- **Track B Bundle 13** (WU-080–086, WU-092): mode toggle / MCP /
+- **Track B Bundle 13** (WU-080–085, WU-092): mode toggle / MCP /
   file context / paste handling / session explorer / model commands
-  / connection UX banners / cross-session command history.
+  / cross-session command history. WU-086 connection UX landed
+  2026-04-19 as the first of this bundle's eight WUs.
 - **WU-061** compaction — server-side, still needs design discussion
   on the trim heuristic + harness UX flow.
 - **WU-067** BFF integration tests — end-to-end test harness driving
