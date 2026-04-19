@@ -57,6 +57,8 @@ See `plan.md`, `track-0-shared.md`, `track-a-bff-server.md`, `track-b-terminal-h
 - [x] WU-070: Input area component (2026-04-18) — commit `aab2aab`
 - [x] WU-072: Streaming markdown rendering (2026-04-18) — commit `7392d5f`
 - [x] WU-071: Conversation viewport component (2026-04-18) — commit `966e80a`
+- [x] WU-073: Harness JSON-RPC protocol client (2026-04-18) — commit `0a7a1db`
+- [x] WU-074: Harness connection manager (2026-04-18) — commit `9e2a97b`
 
 ### Bundle 4 (BFF Foundation) complete
 All four WUs in `internal/bff/` landed race-clean. WU-046 transport, WU-048
@@ -120,6 +122,22 @@ aware rendering, assistant header + footer with metrics).
 
 Charm dependencies added: bubbletea, bubbles, lipgloss, glamour.
 
+### Bundle 6 (Protocol client + Connection manager) complete
+WU-073 ProtocolClient: JSON-RPC over Unix socket / TLS with
+request/response correlation, notification dispatch, typed helpers
+(SubmitTurn, Register, Ping, Health, SessionResume, etc.).
+WU-074 ConnectionManager: 9-state lifecycle, optional auto-start
+of `modeltap start`, heartbeat with FEAT-0008 two-stage degradation
+(3 missed → degraded, 5 missed → reconnecting), exponential
+backoff reconnect with jitter, fast disconnect detection via
+client.Done(), event bridge that translates server notifications
+into Bubbletea messages.
+
+The harness can now connect to the BFF end-to-end. What's missing
+to actually drive a turn through to the user is the App↔manager
+wiring (consumer of the ConnStateMsg/StreamTokenMsg/etc. messages
+the App already handles) and the tool framework (WU-075).
+
 ### Phase 1 Design Artifacts (Track 0)
 - [x] Bundle 1 — Protocol types (WU-040 + 041 + 093) — design `designs/2026-04-16-design-protocol-types-040-041-093.md`; pre-review `docs/releases/v0.2.0/.reviews/protocol-types-040-041-093/`. Commit `f9429e4`.
 - [x] Bundle 2 — Provider formatting (WU-042 + 043 + 044) — design `designs/2026-04-16-design-provider-formatting-042-043-044.md`; pre-review `docs/releases/v0.2.0/.reviews/provider-formatting-042-043-044/`. Commit `3fb9588`.
@@ -149,18 +167,23 @@ Charm dependencies added: bubbletea, bubbles, lipgloss, glamour.
 
 ## Up Next
 
-Server side: substantially complete for single-model turns. Track B
-foundation (Bundle 5) landed. Remaining work:
+Bundles 4, 5, 6, 8, 10 complete; Bundles 9 and 11 partial; the
+harness has working connection lifecycle and event bridge. Remaining:
 
-- **WU-061** compaction (`session.compact` / `compact.apply`) — needs
-  design review for the trim heuristic + harness UX coordination.
-- **WU-067** BFF integration tests — end-to-end test harness driving
-  the BFF over its socket.
-- **Track B Bundle 6** (WU-073/074): protocol client + connection
-  manager. Needed to actually connect the harness UI to the BFF.
 - **Track B Bundle 7** (WU-075–079): tool framework + the 13 tools.
-- **Track B Bundle 13** (WU-080–086): mode toggle, MCP, file context,
-  paste handling, session explorer, model commands, connection UX.
+  Once the framework lands the harness can actually execute work.
+- **Track B Bundle 13** (WU-080–086, WU-092): mode toggle / MCP /
+  file context / paste handling / session explorer / model commands
+  / connection UX banners / cross-session command history.
+- **WU-061** compaction — server-side, still needs design discussion
+  on the trim heuristic + harness UX flow.
+- **WU-067** BFF integration tests — end-to-end test harness driving
+  the BFF over its socket. The harness ProtocolClient is now the
+  natural test driver.
+- **WU-087** harness integration tests — end-to-end against a mock
+  BFF. Easier now that ConnectionManager + ProtocolClient exist.
+- **Integration track** (WU-088–095): end-to-end, CLI launch, docs,
+  security review, performance benchmarks.
 - **WU-060** multi-model branching: deferred — superseded by FEAT-0013
   sub-agents.
 
