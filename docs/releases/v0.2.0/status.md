@@ -61,11 +61,21 @@ WU-049 capabilities manager + register/update handlers.
 ### Bundle 8 (Sessions & Conversation) complete
 All three WUs landed. WU-050 sessions, WU-051 Conversation, WU-052 dispatch.
 
-### Bundle 9 (Model Config & Routing): 3 of 4 WUs complete
-WU-057 providers, WU-058 registry, WU-059 routing landed. WU-060
-multi-model branching deferred — handleTurnSubmit currently rejects
-multi-model routing with a clear error rather than picking the first
-model silently.
+### Bundle 9 (Model Config & Routing): 3 of 4 WUs complete; WU-060 deferred
+WU-057 providers, WU-058 registry, WU-059 routing landed.
+
+**WU-060 multi-model branching is deferred — superseded by
+sub-agents (FEAT-0013).** Decision recorded 2026-04-18: parallel
+model fan-out, per-branch event tagging, cancellation, and recovery
+are structurally identical to the FEAT-0013 sub-agent contract.
+Building branch infrastructure in `internal/bff/branch.go` would be
+duplicate machinery. Routing-based fan-out
+(`coding.review: [opus, gpt-5]`) becomes a sub-agent flow;
+reconciliation (picking / synthesizing across N results) is out of
+scope for sub-agents themselves and lands as either a synthesizer
+agent or a harness-side picker. handleTurnSubmit rejects multi-model
+routes with an error pointing at FEAT-0013. See
+`track-a-bff-server.md` §"WU-060" for the full rationale.
 
 ### Bundle 10 (Streaming, Prompts, Cost) complete
 WU-053 streaming relay, WU-054+055 prompt engine (7-layer assembly with
