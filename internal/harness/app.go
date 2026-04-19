@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -48,6 +49,7 @@ type App struct {
 	connUX    *ConnectionUX
 	paste     *PasteHandler
 	conn      ConnSurface
+	history   *HistoryController
 
 	width  int
 	height int
@@ -63,7 +65,7 @@ func NewApp(opts AppOptions) App {
 	if opts.InitialMode != "" {
 		state.Mode = opts.InitialMode
 	}
-	return App{
+	app := App{
 		state:     state,
 		statusBar: NewStatusBar(state),
 		input:     NewInputArea(state),
@@ -73,12 +75,24 @@ func NewApp(opts AppOptions) App {
 		paste:     NewPasteHandler(),
 		conn:      opts.Conn,
 	}
+	app.history = NewHistoryController(opts.Conn)
+	app.input.SetHistorySource(app.history)
+	return app
 }
 
 // SetConn wires an App to a ConnSurface after construction. Primary
 // callers: CLI launch paths that build the App first and bolt on the
 // manager once its config is resolved, and tests that swap in a fake.
-func (a *App) SetConn(c ConnSurface) { a.conn = c }
+// Swapping conn also rebinds the history controller so arrow-up
+// history traversal starts hitting the new BFF.
+func (a *App) SetConn(c ConnSurface) {
+	a.conn = c
+	a.history = NewHistoryController(c)
+	a.input.SetHistorySource(a.history)
+}
+
+// History exposes the history controller (tests and integration wiring).
+func (a App) History() *HistoryController { return a.history }
 
 // State exposes the shared state pointer for tests and for downstream
 // integration code (connection manager, protocol client).
@@ -238,6 +252,22 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return a, nil
+
+	case HistoryRefreshedMsg:
+		return a, func() tea.Msg {
+			return BannerMsg{
+				Text:     fmt.Sprintf("History scope: %s (%d entries)", msg.Scope, msg.Count),
+				Duration: 3 * time.Second,
+			}
+		}
+
+	case HistoryErrMsg:
+		return a, func() tea.Msg {
+			return BannerMsg{
+				Text:     fmt.Sprintf("History %s: %v", msg.Scope, msg.Err),
+				Duration: 5 * time.Second,
+			}
+		}
 
 	case pasteSummarizeFailureMsg:
 		// Expand into (banner, cancel-resolve). Batch so both fire in
@@ -455,6 +485,18 @@ func (a *App) handleCommand(msg SubmitMsg) tea.Cmd {
 			func() tea.Msg { return announce },
 			reconnectCmd,
 		)
+
+	case "history":
+		scope := strings.TrimSpace(strings.ToLower(msg.CommandArgs))
+		if scope == "" {
+			scope = a.history.Scope()
+			banner := BannerMsg{
+				Text:     fmt.Sprintf("Current history scope: %s (%d entries)", scope, a.history.Len()),
+				Duration: 4 * time.Second,
+			}
+			return func() tea.Msg { return banner }
+		}
+		return a.history.SetScope(scope)
 	}
 	unknown := BannerMsg{
 		Text:     "Unknown command: /" + msg.Command,

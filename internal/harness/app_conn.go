@@ -44,6 +44,11 @@ type ConnProtocolClient interface {
 	// separate notifications the ConnectionManager translates into
 	// StreamTokenMsg / StreamCompleteMsg.
 	SubmitTurn(ctx context.Context, submit *protocol.TurnSubmit) (*TurnSubmitAck, error)
+
+	// HistoryList calls history.list. Used by WU-092 HistoryController
+	// to populate cross-session command history for arrow-up
+	// traversal.
+	HistoryList(ctx context.Context, req *protocol.HistoryList) (*protocol.HistoryListResponse, error)
 }
 
 // connAdapter wraps *ConnectionManager so its Client() returns
