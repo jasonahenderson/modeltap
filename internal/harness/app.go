@@ -10,6 +10,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/google/uuid"
 	"github.com/jasonahenderson/modeltap/internal/protocol"
 )
 
@@ -675,6 +676,9 @@ func (a *App) dispatchTurnSubmit(msg SubmitMsg) tea.Cmd {
 	refs := msg.Attachments
 	attacher := a.attacher
 	mode := a.state.Mode
+	// TurnIDs are harness-assigned per protocol contract; the server
+	// echoes them back so both sides can correlate streaming events.
+	turnID := "turn-" + uuid.NewString()
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
@@ -689,6 +693,7 @@ func (a *App) dispatchTurnSubmit(msg SubmitMsg) tea.Cmd {
 		}
 
 		ack, err := client.SubmitTurn(ctx, &protocol.TurnSubmit{
+			TurnID:      turnID,
 			SessionID:   sessionID,
 			Sequence:    seq,
 			Mode:        mode,
@@ -698,7 +703,12 @@ func (a *App) dispatchTurnSubmit(msg SubmitMsg) tea.Cmd {
 		if err != nil {
 			return TurnSubmittedMsg{Err: err}
 		}
-		return TurnSubmittedMsg{TurnID: ack.TurnID}
+		// Prefer the server-echoed TurnID; fall back to ours if omitted.
+		finalID := ack.TurnID
+		if finalID == "" {
+			finalID = turnID
+		}
+		return TurnSubmittedMsg{TurnID: finalID}
 	}
 }
 
