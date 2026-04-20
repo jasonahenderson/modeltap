@@ -170,6 +170,9 @@ func handleModelSwitch(ctx context.Context, conn *Connection, params json.RawMes
 	if err != nil || sess == nil {
 		return nil, &TransportError{Code: CodeSessionNotFound, Message: fmt.Sprintf("session %q not found", req.SessionID)}
 	}
+	if err := verifySessionAccess(conn, sess); err != nil {
+		return nil, err
+	}
 
 	var resp protocol.ModelSwitchResponse
 	if req.Model == "auto" {

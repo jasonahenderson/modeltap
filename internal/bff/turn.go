@@ -104,6 +104,11 @@ func handleTurnSubmit(ctx context.Context, conn *Connection, params json.RawMess
 
 	// Ensure the session exists in storage; create on first turn (design D2.2).
 	sess, _ := srv.store.GetSession(ctx, submit.SessionID)
+	if sess != nil {
+		if err := verifySessionAccess(conn, sess); err != nil {
+			return nil, err
+		}
+	}
 	if sess == nil {
 		sess = &storage.Session{
 			ID:        submit.SessionID,

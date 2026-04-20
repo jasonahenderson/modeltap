@@ -124,7 +124,7 @@ data: {"type":"message_stop"}
 	// an active session that the server recognizes.
 	sessionID := "e2e-sess"
 	if err := store.CreateSession(ctx, &storage.Session{
-		ID: sessionID, UserID: "solo", Project: "/tmp/proj",
+		ID: sessionID, UserID: "local", Project: "/tmp/proj",
 		Summary: "e2e", Status: "active",
 	}); err != nil {
 		t.Fatalf("CreateSession: %v", err)
