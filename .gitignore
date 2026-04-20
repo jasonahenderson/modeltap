@@ -25,3 +25,7 @@ vendor/
 
 # Local modeltap data if a developer runs the tool from the repo root
 .modeltap/
+
+# dotenv (PATCH-0007): keys live in ~/.modeltap/.env or ./.env
+.env
+.env.local
