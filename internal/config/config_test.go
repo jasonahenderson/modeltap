@@ -226,3 +226,127 @@ func TestDefaultConfigPath(t *testing.T) {
 		t.Errorf("DefaultConfigPath() should end with config.yaml, got %s", path)
 	}
 }
+
+// TestResolveSecret_PassThrough confirms a value without any prefix
+// is returned verbatim — preserves the "paste the key directly"
+// ergonomic so existing configs keep working.
+func TestResolveSecret_PassThrough(t *testing.T) {
+	cases := []string{
+		"sk-ant-abcdef",
+		"",
+		"no-prefix-here",
+		"envbar:not-env-prefix", // prefix is "envbar:", not "env:"
+	}
+	for _, c := range cases {
+		got, err := ResolveSecret(c)
+		if err != nil {
+			t.Errorf("ResolveSecret(%q) err = %v, want nil", c, err)
+		}
+		if got != c {
+			t.Errorf("ResolveSecret(%q) = %q, want %q", c, got, c)
+		}
+	}
+}
+
+func TestResolveSecret_EnvPrefix(t *testing.T) {
+	t.Setenv("MODELTAP_TEST_KEY", "resolved-value")
+	got, err := ResolveSecret("env:MODELTAP_TEST_KEY")
+	if err != nil {
+		t.Fatalf("ResolveSecret: %v", err)
+	}
+	if got != "resolved-value" {
+		t.Errorf("got %q, want %q", got, "resolved-value")
+	}
+}
+
+func TestResolveSecret_EnvPrefix_MissingVar(t *testing.T) {
+	os.Unsetenv("MODELTAP_DEFINITELY_NOT_SET")
+	_, err := ResolveSecret("env:MODELTAP_DEFINITELY_NOT_SET")
+	if err == nil {
+		t.Fatal("expected error for unset env var")
+	}
+	if !contains(err.Error(), "MODELTAP_DEFINITELY_NOT_SET") {
+		t.Errorf("error should name the var: %v", err)
+	}
+}
+
+func TestResolveSecret_EnvPrefix_Empty(t *testing.T) {
+	_, err := ResolveSecret("env:")
+	if err == nil {
+		t.Error("expected error for empty env var name")
+	}
+}
+
+func TestResolveSecret_FilePrefix(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "key")
+	if err := os.WriteFile(path, []byte("sk-ant-from-file\n"), 0o600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	got, err := ResolveSecret("file:" + path)
+	if err != nil {
+		t.Fatalf("ResolveSecret: %v", err)
+	}
+	if got != "sk-ant-from-file" {
+		t.Errorf("got %q, want trimmed %q", got, "sk-ant-from-file")
+	}
+}
+
+func TestResolveSecret_FilePrefix_Missing(t *testing.T) {
+	_, err := ResolveSecret("file:/tmp/modeltap-test-missing-" + t.Name())
+	if err == nil {
+		t.Error("expected error for missing file")
+	}
+}
+
+// contains is a tiny helper — strings.Contains via a thin wrapper so
+// the test file doesn't sprout the import just for one check.
+func contains(haystack, needle string) bool {
+	for i := 0; i+len(needle) <= len(haystack); i++ {
+		if haystack[i:i+len(needle)] == needle {
+			return true
+		}
+	}
+	return false
+}
+
+// TestResolveProviderSecrets_EndToEnd confirms the loader applies
+// ResolveSecret to every provider's APIKey at load time.
+func TestResolveProviderSecrets_EndToEnd(t *testing.T) {
+	t.Setenv("MODELTAP_E2E_KEY", "env-resolved")
+
+	dir := t.TempDir()
+	fileKey := filepath.Join(dir, "other-key")
+	if err := os.WriteFile(fileKey, []byte("file-resolved"), 0o600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	configPath := filepath.Join(dir, "config.yaml")
+	yaml := `providers:
+  anthropic:
+    type: anthropic
+    api_key: env:MODELTAP_E2E_KEY
+  openai:
+    type: openai
+    api_key: file:` + fileKey + `
+  legacy:
+    type: anthropic
+    api_key: sk-plain-legacy
+`
+	if err := os.WriteFile(configPath, []byte(yaml), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	cfg, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Providers["anthropic"].APIKey != "env-resolved" {
+		t.Errorf("anthropic key = %q, want env-resolved", cfg.Providers["anthropic"].APIKey)
+	}
+	if cfg.Providers["openai"].APIKey != "file-resolved" {
+		t.Errorf("openai key = %q, want file-resolved", cfg.Providers["openai"].APIKey)
+	}
+	if cfg.Providers["legacy"].APIKey != "sk-plain-legacy" {
+		t.Errorf("legacy key should pass through; got %q", cfg.Providers["legacy"].APIKey)
+	}
+}
