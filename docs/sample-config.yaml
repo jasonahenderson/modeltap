@@ -1,0 +1,104 @@
+# modeltap — sample config
+#
+# Location: $XDG_CONFIG_HOME/modeltap/config.yaml
+#           (defaults to ~/.config/modeltap/config.yaml)
+#
+# Minimum required for `modeltap harness`: one provider with an api_key,
+# and a routing.default that points at a model that provider serves.
+# Everything else has sane defaults.
+#
+# Environment variables can override any value — prefix MODELTAP_ and
+# uppercase the key (e.g. MODELTAP_BFF_SOCKET_PATH).
+
+# ---------------------------------------------------------------------
+# v0.1 proxy config (modeltap start) — optional, unchanged from v0.1.
+# The harness auto-starts `modeltap start` when the BFF socket is
+# absent, so if you only run the harness you can ignore this section.
+# ---------------------------------------------------------------------
+
+port: 8080
+upstream: https://api.anthropic.com
+db_path: ~/.local/share/modeltap/modeltap.db
+retention_days: 30
+max_body_size: 10MB
+
+dashboard:
+  enabled: false
+  port: 3001
+  bind: 127.0.0.1
+
+# ---------------------------------------------------------------------
+# Providers — used by BOTH the proxy (when Upstream is set) AND the BFF
+# (when Type is set). For the harness, you want Type + APIKey.
+# ---------------------------------------------------------------------
+
+providers:
+  # Anthropic (Claude). The harness will dial this when routing
+  # resolves to a Claude model.
+  anthropic:
+    type: anthropic                 # BFF endpoint type
+    api_key: sk-ant-REPLACE_ME      # required for harness use
+    # host: https://api.anthropic.com  # optional; defaults to the above
+
+  # OpenAI (GPT-4/5 etc.). Uncomment + fill in to route to OpenAI.
+  # openai:
+  #   type: openai
+  #   api_key: sk-REPLACE_ME
+
+  # Local Ollama. Discover lets the BFF auto-enumerate installed
+  # models via /api/tags on startup.
+  # ollama-local:
+  #   type: ollama
+  #   host: http://localhost:11434
+  #   discover: true
+
+# ---------------------------------------------------------------------
+# BFF (terminal harness backend) config.
+# ---------------------------------------------------------------------
+
+bff:
+  # Unix-domain socket the harness dials. Default: $XDG_DATA_HOME/modeltap/server.sock.
+  socket_path: ~/.local/share/modeltap/server.sock
+  # socket_mode: 0o600  # default already; tighten if your home is shared.
+
+  # Team / enterprise profile. Leaving these unset keeps the BFF
+  # socket-only. TLS REFUSES to bind without tls_client_ca_file
+  # (mTLS required — see WU-094 security review).
+  # tls_address: 0.0.0.0:9443
+  # tls_cert_file: /path/to/server.crt
+  # tls_key_file: /path/to/server.key
+  # tls_client_ca_file: /path/to/client-ca.crt
+
+  # Attachment cap: server rejects turn.submit whose Attachments sum
+  # above this size. Default 5 MiB.
+  # max_attachment_size: 5242880
+
+  # Manual model-catalog overrides. Built-in + Ollama-discovery catalog
+  # already knows the common names; only needed for custom deployments.
+  # models:
+  #   my-custom-model:
+  #     provider: ollama-local
+  #     context_window: 32768
+  #     capabilities: [text, tools]
+  #     description: In-house fine-tune
+
+  # Routing tree. The harness resolves `default` on every turn.submit.
+  # Values are either a single model name (single-model turn) or an
+  # array of names (multi-model; deferred to FEAT-0013 sub-agents).
+  routing:
+    default: claude-sonnet-4-6
+    # Per-use-case overrides, selected via the role hint in a turn.
+    # coding: claude-opus-4-7
+    # cheap: claude-haiku-4-5
+    # review: [claude-opus-4-7, gpt-5]   # multi-model, FEAT-0013
+
+# ---------------------------------------------------------------------
+# Pricing overrides (proxy cost tracking). Built-in pricing is baked
+# in; uncomment to override a specific model.
+# ---------------------------------------------------------------------
+
+# pricing:
+#   overrides:
+#     - model: claude-sonnet-4-6
+#       input_per_million: 3.00
+#       output_per_million: 15.00

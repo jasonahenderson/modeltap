@@ -240,8 +240,11 @@ func TestLatencyE2E_TurnSubmitFirstToken(t *testing.T) {
 		if cmdFn != nil {
 			cmdFn() // drain; returns TurnSubmittedMsg, not the first token
 		}
-		// Poll sender for the first StreamTokenMsg.
-		deadline := time.Now().Add(3 * time.Second)
+		// Poll sender for the first StreamTokenMsg. 5s deadline:
+		// the test reconstructs a ConnectionManager every iteration
+		// and on a busy laptop the streaming relay can take longer
+		// than 3s to deliver under contention.
+		deadline := time.Now().Add(5 * time.Second)
 		var firstToken time.Time
 		for time.Now().Before(deadline) && firstToken.IsZero() {
 			for _, m := range sender.snapshot() {

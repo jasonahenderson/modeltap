@@ -25,6 +25,16 @@ type ModeReader interface {
 	CurrentMode() protocol.Mode
 }
 
+// ToolActivityObserver receives start/end notifications for every
+// tool.call the dispatcher handles. The CLI wires an observer that
+// translates these into ToolActivityMsg on the tea.Program so the
+// viewport can render tool-call activity inline. Optional; nil
+// observer is a no-op.
+type ToolActivityObserver interface {
+	OnToolStart(call protocol.ToolCall, summary string)
+	OnToolEnd(call protocol.ToolCall, status, output string, elapsed time.Duration)
+}
+
 // ToolDispatcher is the harness-side layer that sits between server
 // tool.call notifications and the local tool registry. It mirrors the
 // Claude-Code / OpenCode pattern: plan mode is a policy decorator on
@@ -43,6 +53,7 @@ type ToolDispatcher struct {
 	sender   ToolResultSender
 	plan     *PlanAccumulator
 	mode     ModeReader
+	observer ToolActivityObserver
 
 	timeout time.Duration
 
@@ -83,6 +94,9 @@ const seenCapacity = 1024
 // SetTimeout overrides the per-tool execution timeout. Tests use this
 // to drive the cancellation path without sleeping for minutes.
 func (d *ToolDispatcher) SetTimeout(t time.Duration) { d.timeout = t }
+
+// SetObserver installs a ToolActivityObserver. Pass nil to disable.
+func (d *ToolDispatcher) SetObserver(o ToolActivityObserver) { d.observer = o }
 
 // Intercepted returns the count of plan-mode interceptions. Tests
 // only.
@@ -151,13 +165,44 @@ func (d *ToolDispatcher) HandleToolCall(call protocol.ToolCall) error {
 	d.executedCount++
 	d.mu.Unlock()
 
+	summary := defaultPlanSummary(call.Tool, call.Input)
+	if d.observer != nil {
+		d.observer.OnToolStart(call, summary)
+	}
+
+	start := time.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), d.timeout)
 	defer cancel()
 	res, err := d.executor.Execute(ctx, call.Tool, call.Input)
+	elapsed := time.Since(start)
 	if err != nil {
+		if d.observer != nil {
+			d.observer.OnToolEnd(call, tools.StatusError, err.Error(), elapsed)
+		}
 		return d.sendError(call, err.Error())
 	}
+	if d.observer != nil {
+		d.observer.OnToolEnd(call, res.Status, toolEndSummary(res), elapsed)
+	}
 	return d.sendResult(ctx, call, res)
+}
+
+// toolEndSummary produces the one-line outcome rendered in the
+// viewport when a tool finishes. For success: output (truncated); for
+// error/rejected: the Error or Reason string. Long outputs are
+// truncated at 200 chars so the viewport stays scannable.
+func toolEndSummary(res *tools.ToolExecResult) string {
+	switch res.Status {
+	case tools.StatusError:
+		return res.Error
+	case tools.StatusRejected:
+		return res.Reason
+	}
+	out := res.Output
+	if len(out) > 200 {
+		out = out[:200] + "…"
+	}
+	return out
 }
 
 // planShouldIntercept reports whether the tool call should be
