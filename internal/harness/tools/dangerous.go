@@ -16,22 +16,58 @@ type DangerousPattern struct {
 // regexes are compiled lazily on first use (init() below) so the
 // package doesn't pay the compile cost at import time when the tool
 // framework isn't exercised.
+//
+// The catalog is explicitly advisory — regex over a free-form shell
+// command is fundamentally bypassable (obfuscation via quotes, env-var
+// indirection, $'\...' escapes, base64, etc. per WU-094 H-7). The
+// intent is to raise the bar on obvious destructive patterns so the
+// model can't stumble into them without an explicit prompt. True
+// defense belongs in the permission model layer.
 var dangerousPatterns = []*DangerousPattern{
-	// Case-insensitive matching for rm flag variants: -rf, -fR, -Rf, -fr.
+	// rm variants. -rf, -fR, -Rf, -fr detected together; also the
+	// space-separated `-r -f` and `--recursive --force` forms.
 	{Pattern: `(?i)rm\s+(-[a-z]*r[a-z]*f|(-[a-z]*f[a-z]*r))\b`, Desc: "recursive force delete"},
-	{Pattern: `(?i)rm\s+-rf\s+/`, Desc: "recursive force delete from root"},
+	{Pattern: `(?i)rm\s+.*\B-r\b.*\B-f\b`, Desc: "recursive force delete (split flags)"},
+	{Pattern: `(?i)rm\s+.*--recursive.*--force`, Desc: "recursive force delete (long flags)"},
+	{Pattern: `(?i)rm\s+-rf?\s+/`, Desc: "recursive force delete from root"},
+	{Pattern: `(?i)\bfind\s+.*-delete\b`, Desc: "find -delete"},
+	{Pattern: `\bshred\b`, Desc: "overwrite and delete"},
 	{Pattern: `>\s*/dev/`, Desc: "redirect to device"},
 
+	// Permissions / ownership / filesystem.
 	{Pattern: `chmod\s+.*777\b`, Desc: "world-writable permissions"},
 	{Pattern: `chown\s+-R\b`, Desc: "recursive ownership change"},
 	{Pattern: `mkfs\b`, Desc: "format filesystem"},
 	{Pattern: `\bdd\s+`, Desc: "disk/device write"},
 
+	// Network download-and-execute. `curl -d` is the old POST check;
+	// the new entries catch the "download + pipe to shell" pattern
+	// that's the dominant way to bootstrap a malware payload.
 	{Pattern: `curl\s+.*-d\b`, Desc: "curl with data (POST)"},
+	{Pattern: `\bcurl\b.*\|\s*(sh|bash|zsh|ksh|fish|python|python3|node|ruby|perl)\b`, Desc: "curl | shell"},
+	{Pattern: `\bwget\b.*\|\s*(sh|bash|zsh|ksh|fish|python|python3|node|ruby|perl)\b`, Desc: "wget | shell"},
 	{Pattern: `\bwget\b`, Desc: "download"},
 
+	// Arbitrary code execution via -c/-e flags. These are "shell by
+	// another name" — any script that can be -c'd can also escape
+	// every other guard.
+	{Pattern: `\b(bash|sh|zsh|ksh|fish)\s+-c\b`, Desc: "shell -c"},
+	{Pattern: `\b(python|python3)\s+-c\b`, Desc: "python -c"},
+	{Pattern: `\bnode\s+-e\b`, Desc: "node -e"},
+	{Pattern: `\b(ruby|perl)\s+-e\b`, Desc: "interpreter -e"},
+	{Pattern: `\beval\s+`, Desc: "eval"},
+
+	// Network tools that commonly appear in lateral movement.
+	{Pattern: `\b(nc|ncat|netcat)\s`, Desc: "netcat"},
+	{Pattern: `\bssh\s+.*@`, Desc: "ssh to remote host"},
+	{Pattern: `\b(scp|rsync)\s+.*@`, Desc: "file transfer to remote host"},
+
+	// Env-var shenanigans.
 	{Pattern: `export\s+LD_PRELOAD`, Desc: "LD_PRELOAD injection"},
 	{Pattern: `export\s+PATH=`, Desc: "PATH modification"},
+
+	// Fork bomb — classic and unambiguous.
+	{Pattern: `:\(\)\s*\{\s*:\|:\&\s*\}\s*;\s*:`, Desc: "fork bomb"},
 }
 
 // dangerousGitPatterns covers Git operations that are destructive
