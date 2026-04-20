@@ -51,6 +51,14 @@ type ToolDispatcher struct {
 	mu               sync.Mutex
 	interceptedCount int
 	executedCount    int
+
+	// seen tracks tool_call_ids that have been dispatched — WU-094
+	// H-3 idempotency. A misbehaving or malicious BFF that re-emits
+	// the same tool.call would otherwise drive the tool N times.
+	// Capped to avoid unbounded growth across long sessions; the
+	// cap evicts LRU via a ring of timestamped entries.
+	seen     map[string]struct{}
+	seenRing []string
 }
 
 // NewToolDispatcher constructs a dispatcher. executor and sender are
@@ -63,8 +71,14 @@ func NewToolDispatcher(executor *tools.Executor, sender ToolResultSender, plan *
 		plan:     plan,
 		mode:     mode,
 		timeout:  5 * time.Minute,
+		seen:     make(map[string]struct{}),
 	}
 }
+
+// seenCapacity bounds the idempotency set so a long-running session
+// doesn't grow the map forever. Old entries evict LRU-ish via the
+// ring buffer.
+const seenCapacity = 1024
 
 // SetTimeout overrides the per-tool execution timeout. Tests use this
 // to drive the cancellation path without sleeping for minutes.
@@ -94,6 +108,25 @@ func (d *ToolDispatcher) Executed() int {
 func (d *ToolDispatcher) HandleToolCall(call protocol.ToolCall) error {
 	if d == nil || d.executor == nil || d.sender == nil {
 		return fmt.Errorf("tool dispatcher not fully wired")
+	}
+
+	// Idempotency — reject duplicate tool_call_ids (WU-094 H-3). A
+	// malicious or buggy BFF that re-emits the same call would
+	// otherwise drive the tool N times.
+	if call.ToolCallID != "" {
+		d.mu.Lock()
+		if _, ok := d.seen[call.ToolCallID]; ok {
+			d.mu.Unlock()
+			return d.sendError(call, "duplicate tool_call_id")
+		}
+		d.seen[call.ToolCallID] = struct{}{}
+		d.seenRing = append(d.seenRing, call.ToolCallID)
+		if len(d.seenRing) > seenCapacity {
+			evict := d.seenRing[0]
+			d.seenRing = d.seenRing[1:]
+			delete(d.seen, evict)
+		}
+		d.mu.Unlock()
 	}
 
 	tool := d.executor.Registry().Get(call.Tool)
@@ -169,6 +202,16 @@ func (d *ToolDispatcher) sendResult(ctx context.Context, call protocol.ToolCall,
 		Reason:     res.Reason,
 	}
 	return d.sender.SendToolResult(ctx, result)
+}
+
+// SendErrorResult is the public error-reporting entrypoint so the
+// ConnectionManager's panic recovery can surface a tool.result on
+// our behalf when the dispatch goroutine panics (WU-094 H-2).
+func (d *ToolDispatcher) SendErrorResult(call protocol.ToolCall, reason string) error {
+	if d == nil || d.sender == nil {
+		return fmt.Errorf("tool dispatcher not wired")
+	}
+	return d.sendError(call, reason)
 }
 
 // sendError posts a terminal failure result for a tool.call that

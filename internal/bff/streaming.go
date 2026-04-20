@@ -23,19 +23,33 @@ type SSEParser struct {
 	r *bufio.Reader
 }
 
+// sseMaxLineBytes bounds a single SSE line. Without this a
+// compromised or malicious upstream can emit `data: ` followed by GB
+// without a newline; bufio.Reader.ReadString grows unbounded and the
+// BFF OOMs. WU-094 H-4. 1 MiB is generous for real provider payloads
+// (largest Anthropic text delta observed in the wild is ~20 KiB).
+const sseMaxLineBytes = 1 << 20
+
+// ErrSSELineTooLarge fires when a single SSE line exceeds the cap.
+// The streaming relay converts this into a turn.complete with a
+// provider error diagnostic so the harness doesn't hang waiting.
+var ErrSSELineTooLarge = errors.New("sse line exceeds max size")
+
 // NewSSEParser wraps r in an SSEParser with a generously-sized buffer
-// to accommodate large per-event JSON payloads.
+// to accommodate large per-event JSON payloads — capped at
+// sseMaxLineBytes so an adversarial upstream can't OOM the BFF.
 func NewSSEParser(r io.Reader) *SSEParser {
 	return &SSEParser{r: bufio.NewReaderSize(r, 64*1024)}
 }
 
 // Next returns the next data payload. Returns io.EOF when the upstream
-// stream is exhausted. `event:` headers and other field types are
+// stream is exhausted, or ErrSSELineTooLarge when a single line
+// exceeds the cap. `event:` headers and other field types are
 // silently skipped — the BFF only needs the data payload because both
 // Anthropic and OpenAI embed event-type info in the JSON.
 func (p *SSEParser) Next() ([]byte, error) {
 	for {
-		line, err := p.r.ReadString('\n')
+		line, err := readBoundedLine(p.r, sseMaxLineBytes)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				if line == "" {
@@ -60,6 +74,29 @@ func (p *SSEParser) Next() ([]byte, error) {
 			return []byte(payload), nil
 		}
 		// Other field types (event:, id:, retry:) — skip.
+	}
+}
+
+// readBoundedLine is like bufio.Reader.ReadString('\n') except it
+// aborts with ErrSSELineTooLarge when accumulated bytes exceed max.
+// Uses ReadSlice in a loop so we can count bytes as they arrive
+// instead of relying on ReadString's unbounded growth.
+func readBoundedLine(r *bufio.Reader, max int) (string, error) {
+	var sb strings.Builder
+	for {
+		chunk, err := r.ReadSlice('\n')
+		sb.Write(chunk)
+		if sb.Len() > max {
+			return sb.String(), ErrSSELineTooLarge
+		}
+		if err == nil {
+			return sb.String(), nil
+		}
+		if errors.Is(err, bufio.ErrBufferFull) {
+			// ReadSlice returned the buffer's worth; keep going.
+			continue
+		}
+		return sb.String(), err
 	}
 }
 

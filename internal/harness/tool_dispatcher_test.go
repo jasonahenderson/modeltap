@@ -229,6 +229,41 @@ func TestToolDispatcher_NilMode_NoIntercept(t *testing.T) {
 	}
 }
 
+// TestToolDispatcher_DuplicateToolCallID pins WU-094 H-3: a malicious
+// or buggy BFF re-emitting the same tool.call must be rejected after
+// the first dispatch. Previously every re-emission drove the tool
+// again — trivial amplification of file writes, Bash runs, cost.
+func TestToolDispatcher_DuplicateToolCallID(t *testing.T) {
+	d, sender, _ := newDispatcher(t, protocol.ModeBuild,
+		&fakeTool{name: "Read", risk: tools.RiskReadOnly, output: "ok"},
+	)
+	call := protocol.ToolCall{
+		TurnID:     "t",
+		ToolCallID: "tc-dup",
+		Tool:       "Read",
+		Input:      json.RawMessage(`{}`),
+	}
+	if err := d.HandleToolCall(call); err != nil {
+		t.Fatalf("first: %v", err)
+	}
+	if err := d.HandleToolCall(call); err != nil {
+		t.Fatalf("second (dup): %v", err)
+	}
+	// Tool ran once; the second dispatch landed as an error result.
+	if d.Executed() != 1 {
+		t.Errorf("executed = %d, want 1 (duplicate must not re-execute)", d.Executed())
+	}
+	if n := len(sender.results); n != 2 {
+		t.Fatalf("expected 2 results (success + dup-error); got %d", n)
+	}
+	if sender.results[1].Status != tools.StatusError {
+		t.Errorf("second result should be error; got %q", sender.results[1].Status)
+	}
+	if !strings.Contains(sender.results[1].Error, "duplicate") {
+		t.Errorf("second error should say duplicate; got %q", sender.results[1].Error)
+	}
+}
+
 func TestToolDispatcher_AppStateAsModeReader(t *testing.T) {
 	// AppState itself implements ModeReader — verify that path works
 	// with a real state pointer and reflects mode changes.
