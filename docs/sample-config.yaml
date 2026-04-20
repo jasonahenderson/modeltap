@@ -36,17 +36,21 @@ providers:
   # Anthropic (Claude). The harness will dial this when routing
   # resolves to a Claude model.
   anthropic:
-    type: anthropic                 # BFF endpoint type
-    api_key: sk-ant-REPLACE_ME      # required for harness use
+    type: anthropic                    # BFF endpoint type
+    # api_key supports three forms (PATCH-0004):
+    #   env:VAR         — read from environment (recommended)
+    #   file:/abs/path  — read from a file (Docker secrets, CI)
+    #   sk-...          — plain (NOT recommended: config is committable)
+    api_key: env:ANTHROPIC_API_KEY
     # host: https://api.anthropic.com  # optional; defaults to the above
 
   # OpenAI (GPT-4/5 etc.). Uncomment + fill in to route to OpenAI.
   # openai:
   #   type: openai
-  #   api_key: sk-REPLACE_ME
+  #   api_key: env:OPENAI_API_KEY
 
   # Local Ollama. Discover lets the BFF auto-enumerate installed
-  # models via /api/tags on startup.
+  # models via /api/tags on startup. No api_key needed.
   # ollama-local:
   #   type: ollama
   #   host: http://localhost:11434

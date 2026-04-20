@@ -136,6 +136,65 @@ func expandHome(path string) string {
 	return filepath.Join(home, path[1:])
 }
 
+// ResolveSecret resolves a secret value that may carry a prefix
+// indicating where the actual value lives. Supported prefixes
+// (PATCH-0004):
+//
+//	env:VAR      — os.Getenv("VAR"); empty value is an error
+//	file:PATH    — read file contents, trim trailing whitespace;
+//	               non-existent path is an error. Leading ~ in PATH
+//	               expands to the user's home dir.
+//	no prefix    — returned verbatim (preserves the legacy paste-key-
+//	               directly ergonomic).
+//
+// Apply at config load time, not on read, so the rest of the codebase
+// continues to see a plain string. Callers that carry a secret
+// through more than one field should call this once per field during
+// load.
+func ResolveSecret(raw string) (string, error) {
+	if raw == "" {
+		return "", nil
+	}
+	switch {
+	case strings.HasPrefix(raw, "env:"):
+		name := strings.TrimPrefix(raw, "env:")
+		if name == "" {
+			return "", fmt.Errorf("secret: env: prefix requires a variable name")
+		}
+		val := os.Getenv(name)
+		if val == "" {
+			return "", fmt.Errorf("secret: env:%s is empty or unset", name)
+		}
+		return val, nil
+	case strings.HasPrefix(raw, "file:"):
+		path := expandHome(strings.TrimPrefix(raw, "file:"))
+		if path == "" {
+			return "", fmt.Errorf("secret: file: prefix requires a path")
+		}
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return "", fmt.Errorf("secret: read %s: %w", path, err)
+		}
+		return strings.TrimRight(string(b), " \t\r\n"), nil
+	}
+	return raw, nil
+}
+
+// resolveProviderSecrets applies ResolveSecret to every provider's
+// APIKey field. Called from Load / LoadWithViper / UnmarshalFrom so
+// every config-consuming entry point gets the same behavior.
+func resolveProviderSecrets(cfg *Config) error {
+	for name, pc := range cfg.Providers {
+		resolved, err := ResolveSecret(pc.APIKey)
+		if err != nil {
+			return fmt.Errorf("provider %q api_key: %w", name, err)
+		}
+		pc.APIKey = resolved
+		cfg.Providers[name] = pc
+	}
+	return nil
+}
+
 // Load reads configuration from defaults, the config file, and environment
 // variables. It returns a Config struct with all resolved values.
 // The configPath parameter is optional; if empty, the default path is used.
@@ -191,6 +250,11 @@ func Load(configPath string) (*Config, error) {
 	cfg.BFF.SocketPath = expandHome(cfg.BFF.SocketPath)
 	cfg.BFF.TLSCertFile = expandHome(cfg.BFF.TLSCertFile)
 	cfg.BFF.TLSKeyFile = expandHome(cfg.BFF.TLSKeyFile)
+
+	// Resolve env: / file: prefixes on provider API keys.
+	if err := resolveProviderSecrets(&cfg); err != nil {
+		return nil, err
+	}
 
 	return &cfg, nil
 }
@@ -249,6 +313,10 @@ func LoadWithViper(configPath string) (*Config, *viper.Viper, error) {
 	cfg.BFF.TLSCertFile = expandHome(cfg.BFF.TLSCertFile)
 	cfg.BFF.TLSKeyFile = expandHome(cfg.BFF.TLSKeyFile)
 
+	if err := resolveProviderSecrets(&cfg); err != nil {
+		return nil, nil, err
+	}
+
 	return &cfg, v, nil
 }
 
@@ -263,6 +331,9 @@ func UnmarshalFrom(v *viper.Viper) (*Config, error) {
 	cfg.BFF.SocketPath = expandHome(cfg.BFF.SocketPath)
 	cfg.BFF.TLSCertFile = expandHome(cfg.BFF.TLSCertFile)
 	cfg.BFF.TLSKeyFile = expandHome(cfg.BFF.TLSKeyFile)
+	if err := resolveProviderSecrets(&cfg); err != nil {
+		return nil, err
+	}
 	return &cfg, nil
 }
 
