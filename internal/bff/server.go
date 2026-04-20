@@ -3,6 +3,7 @@ package bff
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -68,9 +69,10 @@ type ServerConfig struct {
 	SocketMode os.FileMode
 
 	// TLS endpoint (team/enterprise profile).
-	TLSAddress  string
-	TLSCertFile string
-	TLSKeyFile  string
+	TLSAddress      string
+	TLSCertFile     string
+	TLSKeyFile      string
+	TLSClientCAFile string // WU-094 H-14: required when TLSAddress is set
 
 	// Connection limits.
 	MaxConnections int
@@ -312,17 +314,41 @@ func (s *Server) startSocketListener() (net.Listener, error) {
 	return ln, nil
 }
 
-// startTLSListener binds the TLS listener using the configured cert and
-// key. The cert is loaded once at Start; hot reload is out of scope for
-// WU-047.
+// startTLSListener binds the TLS listener using the configured cert
+// and key. The cert is loaded once at Start; hot reload is out of
+// scope for WU-047.
+//
+// Refuses to bind without client-CA config (WU-094 H-14): the
+// current auth state machine is a no-op stub, so any TLS peer that
+// completes the handshake is accepted as SoloUserID with full
+// session access. Until the auth WU lands real credential exchange,
+// mTLS is the only access control we can offer on the TLS profile.
+// Callers who need the TLS listener must supply TLSClientCAFile so
+// client certs are required and verified.
 func (s *Server) startTLSListener() (net.Listener, error) {
+	if s.config.TLSClientCAFile == "" {
+		return nil, fmt.Errorf(
+			"TLS listener refuses to bind without tls_client_ca_file configured: " +
+				"auth is not yet implemented, so any reachable client would be accepted " +
+				"as the solo user. Configure mTLS or use the unix socket profile.")
+	}
 	cert, err := tls.LoadX509KeyPair(s.config.TLSCertFile, s.config.TLSKeyFile)
 	if err != nil {
 		return nil, fmt.Errorf("load cert: %w", err)
 	}
+	caPEM, err := os.ReadFile(s.config.TLSClientCAFile)
+	if err != nil {
+		return nil, fmt.Errorf("load client CA: %w", err)
+	}
+	pool := x509.NewCertPool()
+	if !pool.AppendCertsFromPEM(caPEM) {
+		return nil, fmt.Errorf("client CA file %s contains no parseable certs", s.config.TLSClientCAFile)
+	}
 	tlsConfig := &tls.Config{
 		Certificates: []tls.Certificate{cert},
-		MinVersion:   tls.VersionTLS12,
+		MinVersion:   tls.VersionTLS13,
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+		ClientCAs:    pool,
 	}
 	ln, err := tls.Listen("tcp", s.config.TLSAddress, tlsConfig)
 	if err != nil {

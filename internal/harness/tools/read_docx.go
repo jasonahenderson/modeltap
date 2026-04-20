@@ -23,6 +23,14 @@ import (
 //     adds a trailing blank line to keep tables visually separated.
 //   - Everything else (styling, comments, revision metadata) is
 //     ignored.
+// docxMaxDecompressedBytes bounds how much of word/document.xml the
+// reader will decompress. DOCX is a ZIP container; a 1 KB crafted
+// `.docx` can expand to gigabytes via a zip bomb. WU-094 H-15.
+// 50 MiB is well above realistic document sizes (largest observed
+// in the wild is ~15 MiB of plain XML) while keeping the harness
+// safe from adversarial inputs.
+const docxMaxDecompressedBytes = 50 * 1024 * 1024
+
 func readDOCXFile(path string) (*ToolExecResult, error) {
 	zr, err := zip.OpenReader(path)
 	if err != nil {
@@ -33,6 +41,14 @@ func readDOCXFile(path string) (*ToolExecResult, error) {
 	var docXML io.ReadCloser
 	for _, f := range zr.File {
 		if f.Name == "word/document.xml" {
+			// Reject the entry up front if its declared
+			// uncompressed size already exceeds the cap — avoids
+			// streaming through megabytes of decompression on an
+			// obvious bomb.
+			if f.UncompressedSize64 > docxMaxDecompressedBytes {
+				return ErrorResult("docx document.xml too large: %d bytes (cap %d)",
+					f.UncompressedSize64, docxMaxDecompressedBytes), nil
+			}
 			rc, err := f.Open()
 			if err != nil {
 				return nil, fmt.Errorf("docx open document.xml: %w", err)
@@ -46,9 +62,16 @@ func readDOCXFile(path string) (*ToolExecResult, error) {
 	}
 	defer docXML.Close()
 
-	text, err := extractDocxText(docXML)
+	// Wrap with LimitReader so a lying header (declared small,
+	// actual bomb) still hits the cap at read time.
+	bounded := io.LimitReader(docXML, docxMaxDecompressedBytes+1)
+	text, err := extractDocxText(bounded)
 	if err != nil {
 		return nil, fmt.Errorf("docx extract: %w", err)
+	}
+	if len(text) >= docxMaxDecompressedBytes {
+		return ErrorResult("docx content exceeded decompression cap (%d bytes)",
+			docxMaxDecompressedBytes), nil
 	}
 	return SuccessResult(text, "text"), nil
 }

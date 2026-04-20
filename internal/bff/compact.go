@@ -233,7 +233,7 @@ func applyCompactPlan(ctx context.Context, store storage.Store, sessionID string
 // handleSessionCompact implements method session.compact. Returns a
 // CompactPlan the client renders; the client then issues compact.apply
 // with the action map it wants to run.
-func handleSessionCompact(_ context.Context, conn *Connection, params json.RawMessage) (any, error) {
+func handleSessionCompact(ctx context.Context, conn *Connection, params json.RawMessage) (any, error) {
 	var req protocol.SessionCompact
 	if err := json.Unmarshal(params, &req); err != nil {
 		return nil, &TransportError{Code: CodeInvalidParams, Message: "decode session.compact", wrapped: err}
@@ -242,7 +242,6 @@ func handleSessionCompact(_ context.Context, conn *Connection, params json.RawMe
 		return nil, &TransportError{Code: CodeInvalidParams, Message: "session_id is required"}
 	}
 
-	ctx := context.Background()
 	turns, err := conn.server.store.ListTurns(ctx, req.SessionID)
 	if err != nil {
 		return nil, &TransportError{Code: CodeInternalError, Message: "list turns: " + err.Error()}
@@ -255,7 +254,7 @@ func handleSessionCompact(_ context.Context, conn *Connection, params json.RawMe
 // handleCompactApply implements method compact.apply. Mutates turns
 // according to the action map, records a manual_compact session
 // event, returns a summary.
-func handleCompactApply(_ context.Context, conn *Connection, params json.RawMessage) (any, error) {
+func handleCompactApply(ctx context.Context, conn *Connection, params json.RawMessage) (any, error) {
 	var req protocol.CompactApply
 	if err := json.Unmarshal(params, &req); err != nil {
 		return nil, &TransportError{Code: CodeInvalidParams, Message: "decode compact.apply", wrapped: err}
@@ -263,7 +262,6 @@ func handleCompactApply(_ context.Context, conn *Connection, params json.RawMess
 	if req.SessionID == "" {
 		return nil, &TransportError{Code: CodeInvalidParams, Message: "session_id is required"}
 	}
-	ctx := context.Background()
 	window := contextWindowForSession(conn.server, req.SessionID)
 	return applyCompactPlan(ctx, conn.server.store, req.SessionID, req.Actions, window)
 }

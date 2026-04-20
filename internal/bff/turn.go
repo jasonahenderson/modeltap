@@ -65,7 +65,7 @@ func (tt *turnTracker) deregister(turnID string) {
 // The streaming relay runs on a goroutine launched here; cancellation
 // is wired through the server's turnTracker so that turn.cancel can
 // abort an in-flight stream.
-func handleTurnSubmit(_ context.Context, conn *Connection, params json.RawMessage) (any, error) {
+func handleTurnSubmit(ctx context.Context, conn *Connection, params json.RawMessage) (any, error) {
 	submit, err := ValidateTurnSubmit(params)
 	if err != nil {
 		return nil, err
@@ -101,8 +101,6 @@ func handleTurnSubmit(_ context.Context, conn *Connection, params json.RawMessag
 			}
 		}
 	}
-
-	ctx := context.Background()
 
 	// Ensure the session exists in storage; create on first turn (design D2.2).
 	sess, _ := srv.store.GetSession(ctx, submit.SessionID)

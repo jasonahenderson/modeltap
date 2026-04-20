@@ -16,6 +16,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -242,10 +243,14 @@ func TestServer_TLSListener(t *testing.T) {
 	keyFile := filepath.Join(dir, "key.pem")
 	generateSelfSignedCert(t, certFile, keyFile)
 
+	// mTLS is required now (WU-094 H-14). Reuse the server cert as
+	// its own client CA for the test — exercises the verification
+	// code path without maintaining a second fixture.
 	cfg := ServerConfig{
 		TLSAddress:        "127.0.0.1:0", // ephemeral port; resolved after Start
 		TLSCertFile:       certFile,
 		TLSKeyFile:        keyFile,
+		TLSClientCAFile:   certFile,
 		MaxConnections:    100,
 		HeartbeatInterval: 10 * time.Millisecond,
 		HeartbeatTimeout:  200 * time.Millisecond,
@@ -262,12 +267,50 @@ func TestServer_TLSListener(t *testing.T) {
 		t.Fatalf("TLS address empty after Start")
 	}
 
-	// Client with InsecureSkipVerify (self-signed cert).
-	conn, err := tls.Dial("tcp", addr, &tls.Config{InsecureSkipVerify: true})
+	// Client presents the same cert as its identity to satisfy
+	// RequireAndVerifyClientCert.
+	clientCert, err := tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		t.Fatalf("load client cert: %v", err)
+	}
+	conn, err := tls.Dial("tcp", addr, &tls.Config{
+		InsecureSkipVerify: true,
+		Certificates:       []tls.Certificate{clientCert},
+	})
 	if err != nil {
 		t.Fatalf("tls dial: %v", err)
 	}
 	_ = conn.Close()
+}
+
+// TestServer_TLSListener_RefusesWithoutClientCA pins WU-094 H-14:
+// binding the TLS listener without tls_client_ca_file must fail
+// loudly rather than accept arbitrary peers as the solo user.
+func TestServer_TLSListener_RefusesWithoutClientCA(t *testing.T) {
+	dir := t.TempDir()
+	certFile := filepath.Join(dir, "cert.pem")
+	keyFile := filepath.Join(dir, "key.pem")
+	generateSelfSignedCert(t, certFile, keyFile)
+
+	cfg := ServerConfig{
+		TLSAddress:        "127.0.0.1:0",
+		TLSCertFile:       certFile,
+		TLSKeyFile:        keyFile,
+		// No TLSClientCAFile — must refuse.
+		MaxConnections:    100,
+		HeartbeatInterval: 10 * time.Millisecond,
+		HeartbeatTimeout:  200 * time.Millisecond,
+		GracePeriod:       50 * time.Millisecond,
+	}
+	srv := NewServer(&recordingStore{}, cfg)
+	err := srv.Start()
+	if err == nil {
+		_ = srv.Shutdown(context.Background())
+		t.Fatal("expected Start to fail without TLSClientCAFile")
+	}
+	if !strings.Contains(err.Error(), "tls_client_ca_file") {
+		t.Errorf("error should name the missing config: %v", err)
+	}
 }
 
 func TestHandleConnectionHealth_Populated(t *testing.T) {

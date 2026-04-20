@@ -31,6 +31,7 @@ func startBFFServer(cfg *config.Config, store storage.Store, stderr io.Writer) (
 	bffCfg.TLSAddress = cfg.BFF.TLSAddress
 	bffCfg.TLSCertFile = cfg.BFF.TLSCertFile
 	bffCfg.TLSKeyFile = cfg.BFF.TLSKeyFile
+	bffCfg.TLSClientCAFile = cfg.BFF.TLSClientCAFile
 	if cfg.BFF.MaxConnections > 0 {
 		bffCfg.MaxConnections = cfg.BFF.MaxConnections
 	}
