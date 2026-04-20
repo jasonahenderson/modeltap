@@ -165,3 +165,67 @@ func TestStartBFFServer_RoutingTreeAndManualModels(t *testing.T) {
 		t.Errorf("multi-model raw not a JSON array: %v", err)
 	}
 }
+
+// TestResolveProviderHost pins PATCH-0005: the BFF's provider
+// endpoint defaults to the local proxy when the proxy is running
+// and the provider entry has no explicit host override. Explicit
+// overrides and ollama/mlx skip the default.
+func TestResolveProviderHost(t *testing.T) {
+	cases := []struct {
+		name      string
+		provider  config.ProviderConfig
+		proxyPort int
+		want      string
+	}{
+		{
+			name:      "cloud provider no host + proxy running defaults to proxy",
+			provider:  config.ProviderConfig{Type: "anthropic"},
+			proxyPort: 8080,
+			want:      "http://127.0.0.1:8080",
+		},
+		{
+			name:      "explicit host always wins",
+			provider:  config.ProviderConfig{Type: "anthropic", Host: "https://api.anthropic.com"},
+			proxyPort: 8080,
+			want:      "https://api.anthropic.com",
+		},
+		{
+			name:      "proxy disabled (port 0) returns empty — adapter picks default",
+			provider:  config.ProviderConfig{Type: "anthropic"},
+			proxyPort: 0,
+			want:      "",
+		},
+		{
+			name:      "ollama skipped — local already, no proxy routing",
+			provider:  config.ProviderConfig{Type: "ollama"},
+			proxyPort: 8080,
+			want:      "",
+		},
+		{
+			name:      "mlx skipped — same reason",
+			provider:  config.ProviderConfig{Type: "mlx"},
+			proxyPort: 8080,
+			want:      "",
+		},
+		{
+			name:      "openai defaults to proxy",
+			provider:  config.ProviderConfig{Type: "openai"},
+			proxyPort: 9090,
+			want:      "http://127.0.0.1:9090",
+		},
+		{
+			name:      "ollama with explicit host still honored",
+			provider:  config.ProviderConfig{Type: "ollama", Host: "http://remote-ollama:11434"},
+			proxyPort: 8080,
+			want:      "http://remote-ollama:11434",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := resolveProviderHost(c.provider, c.proxyPort)
+			if got != c.want {
+				t.Errorf("got %q, want %q", got, c.want)
+			}
+		})
+	}
+}
