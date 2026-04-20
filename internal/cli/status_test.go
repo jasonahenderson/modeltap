@@ -76,7 +76,7 @@ func testStatusConfig() *config.Config {
 	return &config.Config{
 		Port:          8080,
 		Upstream:      "https://api.anthropic.com",
-		DBPath:        "~/.config/modeltap/modeltap.db",
+		DBPath:        "~/.modeltap/modeltap.db",
 		RetentionDays: 30,
 	}
 }

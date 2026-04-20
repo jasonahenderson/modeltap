@@ -139,12 +139,35 @@ func statusSystemd() (*ServiceStatus, error) {
 }
 
 // LogFilePath returns the path to the modeltap log file on macOS.
+// Prefers the new canonical location (~/.modeltap/modeltap.log or
+// $XDG_DATA_HOME/modeltap/modeltap.log) but falls back to the v0.1-era
+// ~/.config/modeltap/modeltap.log if that file already exists and the
+// new one does not — mirrors the PATCH-0006 config resolver so a
+// legacy install keeps finding its logs.
 func LogFilePath() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("resolving home directory: %w", err)
 	}
-	return filepath.Join(home, ".config", "modeltap", "modeltap.log"), nil
+	newPath := filepath.Join(dataDir(home), "modeltap.log")
+	if _, err := os.Stat(newPath); err == nil {
+		return newPath, nil
+	}
+	legacy := filepath.Join(home, ".config", "modeltap", "modeltap.log")
+	if _, err := os.Stat(legacy); err == nil {
+		return legacy, nil
+	}
+	return newPath, nil
+}
+
+// dataDir returns the directory that holds modeltap's runtime data
+// for log resolution. Kept local to this package to avoid an import
+// cycle with internal/config.
+func dataDir(home string) string {
+	if xdg := os.Getenv("XDG_DATA_HOME"); xdg != "" {
+		return filepath.Join(xdg, "modeltap")
+	}
+	return filepath.Join(home, ".modeltap")
 }
 
 // Logs retrieves the last N lines of service log output for the given platform.

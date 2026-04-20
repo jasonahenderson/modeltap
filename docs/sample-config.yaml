@@ -1,7 +1,15 @@
 # modeltap — sample config
 #
-# Location: $XDG_CONFIG_HOME/modeltap/config.yaml
-#           (defaults to ~/.config/modeltap/config.yaml)
+# Location (PATCH-0006):
+#   ~/.modeltap/config.yaml                     (default)
+#   $XDG_CONFIG_HOME/modeltap/config.yaml       (when XDG_CONFIG_HOME is set)
+#   ~/.config/modeltap/config.yaml              (legacy, still honored with a
+#                                                deprecation warning for one
+#                                                release cycle)
+#
+# All other modeltap state (SQLite DB, BFF socket, service log) also
+# lives under ~/.modeltap/ by default, or $XDG_DATA_HOME/modeltap/ when
+# that env var is set.
 #
 # Minimum required for `modeltap harness`: one provider with an api_key,
 # and a routing.default that points at a model that provider serves.
@@ -18,7 +26,7 @@
 
 port: 8080
 upstream: https://api.anthropic.com
-db_path: ~/.local/share/modeltap/modeltap.db
+db_path: ~/.modeltap/modeltap.db
 retention_days: 30
 max_body_size: 10MB
 
@@ -70,8 +78,9 @@ providers:
 # ---------------------------------------------------------------------
 
 bff:
-  # Unix-domain socket the harness dials. Default: $XDG_DATA_HOME/modeltap/server.sock.
-  socket_path: ~/.local/share/modeltap/server.sock
+  # Unix-domain socket the harness dials. Default: ~/.modeltap/server.sock
+  # (or $XDG_DATA_HOME/modeltap/server.sock when XDG_DATA_HOME is set).
+  socket_path: ~/.modeltap/server.sock
   # socket_mode: 0o600  # default already; tighten if your home is shared.
 
   # Team / enterprise profile. Leaving these unset keeps the BFF

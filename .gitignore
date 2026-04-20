@@ -22,3 +22,6 @@ vendor/
 *.swp
 *.swo
 *~
+
+# Local modeltap data if a developer runs the tool from the repo root
+.modeltap/

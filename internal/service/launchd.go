@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"path/filepath"
 	"text/template"
 )
 
@@ -53,7 +52,7 @@ func generateLaunchdPlist(cfg Config) (string, error) {
 	data := launchdData{
 		ServiceName: cfg.ServiceName,
 		BinaryPath:  cfg.BinaryPath,
-		LogDir:      filepath.Join(home, ".config", "modeltap"),
+		LogDir:      dataDir(home),
 		HomeDir:     home,
 	}
 

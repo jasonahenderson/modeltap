@@ -187,7 +187,8 @@ func newServiceLogsCommand() *cobra.Command {
 		Short: "Show recent logs from the modeltap background service",
 		Long: `Display recent log output from the modeltap background service.
 
-On macOS, reads from the log file at ~/.config/modeltap/modeltap.log.
+On macOS, reads from the log file at ~/.modeltap/modeltap.log
+(or the legacy ~/.config/modeltap/modeltap.log for installs predating PATCH-0006).
 On Linux, reads from journalctl for the modeltap user service.
 
 Use the --lines (-n) flag to control how many lines are displayed.`,
