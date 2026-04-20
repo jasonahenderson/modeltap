@@ -7,6 +7,13 @@ import (
 	"time"
 )
 
+// MaxCommandHistoryPerListCall is the hard ceiling on ListCommandHistory
+// output — a user's full history across months is potentially tens
+// of thousands of rows; dumping everything on every /history scroll
+// is a real DoS vector (WU-094 H-9). Clients page via Before /
+// BeforeID to walk older entries.
+const MaxCommandHistoryPerListCall = 500
+
 // AppendCommandHistory inserts a command history entry.
 func (s *SQLiteStore) AppendCommandHistory(ctx context.Context, entry *CommandHistoryEntry) error {
 	const query = `
@@ -35,6 +42,9 @@ VALUES (?, ?, ?, ?, ?)`
 //   - Otherwise -> user scope
 //
 // Pagination uses compound cursor (created_at, id) per A-07.
+// Limit is clamped to MaxCommandHistoryPerListCall — callers that
+// previously passed 0 (zero value) used to retrieve the full
+// history; now they get a bounded page.
 func (s *SQLiteStore) ListCommandHistory(ctx context.Context, filter CommandHistoryFilter) ([]CommandHistoryEntry, error) {
 	var conditions []string
 	var args []any
@@ -66,10 +76,18 @@ func (s *SQLiteStore) ListCommandHistory(ctx context.Context, filter CommandHist
 	query := "SELECT id, user_id, project, session_id, content, created_at FROM command_history" +
 		where + " ORDER BY created_at DESC, id DESC"
 
-	if filter.Limit > 0 {
-		query += " LIMIT ?"
-		args = append(args, filter.Limit)
+	// Default + cap the limit (WU-094 H-9). filter.Limit=0 used to
+	// mean "unlimited" — a bug that dumped the user's full history
+	// on any caller that left the field zero-valued.
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = MaxCommandHistoryPerListCall
 	}
+	if limit > MaxCommandHistoryPerListCall {
+		limit = MaxCommandHistoryPerListCall
+	}
+	query += " LIMIT ?"
+	args = append(args, limit)
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {

@@ -114,16 +114,26 @@ FROM turns WHERE id = ?`
 	return &t, nil
 }
 
-// ListTurns returns all turns for a session, ordered by sequence.
+// MaxTurnsPerListCall is the hard ceiling on ListTurns output — a
+// long-running session with tens of thousands of turns would
+// otherwise stream everything into a slice and OOM the caller
+// (WU-094 H-8). Callers needing more should paginate via the
+// sequence cursor. Tuned generous: 2000 turns × ~1 KiB/turn ≈ 2 MiB.
+const MaxTurnsPerListCall = 2000
+
+// ListTurns returns turns for a session, ordered by sequence,
+// capped at MaxTurnsPerListCall. Compacted sessions always fit
+// well under the cap; only pathologically long uncompacted
+// sessions will trim, and those already demand a /compact pass.
 func (s *SQLiteStore) ListTurns(ctx context.Context, sessionID string) ([]Turn, error) {
 	const query = `
 SELECT id, session_id, sequence, role, content, model, provider,
        input_tokens, output_tokens, cost, latency_ms,
        tool_calls, files_touched, files_modified,
        compacted, compacted_summary, original_turns, created_at
-FROM turns WHERE session_id = ? ORDER BY sequence`
+FROM turns WHERE session_id = ? ORDER BY sequence LIMIT ?`
 
-	rows, err := s.db.QueryContext(ctx, query, sessionID)
+	rows, err := s.db.QueryContext(ctx, query, sessionID, MaxTurnsPerListCall)
 	if err != nil {
 		return nil, fmt.Errorf("listing turns: %w", err)
 	}

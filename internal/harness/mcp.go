@@ -50,16 +50,21 @@ type MCPLauncher interface {
 type ExecLauncher struct{}
 
 // Launch starts the configured binary with its stdio piped.
+//
+// Environment handling (WU-094 H-6): MCP servers are third-party
+// code installed from npm / pip / random git repos. Passing the
+// parent's full env (which includes ANTHROPIC_API_KEY, OPENAI_API_KEY,
+// AWS_*, GITHUB_TOKEN, etc.) to every MCP server lets a malicious
+// one exfiltrate credentials. We pass only a minimal allowlist plus
+// anything the user explicitly configured via cfg.Env.
 func (ExecLauncher) Launch(ctx context.Context, cfg MCPServerConfig) (MCPStream, func(), error) {
 	if cfg.Command == "" {
 		return MCPStream{}, nil, errors.New("mcp: command required")
 	}
 	cmd := exec.CommandContext(ctx, cfg.Command, cfg.Args...)
-	if len(cfg.Env) > 0 {
-		cmd.Env = append(cmd.Env, os.Environ()...)
-		for k, v := range cfg.Env {
-			cmd.Env = append(cmd.Env, k+"="+v)
-		}
+	cmd.Env = filteredEnv(os.Environ())
+	for k, v := range cfg.Env {
+		cmd.Env = append(cmd.Env, k+"="+v)
 	}
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -77,6 +82,71 @@ func (ExecLauncher) Launch(ctx context.Context, cfg MCPServerConfig) (MCPStream,
 		_ = cmd.Wait()
 	}
 	return MCPStream{In: stdin, Out: stdout}, stop, nil
+}
+
+// mcpEnvAllowlist is the minimal set of environment variable names
+// forwarded to MCP subprocesses by default. Anything outside this
+// list has to be explicitly opted in via MCPServerConfig.Env.
+// Covers what's needed for a typical binary to locate dependencies
+// and format text — nothing touching credentials or config.
+var mcpEnvAllowlist = map[string]struct{}{
+	"PATH":       {},
+	"HOME":       {},
+	"USER":       {},
+	"LANG":       {},
+	"TMPDIR":     {},
+	"SHELL":      {},
+	"LOGNAME":    {},
+	"TZ":         {},
+	"TERM":       {},
+	"XDG_CONFIG_HOME": {},
+	"XDG_DATA_HOME":   {},
+	"XDG_CACHE_HOME":  {},
+}
+
+// filteredEnv returns only the env vars whose names match the MCP
+// allowlist. `LC_*` variables are forwarded as a prefix match because
+// their set is POSIX-defined but open-ended (LC_TIME, LC_NUMERIC…).
+// Credential-looking variables (anything ending in _KEY / _TOKEN /
+// _SECRET, anything under known provider namespaces) are explicitly
+// rejected even if they happen to land in the allowlist.
+func filteredEnv(input []string) []string {
+	out := make([]string, 0, len(mcpEnvAllowlist)+4)
+	for _, entry := range input {
+		eq := strings.IndexByte(entry, '=')
+		if eq <= 0 {
+			continue
+		}
+		name := entry[:eq]
+		if isSensitiveEnvName(name) {
+			continue
+		}
+		if _, allow := mcpEnvAllowlist[name]; allow {
+			out = append(out, entry)
+			continue
+		}
+		if strings.HasPrefix(name, "LC_") {
+			out = append(out, entry)
+		}
+	}
+	return out
+}
+
+// isSensitiveEnvName catches names that look like credentials, even
+// if they happen to match the positive allowlist. Defense in depth.
+func isSensitiveEnvName(name string) bool {
+	upper := strings.ToUpper(name)
+	for _, suf := range []string{"_KEY", "_TOKEN", "_SECRET", "_PASSWORD", "_CREDENTIAL", "_CREDENTIALS"} {
+		if strings.HasSuffix(upper, suf) {
+			return true
+		}
+	}
+	for _, pre := range []string{"ANTHROPIC_", "OPENAI_", "AWS_", "AZURE_", "GCP_", "GITHUB_", "GITLAB_", "BITBUCKET_", "MODELTAP_", "SSH_"} {
+		if strings.HasPrefix(upper, pre) {
+			return true
+		}
+	}
+	return false
 }
 
 // MCPServerStatus is the user-facing view of one server.

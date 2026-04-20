@@ -318,6 +318,68 @@ func TestApp_MCPCommand_Reconnect_UnknownServer(t *testing.T) {
 	}
 }
 
+// TestFilteredEnv_StripsCredentials pins WU-094 H-6: MCP subprocesses
+// must not inherit the full parent env. API keys and credentials
+// get stripped; a minimal allowlist (PATH, HOME, etc.) + LC_* is
+// forwarded. Anything the user explicitly adds via MCPServerConfig.Env
+// is passed through downstream.
+func TestFilteredEnv_StripsCredentials(t *testing.T) {
+	got := filteredEnv([]string{
+		"PATH=/usr/bin",
+		"HOME=/home/u",
+		"LC_TIME=en_US",
+		"ANTHROPIC_API_KEY=sk-ant-xxx",
+		"OPENAI_API_KEY=sk-xxx",
+		"AWS_SECRET_ACCESS_KEY=zzz",
+		"GITHUB_TOKEN=ghp_xxx",
+		"MODELTAP_SECRET=y",
+		"SOME_API_TOKEN=z",
+		"DATABASE_PASSWORD=p",
+		"MY_CUSTOM_CREDENTIAL=c",
+		"SSH_AUTH_SOCK=/tmp/s",
+		"RANDOM_VAR=value", // not allowed, not sensitive — still stripped
+	})
+	want := map[string]bool{
+		"PATH=/usr/bin":     false,
+		"HOME=/home/u":      false,
+		"LC_TIME=en_US":     false,
+	}
+	for _, e := range got {
+		if _, ok := want[e]; ok {
+			want[e] = true
+			continue
+		}
+		t.Errorf("filteredEnv leaked %q", e)
+	}
+	for k, seen := range want {
+		if !seen {
+			t.Errorf("filteredEnv dropped expected %q", k)
+		}
+	}
+}
+
+func TestIsSensitiveEnvName(t *testing.T) {
+	sensitive := []string{
+		"ANTHROPIC_API_KEY", "anthropic_api_key",
+		"OPENAI_KEY", "AWS_SECRET_ACCESS_KEY",
+		"GITHUB_TOKEN", "MY_SECRET", "CUSTOM_CREDENTIAL",
+		"DATABASE_PASSWORD", "ssh_auth_sock",
+	}
+	for _, n := range sensitive {
+		if !isSensitiveEnvName(n) {
+			t.Errorf("%q should be sensitive", n)
+		}
+	}
+	safe := []string{
+		"PATH", "HOME", "LANG", "TERM", "LC_TIME", "MY_VAR", "CONFIG_DIR",
+	}
+	for _, n := range safe {
+		if isSensitiveEnvName(n) {
+			t.Errorf("%q should not be sensitive", n)
+		}
+	}
+}
+
 func TestApp_MCPCommand_UsageWhenMissingName(t *testing.T) {
 	mgr := NewMCPManager(tools.NewRegistry(), &fakeLauncher{})
 	app := NewApp(AppOptions{MCP: mgr})

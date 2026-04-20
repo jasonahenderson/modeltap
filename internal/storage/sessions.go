@@ -442,13 +442,20 @@ VALUES (?, ?, ?, ?, ?)`
 	return nil
 }
 
-// ListServerEvents returns all events for a session, ordered by time.
+// MaxServerEventsPerListCall bounds ListServerEvents output; see
+// WU-094 H-8. Events accumulate over time (one per auto-compact,
+// per reconnect hiccup, etc.) so a long-lived session can have
+// thousands. Callers needing more should paginate.
+const MaxServerEventsPerListCall = 500
+
+// ListServerEvents returns events for a session, ordered by time,
+// capped at MaxServerEventsPerListCall (most recent).
 func (s *SQLiteStore) ListServerEvents(ctx context.Context, sessionID string) ([]ServerSessionEvent, error) {
 	const query = `
 SELECT id, session_id, type, detail, payload, at
-FROM session_events WHERE session_id = ? ORDER BY at`
+FROM session_events WHERE session_id = ? ORDER BY at DESC LIMIT ?`
 
-	rows, err := s.db.QueryContext(ctx, query, sessionID)
+	rows, err := s.db.QueryContext(ctx, query, sessionID, MaxServerEventsPerListCall)
 	if err != nil {
 		return nil, fmt.Errorf("listing session events: %w", err)
 	}
