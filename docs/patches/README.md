@@ -12,6 +12,7 @@ Implementation-scoped work authorization documents. Patches are the lightweight 
 | [PATCH-0004](0004-secret-prefix-resolver.md) | Secret Prefix Resolver for Provider API Keys | done |
 | [PATCH-0005](0005-bff-route-via-proxy-default.md) | Route BFF provider traffic through the v0.1 proxy by default | approved |
 | [PATCH-0006](0006-unified-config-data-dir.md) | Unified `~/.modeltap/` config & data directory | done |
+| [PATCH-0007](0007-dotenv-loader.md) | `.env` loader for provider credentials | done |
 
 ## When to Use a Patch
 

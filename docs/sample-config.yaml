@@ -17,6 +17,15 @@
 #
 # Environment variables can override any value — prefix MODELTAP_ and
 # uppercase the key (e.g. MODELTAP_BFF_SOCKET_PATH).
+#
+# dotenv (PATCH-0007): modeltap auto-loads ./.env then ~/.modeltap/.env
+# at startup. Variables already in the process environment win; the
+# file fills in the gaps. Handy for provider keys:
+#
+#   echo 'ANTHROPIC_API_KEY=sk-ant-...' >> ~/.modeltap/.env
+#   chmod 600 ~/.modeltap/.env
+#
+# Disable with MODELTAP_DOTENV=false; trace with MODELTAP_DEBUG_DOTENV=1.
 
 # ---------------------------------------------------------------------
 # v0.1 proxy config (modeltap start) — optional, unchanged from v0.1.
