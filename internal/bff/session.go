@@ -29,6 +29,26 @@ type SessionManager struct {
 	active map[string]*ActiveSession
 }
 
+// verifySessionAccess returns a "session not found" TransportError
+// when the connection's principal doesn't own the given session.
+// WU-094 H-10 / H-11 / H-12: today every connection runs as
+// SoloUserID so the check is a no-op, but it lands in every
+// session-scoped handler now so the auth WU doesn't have to
+// retrofit dozens of call sites. Deliberately leaks no "forbidden"
+// distinction — existence and ownership failures look identical.
+func verifySessionAccess(conn *Connection, sess *storage.Session) error {
+	if sess == nil {
+		return &TransportError{Code: CodeSessionNotFound, Message: "session not found"}
+	}
+	if sess.UserID != "" && conn.UserID() != "" && sess.UserID != conn.UserID() {
+		return &TransportError{
+			Code:    CodeSessionNotFound,
+			Message: fmt.Sprintf("session %q not found", sess.ID),
+		}
+	}
+	return nil
+}
+
 // ActiveSession is the in-memory footprint of a session currently bound
 // to a connection. Fields beyond those needed by WU-050 handlers are
 // added by downstream WUs (turn state, branch manager, etc.).
@@ -121,6 +141,9 @@ func handleSessionResume(ctx context.Context, conn *Connection, params json.RawM
 			Code:    CodeSessionNotFound,
 			Message: fmt.Sprintf("session %q not found", req.SessionID),
 		}
+	}
+	if err := verifySessionAccess(conn, sess); err != nil {
+		return nil, err
 	}
 
 	expiry := time.Now().Add(SessionLockTTL)
@@ -229,6 +252,9 @@ func handleSessionDetails(ctx context.Context, conn *Connection, params json.Raw
 	if err != nil || sess == nil {
 		return nil, &TransportError{Code: CodeSessionNotFound, Message: fmt.Sprintf("session %q not found", req.SessionID)}
 	}
+	if err := verifySessionAccess(conn, sess); err != nil {
+		return nil, err
+	}
 
 	turns, err := srv.store.ListTurns(ctx, req.SessionID)
 	if err != nil {
@@ -299,8 +325,12 @@ func handleSessionClear(ctx context.Context, conn *Connection, params json.RawMe
 	}
 
 	srv := conn.server
-	if _, err := srv.store.GetSession(ctx, req.SessionID); err != nil {
+	sess, err := srv.store.GetSession(ctx, req.SessionID)
+	if err != nil || sess == nil {
 		return nil, &TransportError{Code: CodeSessionNotFound, Message: fmt.Sprintf("session %q not found", req.SessionID)}
+	}
+	if err := verifySessionAccess(conn, sess); err != nil {
+		return nil, err
 	}
 
 	active := srv.sessions.EnsureActive(req.SessionID, conn)
@@ -334,6 +364,9 @@ func handleSessionFork(ctx context.Context, conn *Connection, params json.RawMes
 	src, err := srv.store.GetSession(ctx, req.SessionID)
 	if err != nil || src == nil {
 		return nil, &TransportError{Code: CodeSessionNotFound, Message: fmt.Sprintf("session %q not found", req.SessionID)}
+	}
+	if err := verifySessionAccess(conn, src); err != nil {
+		return nil, err
 	}
 
 	// Create the new session with copied fields but reset cost/tokens.

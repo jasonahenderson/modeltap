@@ -242,6 +242,13 @@ func handleSessionCompact(ctx context.Context, conn *Connection, params json.Raw
 		return nil, &TransportError{Code: CodeInvalidParams, Message: "session_id is required"}
 	}
 
+	sess, err := conn.server.store.GetSession(ctx, req.SessionID)
+	if err != nil || sess == nil {
+		return nil, &TransportError{Code: CodeSessionNotFound, Message: "session not found"}
+	}
+	if err := verifySessionAccess(conn, sess); err != nil {
+		return nil, err
+	}
 	turns, err := conn.server.store.ListTurns(ctx, req.SessionID)
 	if err != nil {
 		return nil, &TransportError{Code: CodeInternalError, Message: "list turns: " + err.Error()}
@@ -261,6 +268,13 @@ func handleCompactApply(ctx context.Context, conn *Connection, params json.RawMe
 	}
 	if req.SessionID == "" {
 		return nil, &TransportError{Code: CodeInvalidParams, Message: "session_id is required"}
+	}
+	sess, err := conn.server.store.GetSession(ctx, req.SessionID)
+	if err != nil || sess == nil {
+		return nil, &TransportError{Code: CodeSessionNotFound, Message: "session not found"}
+	}
+	if err := verifySessionAccess(conn, sess); err != nil {
+		return nil, err
 	}
 	window := contextWindowForSession(conn.server, req.SessionID)
 	return applyCompactPlan(ctx, conn.server.store, req.SessionID, req.Actions, window)
@@ -303,7 +317,7 @@ func replaceTurnsWithSummary(ctx context.Context, store storage.Store, sessionID
 
 func deleteTurns(ctx context.Context, store storage.Store, turns []storage.Turn) error {
 	for _, t := range turns {
-		if err := store.DeleteTurn(ctx, t.ID); err != nil {
+		if err := store.DeleteTurn(ctx, t.SessionID, t.ID); err != nil {
 			return fmt.Errorf("delete turn %s: %w", t.ID, err)
 		}
 	}

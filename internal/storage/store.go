@@ -213,7 +213,11 @@ type Store interface {
 	CreateTurn(ctx context.Context, t *Turn) error
 	GetTurn(ctx context.Context, id string) (*Turn, error)
 	ListTurns(ctx context.Context, sessionID string) ([]Turn, error)
-	DeleteTurn(ctx context.Context, id string) error
+	// DeleteTurn scopes by (sessionID, turnID) so a caller can't
+	// accidentally delete a turn from a session they don't own —
+	// WU-094 H-12. Idempotent: deleting an absent pair is not an
+	// error.
+	DeleteTurn(ctx context.Context, sessionID, turnID string) error
 
 	// Session aggregation helpers
 	SessionSummaries(ctx context.Context, filter SessionFilter) ([]SessionSummary, error)

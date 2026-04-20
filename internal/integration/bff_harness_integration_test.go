@@ -161,7 +161,7 @@ func TestBFFHarness_SessionResume(t *testing.T) {
 	seededID := "sess-integration-resume"
 	seeded := &storage.Session{
 		ID:      seededID,
-		UserID:  "solo",
+		UserID:  "local",
 		Project: dir,
 		Summary: "seeded",
 		Status:  "active",
