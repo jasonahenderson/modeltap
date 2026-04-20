@@ -66,6 +66,7 @@ type BFFConfig struct {
 	TLSAddress        string `yaml:"tls_address,omitempty" mapstructure:"tls_address"`
 	TLSCertFile       string `yaml:"tls_cert_file,omitempty" mapstructure:"tls_cert_file"`
 	TLSKeyFile        string `yaml:"tls_key_file,omitempty" mapstructure:"tls_key_file"`
+	TLSClientCAFile   string `yaml:"tls_client_ca_file,omitempty" mapstructure:"tls_client_ca_file"`
 	MaxConnections    int    `yaml:"max_connections,omitempty" mapstructure:"max_connections"`
 	MaxAttachmentSize int    `yaml:"max_attachment_size,omitempty" mapstructure:"max_attachment_size"`
 

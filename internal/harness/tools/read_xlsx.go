@@ -2,6 +2,7 @@ package tools
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/xuri/excelize/v2"
@@ -12,11 +13,23 @@ import (
 // trailing marker; sheets are processed in workbook order.
 const xlsxMaxCellsPerSheet = 500
 
+// xlsxMaxFileBytes bounds the on-disk XLSX file size pre-parse to
+// protect against zip-bomb attacks (a tiny file that expands to GB
+// in excelize). WU-094 H-15. Realistic business spreadsheets rarely
+// exceed a few MB; 50 MiB is generous.
+const xlsxMaxFileBytes = 50 * 1024 * 1024
+
 // readXLSXFile extracts cells from every sheet in an XLSX workbook and
 // formats them as tab-separated text tables, one section per sheet.
 // Columns are left ragged — no alignment — because the output is
 // consumed by an LLM that doesn't need pretty columns.
 func readXLSXFile(path string) (*ToolExecResult, error) {
+	// File-size guard for zip-bomb defense (WU-094 H-15). Has to
+	// live before OpenFile because excelize maps the whole archive
+	// on open and won't return until decompression has started.
+	if info, err := os.Stat(path); err == nil && info.Size() > xlsxMaxFileBytes {
+		return ErrorResult("xlsx file too large: %d bytes (cap %d)", info.Size(), xlsxMaxFileBytes), nil
+	}
 	f, err := excelize.OpenFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("xlsx open: %w", err)

@@ -111,6 +111,14 @@ func (g *GrepTool) Execute(_ context.Context, input json.RawMessage) (*ToolExecR
 	}
 	var results []fileHits
 
+	// Bound total bytes scanned to prevent a pathological repo
+	// (10 GB log file, million-file tree) from OOMing the harness.
+	// WU-094 H-15. Per-file grepFile already skips binary files and
+	// caps matches; this is the aggregate backstop.
+	var scannedBytes int64
+	const maxScanBytes int64 = 256 * 1024 * 1024 // 256 MiB aggregate
+	scanTruncated := false
+
 	walkErr := filepath.WalkDir(searchRoot, func(path string, d fs.DirEntry, werr error) error {
 		if werr != nil {
 			return nil // skip unreadable entries
@@ -127,6 +135,13 @@ func (g *GrepTool) Execute(_ context.Context, input json.RawMessage) (*ToolExecR
 				return nil
 			}
 		}
+		if info, ierr := d.Info(); ierr == nil {
+			scannedBytes += info.Size()
+			if scannedBytes > maxScanBytes {
+				scanTruncated = true
+				return filepath.SkipAll
+			}
+		}
 		hits := grepFile(path, re, in.Context, g.maxMatches)
 		if hits.count == 0 {
 			return nil
@@ -138,6 +153,7 @@ func (g *GrepTool) Execute(_ context.Context, input json.RawMessage) (*ToolExecR
 		results = append(results, fileHits{relPath: rel, lines: hits.lines, count: hits.count})
 		return nil
 	})
+	_ = scanTruncated // reserved for a follow-up "partial results" banner
 	if walkErr != nil {
 		return ErrorResult("walk: %v", walkErr), nil
 	}
