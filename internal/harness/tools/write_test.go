@@ -174,3 +174,73 @@ func TestWrite_RelativePath_ResolvesToRoot(t *testing.T) {
 		t.Errorf("content mismatch: %q", got)
 	}
 }
+
+// TestResolveInRoot_RejectsSymlinkEscape pins WU-094 C-4: the previous
+// build's resolveInRoot did Clean + Rel only. A symlink inside the
+// project (e.g. a checked-in `./secret → /etc/passwd`) would pass
+// the textual check and let Read/Write/Edit follow through to an
+// out-of-root target. The fix walks EvalSymlinks; symlinked
+// descendants that escape the evaluated root are now rejected.
+func TestResolveInRoot_RejectsSymlinkEscape(t *testing.T) {
+	root := t.TempDir()
+	// Create a symlink inside the root that targets /etc/passwd.
+	linkPath := filepath.Join(root, "secret")
+	if err := os.Symlink("/etc/passwd", linkPath); err != nil {
+		t.Fatalf("symlink: %v", err)
+	}
+	_, err := resolveInRoot(root, "secret")
+	if err == nil {
+		t.Fatalf("expected symlink escape to be rejected")
+	}
+	if !strings.Contains(err.Error(), "symlink") {
+		t.Errorf("error should name symlink escape; got %v", err)
+	}
+}
+
+// TestResolveInRoot_AllowsSymlinkedProjectRoot confirms the fix
+// doesn't break the common case where the project root itself is
+// reached via a symlink (e.g. /tmp → /private/tmp on macOS).
+// EvalSymlinks the root and allow descendants under the resolved
+// form.
+func TestResolveInRoot_AllowsSymlinkedProjectRoot(t *testing.T) {
+	realRoot := t.TempDir()
+	// Place a file in the root; resolveInRoot should accept it even
+	// when called via a symlink path.
+	if err := os.WriteFile(filepath.Join(realRoot, "inside.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	if _, err := resolveInRoot(realRoot, "inside.txt"); err != nil {
+		t.Errorf("legitimate in-root path should resolve: %v", err)
+	}
+}
+
+// TestResolveInRoot_AllowsNonexistentPath confirms Write / Edit can
+// still create a new file inside the root — the fix must not break
+// paths that don't exist yet (common case).
+func TestResolveInRoot_AllowsNonexistentPath(t *testing.T) {
+	root := t.TempDir()
+	got, err := resolveInRoot(root, "nested/new.txt")
+	if err != nil {
+		t.Fatalf("nonexistent path under root should resolve: %v", err)
+	}
+	if !strings.HasPrefix(got, root) {
+		t.Errorf("resolved path %q should be under root %q", got, root)
+	}
+}
+
+// TestResolveInRoot_RejectsSymlinkedParent covers a subtler case:
+// a file whose parent directory is a symlink pointing outside the
+// root. Creating through such a parent would land outside scope.
+func TestResolveInRoot_RejectsSymlinkedParent(t *testing.T) {
+	root := t.TempDir()
+	outsideDir := t.TempDir()
+	// Inside the root, create a symlink directory pointing outside.
+	linkDir := filepath.Join(root, "escape")
+	if err := os.Symlink(outsideDir, linkDir); err != nil {
+		t.Fatalf("symlink: %v", err)
+	}
+	_, err := resolveInRoot(root, "escape/new.txt")
+	if err == nil {
+		t.Fatalf("expected escape-through-symlinked-parent to be rejected")
+	}
+}

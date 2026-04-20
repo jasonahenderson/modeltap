@@ -26,11 +26,84 @@ type WebFetchTool struct {
 
 // NewWebFetchTool constructs a WebFetch tool with production defaults:
 // 30s timeout, 100 KB output cap, loopback blocked for SSRF.
+//
+// SSRF defense is layered:
+//  1. URL host is classified via isBlockedHost before the request is issued.
+//  2. Transport.DialContext re-resolves the host at dial time and
+//     validates every returned IP — closes DNS rebinding (where the
+//     first resolution returned a public IP and a racing lookup
+//     flips to a private one).
+//  3. Client.CheckRedirect re-runs isBlockedHost on every redirect
+//     target — closes the "302 → http://169.254.169.254/…" vector
+//     flagged by WU-094 C-2.
 func NewWebFetchTool() *WebFetchTool {
-	return &WebFetchTool{
-		httpClient: &http.Client{Timeout: 30 * time.Second},
-		maxBytes:   100 * 1024,
+	f := &WebFetchTool{maxBytes: 100 * 1024}
+	f.httpClient = &http.Client{
+		Timeout:       30 * time.Second,
+		Transport:     f.buildTransport(),
+		CheckRedirect: f.checkRedirect,
 	}
+	return f
+}
+
+// buildTransport wires a DialContext that resolves the target host
+// and rejects any response that includes a blocked IP. The stdlib
+// Transport would otherwise dial whatever the resolver returns, which
+// is where DNS rebinding lives.
+func (f *WebFetchTool) buildTransport() *http.Transport {
+	base := &net.Dialer{Timeout: 10 * time.Second}
+	t := http.DefaultTransport.(*http.Transport).Clone()
+	t.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		host, port, err := net.SplitHostPort(addr)
+		if err != nil {
+			return nil, err
+		}
+		// If host is already an IP, validate it directly without a
+		// resolver call. Otherwise resolve and validate every
+		// returned address.
+		if ip := net.ParseIP(host); ip != nil {
+			if f.isBlockedIP(ip) {
+				return nil, fmt.Errorf("blocked: %s resolves to a private address", host)
+			}
+			return base.DialContext(ctx, network, addr)
+		}
+		addrs, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+		if err != nil {
+			return nil, err
+		}
+		for _, a := range addrs {
+			if f.isBlockedIP(a.IP) {
+				return nil, fmt.Errorf("blocked: %s resolves to a private address", host)
+			}
+		}
+		// Dial the first resolved IP (stdlib behavior) but via our
+		// validated set. Using `addr` verbatim would re-resolve and
+		// race with our check; dial the IP we already validated.
+		if len(addrs) > 0 {
+			return base.DialContext(ctx, network, net.JoinHostPort(addrs[0].IP.String(), port))
+		}
+		return nil, fmt.Errorf("no addresses for %s", host)
+	}
+	return t
+}
+
+// checkRedirect re-runs the host classification on every redirect
+// hop. Returning a non-nil error aborts the redirect chain with that
+// error surfaced to the caller.
+func (f *WebFetchTool) checkRedirect(req *http.Request, via []*http.Request) error {
+	if len(via) >= 10 {
+		return fmt.Errorf("stopped after 10 redirects")
+	}
+	if req.URL == nil {
+		return fmt.Errorf("redirect to empty URL")
+	}
+	if req.URL.Scheme != "http" && req.URL.Scheme != "https" {
+		return fmt.Errorf("redirect to unsupported scheme: %q", req.URL.Scheme)
+	}
+	if f.isBlockedHost(req.URL.Hostname()) {
+		return fmt.Errorf("blocked redirect: %q resolves to a private address", req.URL.Hostname())
+	}
+	return nil
 }
 
 // SetMaxBytes overrides the output-size cap.
@@ -126,6 +199,7 @@ func (f *WebFetchTool) Execute(ctx context.Context, input json.RawMessage) (*Too
 
 // isBlockedHost reports whether the host should be refused outright
 // regardless of the permission layer (SSRF defense-in-depth).
+// Delegates to isBlockedIP for IP-literal handling.
 func (f *WebFetchTool) isBlockedHost(host string) bool {
 	host = strings.ToLower(strings.TrimSpace(host))
 	if host == "" {
@@ -137,14 +211,33 @@ func (f *WebFetchTool) isBlockedHost(host string) bool {
 			return true
 		}
 	}
-	ip := net.ParseIP(host)
-	if ip != nil {
-		if !f.allowLoopback && ip.IsLoopback() {
-			return true
-		}
-		if ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsMulticast() || ip.IsUnspecified() {
-			return true
-		}
+	if ip := net.ParseIP(host); ip != nil {
+		return f.isBlockedIP(ip)
+	}
+	return false
+}
+
+// isBlockedIP reports whether an already-parsed IP is on the SSRF
+// blocklist. Covers loopback, RFC1918, link-local, multicast,
+// unspecified, and IPv4-mapped IPv6 variants of all of those.
+func (f *WebFetchTool) isBlockedIP(ip net.IP) bool {
+	if ip == nil {
+		return true
+	}
+	// Resolve IPv4-mapped IPv6 (::ffff:127.0.0.1) to the embedded
+	// v4 form so IsLoopback / IsPrivate classify correctly.
+	if v4 := ip.To4(); v4 != nil {
+		ip = v4
+	}
+	if !f.allowLoopback && ip.IsLoopback() {
+		return true
+	}
+	if ip.IsPrivate() ||
+		ip.IsLinkLocalUnicast() ||
+		ip.IsLinkLocalMulticast() ||
+		ip.IsMulticast() ||
+		ip.IsUnspecified() {
+		return true
 	}
 	return false
 }

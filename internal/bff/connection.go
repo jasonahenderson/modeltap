@@ -375,6 +375,14 @@ func (c *Connection) Run() {
 
 	c.initialize()
 
+	// Start the heartbeat monitor once the connection is initialized.
+	// Without this a misbehaving client that connects but never sends
+	// a frame (nc -U modeltap.sock &amp; wait) holds a slot in s.conns
+	// until the process dies — WU-094 C-5 (slowloris DoS). The
+	// monitor fails the connection when LastPing goes stale past
+	// HeartbeatTimeout.
+	c.startHeartbeatMonitor()
+
 	for {
 		env, err := c.transport.ReadMessage()
 		if err != nil {
