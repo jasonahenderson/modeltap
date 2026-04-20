@@ -185,6 +185,18 @@ func (s *WebSearchTool) braveSearch(ctx context.Context, query string, limit int
 	return out, nil
 }
 
+// redactAPIKey scrubs any literal key occurrence from s. Used to
+// sanitize SerpAPI error/body output since the key rides in the
+// request URL's query string — url.Error embeds the full URL in
+// its Error() string, which would otherwise leak the key into the
+// tool result surfaced to the model (WU-094 C-3).
+func redactAPIKey(s, key string) string {
+	if key == "" || !strings.Contains(s, key) {
+		return s
+	}
+	return strings.ReplaceAll(s, key, "[REDACTED]")
+}
+
 func (s *WebSearchTool) serpAPISearch(ctx context.Context, query string, limit int) ([]searchHit, error) {
 	base := s.cfg.SerpAPIBaseURL
 	if base == "" {
@@ -204,22 +216,25 @@ func (s *WebSearchTool) serpAPISearch(ctx context.Context, query string, limit i
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
-		return nil, fmt.Errorf("serpapi request: %w", err)
+		return nil, fmt.Errorf("serpapi request: %s", redactAPIKey(err.Error(), s.cfg.APIKey))
 	}
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("serpapi http: %w", err)
+		// url.Error embeds the full URL — which includes our
+		// api_key= in the query string. Redact it before surfacing
+		// up to the model / tool output (WU-094 C-3).
+		return nil, fmt.Errorf("serpapi http: %s", redactAPIKey(err.Error(), s.cfg.APIKey))
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
-		return nil, fmt.Errorf("serpapi read: %w", err)
+		return nil, fmt.Errorf("serpapi read: %s", redactAPIKey(err.Error(), s.cfg.APIKey))
 	}
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("serpapi status %d: %s", resp.StatusCode, body)
+		return nil, fmt.Errorf("serpapi status %d: %s", resp.StatusCode, redactAPIKey(string(body), s.cfg.APIKey))
 	}
 
 	var parsed struct {

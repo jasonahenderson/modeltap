@@ -130,6 +130,35 @@ func TestWebSearch_BraveHTTPError(t *testing.T) {
 	}
 }
 
+// TestWebSearch_SerpAPIKeyRedactedOnError pins WU-094 C-3: the
+// SerpAPI key rides in the query string, so any url.Error surfaces
+// the full URL (key included) in its Error() string. That used to
+// flow straight into the tool output. Now error paths redact the
+// key before returning.
+func TestWebSearch_SerpAPIKeyRedactedOnError(t *testing.T) {
+	secretKey := "sk-serp-test-12345-DONOTLEAK"
+	// Point at a closed TCP port so the transport-level error fires
+	// with a url.Error that embeds the request URL (and key).
+	s := NewWebSearchTool(WebSearchConfig{
+		APIKey:         secretKey,
+		Engine:         "serpapi",
+		SerpAPIBaseURL: "http://127.0.0.1:1/search",
+	})
+	res, err := s.Execute(context.Background(), wsInput(t, map[string]any{"query": "test"}))
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if res.Status != StatusError {
+		t.Fatalf("Status = %q, want error", res.Status)
+	}
+	if strings.Contains(res.Error, secretKey) {
+		t.Errorf("API key leaked into error: %q", res.Error)
+	}
+	if !strings.Contains(res.Error, "REDACTED") {
+		t.Errorf("error should show redaction marker; got %q", res.Error)
+	}
+}
+
 func TestWebSearch_SerpAPISuccess(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if key := r.URL.Query().Get("api_key"); key != "serp-key" {

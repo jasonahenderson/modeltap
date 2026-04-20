@@ -150,6 +150,52 @@ func TestWebFetch_MissingURL(t *testing.T) {
 	}
 }
 
+// TestWebFetch_RedirectToPrivateBlocked pins WU-094 C-2: the
+// previous build used the default CheckRedirect (follow up to 10),
+// so a public endpoint returning a 302 to http://169.254.169.254/...
+// was followed transparently and the internal response leaked back
+// to the model. Now CheckRedirect re-runs isBlockedHost on every hop.
+func TestWebFetch_RedirectToPrivateBlocked(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Location", "http://169.254.169.254/latest/meta-data/")
+		w.WriteHeader(http.StatusFound)
+	}))
+	defer ts.Close()
+
+	// The tool must block even though the initial URL is httptest
+	// (loopback, allowed in test builds) — the redirect target is
+	// link-local and must be refused regardless of the test flag.
+	f := newWebFetchForTest()
+	res, err := f.Execute(context.Background(), wfInput(t, ts.URL))
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if res.Status != StatusError {
+		t.Fatalf("Status = %q, want error (redirect to link-local must be blocked)", res.Status)
+	}
+	if !strings.Contains(res.Error, "169.254") && !strings.Contains(res.Error, "blocked") {
+		t.Errorf("error should name the blocked redirect; got %q", res.Error)
+	}
+}
+
+func TestWebFetch_RedirectLoopBounded(t *testing.T) {
+	var ts *httptest.Server
+	ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Location", ts.URL)
+		w.WriteHeader(http.StatusFound)
+	}))
+	defer ts.Close()
+
+	f := newWebFetchForTest()
+	res, err := f.Execute(context.Background(), wfInput(t, ts.URL))
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if res.Status != StatusError {
+		t.Errorf("Status = %q, want error on redirect loop", res.Status)
+	}
+}
+
 func TestWebFetch_HTTPError(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
