@@ -53,8 +53,9 @@ SQLite schema migrated to v2 with sessions, turns, command history, session lock
 
 See `docs/adr/` for the full list; v0.2.0 specifically introduced:
 
-- **ADR-0012** — JSON-RPC 2.0 BFF protocol (framing, error codes, handshake)
 - **ADR-0013** — Bubbletea TUI framework for the harness
+
+The BFF JSON-RPC protocol (framing, error codes, handshake) lives in `FEAT-0008 §Protocol` rather than a standalone ADR; the decision was scoped alongside the feature because the protocol exists only to serve the harness↔BFF pair.
 
 ## Protocol
 
@@ -73,11 +74,64 @@ None for v0.1 users — the proxy (`modeltap start`) and its CLI surface (`logs`
 
 No AGPL / UniDoc / commercial deps were added; DOCX reading is stdlib-only (archive/zip + encoding/xml) per ADR-0010.
 
+## Related artifacts
+
+The canonical index of every numbered doc that drove, constrains, or informs v0.2.0. Per `.agents/process.md`, only `accepted` features and ADRs authorize code; explorations are upstream rationale and patches are implementation-scoped add-ons. Cross-reference this list against commit prefixes (`WU-`, `PATCH-`, `FEAT-`, `ADR-`, `EXP-`) to audit the release.
+
+### Features
+
+| ID | Title | Status | Role in v0.2.0 |
+|----|-------|--------|----------------|
+| [FEAT-0008](../../features/0008-bff-server.md) | BFF Server | accepted | **Primary deliverable** — full JSON-RPC BFF implemented (Track A, WU-046–067, 091). |
+| [FEAT-0009](../../features/0009-terminal-harness.md) | Terminal Harness | accepted | **Primary deliverable** — Bubbletea harness + 13 tools + MCP (Track B, WU-068–087, 092). |
+| [FEAT-0010](../../features/0010-enterprise-auth.md) | Enterprise Auth & Multi-User | proposed | Partial hooks only: TLS/mTLS listener surface (WU-047), `user_id` columns on sessions/turns/command history (WU-045). Full multi-user deferred. |
+| [FEAT-0011](../../features/0011-knowledge-integration.md) | Knowledge Integration | proposed | Not delivered in v0.2.0. Prompt Layer 6 is an explicit placeholder (WU-054/055); integration lands in a later release. |
+| [FEAT-0012](../../features/0012-skills-and-agent-teams.md) | Skills | proposed | Not delivered. Referenced by EXP-0009 as the prompt-architecture consumer. |
+| [FEAT-0013](../../features/0013-agent-teams.md) | Agent Teams | proposed | Not delivered. Supersedes WU-060 (multi-model branching explicitly deferred — see status.md). |
+
+### ADRs
+
+| ID | Title | Status | Role in v0.2.0 |
+|----|-------|--------|----------------|
+| [ADR-0001](../../adr/0001-programming-language.md) | Go as primary language | accepted | Pre-existing constraint. |
+| [ADR-0002](../../adr/0002-storage-format.md) | SQLite, WAL mode | accepted | Pre-existing constraint. Schema extended via migration v2 (WU-045, WU-091). |
+| [ADR-0003](../../adr/0003-cli-framework.md) | Cobra CLI | accepted | Pre-existing constraint. |
+| [ADR-0004](../../adr/0004-configuration-management.md) | Viper configuration | accepted | Pre-existing constraint. |
+| [ADR-0005](../../adr/0005-capture-mode-strategy.md) | Always full capture | accepted | Pre-existing constraint. |
+| [ADR-0006](../../adr/0006-multi-provider-support.md) | Multi-provider adapters | accepted | Extended (not formally amended): `FormatMessages` / `FormatToolDefinitions` added to the Provider interface in WU-042. |
+| [ADR-0007](../../adr/0007-usage-metrics.md) | Pre-computed aggregation tables | accepted | Pre-existing constraint; cost events (WU-056) feed the same tables. |
+| [ADR-0008](../../adr/0008-knowledge-layer-architecture.md) | sqlite-vec knowledge layer | accepted | Pre-existing constraint; not active in v0.2.0 (see FEAT-0011). |
+| [ADR-0009](../../adr/0009-mcp-server-for-knowledge-access.md) | MCP stdio transport | accepted | Governs the harness-side MCP client shape (WU-081). |
+| [ADR-0010](../../adr/0010-open-source-license.md) | Apache 2.0 | accepted | Gates dependency choices — drove the stdlib-only DOCX implementation and the no-UniDoc PDF choice. |
+| [ADR-0011](../../adr/0011-contribution-model-and-governance.md) | BDFL + contributor tiers | accepted | Pre-existing constraint. |
+| [ADR-0012](../../adr/0012-background-execution-strategy.md) | Background execution (proxy service) | accepted | Pre-existing (v0.1). The harness auto-start path leverages the same daemonization primitives. |
+| [ADR-0013](../../adr/0013-terminal-ui-framework.md) | Bubbletea TUI framework | proposed | **New in v0.2.0** — framework selection for the harness. |
+
+### Patches
+
+| ID | Title | Status | Role in v0.2.0 |
+|----|-------|--------|----------------|
+| [PATCH-0001](../../patches/0001-openai-responses-api-support.md) | OpenAI Responses API support | proposed | Not landed in v0.2.0; kept for a later patch release. |
+| [PATCH-0002](../../patches/0002-local-inference-support.md) | Local inference (MLX + Ollama) | proposed | Ollama adapter landed via WU-066. MLX provider-type scaffolding in place; not a full deliverable. |
+| [PATCH-0003](../../patches/0003-harness-app-conn-mgr-wiring.md) | Harness App ↔ ConnectionManager wiring | approved | Shipped: `ConnSurface` / `deferredSender` wiring between the Bubbletea App and the connection manager. |
+| [PATCH-0004](../../patches/0004-secret-prefix-resolver.md) | Secret prefix resolver (`env:` / `file:`) | done | Shipped: `config.ResolveSecret` applied to provider API keys; sample config updated. |
+| [PATCH-0005](../../patches/0005-bff-route-via-proxy-default.md) | Route BFF provider traffic through the v0.1 proxy by default | approved | Shipped: harness conversations now flow through the proxy's capture tables; cloud providers default to `http://127.0.0.1:<port>` unless `host:` is set. |
+
+### Explorations
+
+Explorations are upstream rationale — they do not authorize code, but they frame v0.2.0's direction.
+
+| ID | Title | Status | Relationship to v0.2.0 |
+|----|-------|--------|-----------------------|
+| [EXP-0007](../../explorations/0007-multi-model-orchestration.md) | Multi-Model Orchestration | exploring | Motivates FEAT-0013 (deferred); explains why WU-060 was rejected. |
+| [EXP-0008](../../explorations/0008-integrated-harness.md) | Integrated Harness — Modeltap as Professional AI Environment | exploring | **Origin story for v0.2.0.** FEAT-0008/0009/0010/0011/0012/0013 all trace back to this exploration. |
+| [EXP-0009](../../explorations/0009-harness-prompt-architecture.md) | Harness Prompt Architecture — Lessons from the Claude Code Leak | exploring | Informs the system prompt engine (WU-054/055, seven-layer design). |
+
 ## Known follow-ups (carry to v0.2.1 or later)
 
-- **WU-061 compaction** — server-side compaction handler. Requires a trim-heuristic + harness UX design pass.
-- **Plan-mode tool interception** — `PlanAccumulator.Append` isn't called yet. Needs the harness tool executor wired into the ConnectionManager's `tool.call` event bridge.
 - **`/drop <file>` and full ContextManager** — per-session attachment bookkeeping (drop, pin, stale detection) isn't implemented; `/context` shows the server's view only.
-- **Streaming event delivery to the App** — the WU-088 e2e test asserts turn dispatch to the mock provider but not `StreamTokenMsg` / `StreamCompleteMsg` delivery back into the App. A small wiring step in the event bridge covers this.
-- **WU-094 security review** — formal OWASP-style pass.
-- **WU-095 performance benchmarks** — scenario design + budgets.
+- **WU-094 Medium / Low follow-ups** — 5 Mediums + 19 Lows from the security review remain; tracked in `status.md` and `.reviews/security/`.
+- **Multi-model branching** — WU-060 explicitly deferred to FEAT-0013; `turn.submit` rejects array routes with a clear error.
+- **OpenAI Responses API support** — PATCH-0001 proposed; not landed.
+- **Full local inference (MLX)** — PATCH-0002 proposed; Ollama shipped, MLX adapter scaffolding only.
+- **FEAT-0010 multi-user** — TLS/mTLS listener + `user_id` schema hooks are in; full user management, auth flow, and session isolation checks remain.
