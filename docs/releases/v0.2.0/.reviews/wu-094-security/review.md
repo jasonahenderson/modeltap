@@ -6,6 +6,21 @@
 
 ---
 
+## Remediation status (as of 2026-04-19)
+
+**All 5 Criticals + all 15 Highs fixed.** Mediums and Lows remain documented below for v0.2.x / v0.3 hardening — none are exploitable in the default solo-profile deployment.
+
+| Severity | Count | Fixed | Commit(s) |
+|---|---|---|---|
+| Critical | 5 | **5** | `62116a6` (C-1..C-5) |
+| High | 15 | **15** | `71112e3` (H-1..H-5), `e97f087` (H-6/H-8/H-9), `e8d037c` (H-13/H-14/H-15), `1cd6dd1` (H-10/H-11/H-12), `d4ac156` (H-7) |
+| Medium | 21 | 0 | deferred to v0.2.x |
+| Low / Info | 19 | 0 | deferred to v0.3 |
+
+Regression tests land with each fix so reintroducing the bypass shape breaks CI. See each commit for the specific invariant it pins.
+
+---
+
 ## Executive summary
 
 **5 Critical, 15 High, 21 Medium, 19 Low/Info.**
