@@ -1,7 +1,7 @@
 # v0.2.0 Status
 
 ## Last Updated
-2026-04-19 (WU-067 + WU-087 + WU-088 integration tests + WU-090 changelog landed)
+2026-04-19 (WU-094 security review + Criticals fixed, WU-095 perf baseline)
 
 ## Current Phase
 **Phase 3 — Implementation.** Phase 1 (design) and Phase 2 (review + cross-flow audit) complete. All 22 blocking, 28 attention, 2 critical, and 11 important findings resolved across pre-review lints and cross-flow audit.
@@ -80,6 +80,13 @@ See `plan.md`, `track-0-shared.md`, `track-a-bff-server.md`, `track-b-terminal-h
 - [x] WU-088: end-to-end harness → BFF → mock provider (2026-04-19) — commit `b6c83e1`
 - [x] ADMIN: bare modeltap launches harness (2026-04-19) — commit `2ef1037`
 - [x] WU-090: v0.2.0 changelog (2026-04-19) — commit `6a04a4e`
+- [x] Streaming event delivery: full HandleEvent table + e2e (2026-04-19) — commit `53a03e0`
+- [x] Plan-mode tool interception via ToolDispatcher (2026-04-19) — commit `1e971c3`
+- [x] WU-061: manual compaction (session.compact + compact.apply + /compact) (2026-04-19) — commit `cc06a19`
+- [x] WU-094: security review — consolidated findings (2026-04-19) — commit `4f0e47a`
+- [x] Security: fix WU-094 Criticals (C-1..C-5) (2026-04-19) — commit `62116a6`
+- [x] Security: fix WU-094 top-tier Highs (H-1..H-5) (2026-04-19) — commit `71112e3`
+- [x] WU-095: performance baseline (micro-benchmarks + e2e latency) (2026-04-19) — commit `7fc231f`
 
 ### Bundle 4 (BFF Foundation) complete
 All four WUs in `internal/bff/` landed race-clean. WU-046 transport, WU-048
@@ -239,10 +246,13 @@ harness has working connection lifecycle and event bridge. Remaining:
   natural test driver.
 - **WU-087** harness integration tests — end-to-end against a mock
   BFF. Easier now that ConnectionManager + ProtocolClient exist.
-- **Integration track** (WU-094, 095, full WU-090 usage guide):
-  security review, performance benchmarks, user-led doc sweep.
-  WU-067/087/088 integration tests and the changelog portion of
-  WU-090 landed 2026-04-19; WU-089 CLI launch landed 2026-04-19.
+- **Integration track**: WU-094 security review landed 2026-04-19
+  with all 5 Criticals and top-5 Highs fixed. WU-095 performance
+  baseline landed 2026-04-19 (A+B — micro-benchmarks + e2e latency
+  p50/p95/p99 across handshake, ping, session.list, turn.submit).
+  Remaining: 10 Highs + 21 Mediums + 19 Lows from WU-094 deferred
+  to v0.2.x / v0.3 (details in .reviews/wu-094-security/review.md);
+  full usage-guide sweep portion of WU-090 remains user-led.
 - **WU-060** multi-model branching: deferred — superseded by FEAT-0013
   sub-agents.
 
