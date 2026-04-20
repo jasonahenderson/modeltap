@@ -10,6 +10,7 @@ Implementation-scoped work authorization documents. Patches are the lightweight 
 | [PATCH-0002](0002-local-inference-support.md) | Local Inference Support | proposed |
 | [PATCH-0003](0003-harness-app-conn-mgr-wiring.md) | Harness App ↔ ConnectionManager Wiring | approved |
 | [PATCH-0004](0004-secret-prefix-resolver.md) | Secret Prefix Resolver for Provider API Keys | done |
+| [PATCH-0005](0005-bff-route-via-proxy-default.md) | Route BFF provider traffic through the v0.1 proxy by default | approved |
 
 ## When to Use a Patch
 

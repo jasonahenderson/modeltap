@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/jasonahenderson/modeltap/internal/bff"
 	"github.com/jasonahenderson/modeltap/internal/config"
@@ -13,6 +14,31 @@ import (
 	"github.com/jasonahenderson/modeltap/internal/provider"
 	"github.com/jasonahenderson/modeltap/internal/storage"
 )
+
+// resolveProviderHost applies the PATCH-0005 default-to-proxy
+// behavior. When the v0.1 reverse proxy is configured to listen
+// (proxyPort > 0) and the provider has no explicit host override,
+// default the BFF's provider endpoint at http://127.0.0.1:<port>
+// so harness conversations flow through the proxy's capture
+// pipeline. Ollama/MLX are skipped — those are already local.
+//
+// Explicit overrides win: a user who sets host verbatim (including
+// https://api.anthropic.com) keeps the direct path. This lets
+// operators route around the proxy for latency or isolation when
+// they know what they're doing.
+func resolveProviderHost(pc config.ProviderConfig, proxyPort int) string {
+	if pc.Host != "" {
+		return pc.Host
+	}
+	if proxyPort <= 0 {
+		return ""
+	}
+	switch pc.Type {
+	case bff.ProviderTypeOllama, bff.ProviderTypeMLX:
+		return ""
+	}
+	return "http://127.0.0.1:" + strconv.Itoa(proxyPort)
+}
 
 // startBFFServer constructs a BFF server, populates its provider /
 // adapter / model / routing surfaces from the loaded config, ensures
@@ -58,11 +84,12 @@ func startBFFServer(cfg *config.Config, store storage.Store, stderr io.Writer) (
 		if pc.Type == "" {
 			continue
 		}
+		host := resolveProviderHost(pc, cfg.Port)
 		ep := &bff.ProviderEndpoint{
 			Name:     name,
 			Type:     pc.Type,
 			APIKey:   pc.APIKey,
-			Host:     pc.Host,
+			Host:     host,
 			Discover: pc.Discover,
 		}
 		if err := srv.Providers().Add(ep); err != nil {
