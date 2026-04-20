@@ -611,7 +611,17 @@ func (cm *ConnectionManager) HandleEvent(method string, params json.RawMessage) 
 		d := cm.toolDispatcher
 		cm.mu.RUnlock()
 		if d != nil {
-			go func() { _ = d.HandleToolCall(ev) }()
+			// Defensive recover: a tool panic must not kill the
+			// harness. Synthesize an error tool.result so the
+			// server doesn't hang waiting. WU-094 H-2.
+			go func(call protocol.ToolCall) {
+				defer func() {
+					if r := recover(); r != nil {
+						_ = d.SendErrorResult(call, fmt.Sprintf("tool panicked: %v", r))
+					}
+				}()
+				_ = d.HandleToolCall(call)
+			}(ev)
 		} else {
 			cm.sender.Send(ToolCallMsg{
 				TurnID:     ev.TurnID,

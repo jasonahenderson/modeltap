@@ -301,7 +301,18 @@ func (c *ProtocolClient) readLoop() {
 				continue
 			}
 			if c.eventHandler != nil {
-				c.eventHandler.HandleEvent(notif.Method, notif.Params)
+				// Defensive recover: an event handler panic must not
+				// kill the read loop (WU-094 H-1). The read loop is
+				// the only thing draining the socket; losing it
+				// crashes the whole harness.
+				func() {
+					defer func() {
+						if r := recover(); r != nil {
+							_ = r // swallow; server is untrusted
+						}
+					}()
+					c.eventHandler.HandleEvent(notif.Method, notif.Params)
+				}()
 			}
 		}
 	}

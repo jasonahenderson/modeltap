@@ -75,6 +75,33 @@ func handleTurnSubmit(_ context.Context, conn *Connection, params json.RawMessag
 	}
 
 	srv := conn.server
+
+	// Enforce the advertised MaxAttachmentSize (WU-094 H-5). The
+	// cap was returned in CapabilitiesRegisterResponse as a
+	// contract but no code enforced it, so a client could push
+	// up-to-frame-size attachments with every turn. Per-attachment
+	// and total caps both apply; total cap is the advertised value,
+	// any single attachment must fit under the same bound.
+	if max := srv.config.MaxAttachmentSize; max > 0 {
+		total := 0
+		for i, a := range submit.Attachments {
+			size := len(a.Raw) + len(a.Content)
+			if size > max {
+				return nil, &TransportError{
+					Code:    CodeInvalidParams,
+					Message: fmt.Sprintf("attachment %d exceeds max_attachment_size (%d > %d bytes)", i, size, max),
+				}
+			}
+			total += size
+			if total > max {
+				return nil, &TransportError{
+					Code:    CodeInvalidParams,
+					Message: fmt.Sprintf("attachments total (%d bytes) exceeds max_attachment_size (%d)", total, max),
+				}
+			}
+		}
+	}
+
 	ctx := context.Background()
 
 	// Ensure the session exists in storage; create on first turn (design D2.2).
