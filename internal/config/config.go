@@ -5,14 +5,18 @@
 //	flags > environment variables > config file > defaults
 //
 // Environment variables use the MODELTAP_ prefix (e.g., MODELTAP_PORT).
-// The config file path defaults to ~/.config/modeltap/config.yaml.
+// The config file path defaults to ~/.modeltap/config.yaml (PATCH-0006),
+// with ~/.config/modeltap/config.yaml honored as a legacy fallback for
+// one release cycle.
 package config
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
@@ -96,32 +100,146 @@ type Config struct {
 	BFF           BFFConfig                 `yaml:"bff" mapstructure:"bff"`
 }
 
-// DefaultConfigDir returns the default configuration directory path.
-func DefaultConfigDir() string {
+// homeDir is a small wrapper so every path helper degrades identically
+// when os.UserHomeDir fails (returning "~" produces a visibly-wrong
+// path that is still obvious in error messages).
+func homeDir() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		home = "~"
+		return "~"
 	}
-	return filepath.Join(home, ".config", "modeltap")
+	return home
 }
 
-// DefaultConfigPath returns the default config file path.
+// DefaultConfigDir returns the directory in which `config.yaml` lives
+// for a fresh install. Honors $XDG_CONFIG_HOME when explicitly set
+// (Linux power-user opt-in); otherwise defaults to ~/.modeltap
+// (PATCH-0006).
+func DefaultConfigDir() string {
+	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+		return filepath.Join(xdg, "modeltap")
+	}
+	return filepath.Join(homeDir(), ".modeltap")
+}
+
+// DefaultConfigPath returns the canonical config file path a fresh
+// install writes to.
 func DefaultConfigPath() string {
 	return filepath.Join(DefaultConfigDir(), "config.yaml")
 }
 
-// DefaultBFFSocketPath returns the canonical Unix-domain socket path
-// for the BFF JSON-RPC listener. Falls back to the user's home dir
-// when XDG_DATA_HOME is unset.
-func DefaultBFFSocketPath() string {
+// LegacyConfigPath returns the pre-PATCH-0006 config file path
+// (~/.config/modeltap/config.yaml). Used as a fallback when the new
+// default does not exist — see ResolveConfigPath.
+func LegacyConfigPath() string {
+	return filepath.Join(homeDir(), ".config", "modeltap", "config.yaml")
+}
+
+// DefaultDataDir returns the directory in which the SQLite DB, BFF
+// socket, and service log live for a fresh install. Honors
+// $XDG_DATA_HOME when explicitly set; otherwise ~/.modeltap
+// (PATCH-0006).
+func DefaultDataDir() string {
+	if xdg := os.Getenv("XDG_DATA_HOME"); xdg != "" {
+		return filepath.Join(xdg, "modeltap")
+	}
+	return filepath.Join(homeDir(), ".modeltap")
+}
+
+// legacyDBPath / legacySocketPath / legacyLogPath return the v0.1-era
+// defaults. Kept as package-private helpers because they are only
+// relevant when the config resolver detects a legacy install.
+func legacyDBPath() string {
+	return filepath.Join(homeDir(), ".config", "modeltap", "modeltap.db")
+}
+func legacySocketPath() string {
+	// $XDG_DATA_HOME was honored pre-PATCH-0006; preserve that so a
+	// Linux user with XDG_DATA_HOME set and a legacy config keeps the
+	// socket at the same place it was before the patch.
 	if xdg := os.Getenv("XDG_DATA_HOME"); xdg != "" {
 		return filepath.Join(xdg, "modeltap", "server.sock")
 	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		home = "~"
+	return filepath.Join(homeDir(), ".local", "share", "modeltap", "server.sock")
+}
+func legacyLogPath() string {
+	return filepath.Join(homeDir(), ".config", "modeltap", "modeltap.log")
+}
+
+// DefaultBFFSocketPath returns the canonical Unix-domain socket path
+// for the BFF JSON-RPC listener.
+func DefaultBFFSocketPath() string {
+	return filepath.Join(DefaultDataDir(), "server.sock")
+}
+
+// ConfigPathResolution records where a config file was located and
+// whether the resolver fell back to a legacy path. Legacy=true means
+// the caller should also apply legacy defaults for DB / socket / log
+// so the existing install keeps working with zero edits.
+type ConfigPathResolution struct {
+	Path    string
+	Legacy  bool
+	Warning string // stderr notice to print once; "" when no fallback occurred
+}
+
+// ResolveConfigPath picks where to read config from when the caller
+// hasn't specified one. Prefers the new canonical default and falls
+// back to ~/.config/modeltap/config.yaml iff that path exists but the
+// new one does not. Explicit CLI / env paths bypass this entirely.
+func ResolveConfigPath() ConfigPathResolution {
+	newPath := DefaultConfigPath()
+	if _, err := os.Stat(newPath); err == nil {
+		return ConfigPathResolution{Path: newPath}
 	}
-	return filepath.Join(home, ".local", "share", "modeltap", "server.sock")
+	legacy := LegacyConfigPath()
+	if _, err := os.Stat(legacy); err == nil && legacy != newPath {
+		return ConfigPathResolution{
+			Path:   legacy,
+			Legacy: true,
+			Warning: fmt.Sprintf(
+				"modeltap: using legacy config at %s\n"+
+					"          move to %s to silence this warning\n"+
+					"          (and relocate modeltap.db + server.sock alongside it)\n",
+				legacy, newPath,
+			),
+		}
+	}
+	return ConfigPathResolution{Path: newPath}
+}
+
+// legacyWarnOnce prints a deprecation warning at most once per
+// process. Silent when stderr is nil (tests, -h output).
+var legacyWarnOnce sync.Once
+
+func emitLegacyWarning(stderr io.Writer, msg string) {
+	if stderr == nil || msg == "" {
+		return
+	}
+	legacyWarnOnce.Do(func() {
+		fmt.Fprint(stderr, msg)
+	})
+}
+
+// applyDefaults sets every Viper default value. Split out so Load and
+// LoadWithViper stay in sync, and so the legacy-vs-new-default decision
+// lives in one place.
+func applyDefaults(v *viper.Viper, legacy bool) {
+	v.SetDefault("port", 8080)
+	v.SetDefault("upstream", "https://api.anthropic.com")
+	if legacy {
+		v.SetDefault("db_path", legacyDBPath())
+		v.SetDefault("bff.socket_path", legacySocketPath())
+	} else {
+		v.SetDefault("db_path", filepath.Join(DefaultDataDir(), "modeltap.db"))
+		v.SetDefault("bff.socket_path", DefaultBFFSocketPath())
+	}
+	v.SetDefault("retention_days", 30)
+	v.SetDefault("max_body_size", "10MB")
+	v.SetDefault("dashboard.enabled", false)
+	v.SetDefault("dashboard.port", 8081)
+	v.SetDefault("dashboard.bind", "127.0.0.1")
+	v.SetDefault("bff.socket_mode", uint32(0o600))
+	v.SetDefault("bff.max_connections", 100)
+	v.SetDefault("bff.max_attachment_size", 5*1024*1024)
 }
 
 // expandHome expands a leading ~ in a path to the user's home directory.
@@ -197,92 +315,35 @@ func resolveProviderSecrets(cfg *Config) error {
 
 // Load reads configuration from defaults, the config file, and environment
 // variables. It returns a Config struct with all resolved values.
-// The configPath parameter is optional; if empty, the default path is used.
+// The configPath parameter is optional; if empty, the resolver picks
+// between the new canonical default and the legacy fallback.
 func Load(configPath string) (*Config, error) {
-	v := viper.New()
-
-	// Set defaults.
-	v.SetDefault("port", 8080)
-	v.SetDefault("upstream", "https://api.anthropic.com")
-	v.SetDefault("db_path", filepath.Join("~", ".config", "modeltap", "modeltap.db"))
-	v.SetDefault("retention_days", 30)
-	v.SetDefault("max_body_size", "10MB")
-	v.SetDefault("dashboard.enabled", false)
-	v.SetDefault("dashboard.port", 8081)
-	v.SetDefault("dashboard.bind", "127.0.0.1")
-	v.SetDefault("bff.socket_path", DefaultBFFSocketPath())
-	v.SetDefault("bff.socket_mode", uint32(0o600))
-	v.SetDefault("bff.max_connections", 100)
-	v.SetDefault("bff.max_attachment_size", 5*1024*1024)
-
-	// Set up config file.
-	if configPath == "" {
-		configPath = DefaultConfigPath()
-	}
-	configPath = expandHome(configPath)
-
-	v.SetConfigFile(configPath)
-	v.SetConfigType("yaml")
-
-	// Read config file (ignore file-not-found errors).
-	if err := v.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			// If the file simply doesn't exist, that's fine.
-			if !os.IsNotExist(err) {
-				return nil, fmt.Errorf("reading config file: %w", err)
-			}
-		}
-	}
-
-	// Set up environment variables.
-	v.SetEnvPrefix("MODELTAP")
-	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	v.AutomaticEnv()
-
-	// Unmarshal into Config struct.
-	var cfg Config
-	if err := v.Unmarshal(&cfg); err != nil {
-		return nil, fmt.Errorf("unmarshalling config: %w", err)
-	}
-
-	// Expand ~ in paths.
-	cfg.DBPath = expandHome(cfg.DBPath)
-	cfg.BFF.SocketPath = expandHome(cfg.BFF.SocketPath)
-	cfg.BFF.TLSCertFile = expandHome(cfg.BFF.TLSCertFile)
-	cfg.BFF.TLSKeyFile = expandHome(cfg.BFF.TLSKeyFile)
-
-	// Resolve env: / file: prefixes on provider API keys.
-	if err := resolveProviderSecrets(&cfg); err != nil {
-		return nil, err
-	}
-
-	return &cfg, nil
+	cfg, _, err := loadInternal(configPath, os.Stderr)
+	return cfg, err
 }
 
 // LoadWithViper is like Load but also returns the viper instance, allowing
 // callers to bind CLI flags to it for flag > env > file precedence.
 func LoadWithViper(configPath string) (*Config, *viper.Viper, error) {
+	return loadInternal(configPath, os.Stderr)
+}
+
+// loadInternal is the shared implementation behind Load and
+// LoadWithViper. stderr is exposed as a parameter so tests can capture
+// the legacy-fallback deprecation warning.
+func loadInternal(configPath string, stderr io.Writer) (*Config, *viper.Viper, error) {
 	v := viper.New()
 
-	// Set defaults.
-	v.SetDefault("port", 8080)
-	v.SetDefault("upstream", "https://api.anthropic.com")
-	v.SetDefault("db_path", filepath.Join("~", ".config", "modeltap", "modeltap.db"))
-	v.SetDefault("retention_days", 30)
-	v.SetDefault("max_body_size", "10MB")
-	v.SetDefault("dashboard.enabled", false)
-	v.SetDefault("dashboard.port", 8081)
-	v.SetDefault("dashboard.bind", "127.0.0.1")
-	v.SetDefault("bff.socket_path", DefaultBFFSocketPath())
-	v.SetDefault("bff.socket_mode", uint32(0o600))
-	v.SetDefault("bff.max_connections", 100)
-	v.SetDefault("bff.max_attachment_size", 5*1024*1024)
-
-	// Set up config file.
+	legacy := false
 	if configPath == "" {
-		configPath = DefaultConfigPath()
+		res := ResolveConfigPath()
+		configPath = res.Path
+		legacy = res.Legacy
+		emitLegacyWarning(stderr, res.Warning)
 	}
 	configPath = expandHome(configPath)
+
+	applyDefaults(v, legacy)
 
 	v.SetConfigFile(configPath)
 	v.SetConfigType("yaml")
@@ -296,18 +357,15 @@ func LoadWithViper(configPath string) (*Config, *viper.Viper, error) {
 		}
 	}
 
-	// Set up environment variables.
 	v.SetEnvPrefix("MODELTAP")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
 
-	// Unmarshal into Config struct.
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {
 		return nil, nil, fmt.Errorf("unmarshalling config: %w", err)
 	}
 
-	// Expand ~ in paths.
 	cfg.DBPath = expandHome(cfg.DBPath)
 	cfg.BFF.SocketPath = expandHome(cfg.BFF.SocketPath)
 	cfg.BFF.TLSCertFile = expandHome(cfg.BFF.TLSCertFile)

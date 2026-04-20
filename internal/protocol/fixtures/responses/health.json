@@ -8,7 +8,7 @@
   },
   "storage": {
     "status": "ready",
-    "path": "/Users/dev/.config/modeltap/modeltap.db"
+    "path": "/Users/dev/.modeltap/modeltap.db"
   },
   "capabilities": {
     "status": "ready"
