@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync/atomic"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jasonahenderson/modeltap/internal/config"
@@ -33,6 +34,40 @@ func registerBuiltinTools(registry *tools.Registry, projectRoot string, tracker 
 	// API key from config; wiring it here without one would register
 	// a tool that always errors. Users enable it explicitly once MCP
 	// / config surfaces grow an api_key input.
+}
+
+// toolActivityObserver adapts the deferredSender into the
+// ToolActivityObserver interface. Every tool start / end fires a
+// ToolActivityMsg onto the tea.Program so the viewport can render
+// inline "⚙ tool…" / "✓ outcome" entries. The dispatcher lives on
+// a goroutine outside the Update loop, so routing through sender
+// (tea.Program.Send) is the correct pattern.
+type toolActivityObserver struct {
+	sender *deferredSender
+}
+
+func newToolActivityObserver(sender *deferredSender) *toolActivityObserver {
+	return &toolActivityObserver{sender: sender}
+}
+
+func (o *toolActivityObserver) OnToolStart(call protocol.ToolCall, summary string) {
+	o.sender.Send(harness.ToolActivityMsg{
+		Phase:      harness.ToolActivityStart,
+		ToolName:   call.Tool,
+		ToolCallID: call.ToolCallID,
+		Summary:    summary,
+	})
+}
+
+func (o *toolActivityObserver) OnToolEnd(call protocol.ToolCall, status, output string, elapsed time.Duration) {
+	o.sender.Send(harness.ToolActivityMsg{
+		Phase:      harness.ToolActivityEnd,
+		ToolName:   call.Tool,
+		ToolCallID: call.ToolCallID,
+		Status:     status,
+		Summary:    output,
+		Duration:   elapsed,
+	})
 }
 
 // toolResultSender adapts *ConnectionManager to the narrow
@@ -229,6 +264,7 @@ func runHarness(cmd *cobra.Command, flags *harnessFlags) error {
 		app.Plan(),
 		app.State(),
 	)
+	dispatcher.SetObserver(newToolActivityObserver(sender))
 	cm.SetToolDispatcher(dispatcher)
 	if flags.resumeID != "" {
 		app.State().SessionID = flags.resumeID

@@ -215,6 +215,30 @@ type TurnSubmittedMsg struct {
 	Err    error
 }
 
+// ToolActivityPhase discriminates start vs end of a tool execution.
+type ToolActivityPhase string
+
+const (
+	// ToolActivityStart fires before the dispatcher invokes a tool.
+	ToolActivityStart ToolActivityPhase = "start"
+	// ToolActivityEnd fires after the tool returns (success or error).
+	ToolActivityEnd ToolActivityPhase = "end"
+)
+
+// ToolActivityMsg reports tool execution progress to the viewport so
+// the user sees "⚙ Read foo.txt" → "✓ 42 lines" instead of a silent
+// gap between their submit and the assistant's response. Start
+// events render a tool_call line; End events render a tool_result
+// line with outcome + duration.
+type ToolActivityMsg struct {
+	Phase      ToolActivityPhase
+	ToolName   string
+	ToolCallID string
+	Summary    string        // one-line description (start) or outcome (end)
+	Status     string        // populated on Phase=end: success / error / rejected
+	Duration   time.Duration // populated on Phase=end
+}
+
 // TickMsg is the periodic tick driving the call duration display in
 // the status bar.
 type TickMsg time.Time
