@@ -116,6 +116,9 @@ The canonical index of every numbered doc that drove, constrains, or informs v0.
 | [PATCH-0003](../../patches/0003-harness-app-conn-mgr-wiring.md) | Harness App ↔ ConnectionManager wiring | approved | Shipped: `ConnSurface` / `deferredSender` wiring between the Bubbletea App and the connection manager. |
 | [PATCH-0004](../../patches/0004-secret-prefix-resolver.md) | Secret prefix resolver (`env:` / `file:`) | done | Shipped: `config.ResolveSecret` applied to provider API keys; sample config updated. |
 | [PATCH-0005](../../patches/0005-bff-route-via-proxy-default.md) | Route BFF provider traffic through the v0.1 proxy by default | approved | Shipped: harness conversations now flow through the proxy's capture tables; cloud providers default to `http://127.0.0.1:<port>` unless `host:` is set. |
+| [PATCH-0006](../../patches/0006-unified-config-data-dir.md) | Unified `~/.modeltap/` config & data directory | done | Shipped: single canonical dir for config, DB, socket, and log; XDG override and one-release legacy fallback preserved. |
+| [PATCH-0007](../../patches/0007-dotenv-loader.md) | `.env` loader for provider credentials | done | Shipped: `./.env` and `~/.modeltap/.env` are auto-loaded at startup; opt-out via `MODELTAP_DOTENV=false`. |
+| [PATCH-0009](../../patches/0009-root-readme.md) | Root `README.md` | done | Shipped: repo-root `README.md` with pitch, quick start, repo map, contributor entry points, and Apache-2.0 framing. |
 
 ### Explorations
 
