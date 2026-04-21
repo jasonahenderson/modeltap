@@ -8,11 +8,12 @@ Implementation-scoped work authorization documents. Patches are the lightweight 
 |-------|-------|--------|
 | [PATCH-0001](0001-openai-responses-api-support.md) | OpenAI Responses API Support | proposed |
 | [PATCH-0002](0002-local-inference-support.md) | Local Inference Support | proposed |
-| [PATCH-0003](0003-harness-app-conn-mgr-wiring.md) | Harness App ↔ ConnectionManager Wiring | approved |
+| [PATCH-0008](0008-moonshot-provider-adapter.md) | Moonshot Provider Adapter (Kimi K2.6) | proposed |
 | [PATCH-0004](0004-secret-prefix-resolver.md) | Secret Prefix Resolver for Provider API Keys | done |
 | [PATCH-0005](0005-bff-route-via-proxy-default.md) | Route BFF provider traffic through the v0.1 proxy by default | approved |
 | [PATCH-0006](0006-unified-config-data-dir.md) | Unified `~/.modeltap/` config & data directory | done |
 | [PATCH-0007](0007-dotenv-loader.md) | `.env` loader for provider credentials | done |
+| [PATCH-0009](0009-root-readme.md) | Root `README.md` | done |
 
 ## When to Use a Patch
 

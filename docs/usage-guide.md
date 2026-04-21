@@ -1,5 +1,7 @@
 # modeltap Usage Guide
 
+> For a project overview, quick start, and contributor entry points, see the root [`README.md`](../README.md). This guide is the detailed command and configuration reference.
+
 ## Overview
 
 modeltap is a transparent reverse proxy for AI/ML API clients. It sits between your application and AI provider APIs (such as Anthropic and OpenAI), capturing every request and response that passes through. It stores this data locally in SQLite and provides tools for browsing logs, exporting data, tracking usage metrics (tokens, latency, estimated cost), and viewing everything in a web dashboard.
