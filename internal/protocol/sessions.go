@@ -47,11 +47,11 @@ type SessionDetail struct {
 
 // TurnSummary is an element of SessionDetail.Turns.
 type TurnSummary struct {
-	Sequence      int    `json:"sequence"`
-	Summary       string `json:"summary"`
-	Compacted     bool   `json:"compacted"`
-	OriginalTurns []int  `json:"original_turns,omitempty"`
-	Model         string `json:"model"`
+	Sequence      int     `json:"sequence"`
+	Summary       string  `json:"summary"`
+	Compacted     bool    `json:"compacted"`
+	OriginalTurns []int   `json:"original_turns,omitempty"`
+	Model         string  `json:"model"`
 	Cost          float64 `json:"cost"`
 }
 
@@ -77,7 +77,7 @@ type SessionSyncResponse struct {
 type ActiveTurnState struct {
 	TurnID               string            `json:"turn_id"`
 	Status               string            `json:"status"`
-	PendingToolCalls     []PendingToolCall  `json:"pending_tool_calls,omitempty"`
+	PendingToolCalls     []PendingToolCall `json:"pending_tool_calls,omitempty"`
 	CompletedTokens      int               `json:"completed_tokens,omitempty"`
 	TokenReplayAvailable bool              `json:"token_replay_available"`
 	Summary              string            `json:"summary"`

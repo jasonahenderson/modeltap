@@ -377,9 +377,9 @@ func (c *ProtocolClient) SendToolResult(ctx context.Context, result *protocol.To
 // harness needs at hand. The full response is also returned via the
 // underlying call for callers that want richer fields.
 type RegisterResponse struct {
-	NegotiatedVersion string `json:"protocol_version"`
-	MaxFrameSize      int    `json:"max_frame_size"`
-	MaxAttachmentSize int    `json:"max_attachment_size"`
+	NegotiatedVersion  string                      `json:"protocol_version"`
+	MaxFrameSize       int                         `json:"max_frame_size"`
+	MaxAttachmentSize  int                         `json:"max_attachment_size"`
 	ServerCapabilities protocol.ServerCapabilities `json:"server_capabilities"`
 }
 

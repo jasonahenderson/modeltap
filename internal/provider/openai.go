@@ -43,12 +43,12 @@ func (p *OpenAIProvider) Detect(r *http.Request) bool {
 
 // openaiRequest represents the JSON body of an OpenAI chat completions request.
 type openaiRequest struct {
-	Model              string          `json:"model"`
-	MaxTokens          int             `json:"max_tokens"`
-	MaxCompletionTokens int            `json:"max_completion_tokens"`
-	Messages           json.RawMessage `json:"messages"`
-	Temperature        *float64        `json:"temperature"`
-	Stream             bool            `json:"stream"`
+	Model               string          `json:"model"`
+	MaxTokens           int             `json:"max_tokens"`
+	MaxCompletionTokens int             `json:"max_completion_tokens"`
+	Messages            json.RawMessage `json:"messages"`
+	Temperature         *float64        `json:"temperature"`
+	Stream              bool            `json:"stream"`
 }
 
 // ParseRequest extracts metadata from an OpenAI chat completions request body.
@@ -81,8 +81,8 @@ func (p *OpenAIProvider) ParseRequest(body []byte, headers http.Header) (*Reques
 
 // openaiResponse represents the JSON body of an OpenAI chat completions response.
 type openaiResponse struct {
-	Model   string `json:"model"`
-	Usage   struct {
+	Model string `json:"model"`
+	Usage struct {
 		PromptTokens     int64 `json:"prompt_tokens"`
 		CompletionTokens int64 `json:"completion_tokens"`
 	} `json:"usage"`
@@ -301,10 +301,10 @@ type openaiToolCallFunction struct {
 // openaiMessageWire is the wire format for an OpenAI chat message.
 // Content can be either a string or array of content blocks.
 type openaiMessageWire struct {
-	Role      string              `json:"role"`
-	Content   any                 `json:"content"`
-	ToolCalls []openaiToolCallWire `json:"tool_calls,omitempty"`
-	ToolCallID string             `json:"tool_call_id,omitempty"`
+	Role       string               `json:"role"`
+	Content    any                  `json:"content"`
+	ToolCalls  []openaiToolCallWire `json:"tool_calls,omitempty"`
+	ToolCallID string               `json:"tool_call_id,omitempty"`
 }
 
 // openaiContentBlock represents a content block in the array form.
@@ -331,8 +331,8 @@ type openaiRequestBody struct {
 
 // openaiToolDefWire is the wire format for an OpenAI tool definition.
 type openaiToolDefWire struct {
-	Type     string              `json:"type"`
-	Function openaiToolDefFunc   `json:"function"`
+	Type     string            `json:"type"`
+	Function openaiToolDefFunc `json:"function"`
 }
 
 type openaiToolDefFunc struct {

@@ -107,15 +107,15 @@ func TestAnthropicProvider_ParseRequest(t *testing.T) {
 	p := NewAnthropicProvider()
 
 	tests := []struct {
-		name        string
-		body        string
-		wantModel   string
-		wantMax     int
-		wantMsgs    int
-		wantStream  bool
-		wantTemp    *float64
-		wantSystem  string
-		wantErr     bool
+		name       string
+		body       string
+		wantModel  string
+		wantMax    int
+		wantMsgs   int
+		wantStream bool
+		wantTemp   *float64
+		wantSystem string
+		wantErr    bool
 	}{
 		{
 			name: "typical messages request",

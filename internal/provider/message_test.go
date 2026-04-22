@@ -273,7 +273,7 @@ func TestEstimateTokens(t *testing.T) {
 		{
 			name:  "100 chars",
 			input: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", // 100 a's
-			want:  25, // 100/4 = 25
+			want:  25,                                                                                                     // 100/4 = 25
 		},
 	}
 

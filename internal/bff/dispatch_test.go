@@ -22,8 +22,8 @@ type stubAdapter struct {
 	formatEr error
 }
 
-func (a *stubAdapter) Name() string                                                       { return a.name }
-func (a *stubAdapter) Detect(_ *http.Request) bool                                        { return false }
+func (a *stubAdapter) Name() string                { return a.name }
+func (a *stubAdapter) Detect(_ *http.Request) bool { return false }
 func (a *stubAdapter) ParseRequest(_ []byte, _ http.Header) (*provider.RequestMetadata, error) {
 	return &provider.RequestMetadata{}, nil
 }

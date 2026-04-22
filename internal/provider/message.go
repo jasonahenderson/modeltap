@@ -9,12 +9,12 @@ import (
 // state; each Provider.FormatMessages translates the canonical form into
 // the provider's wire format.
 type Message struct {
-	Role        string         `json:"role"`                    // user | assistant | system | tool
-	Content     string         `json:"content"`                 // primary text content; may be empty if tool_calls/results are the payload
-	ToolCalls   []ToolCall     `json:"tool_calls,omitempty"`    // assistant role: tool invocations produced by the model
-	ToolResults []ToolResult   `json:"tool_results,omitempty"`  // tool role OR user continuations: results of executed tools
-	Attachments []Attachment   `json:"attachments,omitempty"`   // files/images attached to this message
-	Metadata    map[string]any `json:"metadata,omitempty"`      // optional provenance: turn_id, branch_id, timestamps
+	Role        string         `json:"role"`                   // user | assistant | system | tool
+	Content     string         `json:"content"`                // primary text content; may be empty if tool_calls/results are the payload
+	ToolCalls   []ToolCall     `json:"tool_calls,omitempty"`   // assistant role: tool invocations produced by the model
+	ToolResults []ToolResult   `json:"tool_results,omitempty"` // tool role OR user continuations: results of executed tools
+	Attachments []Attachment   `json:"attachments,omitempty"`  // files/images attached to this message
+	Metadata    map[string]any `json:"metadata,omitempty"`     // optional provenance: turn_id, branch_id, timestamps
 }
 
 // ToolCall represents a tool invocation produced by an assistant message.
@@ -35,9 +35,9 @@ type ToolResult struct {
 
 // Attachment represents a file or image attached to a message.
 type Attachment struct {
-	Path        string `json:"path"`         // project-relative file path
-	Raw         string `json:"raw"`          // base64-encoded original bytes
-	Content     string `json:"content"`      // extracted text representation
+	Path        string `json:"path"`    // project-relative file path
+	Raw         string `json:"raw"`     // base64-encoded original bytes
+	Content     string `json:"content"` // extracted text representation
 	ContentType string `json:"content_type"`
 	Transform   string `json:"transform"`
 }

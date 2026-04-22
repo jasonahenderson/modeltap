@@ -164,7 +164,7 @@ func parseGitArgs(cmd string) ([]string, error) {
 // use prompts.
 var gitReadCommands = map[string]bool{
 	"status": true, "log": true, "diff": true, "show": true,
-	"branch":   true, "tag": true,
+	"branch": true, "tag": true,
 	"ls-files": true, "ls-tree": true, "rev-parse": true,
 	"blame": true, "shortlog": true, "describe": true,
 	"rev-list": true, "cat-file": true, "name-rev": true,

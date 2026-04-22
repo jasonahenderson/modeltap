@@ -61,10 +61,10 @@ type Provider interface {
 // Error is populated, depending on Type.
 type StreamEvent struct {
 	Type     StreamEventType
-	Content  string         // populated for StreamEventText
+	Content  string          // populated for StreamEventText
 	ToolCall *StreamToolCall // populated for StreamEventToolCall*
-	Usage    *StreamUsage   // populated for StreamEventUsage and StreamEventDone
-	Error    string         // populated for StreamEventError
+	Usage    *StreamUsage    // populated for StreamEventUsage and StreamEventDone
+	Error    string          // populated for StreamEventError
 }
 
 // StreamEventType discriminates StreamEvent payloads.
@@ -99,11 +99,11 @@ type StreamUsage struct {
 
 // RequestMetadata holds provider-agnostic fields extracted from an LLM API request.
 type RequestMetadata struct {
-	Model       string
-	MaxTokens   int
-	Messages    int    // number of messages in the conversation
-	Temperature *float64
-	Stream      bool
+	Model        string
+	MaxTokens    int
+	Messages     int // number of messages in the conversation
+	Temperature  *float64
+	Stream       bool
 	SystemPrompt string
 }
 
@@ -123,23 +123,23 @@ type StreamChunk struct {
 
 // FormatMessagesOpts groups the inputs to FormatMessages.
 type FormatMessagesOpts struct {
-	Messages     []Message                  // canonical conversation, in turn order (oldest first)
-	SystemPrompt string                     // pre-assembled by prompt engine
-	WindowSize   int                        // max total tokens for truncation (approximate)
-	Model        string                     // provider-specific model identifier
-	MaxTokens    int                        // output token cap
-	Temperature  *float64                   // optional
+	Messages     []Message // canonical conversation, in turn order (oldest first)
+	SystemPrompt string    // pre-assembled by prompt engine
+	WindowSize   int       // max total tokens for truncation (approximate)
+	Model        string    // provider-specific model identifier
+	MaxTokens    int       // output token cap
+	Temperature  *float64  // optional
 	Stream       bool
-	Tools        []protocol.ToolDefinition  // optional; empty slice means no tool-use
-	Capabilities []string                   // model capabilities (e.g., "vision", "tool_use")
+	Tools        []protocol.ToolDefinition // optional; empty slice means no tool-use
+	Capabilities []string                  // model capabilities (e.g., "vision", "tool_use")
 }
 
 // Error sentinels for provider formatting operations.
 var (
-	ErrNotImplemented      = errors.New("provider: method not implemented")
-	ErrWindowTooSmall      = errors.New("provider: context window too small even for system prompt")
-	ErrEmptyMessages       = errors.New("provider: messages slice is empty")
-	ErrTruncationEmpty     = errors.New("provider: truncation produced no viable messages")
-	ErrInvalidToolInput    = errors.New("provider: tool_call input is not valid JSON")
+	ErrNotImplemented        = errors.New("provider: method not implemented")
+	ErrWindowTooSmall        = errors.New("provider: context window too small even for system prompt")
+	ErrEmptyMessages         = errors.New("provider: messages slice is empty")
+	ErrTruncationEmpty       = errors.New("provider: truncation produced no viable messages")
+	ErrInvalidToolInput      = errors.New("provider: tool_call input is not valid JSON")
 	ErrUnsupportedOutputType = errors.New("provider: tool_result output_type is not supported by provider")
 )

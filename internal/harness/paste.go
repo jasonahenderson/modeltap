@@ -29,11 +29,11 @@ const defaultPasteTruncateLimit = 2048
 //     Complete() call. Stays active so the user can't accidentally
 //     dismiss the overlay mid-flight.
 type PasteHandler struct {
-	mu             sync.Mutex
-	active         bool
-	awaitingSum    bool
-	pending        PasteDetectedMsg
-	truncateLimit  int
+	mu            sync.Mutex
+	active        bool
+	awaitingSum   bool
+	pending       PasteDetectedMsg
+	truncateLimit int
 }
 
 // NewPasteHandler returns an inactive handler.

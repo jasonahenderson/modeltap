@@ -454,4 +454,3 @@ func (h *APIHandler) ListenAndServe(ctx context.Context) error {
 	}
 	return err
 }
-

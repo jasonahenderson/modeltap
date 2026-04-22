@@ -21,9 +21,13 @@ type turnAdapter struct {
 	body []byte
 }
 
-func (a *turnAdapter) Name() string                                                       { return ProviderTypeAnthropic }
-func (a *turnAdapter) FormatMessages(_ provider.FormatMessagesOpts) ([]byte, error)       { return a.body, nil }
-func (a *turnAdapter) FormatToolDefinitions(_ []protocol.ToolDefinition) ([]byte, error)  { return []byte("[]"), nil }
+func (a *turnAdapter) Name() string { return ProviderTypeAnthropic }
+func (a *turnAdapter) FormatMessages(_ provider.FormatMessagesOpts) ([]byte, error) {
+	return a.body, nil
+}
+func (a *turnAdapter) FormatToolDefinitions(_ []protocol.ToolDefinition) ([]byte, error) {
+	return []byte("[]"), nil
+}
 func (a *turnAdapter) ParseStreamEvent(data []byte) (*provider.StreamEvent, error) {
 	switch string(data) {
 	case "done":

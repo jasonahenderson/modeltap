@@ -312,7 +312,7 @@ type MCPToolsCallResult struct {
 type MCPContentBlock struct {
 	Type     string `json:"type"`
 	Text     string `json:"text,omitempty"`
-	Data     string `json:"data,omitempty"`     // base64 for image/resource
+	Data     string `json:"data,omitempty"` // base64 for image/resource
 	MimeType string `json:"mimeType,omitempty"`
 }
 

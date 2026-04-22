@@ -293,9 +293,9 @@ func TestServer_TLSListener_RefusesWithoutClientCA(t *testing.T) {
 	generateSelfSignedCert(t, certFile, keyFile)
 
 	cfg := ServerConfig{
-		TLSAddress:        "127.0.0.1:0",
-		TLSCertFile:       certFile,
-		TLSKeyFile:        keyFile,
+		TLSAddress:  "127.0.0.1:0",
+		TLSCertFile: certFile,
+		TLSKeyFile:  keyFile,
 		// No TLSClientCAFile — must refuse.
 		MaxConnections:    100,
 		HeartbeatInterval: 10 * time.Millisecond,

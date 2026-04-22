@@ -21,9 +21,9 @@ type ModelInfo struct {
 
 // ModelListResponse is the response to model.list.
 type ModelListResponse struct {
-	Models          []ModelInfo    `json:"models"`
-	CurrentOverride string         `json:"current_override,omitempty"`
-	RoutingPolicy   RoutingPolicy  `json:"routing_policy"`
+	Models          []ModelInfo   `json:"models"`
+	CurrentOverride string        `json:"current_override,omitempty"`
+	RoutingPolicy   RoutingPolicy `json:"routing_policy"`
 }
 
 // RoutingPolicy maps dot-path role names to model names or arrays.

@@ -79,7 +79,7 @@ file so it persists across restarts.`,
 
   # Set retention days
   modeltap config set retention_days 90`,
-		Args:  cobra.ExactArgs(2),
+		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fmt.Fprintf(cmd.OutOrStdout(), "config set %s=%s: not implemented yet\n", args[0], args[1])
 			return nil

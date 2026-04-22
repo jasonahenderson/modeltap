@@ -142,7 +142,7 @@ func TestMCPManager_Launch_RegistersTools(t *testing.T) {
 
 	got := reg.Names()
 	want := map[string]bool{
-		"mcp/demo:read_file": false,
+		"mcp/demo:read_file":  false,
 		"mcp/demo:write_note": false,
 	}
 	for _, n := range got {
@@ -340,9 +340,9 @@ func TestFilteredEnv_StripsCredentials(t *testing.T) {
 		"RANDOM_VAR=value", // not allowed, not sensitive — still stripped
 	})
 	want := map[string]bool{
-		"PATH=/usr/bin":     false,
-		"HOME=/home/u":      false,
-		"LC_TIME=en_US":     false,
+		"PATH=/usr/bin": false,
+		"HOME=/home/u":  false,
+		"LC_TIME=en_US": false,
 	}
 	for _, e := range got {
 		if _, ok := want[e]; ok {

@@ -404,8 +404,8 @@ func TestConnMgr_ConnectSync_HappyPath(t *testing.T) {
 
 	sender := &recordingSender{}
 	cm := NewConnectionManager(ConnectionConfig{
-		SocketPath:   sock,
-		Registration: &protocol.CapabilitiesRegister{ProtocolVersion: "1"},
+		SocketPath:        sock,
+		Registration:      &protocol.CapabilitiesRegister{ProtocolVersion: "1"},
 		HeartbeatInterval: 50 * time.Millisecond,
 		HeartbeatTimeout:  100 * time.Millisecond,
 	}, sender)

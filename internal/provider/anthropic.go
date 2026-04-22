@@ -200,9 +200,9 @@ func (a *AnthropicProvider) ParseStreamEvent(data []byte) (*StreamEvent, error) 
 		var ev struct {
 			Index        int `json:"index"`
 			ContentBlock struct {
-				Type  string `json:"type"`
-				ID    string `json:"id"`
-				Name  string `json:"name"`
+				Type  string          `json:"type"`
+				ID    string          `json:"id"`
+				Name  string          `json:"name"`
 				Input json.RawMessage `json:"input"`
 			} `json:"content_block"`
 		}

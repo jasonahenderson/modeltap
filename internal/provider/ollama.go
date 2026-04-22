@@ -47,12 +47,12 @@ type ollamaMsg struct {
 // is true Ollama writes one of these per line; when stream is false it
 // writes a single object.
 type ollamaChatResponse struct {
-	Model            string `json:"model"`
-	Message          ollamaMsg `json:"message"`
-	Done             bool   `json:"done"`
-	DoneReason       string `json:"done_reason"`
-	PromptEvalCount  int    `json:"prompt_eval_count"`
-	EvalCount        int    `json:"eval_count"`
+	Model           string    `json:"model"`
+	Message         ollamaMsg `json:"message"`
+	Done            bool      `json:"done"`
+	DoneReason      string    `json:"done_reason"`
+	PromptEvalCount int       `json:"prompt_eval_count"`
+	EvalCount       int       `json:"eval_count"`
 }
 
 // ParseRequest extracts metadata from an outgoing /api/chat request.

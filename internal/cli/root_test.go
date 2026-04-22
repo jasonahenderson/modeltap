@@ -40,8 +40,8 @@ func TestVersionFlag(t *testing.T) {
 
 func TestSubcommandsRegistered(t *testing.T) {
 	tests := []struct {
-		name    string
-		subcmd  string
+		name   string
+		subcmd string
 	}{
 		{"start", "start"},
 		{"logs", "logs"},
