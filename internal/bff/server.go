@@ -376,14 +376,23 @@ func (s *Server) acceptLoop(ln net.Listener, requiresAuth bool) {
 			time.Sleep(10 * time.Millisecond)
 			continue
 		}
+		// Increment wg here (inside a goroutine that already holds a wg
+		// reference) so concurrent Shutdown -> wg.Wait cannot race with
+		// Add(1) in the handler goroutine. See sync.WaitGroup docs:
+		// Add with positive delta is safe while the counter is known >0.
+		s.wg.Add(1)
 		go s.handleConnection(conn, requiresAuth)
 	}
 }
 
 // handleConnection wraps a freshly-accepted net.Conn in a Connection
 // and runs its lifecycle. Enforces MaxConnections; over-limit connections
-// are closed without protocol reply.
+// are closed without protocol reply. The caller (acceptLoop) must have
+// already called s.wg.Add(1); this function is responsible for the
+// matching Done on every return path.
 func (s *Server) handleConnection(netConn net.Conn, requiresAuth bool) {
+	defer s.wg.Done()
+
 	s.mu.Lock()
 	if s.config.MaxConnections > 0 && len(s.conns) >= s.config.MaxConnections {
 		s.mu.Unlock()
@@ -394,11 +403,9 @@ func (s *Server) handleConnection(netConn net.Conn, requiresAuth bool) {
 	transport := NewFrameTransport(netConn)
 	c := NewConnection(uuid.NewString(), transport, s, requiresAuth)
 	s.conns[c] = struct{}{}
-	s.wg.Add(1)
 	s.mu.Unlock()
 
 	defer func() {
-		s.wg.Done()
 		s.mu.Lock()
 		delete(s.conns, c)
 		s.mu.Unlock()

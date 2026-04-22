@@ -122,6 +122,7 @@ The canonical index of every numbered doc that drove, constrains, or informs v0.
 | [PATCH-0010](../../patches/0010-makefile-hygiene.md) | Makefile hygiene — PATH-resolved Go + check-only default | done | Shipped: `GO ?= go` (PATH-resolved with env-var override), new `fmt-check` target, `all:` no longer mutates source. |
 | [PATCH-0012](../../patches/0012-lint-out-of-default-target.md) | Remove `lint` from the Makefile default target | proposed | `make` no longer requires `golangci-lint`; `make lint` remains explicit for developers and CI. |
 | [PATCH-0013](../../patches/0013-sqlite-busy-timeout.md) | Set SQLite `busy_timeout` on every pool connection | proposed | Fixes dropped captures under concurrent upstream traffic; `busy_timeout=5000` added to the DSN so writers briefly block instead of returning `SQLITE_BUSY`. |
+| [PATCH-0014](../../patches/0014-bff-shutdown-waitgroup-race.md) | Fix BFF Server `sync.WaitGroup` race between accept and Shutdown | approved | Shipped: `wg.Add(1)` hoisted into the accept loop (caller already holds a wg reference) so concurrent `Shutdown -> wg.Wait` can no longer race with a fresh connection being spawned. Unblocks `go test -race ./...`. |
 
 ### Explorations
 
