@@ -121,6 +121,7 @@ The canonical index of every numbered doc that drove, constrains, or informs v0.
 | [PATCH-0009](../../patches/0009-root-readme.md) | Root `README.md` | done | Shipped: repo-root `README.md` with pitch, quick start, repo map, contributor entry points, and Apache-2.0 framing. |
 | [PATCH-0010](../../patches/0010-makefile-hygiene.md) | Makefile hygiene — PATH-resolved Go + check-only default | done | Shipped: `GO ?= go` (PATH-resolved with env-var override), new `fmt-check` target, `all:` no longer mutates source. |
 | [PATCH-0012](../../patches/0012-lint-out-of-default-target.md) | Remove `lint` from the Makefile default target | proposed | `make` no longer requires `golangci-lint`; `make lint` remains explicit for developers and CI. |
+| [PATCH-0013](../../patches/0013-sqlite-busy-timeout.md) | Set SQLite `busy_timeout` on every pool connection | proposed | Fixes dropped captures under concurrent upstream traffic; `busy_timeout=5000` added to the DSN so writers briefly block instead of returning `SQLITE_BUSY`. |
 
 ### Explorations
 
