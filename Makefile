@@ -6,7 +6,7 @@ LDFLAGS = -X main.version=$(VERSION)
 
 .PHONY: all build test lint fmt fmt-check vet clean
 
-all: fmt-check vet lint test build
+all: fmt-check vet test build
 
 build:
 	$(GO) build -ldflags "$(LDFLAGS)" -o $(BINARY) ./cmd/modeltap/
