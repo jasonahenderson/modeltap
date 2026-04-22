@@ -463,6 +463,34 @@ func TestWALModeEnabled(t *testing.T) {
 	}
 }
 
+func TestBusyTimeoutConfigured(t *testing.T) {
+	// In-memory store: busy_timeout must be inherited from the DSN pragma.
+	store := newTestStore(t)
+
+	var timeout int
+	if err := store.db.QueryRow("PRAGMA busy_timeout").Scan(&timeout); err != nil {
+		t.Fatalf("PRAGMA busy_timeout: %v", err)
+	}
+	if timeout != 5000 {
+		t.Errorf("busy_timeout (memory): got %d, want 5000", timeout)
+	}
+
+	// File-backed store: same expectation.
+	tmpDir := t.TempDir()
+	fileStore, err := NewSQLiteStore(tmpDir + "/test.db")
+	if err != nil {
+		t.Fatalf("NewSQLiteStore(file): %v", err)
+	}
+	defer fileStore.Close()
+
+	if err := fileStore.db.QueryRow("PRAGMA busy_timeout").Scan(&timeout); err != nil {
+		t.Fatalf("PRAGMA busy_timeout (file): %v", err)
+	}
+	if timeout != 5000 {
+		t.Errorf("busy_timeout (file): got %d, want 5000", timeout)
+	}
+}
+
 func TestStoreInterfaceCompliance(t *testing.T) {
 	// Compile-time check that SQLiteStore implements Store.
 	var _ Store = (*SQLiteStore)(nil)

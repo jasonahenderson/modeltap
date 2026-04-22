@@ -33,8 +33,11 @@ func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 		}
 	}
 
-	// Use DSN pragmas so every pool connection gets foreign_keys=ON and WAL mode.
-	dsn := dbPath + "?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)"
+	// Use DSN pragmas so every pool connection gets foreign_keys=ON, WAL mode,
+	// and a non-zero busy_timeout. Without busy_timeout, concurrent writers get
+	// SQLITE_BUSY immediately on contention; with it, writers briefly block
+	// instead of losing the write.
+	dsn := dbPath + "?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("opening database: %w", err)

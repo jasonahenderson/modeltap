@@ -16,6 +16,7 @@ Implementation-scoped work authorization documents. Patches are the lightweight 
 | [PATCH-0009](0009-root-readme.md) | Root `README.md` | done |
 | [PATCH-0010](0010-makefile-hygiene.md) | Makefile hygiene — PATH-resolved Go + check-only default | done |
 | [PATCH-0012](0012-lint-out-of-default-target.md) | Remove `lint` from the Makefile default target | proposed |
+| [PATCH-0013](0013-sqlite-busy-timeout.md) | Set SQLite `busy_timeout` on every pool connection | proposed |
 
 ## When to Use a Patch
 
