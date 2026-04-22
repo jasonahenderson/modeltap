@@ -15,6 +15,7 @@ Implementation-scoped work authorization documents. Patches are the lightweight 
 | [PATCH-0007](0007-dotenv-loader.md) | `.env` loader for provider credentials | done |
 | [PATCH-0009](0009-root-readme.md) | Root `README.md` | done |
 | [PATCH-0010](0010-makefile-hygiene.md) | Makefile hygiene — PATH-resolved Go + check-only default | done |
+| [PATCH-0012](0012-lint-out-of-default-target.md) | Remove `lint` from the Makefile default target | proposed |
 
 ## When to Use a Patch
 
