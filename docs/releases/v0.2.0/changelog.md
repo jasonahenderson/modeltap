@@ -119,6 +119,7 @@ The canonical index of every numbered doc that drove, constrains, or informs v0.
 | [PATCH-0006](../../patches/0006-unified-config-data-dir.md) | Unified `~/.modeltap/` config & data directory | done | Shipped: single canonical dir for config, DB, socket, and log; XDG override and one-release legacy fallback preserved. |
 | [PATCH-0007](../../patches/0007-dotenv-loader.md) | `.env` loader for provider credentials | done | Shipped: `./.env` and `~/.modeltap/.env` are auto-loaded at startup; opt-out via `MODELTAP_DOTENV=false`. |
 | [PATCH-0009](../../patches/0009-root-readme.md) | Root `README.md` | done | Shipped: repo-root `README.md` with pitch, quick start, repo map, contributor entry points, and Apache-2.0 framing. |
+| [PATCH-0010](../../patches/0010-makefile-hygiene.md) | Makefile hygiene — PATH-resolved Go + check-only default | done | Shipped: `GO ?= go` (PATH-resolved with env-var override), new `fmt-check` target, `all:` no longer mutates source. |
 
 ### Explorations
 

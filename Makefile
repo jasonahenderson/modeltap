@@ -1,11 +1,12 @@
 VERSION ?= dev
-GO ?= /usr/local/opt/go/bin/go
+GO ?= go
+GO_FMT ?= gofmt
 BINARY = bin/modeltap
 LDFLAGS = -X main.version=$(VERSION)
 
-.PHONY: all build test lint fmt vet clean
+.PHONY: all build test lint fmt fmt-check vet clean
 
-all: fmt vet lint test build
+all: fmt-check vet lint test build
 
 build:
 	$(GO) build -ldflags "$(LDFLAGS)" -o $(BINARY) ./cmd/modeltap/
@@ -17,7 +18,16 @@ lint:
 	golangci-lint run ./...
 
 fmt:
-	gofmt -s -w .
+	$(GO_FMT) -s -w .
+
+fmt-check:
+	@files=$$($(GO_FMT) -s -l .); \
+	if [ -n "$$files" ]; then \
+	  echo "gofmt -s would rewrite the following files:"; \
+	  echo "$$files"; \
+	  echo "run 'make fmt' to apply."; \
+	  exit 1; \
+	fi
 
 vet:
 	$(GO) vet ./...
