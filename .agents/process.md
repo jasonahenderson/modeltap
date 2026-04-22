@@ -73,12 +73,47 @@ Prime directives:
 
 - Release planning and delivery reviews live under the active release
   directory's `.reviews/` subdirectory.
-- Canonical per-doc findings filenames remain `{stem}-findings.md` and
-  `{stem}-findings.json`.
+- Canonical per-doc findings keep the single filename `{stem}-findings.md`.
+  Dispositions live in a table at the bottom of that file; no sidecar JSON.
 - Non-canonical review artifacts should include the reviewer identity when
   known, for example `codex-plan-review.md`.
 - `docs/history/` should record that the review happened and point to the
   canonical review artifact path.
+
+## Release Tags
+
+Every shipped release has exactly one annotated Git tag named `vX.Y.Z`.
+The tag points at the release commit: the commit where the release status,
+changelog, readiness review, and any final release notes are complete.
+
+Release close sequence:
+
+1. Finish all release-scoped work and update `docs/releases/<version>/status.md`
+   to shipped/complete.
+2. Finalize `docs/releases/<version>/changelog.md`.
+3. Record or link the release-readiness review under
+   `docs/releases/<version>/.reviews/`.
+4. Commit those final release artifacts with an `ADMIN:` commit.
+5. Create an annotated tag:
+   `git tag -a vX.Y.Z -m "modeltap vX.Y.Z"`.
+6. Run release packaging from that tag. GoReleaser derives `{{ .Version }}`
+   from the tag.
+
+Tag update policy:
+
+- Before a release is published, announced, or used for distribution, the
+  `vX.Y.Z` tag is a release-candidate pointer and may be moved if final commits
+  are added.
+- To move an unpublished tag, delete/recreate or force-update it locally:
+  `git tag -f -a vX.Y.Z -m "modeltap vX.Y.Z" <new-release-commit>`.
+- If the tag was pushed but the release is still unpublished, update the remote
+  tag explicitly: `git push --force-with-lease origin refs/tags/vX.Y.Z`.
+- Any tag move must be logged in `docs/history/` with the old SHA, new SHA, and
+  reason.
+- After a release is published or announced, the tag is immutable by default.
+  New commits must ship as a new version, usually the next patch release. Moving
+  a published tag requires an explicit maintainer decision and a correction note
+  in the release history.
 
 ## Commit Policy
 

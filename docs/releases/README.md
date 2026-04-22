@@ -46,6 +46,26 @@ Use this location for:
 - **Minor (v0.X.0)**: new features (new capabilities, new commands, new config sections)
 - **Patch (v0.0.X)**: bug fixes, security patches, documentation updates
 
+## Git Tags
+
+Each shipped release is represented by one annotated Git tag named `vX.Y.Z`.
+The tag points at the final release commit, after status, changelog, and
+release-readiness artifacts are committed. Packaging tools such as GoReleaser
+derive the release version from this tag.
+
+If final commits land after the tag is created but before the release is
+published, move the tag to the new release commit:
+
+```bash
+git tag -f -a vX.Y.Z -m "modeltap vX.Y.Z" <new-release-commit>
+git push --force-with-lease origin refs/tags/vX.Y.Z
+```
+
+Log tag moves in `docs/history/` with the old SHA, new SHA, and reason. Once a
+release is published or announced, treat its tag as immutable; ship follow-up
+changes as a new patch release unless a maintainer explicitly approves and
+documents a correction.
+
 ## Feature-to-Release Mapping
 
 Features are assigned to releases based on dependency chain and delivery priority:
