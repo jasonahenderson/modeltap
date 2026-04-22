@@ -1,18 +1,17 @@
 # modeltap
 
+[![CI](https://github.com/jasonahenderson/modeltap/actions/workflows/ci.yml/badge.svg)](https://github.com/jasonahenderson/modeltap/actions/workflows/ci.yml)
+[![Go Version](https://img.shields.io/badge/go-1.22+-00ADD8?logo=go)](https://golang.org)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Latest Release](https://img.shields.io/github/v/release/jasonahenderson/modeltap)](https://github.com/jasonahenderson/modeltap/releases)
+
 **A local-first integrated environment for AI coding tools.**
 
-modeltap started as a transparent reverse proxy that captures every request and response between an AI client and providers like Anthropic and OpenAI — giving you a complete, queryable record of your own traffic in local SQLite. It's growing into a broader substrate: a JSON-RPC backend, a terminal harness, a built-in tool framework, and a knowledge layer, all running on your machine and all under Apache 2.0.
+modeltap started as a transparent reverse proxy that captures every request and response between an AI client and providers like Anthropic and OpenAI — giving you a complete, queryable record of your own traffic in local SQLite. It is growing into a broader substrate: a JSON-RPC backend, a terminal harness, a built-in tool framework, and a knowledge layer, all running on your machine and all under Apache 2.0.
 
-You keep your API keys. You keep your data. You keep the history.
+> You keep your API keys. You keep your data. You keep the history.
 
-## Why modeltap
-
-- **Local-first.** Everything — captured traffic, session history, metrics — lives on your disk in a single SQLite database. No cloud account, no telemetry, no vendor lock.
-- **Provider-agnostic routing.** One proxy address fronts both Anthropic and OpenAI traffic. Point any client that honors `ANTHROPIC_BASE_URL` or `OPENAI_BASE_URL` at modeltap and it just works.
-- **Real cost and token accounting.** Per-request input/output tokens, latency, and estimated cost — extracted from live responses, including reassembled SSE streams.
-- **Full record, not samples.** Captures every request and response in full, with retention-based pruning (ADR-0005). You can always go back and read the bytes.
-- **Built to grow.** v0.2.0 adds a JSON-RPC BFF and a Bubbletea terminal harness with a tool framework and MCP client. A knowledge layer (sqlite-vec), skills, and agent teams are on the roadmap.
+---
 
 ## Quick start
 
@@ -25,17 +24,35 @@ make build
 ./bin/modeltap --version
 ```
 
-Start the proxy and point a client at it:
+From here, two paths depending on what you want:
+
+### Run the terminal harness
+
+`modeltap` with no subcommand launches the interactive Bubbletea harness — the v0.2.0 headline. It auto-starts a local BFF server over a unix socket and drops you into a chat UI with slash commands, 13 built-in tools, session history, and MCP support.
+
+```sh
+export ANTHROPIC_API_KEY=sk-ant-...   # or OPENAI_API_KEY, or both
+./bin/modeltap                         # launch the harness
+./bin/modeltap --resume <session-id>   # pick up a prior session
+```
+
+Inside the harness: `/help` for slash commands, `/sessions` to browse history, `/models` for the model catalog, `/mcp status` for MCP servers. `Ctrl+C` to exit.
+
+### Capture traffic from your own AI tools
+
+Run modeltap as a transparent reverse proxy in front of your existing clients. Every request and response — including reassembled SSE streams — lands in local SQLite with tokens, latency, and cost attached.
 
 ```sh
 ./bin/modeltap start --dashboard
-# in another shell:
+# in another shell, point a client at it:
 export ANTHROPIC_BASE_URL=http://localhost:8080
 export ANTHROPIC_API_KEY=sk-ant-...   # your existing key, unchanged
 claude                                # or any Anthropic-compatible client
 ```
 
-Browse what was captured:
+For OpenAI clients, use `OPENAI_BASE_URL=http://localhost:8080/v1` with `OPENAI_API_KEY`.
+
+### Browse captured traffic
 
 ```sh
 ./bin/modeltap logs
@@ -44,7 +61,36 @@ Browse what was captured:
 open http://127.0.0.1:8081            # dashboard (if --dashboard was passed)
 ```
 
-For OpenAI clients use `OPENAI_BASE_URL=http://localhost:8080/v1` with `OPENAI_API_KEY`. Full install, configuration, and client-integration details — including Claude Code, Codex, and OpenCode — are in [`docs/usage-guide.md`](docs/usage-guide.md).
+Full install, configuration, and client-integration details — including Claude Code, Codex, and OpenCode — are in [`docs/usage-guide.md`](docs/usage-guide.md).
+
+---
+
+## Why modeltap
+
+| Capability | What it means |
+|------------|---------------|
+| **Local-first** | Everything — captured traffic, session history, metrics — lives on your disk in a single SQLite database. No cloud account, no telemetry, no vendor lock. |
+| **Provider-agnostic routing** | One proxy address fronts both Anthropic and OpenAI traffic. Point any client that honors `ANTHROPIC_BASE_URL` or `OPENAI_BASE_URL` at modeltap and it just works. |
+| **Real cost and token accounting** | Per-request input/output tokens, latency, and estimated cost — extracted from live responses, including reassembled SSE streams. |
+| **Full record, not samples** | Captures every request and response in full, with retention-based pruning ([ADR-0005](docs/adr/0005-retention-based-pruning.md)). You can always go back and read the bytes. |
+| **Built to grow** | v0.2.0 adds a JSON-RPC BFF and a Bubbletea terminal harness with a tool framework and MCP client. A knowledge layer (sqlite-vec), skills, and agent teams are on the roadmap. |
+
+```text
+  ┌─────────┐      ┌──────────┐      ┌────────────────┐
+  │ Client  │ ───▶ │ modeltap │ ───▶ │ Anthropic /    │
+  │(Claude  │      │(capture +│      │ OpenAI         │
+  │ Code,   │ ◀─── │  proxy)  │ ◀─── │ providers      │
+  │ Codex)  │      └──────────┘      └────────────────┘
+  └─────────┘           │
+                        ▼
+                 ┌──────────┐
+                 │  SQLite  │
+                 │ (traffic │
+                 │  + meta) │
+                 └──────────┘
+```
+
+---
 
 ## What's in this repo
 
@@ -53,12 +99,14 @@ For OpenAI clients use `OPENAI_BASE_URL=http://localhost:8080/v1` with `OPENAI_A
 | `cmd/modeltap/` | CLI entrypoint |
 | `internal/` | Proxy, storage, providers, harness, BFF, dashboard |
 | `pkg/` | Public packages |
-| `docs/adr/` | Architecture Decision Records — the accepted ones drive the codebase |
+| `docs/adr/` | Architecture Decision Records — accepted ones drive the codebase |
 | `docs/features/` | Feature specs — accepted specs drive work units |
 | `docs/patches/` | Implementation-scoped patches (fixes, plumbing, small additions) |
 | `docs/releases/` | Per-release plan, status, changelog, and track files |
 | `docs/history/` | Session logs — continuity across working sessions |
 | `docs/usage-guide.md` | User-facing install, config, and command reference |
+
+---
 
 ## Status
 
@@ -67,6 +115,8 @@ modeltap is pre-1.0. Interfaces may shift between minor versions.
 - **v0.1** — shipped. Reverse proxy, capture, metrics, dashboard, service management, Anthropic + OpenAI adapters.
 - **v0.2.0** — in development on branch `exploration/integrated-harness`. Adds a JSON-RPC BFF server, a Bubbletea terminal harness, a 13-tool built-in framework, an MCP client, and an Ollama adapter. See [`docs/releases/v0.2.0/`](docs/releases/v0.2.0/) for plan, status, and changelog.
 - **Direction** — enterprise auth and multi-user ([FEAT-0010](docs/features/0010-enterprise-auth.md)), knowledge integration ([FEAT-0011](docs/features/0011-knowledge-integration.md)), skills ([FEAT-0012](docs/features/0012-skills-and-agent-teams.md)), agent teams ([FEAT-0013](docs/features/0013-agent-teams.md)). Proposed, not yet accepted.
+
+---
 
 ## Contributing
 
