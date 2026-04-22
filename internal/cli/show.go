@@ -40,7 +40,7 @@ in the logs table output.`,
 
   # Show detail using a full UUID
   modeltap show 550e8400-e29b-41d4-a716-446655440000`,
-		Args:  cobra.ExactArgs(1),
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if showStore == nil {
 				return fmt.Errorf("no store configured")

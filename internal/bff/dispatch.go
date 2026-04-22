@@ -22,7 +22,7 @@ type DispatchOpts struct {
 	Conversation *Conversation
 	SystemPrompt string
 	Model        string
-	EndpointName string                    // which ProviderRegistry entry to use
+	EndpointName string // which ProviderRegistry entry to use
 	MaxTokens    int
 	Temperature  *float64
 	Tools        []protocol.ToolDefinition

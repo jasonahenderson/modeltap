@@ -172,9 +172,9 @@ func (m *CaptureMiddleware) Wrap(next http.Handler) http.Handler {
 // sensitiveHeaders lists header names whose values must be redacted before
 // storage. Comparison is case-insensitive (http.Header canonicalises keys).
 var sensitiveHeaders = map[string]bool{
-	"Authorization":   true,
-	"X-Api-Key":       true,
-	"Api-Key":         true,
+	"Authorization":       true,
+	"X-Api-Key":           true,
+	"Api-Key":             true,
 	"Proxy-Authorization": true,
 }
 
@@ -199,8 +199,8 @@ func sanitizeHeaders(h http.Header) map[string]string {
 // headers, and body while still writing everything through to the client.
 type responseRecorder struct {
 	http.ResponseWriter
-	statusCode int
-	body       bytes.Buffer
+	statusCode  int
+	body        bytes.Buffer
 	wroteHeader bool
 }
 

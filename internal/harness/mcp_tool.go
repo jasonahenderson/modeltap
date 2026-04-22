@@ -40,15 +40,15 @@ func NewMCPTool(namespace string, desc MCPToolDescriptor, client *MCPClient) *MC
 	}
 }
 
-func (m *MCPTool) Name() string                { return m.displayName }
-func (m *MCPTool) Description() string         { return m.description }
+func (m *MCPTool) Name() string        { return m.displayName }
+func (m *MCPTool) Description() string { return m.description }
 func (m *MCPTool) InputSchema() json.RawMessage {
 	if len(m.schema) == 0 {
 		return json.RawMessage(`{"type":"object"}`)
 	}
 	return m.schema
 }
-func (m *MCPTool) OutputEnvelope() string   { return "text" }
+func (m *MCPTool) OutputEnvelope() string { return "text" }
 
 // RiskLevel is always RiskExecute for remote tools — the harness
 // can't audit what the remote server does, so every call prompts in

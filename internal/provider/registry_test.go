@@ -10,8 +10,8 @@ import (
 
 // mockProvider implements Provider for testing purposes.
 type mockProvider struct {
-	name      string
-	detectFn  func(r *http.Request) bool
+	name     string
+	detectFn func(r *http.Request) bool
 }
 
 func (m *mockProvider) Name() string { return m.name }

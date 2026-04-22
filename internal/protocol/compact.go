@@ -26,10 +26,10 @@ type CompactFileBreakdown struct {
 // compact.plan streaming event. A single declaration serves both paths.
 type CompactPlan struct {
 	Categories           []CompactCategory      `json:"categories"`
-	FilesBreakdown       []CompactFileBreakdown  `json:"files_breakdown,omitempty"`
-	EstimatedTokensFreed int                     `json:"estimated_tokens_freed"`
-	ContextPctBefore     float64                 `json:"context_pct_before"`
-	ContextPctAfter      float64                 `json:"context_pct_after"`
+	FilesBreakdown       []CompactFileBreakdown `json:"files_breakdown,omitempty"`
+	EstimatedTokensFreed int                    `json:"estimated_tokens_freed"`
+	ContextPctBefore     float64                `json:"context_pct_before"`
+	ContextPctAfter      float64                `json:"context_pct_after"`
 }
 
 // CompactApplyResponse is the response to compact.apply.

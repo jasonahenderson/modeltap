@@ -15,11 +15,11 @@ type stubTool struct {
 	err    error
 }
 
-func (s *stubTool) Name() string                  { return s.name }
-func (s *stubTool) Description() string           { return s.name + " stub" }
-func (s *stubTool) InputSchema() json.RawMessage  { return json.RawMessage(`{"type":"object"}`) }
-func (s *stubTool) OutputEnvelope() string        { return "text" }
-func (s *stubTool) RiskLevel() RiskLevel          { return s.risk }
+func (s *stubTool) Name() string                 { return s.name }
+func (s *stubTool) Description() string          { return s.name + " stub" }
+func (s *stubTool) InputSchema() json.RawMessage { return json.RawMessage(`{"type":"object"}`) }
+func (s *stubTool) OutputEnvelope() string       { return "text" }
+func (s *stubTool) RiskLevel() RiskLevel         { return s.risk }
 func (s *stubTool) Execute(_ context.Context, _ json.RawMessage) (*ToolExecResult, error) {
 	if s.err != nil {
 		return nil, s.err

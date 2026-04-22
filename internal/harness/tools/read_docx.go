@@ -23,6 +23,7 @@ import (
 //     adds a trailing blank line to keep tables visually separated.
 //   - Everything else (styling, comments, revision metadata) is
 //     ignored.
+//
 // docxMaxDecompressedBytes bounds how much of word/document.xml the
 // reader will decompress. DOCX is a ZIP container; a 1 KB crafted
 // `.docx` can expand to gigabytes via a zip bomb. WU-094 H-15.

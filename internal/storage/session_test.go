@@ -519,21 +519,21 @@ func TestCreateTurn(t *testing.T) {
 	}
 
 	turn := &Turn{
-		ID:           "turn-1",
-		SessionID:    "sess-1",
-		Sequence:     1,
-		Role:         "user",
-		Content:      json.RawMessage(`"hello"`),
-		Model:        "claude-3",
-		Provider:     "anthropic",
-		InputTokens:  100,
-		OutputTokens: 50,
-		Cost:         0.01,
-		LatencyMs:    200,
-		ToolCalls:    json.RawMessage(`[]`),
-		FilesTouched: []string{"/foo.go"},
+		ID:            "turn-1",
+		SessionID:     "sess-1",
+		Sequence:      1,
+		Role:          "user",
+		Content:       json.RawMessage(`"hello"`),
+		Model:         "claude-3",
+		Provider:      "anthropic",
+		InputTokens:   100,
+		OutputTokens:  50,
+		Cost:          0.01,
+		LatencyMs:     200,
+		ToolCalls:     json.RawMessage(`[]`),
+		FilesTouched:  []string{"/foo.go"},
 		FilesModified: []string{"/foo.go"},
-		CreatedAt:    time.Now().UTC().Truncate(time.Millisecond),
+		CreatedAt:     time.Now().UTC().Truncate(time.Millisecond),
 	}
 	if err := store.CreateTurn(ctx, turn); err != nil {
 		t.Fatalf("CreateTurn: %v", err)

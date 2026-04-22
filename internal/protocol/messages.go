@@ -246,8 +246,8 @@ type HistoryAppend struct {
 // HistoryList requests command history entries with scoping.
 type HistoryList struct {
 	Scope  string `json:"scope"`            // "user", "project", "session"
-	Limit  int    `json:"limit,omitempty"`   // default: 50
-	Before string `json:"before,omitempty"`  // pagination cursor (opaque)
+	Limit  int    `json:"limit,omitempty"`  // default: 50
+	Before string `json:"before,omitempty"` // pagination cursor (opaque)
 }
 
 // -----------------------------------------------------------------------

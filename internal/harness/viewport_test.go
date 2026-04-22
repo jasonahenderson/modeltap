@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 func plainViewport(state *AppState) ConversationViewport {
@@ -59,7 +59,7 @@ func TestViewport_RenderAssistant_StreamingHidesFooter(t *testing.T) {
 	state.Messages = []DisplayMessage{
 		{
 			Role: RoleAssistant, Content: "thinking...",
-			Model: "claude-sonnet-4-6",
+			Model:  "claude-sonnet-4-6",
 			Tokens: TokenInfo{Input: 50}, Cost: 0.01,
 			Streaming: true,
 		},

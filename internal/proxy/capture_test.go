@@ -78,7 +78,6 @@ func (env *captureTestEnv) waitForSave(t *testing.T, timeout time.Duration) {
 	}
 }
 
-
 func TestCaptureMiddleware_SavesRequestAndResponse(t *testing.T) {
 	respBody := `{"id":"msg_123","type":"message","model":"claude-3-5-sonnet-20241022","content":[{"type":"text","text":"Hello!"}],"usage":{"input_tokens":10,"output_tokens":5},"stop_reason":"end_turn"}`
 

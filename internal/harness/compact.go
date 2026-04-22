@@ -50,9 +50,9 @@ const (
 // surface supports arbitrary action maps today, so the follow-up is
 // purely UI.
 type CompactHandler struct {
-	mu      sync.Mutex
-	state   compactHandlerState
-	plan    *protocol.CompactPlan
+	mu    sync.Mutex
+	state compactHandlerState
+	plan  *protocol.CompactPlan
 }
 
 // NewCompactHandler returns an inactive handler.

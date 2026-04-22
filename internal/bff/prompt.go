@@ -33,9 +33,9 @@ type PromptLayer struct {
 
 // PromptEngineOpts configures a PromptEngine instance.
 type PromptEngineOpts struct {
-	CoreBehavioral    string // overrides defaultCoreBehavioral when non-empty
-	DomainConfig      string // Layer 3 — operator-supplied
-	WindowSize        int    // total context window for the resolved model
+	CoreBehavioral    string  // overrides defaultCoreBehavioral when non-empty
+	DomainConfig      string  // Layer 3 — operator-supplied
+	WindowSize        int     // total context window for the resolved model
 	SystemPromptShare float64 // fraction of WindowSize allocated to the system prompt; default 0.25
 }
 

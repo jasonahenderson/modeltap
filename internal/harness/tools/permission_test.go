@@ -164,10 +164,10 @@ func TestIsDangerous_Bash(t *testing.T) {
 		// rm variants
 		`rm -rf foo`,
 		`rm -fR foo`,
-		`rm -r -f /tmp/x`,                     // split flags (WU-094 H-7)
-		`rm --recursive --force /tmp/x`,       // long flags (WU-094 H-7)
-		`find /tmp -type f -delete`,           // WU-094 H-7
-		`shred secrets.txt`,                   // WU-094 H-7
+		`rm -r -f /tmp/x`,               // split flags (WU-094 H-7)
+		`rm --recursive --force /tmp/x`, // long flags (WU-094 H-7)
+		`find /tmp -type f -delete`,     // WU-094 H-7
+		`shred secrets.txt`,             // WU-094 H-7
 		// original catalog
 		`> /dev/sda`,
 		`chmod 777 secrets`,
@@ -213,8 +213,8 @@ func TestIsDangerous_Bash(t *testing.T) {
 		`grep -r foo .`,
 		`echo hello`,
 		`git log --oneline`,
-		`python script.py`,        // -c absent; just a script invocation
-		`node server.js`,          // -e absent
+		`python script.py`,             // -c absent; just a script invocation
+		`node server.js`,               // -e absent
 		`curl https://api.example.com`, // no pipe
 	}
 	for _, c := range safe {

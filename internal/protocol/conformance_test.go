@@ -162,12 +162,12 @@ func TestFixtureRoundTrip(t *testing.T) {
 // ConnectionPing, ConnectionPong, etc.).
 func TestFixtureNotEmpty(t *testing.T) {
 	emptyStructTypes := map[string]bool{
-		"SessionList":     true,
-		"ModelList":       true,
-		"ConnectionPing":  true,
+		"SessionList":      true,
+		"ModelList":        true,
+		"ConnectionPing":   true,
 		"ConnectionHealth": true,
-		"ConnectionReady": true,
-		"ConnectionPong":  true,
+		"ConnectionReady":  true,
+		"ConnectionPong":   true,
 	}
 
 	for _, fc := range allFixtureCases() {

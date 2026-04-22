@@ -1018,10 +1018,10 @@ func TestCompactPlan_OmitEmpty(t *testing.T) {
 
 func TestCompactApplyResponse_RoundTrip(t *testing.T) {
 	v := CompactApplyResponse{
-		Applied:        true,
-		TokensFreed:    4000,
+		Applied:         true,
+		TokensFreed:     4000,
 		ContextPctAfter: 60.0,
-		Summary:        "compacted 3 turns",
+		Summary:         "compacted 3 turns",
 	}
 	b, err := json.Marshal(v)
 	if err != nil {

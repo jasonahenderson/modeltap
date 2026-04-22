@@ -41,16 +41,16 @@ func TestGit_Classification(t *testing.T) {
 		{"tag", RiskReadOnly},
 		{"tag -l", RiskReadOnly},
 
-		{"branch newname", RiskExecute},       // positional-arg mutation
-		{"branch -d featurex", RiskExecute},   // mutation flag
-		{"branch -D bad", RiskDestructive},    // dangerous
-		{"tag v1.0", RiskExecute},             // positional-arg mutation
-		{"tag -d v1.0", RiskExecute},          // mutation flag
-		{"commit -m hi", RiskExecute},         // not in read list
+		{"branch newname", RiskExecute},     // positional-arg mutation
+		{"branch -d featurex", RiskExecute}, // mutation flag
+		{"branch -D bad", RiskDestructive},  // dangerous
+		{"tag v1.0", RiskExecute},           // positional-arg mutation
+		{"tag -d v1.0", RiskExecute},        // mutation flag
+		{"commit -m hi", RiskExecute},       // not in read list
 		{"checkout main", RiskExecute},
 		{"merge origin/main", RiskExecute},
 		{"rebase -i HEAD~3", RiskExecute},
-		{"remote -v", RiskExecute},            // remote not in read list
+		{"remote -v", RiskExecute}, // remote not in read list
 		{"config --unset user.email", RiskExecute},
 
 		{"push --force origin main", RiskDestructive},

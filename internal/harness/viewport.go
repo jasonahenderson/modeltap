@@ -46,8 +46,8 @@ func DefaultViewportStyle() ViewportStyle {
 		UserContent:   lipgloss.NewStyle(),
 		AssistantHead: lipgloss.NewStyle().Faint(true),
 		AssistantFoot: lipgloss.NewStyle().Faint(true),
-		ToolCall:      lipgloss.NewStyle().Foreground(lipgloss.Color("13")),  // magenta
-		ToolResult:    lipgloss.NewStyle().Foreground(lipgloss.Color("10")),  // green
+		ToolCall:      lipgloss.NewStyle().Foreground(lipgloss.Color("13")), // magenta
+		ToolResult:    lipgloss.NewStyle().Foreground(lipgloss.Color("10")), // green
 		System:        lipgloss.NewStyle().Faint(true),
 	}
 }
