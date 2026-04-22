@@ -19,7 +19,7 @@ This document defines the agent team responsible for designing, building, testin
 
 ## Review Artifact Naming
 
-- Canonical per-doc findings keep their stable names: `{stem}-findings.md` and `{stem}-findings.json`.
+- Canonical per-doc findings keep the single filename `{stem}-findings.md`. Dispositions live in a table at the bottom of that file; no sidecar JSON.
 - Non-canonical work-plan reviews should include the reviewing model or harness name in the filename when known.
 - Prefer reviewer-first names for those plan-review artifacts, for example:
   - `codex-plan-review.md`
@@ -279,6 +279,22 @@ Do NOT bundle when WUs have independent blast radius or when a design flaw in on
 ### Phase selection per release
 
 A release's `plan.md` records which phase the release is in. Status updates move WUs within the current phase, and phase transitions are ADMIN commits that mark the boundary.
+
+### Release tags
+
+Every shipped release gets one annotated Git tag named `vX.Y.Z`. The tag points
+at the final release commit after status, changelog, release-readiness review,
+and final notes are committed.
+
+Before publication, the tag may move when final commits are added. Recreate it
+with `git tag -f -a vX.Y.Z -m "modeltap vX.Y.Z" <new-release-commit>` and, if it
+was already pushed, update it with
+`git push --force-with-lease origin refs/tags/vX.Y.Z`. Log the old SHA, new SHA,
+and reason in `docs/history/`.
+
+After publication, tags are immutable by default. New commits ship as a new
+version, usually the next patch release, unless a maintainer explicitly approves
+a correction and documents it.
 
 ### Design Review
 
