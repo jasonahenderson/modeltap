@@ -11,6 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jasonahenderson/modeltap/internal/config"
 	"github.com/jasonahenderson/modeltap/internal/harness"
+	"github.com/jasonahenderson/modeltap/internal/harness/theme"
 	"github.com/jasonahenderson/modeltap/internal/harness/tools"
 	"github.com/jasonahenderson/modeltap/internal/protocol"
 	"github.com/spf13/cobra"
@@ -269,6 +270,11 @@ func runHarness(cmd *cobra.Command, flags *harnessFlags) error {
 		Attacher:  harness.NewContextManager(effectiveProject, tracker),
 	})
 
+	// Initialize the dynamic system theme from terminal background
+	// detection and propagate it to all UI components.
+	theme.InitSystemTheme()
+	app.SetTheme(theme.CurrentTheme())
+
 	// Plan-mode interception is a policy decorator on the
 	// dispatcher: when the App's mode == plan, mutating tool.calls
 	// get queued onto the PlanAccumulator and a synthetic
@@ -289,7 +295,7 @@ func runHarness(cmd *cobra.Command, flags *harnessFlags) error {
 		app.State().ModelOverride = true
 	}
 
-	program := tea.NewProgram(app, tea.WithAltScreen())
+	program := tea.NewProgram(app, tea.WithAltScreen(), tea.WithFilter(harness.TerminalResponseFilter))
 	sender.program.Store(program)
 
 	// Trigger the lifecycle asynchronously so the UI renders
