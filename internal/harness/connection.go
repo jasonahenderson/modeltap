@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -534,9 +535,13 @@ func defaultStartServer(ctx context.Context, cfg ConnectionConfig) error {
 	}
 	cmd := exec.Command(cfg.ServerBinary, args...)
 	// Detach: server outlives harness.
+	// Setting Stdin/Stdout/Stderr to nil lets exec use /dev/null
+	// implicitly, so server startup logs don't leak into the harness
+	// TUI (TERM corruption fix).
 	cmd.Stdin = nil
 	cmd.Stdout = nil
 	cmd.Stderr = nil
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("launch %s: %w", cfg.ServerBinary, err)
 	}

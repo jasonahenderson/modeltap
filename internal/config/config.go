@@ -87,6 +87,16 @@ type BFFConfig struct {
 	Routing map[string]any `yaml:"routing,omitempty" mapstructure:"routing"`
 }
 
+// HarnessConfig holds harness-specific settings per FEAT-0009.
+type HarnessConfig struct {
+	SubmitKey      string `yaml:"submit_key,omitempty" mapstructure:"submit_key"`
+	Permissions    string `yaml:"permissions,omitempty" mapstructure:"permissions"`
+	PasteThreshold int    `yaml:"paste_threshold,omitempty" mapstructure:"paste_threshold"`
+	Theme          string `yaml:"theme,omitempty" mapstructure:"theme"`
+	ShowCost       bool   `yaml:"show_cost,omitempty" mapstructure:"show_cost"`
+	ShowContext    bool   `yaml:"show_context,omitempty" mapstructure:"show_context"`
+}
+
 // Config holds all modeltap configuration values.
 type Config struct {
 	Port          int                       `yaml:"port" mapstructure:"port"`
@@ -98,6 +108,7 @@ type Config struct {
 	Providers     map[string]ProviderConfig `yaml:"providers" mapstructure:"providers"`
 	Pricing       PricingConfig             `yaml:"pricing" mapstructure:"pricing"`
 	BFF           BFFConfig                 `yaml:"bff" mapstructure:"bff"`
+	Harness       HarnessConfig             `yaml:"harness" mapstructure:"harness"`
 }
 
 // homeDir is a small wrapper so every path helper degrades identically

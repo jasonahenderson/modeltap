@@ -110,9 +110,16 @@ func TestHandleTurnSubmit_MissingSession(t *testing.T) {
 		TurnID: "x", Sequence: 1, Mode: protocol.ModeBuild, Content: "hi",
 	}
 	params, _ := json.Marshal(submit)
-	_, err := handleTurnSubmit(context.Background(), c, params)
-	if err == nil {
-		t.Fatalf("expected error for missing session_id")
+	resp, err := handleTurnSubmit(context.Background(), c, params)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	ack, ok := resp.(*protocol.TurnSubmitResponse)
+	if !ok {
+		t.Fatalf("expected TurnSubmitResponse, got %T", resp)
+	}
+	if ack.TurnID == "" {
+		t.Errorf("TurnID not set")
 	}
 }
 

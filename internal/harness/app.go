@@ -151,6 +151,19 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, nil
 
 	case tea.KeyMsg:
+		logDebug("[KEY] type=%v alt=%v string=%q", msg.Type, msg.Alt, msg.String())
+		// Swallow terminal response sequences that leak in as
+		// keystrokes during startup (OSC background query, cursor
+		// position reports, etc.). These are KeyRunes whose first
+		// character is bracket, escape, or backslash. We check *runes*
+		// directly—msg.String() prepends "alt+" when Alt is true, which
+		// makes prefix filtering ineffective on the formatted string.
+		if msg.Type == tea.KeyRunes && len(msg.Runes) > 0 {
+			switch msg.Runes[0] {
+			case '[', ']', '\\', '\u001b':
+				return a, nil
+			}
+		}
 		// Global keys take precedence regardless of focus.
 		if key.Matches(msg, a.keys.Quit) {
 			return a, tea.Quit
@@ -173,9 +186,20 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, nil
 		}
 		if key.Matches(msg, a.keys.ToggleMode) {
+			logDebug("[KEY] ToggleMode matched")
 			return a, a.setMode(a.cycleMode())
 		}
+		// Newline shortcuts: checked BEFORE submit so they work
+		// regardless of the submit-key binding. Alt+Enter and Ctrl+J
+		// are hardcoded cross-terminal ways to insert a newline when
+		// Enter is the submit key.
+		if a.state.Focus == InputFocus && isNewlineShortcut(msg) {
+			logDebug("[KEY] Newline shortcut -> InsertNewline")
+			a.input.InsertNewline()
+			return a, nil
+		}
 		if key.Matches(msg, a.keys.Submit) && a.state.Focus == InputFocus {
+			logDebug("[KEY] Submit dispatch")
 			cmd := a.dispatchSubmit()
 			return a, cmd
 		}
@@ -689,6 +713,35 @@ func (a *App) handleCommand(msg SubmitMsg) tea.Cmd {
 	case "mcp":
 		return a.handleMCPCommand(msg)
 
+	case "help":
+		return func() tea.Msg {
+			return BannerMsg{
+				Text: "Available commands:\n" +
+					"  /help           show this help\n" +
+					"  /status         show connection state\n" +
+					"  /reconnect      force reconnect\n" +
+					"  /plan           plan mode (Ctrl+P/Tab toggles)\n" +
+					"  /build          build mode\n" +
+					"  /auto           auto mode\n" +
+					"  /model <name>   override model\n" +
+					"  /model auto     clear override\n" +
+					"  /models         list models\n" +
+					"  /sessions       list sessions\n" +
+					"  /session        show current session\n" +
+					"  /session resume <id>\n" +
+					"  /session fork   fork session\n" +
+					"  /session clear  clear context\n" +
+					"  /context        show context\n" +
+					"  /compact        compact context\n" +
+					"  /mcp [status]   MCP state\n" +
+					"  @file           attach file\n" +
+					"  Enter            submit\n" +
+					"  Ctrl+J           insert newline\n" +
+					"  Ctrl+P/Tab       toggle mode",
+				Duration: 10 * time.Second,
+			}
+		}
+
 	case "compact":
 		return a.handleCompactCommand(msg)
 	}
@@ -796,4 +849,14 @@ func (a *App) finalizeStreaming(msg StreamCompleteMsg) {
 	a.state.StreamingTurnID = ""
 	a.state.StreamingBuf.Reset()
 	a.state.CallActive = false
+}
+
+// isNewlineShortcut reports whether a key event should insert a newline
+// in the input area rather than trigger the submit key binding. These
+// are hardcoded cross-terminal shortcuts: Alt+Enter (works on terminals
+// that support keyboard disambiguation) and Ctrl+J (ASCII linefeed,
+// works everywhere). They are evaluated before the submit-key check so
+// they always insert a newline regardless of the configured submit key.
+func isNewlineShortcut(msg tea.KeyMsg) bool {
+	return msg.Type == tea.KeyEnter && msg.Alt || msg.Type == tea.KeyCtrlJ
 }

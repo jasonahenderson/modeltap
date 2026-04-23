@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jasonahenderson/modeltap/internal/protocol"
 	"github.com/jasonahenderson/modeltap/internal/provider"
 	"github.com/jasonahenderson/modeltap/internal/storage"
@@ -70,11 +71,15 @@ func handleTurnSubmit(ctx context.Context, conn *Connection, params json.RawMess
 	if err != nil {
 		return nil, err
 	}
-	if submit.SessionID == "" {
-		return nil, &TransportError{Code: CodeInvalidParams, Message: "session_id is required"}
-	}
 
 	srv := conn.server
+
+	// Auto-create a new session when the harness sends an empty
+	// session_id. This is the first-turn UX: the harness generates
+	// a new UUID on startup but the BFF may not have seen it yet.
+	if submit.SessionID == "" {
+		submit.SessionID = uuid.NewString()
+	}
 
 	// Enforce the advertised MaxAttachmentSize (WU-094 H-5). The
 	// cap was returned in CapabilitiesRegisterResponse as a

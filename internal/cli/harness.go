@@ -249,9 +249,24 @@ func runHarness(cmd *cobra.Command, flags *harnessFlags) error {
 	cm := harness.NewConnectionManager(connCfg, sender)
 	defer cm.Disconnect()
 
+	// Resolve submit key from flags (none yet) → config → default.
+	effectiveSubmitKey := cfg.Harness.SubmitKey
+	if effectiveSubmitKey == "" {
+		effectiveSubmitKey = harness.SubmitKeyEnter
+	}
+	// Validate; warn and fall back to enter on unknown.
+	switch effectiveSubmitKey {
+	case harness.SubmitKeyEnter, harness.SubmitKeyCtrlEnter, harness.SubmitKeyEscEnter:
+		// ok
+	default:
+		fmt.Fprintf(os.Stderr, "Warning: unknown harness.submit_key %q, defaulting to enter\n", effectiveSubmitKey)
+		effectiveSubmitKey = harness.SubmitKeyEnter
+	}
+
 	app := harness.NewApp(harness.AppOptions{
-		Conn:     harness.WrapConnectionManager(cm),
-		Attacher: harness.NewContextManager(effectiveProject, tracker),
+		SubmitKey: effectiveSubmitKey,
+		Conn:      harness.WrapConnectionManager(cm),
+		Attacher:  harness.NewContextManager(effectiveProject, tracker),
 	})
 
 	// Plan-mode interception is a policy decorator on the

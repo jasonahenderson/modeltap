@@ -25,10 +25,10 @@ type KeyMap struct {
 }
 
 // DefaultKeyMap returns the canonical KeyMap. submitKey selects the
-// configured submit chord; unknown values fall back to ctrl+enter.
+// configured submit chord; unknown values fall back to enter.
 func DefaultKeyMap(submitKey string) KeyMap {
 	if submitKey == "" {
-		submitKey = SubmitKeyCtrlEnter
+		submitKey = SubmitKeyEnter
 	}
 	var submitBinding key.Binding
 	switch submitKey {
@@ -55,8 +55,8 @@ func DefaultKeyMap(submitKey string) KeyMap {
 		),
 		Submit: submitBinding,
 		ToggleMode: key.NewBinding(
-			key.WithKeys("ctrl+p"),
-			key.WithHelp("ctrl+p", "toggle mode"),
+			key.WithKeys("ctrl+p", "tab"),
+			key.WithHelp("ctrl+p / tab", "toggle mode"),
 		),
 		ScrollUp: key.NewBinding(
 			key.WithKeys("up"),
