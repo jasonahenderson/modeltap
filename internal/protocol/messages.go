@@ -258,9 +258,10 @@ type HistoryList struct {
 // first submission; on an idempotent replay, status reflects the current
 // turn state and Sync is populated.
 type TurnSubmitResponse struct {
-	TurnID string               `json:"turn_id"`
-	Status string               `json:"status"`
-	Sync   *SessionSyncResponse `json:"sync,omitempty"`
+	TurnID    string               `json:"turn_id"`
+	SessionID string               `json:"session_id,omitempty"`
+	Status    string               `json:"status"`
+	Sync      *SessionSyncResponse `json:"sync,omitempty"`
 }
 
 // TurnCancelResponse confirms the cancel request was recorded.

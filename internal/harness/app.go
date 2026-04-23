@@ -301,7 +301,10 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		}
-		return a, nil
+			if msg.SessionID != "" {
+				a.state.SessionID = msg.SessionID
+			}
+			return a, nil
 
 	case HistoryRefreshedMsg:
 		return a, func() tea.Msg {
@@ -808,7 +811,7 @@ func (a *App) dispatchTurnSubmit(msg SubmitMsg) tea.Cmd {
 		if finalID == "" {
 			finalID = turnID
 		}
-		return TurnSubmittedMsg{TurnID: finalID}
+		return TurnSubmittedMsg{TurnID: finalID, SessionID: ack.SessionID}
 	}
 }
 

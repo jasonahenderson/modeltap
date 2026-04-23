@@ -211,8 +211,9 @@ type PasteSummarizeRequestMsg struct {
 // viewport keys its "thinking" spinner on TurnID; the status bar
 // surfaces Err via a transient banner.
 type TurnSubmittedMsg struct {
-	TurnID string
-	Err    error
+	TurnID    string
+	SessionID string
+	Err       error
 }
 
 // ToolActivityPhase discriminates start vs end of a tool execution.
