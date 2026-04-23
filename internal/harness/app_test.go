@@ -7,6 +7,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/jasonahenderson/modeltap/internal/harness/theme"
 	"github.com/jasonahenderson/modeltap/internal/protocol"
 )
 
@@ -267,6 +268,35 @@ func TestApp_View_ContainsZones(t *testing.T) {
 	// state string.
 	if !strings.Contains(view, "[●]") {
 		t.Errorf("View missing status bar ready badge:\n%s", view)
+	}
+}
+
+// TestApp_SetTheme_Smoke verifies that SetTheme propagates to all child
+// components and View renders without panic when a theme is active.
+func TestApp_SetTheme_Smoke(t *testing.T) {
+	app := NewApp(AppOptions{})
+
+	// The "system" theme is registered on package init.
+	theme := theme.CurrentTheme()
+	if theme == nil {
+		t.Skip("no theme registered")
+	}
+
+	app.SetTheme(theme)
+
+	// Set a size so the viewport and textarea allocate width.
+	model, _ := app.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	app = model.(App)
+
+	// Add a message so the viewport has content to render.
+	app.state.Messages = []DisplayMessage{
+		{Role: RoleUser, Content: "test message"},
+	}
+
+	// View should render without panic and contain the themed prefix.
+	view := app.View()
+	if !strings.Contains(view, "test message") {
+		t.Errorf("View missing user content:\n%s", view)
 	}
 }
 
