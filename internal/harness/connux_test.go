@@ -190,6 +190,17 @@ func TestApp_ConnStateMsg_Ready_ClearsBanner(t *testing.T) {
 		t.Fatal("expected a follow-up Cmd clearing the banner")
 	}
 	follow := cmd()
+	// The ConnStateMsg handler may batch the banner-clear with a
+	// background history load; unwrap BatchMsg to find BannerClearMsg.
+	if batch, ok := follow.(tea.BatchMsg); ok {
+		for _, c := range batch {
+			m := c()
+			if _, ok := m.(BannerClearMsg); ok {
+				return
+			}
+		}
+		t.Fatalf("expected BannerClearMsg inside BatchMsg, got %T", follow)
+	}
 	if _, ok := follow.(BannerClearMsg); !ok {
 		t.Fatalf("expected BannerClearMsg, got %T", follow)
 	}
