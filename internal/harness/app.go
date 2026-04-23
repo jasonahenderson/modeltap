@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"reflect"
 	"strings"
 	"time"
@@ -884,35 +883,7 @@ func isNewlineShortcut(msg tea.KeyMsg) bool {
 // queries, cursor-position reports, ST terminators, etc.). It is intended
 // for use with tea.WithFilter so the garbage is removed before Update runs.
 func TerminalResponseFilter(_ tea.Model, msg tea.Msg) tea.Msg {
-	result := terminalResponseFilter(msg)
-	// TEMP: log any KeyMsg that looks like a terminal response but made it
-	// through.  This helps identify sequences we are not yet filtering.
-	if result != nil {
-		if km, ok := msg.(tea.KeyMsg); ok {
-			s := string(km.Runes)
-			looksLikeTerm := false
-			switch {
-			case km.Alt && len(km.Runes) == 1 && (km.Runes[0] == '[' || km.Runes[0] == ']' || km.Runes[0] == '\\'):
-				looksLikeTerm = true
-			case strings.HasPrefix(s, "[") && len(s) > 1:
-				c := s[1]
-				if c >= '0' && c <= '9' {
-					looksLikeTerm = true
-				}
-			case strings.HasPrefix(s, "]") && len(s) > 1:
-				c := s[1]
-				if c >= '0' && c <= '9' {
-					looksLikeTerm = true
-				}
-			case strings.HasPrefix(s, ""):
-				looksLikeTerm = true
-			}
-			if looksLikeTerm {
-				fmt.Fprintf(os.Stderr, "[FILTER-LEAK] KeyMsg type=%v alt=%v runes=%q\n", km.Type, km.Alt, s)
-			}
-		}
-	}
-	return result
+	return terminalResponseFilter(msg)
 }
 
 func terminalResponseFilter(msg tea.Msg) tea.Msg {
