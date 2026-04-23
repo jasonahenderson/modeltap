@@ -93,18 +93,32 @@ func (v *ConversationViewport) SetTheme(t theme.Theme) {
 }
 
 // SetSize informs the viewport of the available rectangle and creates
-// (or resizes) the markdown renderer to match.
+// (or resizes) the markdown renderer to match. When a border style is
+// active the content area is reduced so the final rendered size (body +
+// border) fits exactly within the allocated rectangle.
 func (v *ConversationViewport) SetSize(width, height int) {
 	v.width = width
 	v.height = height
-	v.vp.Width = width
-	v.vp.Height = height
+	contentWidth := width
+	contentHeight := height
+	if v.style.Border.GetBorderTop() {
+		contentWidth -= 2
+		contentHeight -= 2
+		if contentWidth < 1 {
+			contentWidth = 1
+		}
+		if contentHeight < 1 {
+			contentHeight = 1
+		}
+	}
+	v.vp.Width = contentWidth
+	v.vp.Height = contentHeight
 	if v.renderer == nil {
-		if r, err := NewMarkdownRenderer(width); err == nil {
+		if r, err := NewMarkdownRenderer(contentWidth); err == nil {
 			v.renderer = r
 		}
 	} else {
-		_ = v.renderer.SetWidth(width)
+		_ = v.renderer.SetWidth(contentWidth)
 	}
 	v.refreshContent()
 }

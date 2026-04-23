@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"reflect"
 	"strings"
 	"time"
 
@@ -770,6 +772,13 @@ func (a *App) dispatchTurnSubmit(msg SubmitMsg) tea.Cmd {
 	// TurnIDs are harness-assigned per protocol contract; the server
 	// echoes them back so both sides can correlate streaming events.
 	turnID := "turn-" + uuid.NewString()
+	// Show the user's message immediately so the conversation flows
+	// naturally while the network round-trip happens.
+	a.state.Messages = append(a.state.Messages, DisplayMessage{
+		Role:    RoleUser,
+		TurnID:  turnID,
+		Content: content,
+	})
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
@@ -858,20 +867,69 @@ func isNewlineShortcut(msg tea.KeyMsg) bool {
 // queries, cursor-position reports, ST terminators, etc.). It is intended
 // for use with tea.WithFilter so the garbage is removed before Update runs.
 func TerminalResponseFilter(_ tea.Model, msg tea.Msg) tea.Msg {
+	result := terminalResponseFilter(msg)
+	// TEMP: log any KeyMsg that looks like a terminal response but made it
+	// through.  This helps identify sequences we are not yet filtering.
+	if result != nil {
+		if km, ok := msg.(tea.KeyMsg); ok {
+			s := string(km.Runes)
+			looksLikeTerm := false
+			switch {
+			case km.Alt && len(km.Runes) == 1 && (km.Runes[0] == '[' || km.Runes[0] == ']' || km.Runes[0] == '\\'):
+				looksLikeTerm = true
+			case strings.HasPrefix(s, "[") && len(s) > 1:
+				c := s[1]
+				if c >= '0' && c <= '9' {
+					looksLikeTerm = true
+				}
+			case strings.HasPrefix(s, "]") && len(s) > 1:
+				c := s[1]
+				if c >= '0' && c <= '9' {
+					looksLikeTerm = true
+				}
+			case strings.HasPrefix(s, ""):
+				looksLikeTerm = true
+			}
+			if looksLikeTerm {
+				fmt.Fprintf(os.Stderr, "[FILTER-LEAK] KeyMsg type=%v alt=%v runes=%q\n", km.Type, km.Alt, s)
+			}
+		}
+	}
+	return result
+}
+
+func terminalResponseFilter(msg tea.Msg) tea.Msg {
 	km, ok := msg.(tea.KeyMsg)
-	if !ok {
+	if ok {
+		if isTerminalGarbage(km) {
+			return nil
+		}
 		return msg
 	}
-	if isTerminalGarbage(km) {
-		return nil
+
+	// Drop unknown CSI sequences and other terminal garbage that bubbletea
+	// doesn't recognize. These are unexported []byte types (e.g.
+	// unknownCSISequenceMsg) that slip through as raw bytes.
+	t := reflect.TypeOf(msg)
+	if t != nil && t.Kind() == reflect.Slice && t.Elem().Kind() == reflect.Uint8 {
+		v := reflect.ValueOf(msg)
+		if v.Len() > 0 && v.Index(0).Uint() == 0x1b {
+			return nil
+		}
 	}
+
 	return msg
 }
 
 func isTerminalGarbage(msg tea.KeyMsg) bool {
-	// ST terminator fragment parsed as Alt+\.
-	if msg.Alt && len(msg.Runes) == 1 && msg.Runes[0] == '\\' {
-		return true
+	// ESC-prefixed fragments parsed as Alt+[ / Alt+] / Alt+\.
+	// These are the remaining pieces of CSI/OSC/ST response sequences
+	// after the ESC byte is consumed as an Alt modifier.
+	if msg.Alt && len(msg.Runes) == 1 {
+		switch msg.Runes[0] {
+		case '[', ']', '\\':
+			return true
+		}
 	}
 	s := string(msg.Runes)
 	if strings.HasPrefix(s, "\x1b") {
@@ -890,6 +948,20 @@ func isTerminalGarbage(msg tea.KeyMsg) bool {
 		}
 		if c == 'I' || c == 'O' {
 			return true // focus-event responses
+		}
+		if c == '?' || c == '>' || c == '!' || c == '<' {
+			return true // DA1, DA2, soft reset, kitty keyboard protocol
+		}
+	}
+	// Catch OSC response bodies after ESC+']' was consumed as Alt+].
+	// e.g. "11;rgb:1919/1a1a/1b1b", "10;rgb:ffff/ffff/ffff".
+	if len(s) > 0 && len(s) <= 40 {
+		i := 0
+		for i < len(s) && s[i] >= '0' && s[i] <= '9' {
+			i++
+		}
+		if i > 0 && i < len(s) && s[i] == ';' {
+			return true
 		}
 	}
 	return false
