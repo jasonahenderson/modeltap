@@ -40,6 +40,8 @@ A new BFF (backend-for-frontend) server speaks JSON-RPC 2.0 over unix socket (de
 - **Model commands** — `/models` (catalog), `/model` (current), `/model <name|auto>` (override).
 - **Cross-session command history** — up/down arrow at input top traverses BFF-sourced history. `/history user|project|session` switches scope.
 - **MCP client** — stdio JSON-RPC 2.0, subprocess launch with configurable timeout, initialize → tools/list → tool registration. `/mcp status` and `/mcp reconnect <name>`.
+- **Theme system** — 24 embedded color palettes (catppuccin, dracula, nord, gruvbox, tokyonight, etc.) ported from OpenCode (MIT, attributed in `NOTICE`). Dynamic `system` theme detects terminal background via OSC 11 / COLORFGBG and generates an adaptive gray scale. Status bar, viewport, and input area are all themed.
+- **Sensible keybindings** — default submit key is `Enter` (was unreachable `Ctrl+Enter`); `Tab` toggles plan/build mode alongside `Ctrl+P`; `Ctrl+J` and `Alt+Enter` insert newlines; `/help` lists all slash commands.
 
 ### Providers
 
