@@ -346,9 +346,10 @@ func trimSpaces(s string) string {
 
 // TurnSubmitAck mirrors protocol.TurnSubmitResponse for the harness side.
 type TurnSubmitAck struct {
-	TurnID string          `json:"turn_id"`
-	Status string          `json:"status"`
-	Sync   json.RawMessage `json:"sync,omitempty"`
+	TurnID    string          `json:"turn_id"`
+	SessionID string          `json:"session_id,omitempty"`
+	Status    string          `json:"status"`
+	Sync      json.RawMessage `json:"sync,omitempty"`
 }
 
 // SubmitTurn sends turn.submit and returns the ack. Streaming events

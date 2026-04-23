@@ -59,12 +59,12 @@ func DefaultKeyMap(submitKey string) KeyMap {
 			key.WithHelp("ctrl+p / tab", "toggle mode"),
 		),
 		ScrollUp: key.NewBinding(
-			key.WithKeys("up"),
-			key.WithHelp("↑", "scroll up"),
+			key.WithKeys("shift+up"),
+			key.WithHelp("shift+↑", "scroll up"),
 		),
 		ScrollDown: key.NewBinding(
-			key.WithKeys("down"),
-			key.WithHelp("↓", "scroll down"),
+			key.WithKeys("shift+down"),
+			key.WithHelp("shift+↓", "scroll down"),
 		),
 		PageUp: key.NewBinding(
 			key.WithKeys("pgup"),

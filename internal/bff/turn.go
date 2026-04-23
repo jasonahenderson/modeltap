@@ -233,8 +233,9 @@ func handleTurnSubmit(ctx context.Context, conn *Connection, params json.RawMess
 	}()
 
 	return &protocol.TurnSubmitResponse{
-		TurnID: submit.TurnID,
-		Status: "accepted",
+		TurnID:    submit.TurnID,
+		SessionID: submit.SessionID,
+		Status:    "accepted",
 	}, nil
 }
 

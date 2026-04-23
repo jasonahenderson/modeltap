@@ -185,26 +185,6 @@ func TestApp_StreamComplete_FinalizesMetadata(t *testing.T) {
 	}
 }
 
-func TestApp_FocusSwitch_UpAtTopMovesToViewport(t *testing.T) {
-	app := NewApp(AppOptions{})
-	app.state.Focus = InputFocus
-	model, _ := app.Update(tea.KeyMsg{Type: tea.KeyUp})
-	app = model.(App)
-	if app.state.Focus != ViewportFocus {
-		t.Errorf("focus = %v, want viewport (input cursor at top)", app.state.Focus)
-	}
-}
-
-func TestApp_FocusSwitch_DownAtBottomMovesToInput(t *testing.T) {
-	app := NewApp(AppOptions{})
-	app.state.Focus = ViewportFocus
-	model, _ := app.Update(tea.KeyMsg{Type: tea.KeyDown})
-	app = model.(App)
-	if app.state.Focus != InputFocus {
-		t.Errorf("focus = %v, want input (viewport at bottom)", app.state.Focus)
-	}
-}
-
 func TestApp_FocusSwitch_PrintableInViewportSwitchesToInput(t *testing.T) {
 	app := NewApp(AppOptions{})
 	app.state.Focus = ViewportFocus
@@ -336,8 +316,16 @@ func TestTerminalResponseFilter(t *testing.T) {
 		{"CSI focus-in dropped", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("[I")}, nil},
 		{"CSI focus-out dropped", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("[O")}, nil},
 		{"ST terminator dropped", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'\\'}, Alt: true}, nil},
+		{"Alt+] fragment dropped", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{']'}, Alt: true}, nil},
+		{"Alt+[ fragment dropped", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'['}, Alt: true}, nil},
 		{"ESC prefix dropped", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("\x1b[?2004h")}, nil},
+		{"OSC body after Alt+] dropped", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("11;rgb:1919/1a1a/1b1b")}, nil},
 		{"Alt backslash passthrough (not ST)", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a', '\\'}, Alt: true}, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a', '\\'}, Alt: true}},
+		{"unknown CSI byte slice dropped", []byte{0x1b, 0x5b, 0x3f, 0x32, 0x30, 0x30, 0x34, 0x68}, nil},
+		{"plain byte slice passthrough", []byte{'h', 'e', 'l', 'l', 'o'}, []byte{'h', 'e', 'l', 'l', 'o'}},
+		{"Enter passthrough (empty runes)", tea.KeyMsg{Type: tea.KeyEnter}, tea.KeyMsg{Type: tea.KeyEnter}},
+		{"Backspace passthrough (empty runes)", tea.KeyMsg{Type: tea.KeyBackspace}, tea.KeyMsg{Type: tea.KeyBackspace}},
+		{"Tab passthrough (empty runes)", tea.KeyMsg{Type: tea.KeyTab}, tea.KeyMsg{Type: tea.KeyTab}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
