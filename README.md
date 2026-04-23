@@ -1,15 +1,25 @@
-# modeltap
-
-[![CI](https://github.com/jasonahenderson/modeltap/actions/workflows/ci.yml/badge.svg)](https://github.com/jasonahenderson/modeltap/actions/workflows/ci.yml)
+[![CI](https://github.com/jasonahenderson/modeltap/actions/workflows/ci.yml/badge.svg)](https://github.com/jasonahenderson/modeltap/actions)
 [![Go Version](https://img.shields.io/badge/go-1.22+-00ADD8?logo=go)](https://golang.org)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Latest Release](https://img.shields.io/github/v/release/jasonahenderson/modeltap)](https://github.com/jasonahenderson/modeltap/releases)
 
 **A local-first integrated environment for AI coding tools.**
 
-modeltap started as a transparent reverse proxy that captures every request and response between an AI client and providers like Anthropic and OpenAI — giving you a complete, queryable record of your own traffic in local SQLite. It is growing into a broader substrate: a JSON-RPC backend, a terminal harness, a built-in tool framework, and a knowledge layer, all running on your machine and all under Apache 2.0.
+```
+┌─────────┐      ┌─────────┐      ┌────────────────┐
+│  Client │─────>│modeltap │─────>│Anthropic/OpenAI│
+│(Claude, │<─────│(capture │<─────│   providers    │
+│ Codex)  │      │ + log)  │      └────────────────┘
+└─────────┘      └────┬────┘
+                     │
+                     ▼
+               ┌───────────┐
+               │  SQLite   │
+               └───────────┘
+```
 
 > You keep your API keys. You keep your data. You keep the history.
+
+modeltap started as a transparent reverse proxy that captures every request and response between an AI client and providers like Anthropic and OpenAI — giving you a complete, queryable record of your own traffic in local SQLite. It is growing into a broader substrate: a JSON-RPC backend, a terminal harness, a built-in tool framework, and a knowledge layer, all running on your machine and all under Apache 2.0.
 
 ---
 
@@ -37,6 +47,8 @@ export ANTHROPIC_API_KEY=sk-ant-...   # or OPENAI_API_KEY, or both
 ```
 
 Inside the harness: `/help` for slash commands, `/sessions` to browse history, `/models` for the model catalog, `/mcp status` for MCP servers. `Ctrl+C` to exit.
+
+> The harness theme system is ported from [OpenCode](https://github.com/sst/opencode) (MIT) — see [`NOTICE`](NOTICE) for attribution.
 
 ### Capture traffic from your own AI tools
 
@@ -74,21 +86,6 @@ Full install, configuration, and client-integration details — including Claude
 | **Real cost and token accounting** | Per-request input/output tokens, latency, and estimated cost — extracted from live responses, including reassembled SSE streams. |
 | **Full record, not samples** | Captures every request and response in full, with retention-based pruning ([ADR-0005](docs/adr/0005-retention-based-pruning.md)). You can always go back and read the bytes. |
 | **Built to grow** | v0.2.0 adds a JSON-RPC BFF and a Bubbletea terminal harness with a tool framework and MCP client. A knowledge layer (sqlite-vec), skills, and agent teams are on the roadmap. |
-
-```text
-  ┌─────────┐      ┌──────────┐      ┌────────────────┐
-  │ Client  │ ───▶ │ modeltap │ ───▶ │ Anthropic /    │
-  │(Claude  │      │(capture +│      │ OpenAI         │
-  │ Code,   │ ◀─── │  proxy)  │ ◀─── │ providers      │
-  │ Codex)  │      └──────────┘      └────────────────┘
-  └─────────┘           │
-                        ▼
-                 ┌──────────┐
-                 │  SQLite  │
-                 │ (traffic │
-                 │  + meta) │
-                 └──────────┘
-```
 
 ---
 
