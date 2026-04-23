@@ -28,7 +28,7 @@ func TestViewport_RenderUserMessage(t *testing.T) {
 	v := plainViewport(state)
 	v.SetSize(80, 10)
 	out := v.View()
-	if !strings.Contains(out, "> hello") {
+	if !strings.Contains(out, "❯ hello") {
 		t.Errorf("user message not rendered:\n%s", out)
 	}
 }

@@ -5,16 +5,19 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/jasonahenderson/modeltap/internal/harness/theme"
 )
 
 // StatusBar renders the bottom status line per Bundle 5 design D3:
 // connection indicator, mode, model, context%, cost, optional call
 // timer — left-to-right.
 type StatusBar struct {
-	state *AppState
-	width int
-	style StatusBarStyle
+	state   *AppState
+	width   int
+	style   StatusBarStyle
+	spinner spinner.Model
 }
 
 // StatusBarStyle holds the lipgloss styles each status segment uses.
@@ -32,6 +35,8 @@ type StatusBarStyle struct {
 	ContextCritical  lipgloss.Style
 	Cost             lipgloss.Style
 	Timer            lipgloss.Style
+	Separator        lipgloss.Style
+	Spinner          lipgloss.Style
 }
 
 // DefaultStatusBarStyle returns ANSI-coloured styles for an
@@ -50,18 +55,55 @@ func DefaultStatusBarStyle() StatusBarStyle {
 		ContextCritical:  lipgloss.NewStyle().Foreground(lipgloss.Color("9")),
 		Cost:             lipgloss.NewStyle(),
 		Timer:            lipgloss.NewStyle().Faint(true),
+		Separator:        lipgloss.NewStyle().Faint(true),
+		Spinner:          lipgloss.NewStyle(),
+	}
+}
+
+// ThemedStatusBarStyle builds styles from the active theme.
+func ThemedStatusBarStyle(t theme.Theme) StatusBarStyle {
+	if t == nil {
+		return DefaultStatusBarStyle()
+	}
+	sep := lipgloss.NewStyle().Foreground(lipgloss.Color("·"))
+	return StatusBarStyle{
+		ConnReady:        lipgloss.NewStyle().Foreground(t.Success()),
+		ConnDegraded:     lipgloss.NewStyle().Foreground(t.Warning()),
+		ConnReconnecting: lipgloss.NewStyle().Foreground(t.Info()),
+		ConnFailed:       lipgloss.NewStyle().Foreground(t.Error()),
+		Mode:             lipgloss.NewStyle().Bold(true).Foreground(t.Accent()).Background(t.BackgroundPanel()),
+		Model:            lipgloss.NewStyle().Foreground(t.Text()),
+		Context:          lipgloss.NewStyle().Foreground(t.TextMuted()),
+		ContextWarning:   lipgloss.NewStyle().Foreground(t.Warning()),
+		ContextCritical:  lipgloss.NewStyle().Foreground(t.Error()),
+		Cost:             lipgloss.NewStyle().Foreground(t.TextMuted()),
+		Timer:            lipgloss.NewStyle().Foreground(t.TextMuted()).Faint(true),
+		Separator:        sep,
+		Spinner:          lipgloss.NewStyle().Foreground(t.Accent()),
 	}
 }
 
 // NewStatusBar constructs a StatusBar with default styles bound to
 // shared state.
 func NewStatusBar(state *AppState) StatusBar {
-	return StatusBar{state: state, style: DefaultStatusBarStyle()}
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	return StatusBar{state: state, style: DefaultStatusBarStyle(), spinner: s}
 }
 
 // SetStyle overrides the StatusBarStyle (used by tests for plain
 // rendering and by themed UIs in the future).
 func (s *StatusBar) SetStyle(style StatusBarStyle) { s.style = style }
+
+// SetTheme rebuilds styles from the given theme.
+func (s *StatusBar) SetTheme(t theme.Theme) {
+	s.style = ThemedStatusBarStyle(t)
+}
+
+// SetSpinnerStyle updates the spinner style.
+func (s *StatusBar) SetSpinnerStyle(st lipgloss.Style) {
+	s.spinner.Style = st
+}
 
 // SetWidth informs the bar of the available terminal width.
 func (s *StatusBar) SetWidth(w int) { s.width = w }
@@ -83,11 +125,24 @@ func (s *StatusBar) View() string {
 		s.modeDisplay(),
 		s.modelDisplay(),
 	}
-	parts = append(parts, "|", s.contextDisplay(), "|", s.costDisplay())
+	parts = append(parts, s.sep(), s.contextDisplay(), s.sep(), s.costDisplay())
 	if t := s.timerDisplay(); t != "" {
-		parts = append(parts, "|", t)
+		parts = append(parts, s.sep(), t)
+	}
+	if s.state.CallActive {
+		parts = append(parts, s.sep(), s.spinner.View())
 	}
 	return strings.Join(parts, " ")
+}
+
+// Tick advances the spinner frame. Returns a tea.Cmd suitable for
+// the app's Update loop.
+func (s *StatusBar) Tick() {
+	_ = s.spinner.Tick
+}
+
+func (s *StatusBar) sep() string {
+	return s.style.Separator.Render("·")
 }
 
 // connectionIndicator renders a colored badge per FEAT-0009.

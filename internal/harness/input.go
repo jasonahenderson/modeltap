@@ -6,6 +6,8 @@ import (
 
 	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/jasonahenderson/modeltap/internal/harness/theme"
 )
 
 // DefaultPasteThreshold is the byte length above which pasted content
@@ -45,7 +47,7 @@ type InputArea struct {
 func NewInputArea(state *AppState) InputArea {
 	ta := textarea.New()
 	ta.Placeholder = "Type a message... (/help for commands, @file to attach)"
-	ta.Prompt = "> "
+	ta.Prompt = "❯ "
 	ta.ShowLineNumbers = false
 	ta.CharLimit = 0
 	ta.Focus()
@@ -60,6 +62,18 @@ func NewInputArea(state *AppState) InputArea {
 func (i *InputArea) SetWidth(w int) {
 	i.width = w
 	i.ta.SetWidth(w)
+}
+
+// SetTheme styles the textarea prompt with the theme accent color.
+func (i *InputArea) SetTheme(t theme.Theme) {
+	if t == nil {
+		i.ta.FocusedStyle.Prompt = lipgloss.NewStyle()
+		i.ta.BlurredStyle.Prompt = lipgloss.NewStyle()
+		return
+	}
+	accent := lipgloss.NewStyle().Foreground(t.Accent())
+	i.ta.FocusedStyle.Prompt = accent
+	i.ta.BlurredStyle.Prompt = accent
 }
 
 // Height returns the rendered height in rows.

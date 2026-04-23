@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/jasonahenderson/modeltap/internal/harness/theme"
 )
 
 // ConversationViewport wraps bubbles/viewport with auto-scroll, manual-
@@ -36,6 +37,7 @@ type ViewportStyle struct {
 	ToolCall      lipgloss.Style
 	ToolResult    lipgloss.Style
 	System        lipgloss.Style
+	Border        lipgloss.Style
 }
 
 // DefaultViewportStyle returns coloured styles for an interactive
@@ -49,6 +51,24 @@ func DefaultViewportStyle() ViewportStyle {
 		ToolCall:      lipgloss.NewStyle().Foreground(lipgloss.Color("13")), // magenta
 		ToolResult:    lipgloss.NewStyle().Foreground(lipgloss.Color("10")), // green
 		System:        lipgloss.NewStyle().Faint(true),
+		Border:        lipgloss.NewStyle(),
+	}
+}
+
+// ThemedViewportStyle builds viewport styles from the active theme.
+func ThemedViewportStyle(t theme.Theme) ViewportStyle {
+	if t == nil {
+		return DefaultViewportStyle()
+	}
+	return ViewportStyle{
+		UserPrefix:    lipgloss.NewStyle().Bold(true).Foreground(t.Accent()),
+		UserContent:   lipgloss.NewStyle().Foreground(t.Text()),
+		AssistantHead: lipgloss.NewStyle().Faint(true).Foreground(t.TextMuted()),
+		AssistantFoot: lipgloss.NewStyle().Faint(true).Foreground(t.TextMuted()),
+		ToolCall:      lipgloss.NewStyle().Foreground(t.Warning()),
+		ToolResult:    lipgloss.NewStyle().Foreground(t.Success()),
+		System:        lipgloss.NewStyle().Faint(true).Foreground(t.TextMuted()),
+		Border:        lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.BorderSubtle()),
 	}
 }
 
@@ -66,6 +86,11 @@ func NewConversationViewport(state *AppState) ConversationViewport {
 
 // SetStyle overrides the rendering styles.
 func (v *ConversationViewport) SetStyle(style ViewportStyle) { v.style = style }
+
+// SetTheme rebuilds styles from the given theme.
+func (v *ConversationViewport) SetTheme(t theme.Theme) {
+	v.style = ThemedViewportStyle(t)
+}
 
 // SetSize informs the viewport of the available rectangle and creates
 // (or resizes) the markdown renderer to match.
@@ -114,7 +139,11 @@ func (v ConversationViewport) Update(msg tea.Msg) (ConversationViewport, tea.Cmd
 // View renders the visible window.
 func (v *ConversationViewport) View() string {
 	v.refreshContent()
-	return v.vp.View()
+	body := v.vp.View()
+	if v.style.Border.GetBorderTop() {
+		return v.style.Border.Render(body)
+	}
+	return body
 }
 
 // refreshContent rebuilds the viewport's body text from the current
@@ -147,7 +176,7 @@ func (v *ConversationViewport) renderMessages() string {
 func (v *ConversationViewport) renderMessage(m DisplayMessage) string {
 	switch m.Role {
 	case RoleUser:
-		return v.style.UserPrefix.Render("> ") + v.style.UserContent.Render(m.Content)
+		return v.style.UserPrefix.Render("❯ ") + v.style.UserContent.Render(m.Content)
 	case RoleAssistant:
 		return v.renderAssistant(m)
 	case RoleToolCall:
