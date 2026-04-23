@@ -1,6 +1,7 @@
 package harness
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -286,5 +287,34 @@ func TestAppState_NextSequence_Monotonic(t *testing.T) {
 func TestFocusZone_String(t *testing.T) {
 	if InputFocus.String() != "input" || ViewportFocus.String() != "viewport" {
 		t.Errorf("FocusZone.String() mismatch")
+	}
+}
+
+func TestTerminalResponseFilter(t *testing.T) {
+	tests := []struct {
+		name string
+		msg  tea.Msg
+		want tea.Msg
+	}{
+		{"nil passthrough", nil, nil},
+		{"WindowSize passthrough", tea.WindowSizeMsg{Width: 80, Height: 24}, tea.WindowSizeMsg{Width: 80, Height: 24}},
+		{"normal key passthrough", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}}, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}}},
+		{"single bracket passthrough", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'['}}, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'['}}},
+		{"single close bracket passthrough", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{']'}}, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{']'}}},
+		{"OSC response dropped", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("]11;rgb:1919/1a1a/1b1b")}, nil},
+		{"CPR dropped", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("[1;1R")}, nil},
+		{"CSI focus-in dropped", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("[I")}, nil},
+		{"CSI focus-out dropped", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("[O")}, nil},
+		{"ST terminator dropped", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'\\'}, Alt: true}, nil},
+		{"ESC prefix dropped", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("\x1b[?2004h")}, nil},
+		{"Alt backslash passthrough (not ST)", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a', '\\'}, Alt: true}, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a', '\\'}, Alt: true}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := TerminalResponseFilter(nil, tt.msg)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("TerminalResponseFilter() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
