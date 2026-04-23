@@ -216,6 +216,10 @@ type TurnSubmittedMsg struct {
 	Err       error
 }
 
+// historyLoadedMsg is an internal marker fired after the
+// HistoryController finishes an initial Load. Not consumed by the App.
+type historyLoadedMsg struct{}
+
 // ToolActivityPhase discriminates start vs end of a tool execution.
 type ToolActivityPhase string
 

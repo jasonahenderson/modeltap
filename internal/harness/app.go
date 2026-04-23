@@ -238,10 +238,24 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case ConnStateMsg:
 		a.state.ConnState = msg.Info
+		var cmds []tea.Cmd
 		if a.connUX != nil {
-			return a, a.connUX.HandleConnState(msg)
+			cmds = append(cmds, a.connUX.HandleConnState(msg))
 		}
-		return a, nil
+		// Prime the command-history cache once the connection is ready
+		// so arrow-up traversal works immediately.
+		if msg.Info.State == ConnStateReady && a.history != nil {
+			cmds = append(cmds, func() tea.Msg {
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+				_ = a.history.Load(ctx)
+				return historyLoadedMsg{}
+			})
+		}
+		if len(cmds) == 0 {
+			return a, nil
+		}
+		return a, tea.Batch(cmds...)
 
 	case ModelUpdateMsg:
 		a.state.ModelName = msg.Name
