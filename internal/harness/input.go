@@ -81,6 +81,12 @@ func (i *InputArea) CursorAtTop() bool {
 // Value returns the raw textarea contents.
 func (i *InputArea) Value() string { return i.ta.Value() }
 
+// InsertNewline inserts a newline character at the cursor position.
+// Used when Alt/Option+Enter is pressed while Enter is the submit key.
+func (i *InputArea) InsertNewline() {
+	i.ta.InsertRune('\n')
+}
+
 // SetValue replaces the textarea contents (used by tests, command
 // completion, and history traversal).
 func (i *InputArea) SetValue(v string) { i.ta.SetValue(v) }
