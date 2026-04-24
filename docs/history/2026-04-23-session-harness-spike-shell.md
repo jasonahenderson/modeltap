@@ -50,6 +50,8 @@ Checked off enough to evaluate:
 - Command palette
 - Session switching through palette
 - Sidebar toggle through palette
+- Sidebar closed by default
+- Transcript mouse/touchpad scrolling without explicit focus change
 - Structured transcript items after submit
 - Transcript interaction model for submitted tokens
   - select interactive transcript items
@@ -58,6 +60,8 @@ Checked off enough to evaluate:
 - Queued follow-up messages during active streaming
   - submit while busy
   - auto-release after current run completes
+  - preserve FIFO order after interrupt and resumed processing
+  - drain backlog into one merged resumed turn
 
 Partially checked off:
 
@@ -74,12 +78,23 @@ Partially checked off:
 - Queued follow-up messages
   - no edit/cancel/reorder controls yet
   - no explicit interrupt-vs-queue choice yet
+- Stream interruption / stop / retry / branch
+  - stop is implemented with a two-step Esc interrupt
+  - retry / branch are still missing
+- Inline tool / permission event rendering
+  - first fake transcript event shapes are present
+  - approval / denial flow is still missing
 
 Not checked off yet:
 
-- Inline tool / permission events in transcript
+- Composer anchoring review
+  - fixed bottom composer vs single scrolling surface
+  - Claude-style composer scroll-away behavior in tight vertical layouts
+- Packaging / extraction review
+  - can the spike shell stand alone as a releasable component
+  - can the harness consume it as an embedded package without tight coupling
+  - what seams are required if it remains in-repo
 - Split-view inspector
-- Stream interruption / stop / retry / branch
 - Slash command UX with suggestions
 - History recall semantics for tokenized input
 - Empty/loading/error states
@@ -92,11 +107,11 @@ Not checked off yet:
 
 ## Current priority order
 
-1. Tool / permission event rendering in transcript
-2. Stop / retry / branch controls for streaming
-3. Split-view inspector
-4. Slash command UX
-5. History recall semantics for tokenized input
+1. Composer anchoring review
+2. Tool / permission event rendering in transcript
+3. Stop / retry / branch controls for streaming
+4. Split-view inspector
+5. Packaging / extraction review
 
 ## Checkpoint
 
@@ -104,15 +119,19 @@ Current checkpoint state before the next test pass:
 
 - `/demo` is now a deliberate slow-stream mode for queue/interruption testing.
 - Slash commands no longer misclassify as dropped file paths.
+- The sidebar now starts closed and footer hints carry the open/toggle affordance.
 - Submitted paste tokens expand inline in the transcript by default.
 - Queued follow-up messages remain visible in the transcript while waiting.
-- A queue-drain change is in progress so queued items clear from the visible
-  queue surface before the next run starts.
-- `Esc` stop handling for active streaming is in progress and needs manual UX
-  verification in the terminal.
+- Queue draining now merges waiting follow-ups into one resumed turn.
+- `Esc` stop handling is implemented with a two-step interrupt flow.
+- Mouse/touchpad transcript scrolling is enabled and refreshes preserve scroll
+  position instead of forcing the view back to the bottom.
+- The current layout still uses a fixed bottom composer, and the next design
+  review should test a single scrolling surface with the composer at the end.
 
 Immediate test targets after this checkpoint:
 
-- Confirm `Esc` stops an active `/demo` stream in a way that feels correct.
-- Confirm queued follow-ups visibly clear from the queue surface before the
-  next run resumes.
+- Compare the current anchored-composer layout against a single scrolling
+  surface with the composer at the bottom of the conversation.
+- Decide whether transcript tool / permission events belong inline before
+  adding approval and denial interactions.

@@ -13,6 +13,15 @@ func TestNewSeedsMessages(t *testing.T) {
 	if len(app.messages) < 2 {
 		t.Fatalf("expected seeded transcript, got %d messages", len(app.messages))
 	}
+	if app.sidebarOpen {
+		t.Fatal("expected sidebar closed by default")
+	}
+	if app.input.ShowLineNumbers {
+		t.Fatal("expected input line numbers disabled")
+	}
+	if !app.transcript.MouseWheelEnabled {
+		t.Fatal("expected transcript mouse wheel enabled")
+	}
 }
 
 func TestSubmitStartsStreaming(t *testing.T) {
@@ -42,8 +51,11 @@ func TestDemoUsesSlowStreamDelay(t *testing.T) {
 	app.input.SetValue("/demo")
 
 	_ = app.submit()
-	if app.streamDelay != 120*time.Millisecond {
-		t.Fatalf("expected demo stream delay 120ms, got %v", app.streamDelay)
+	if app.streamDelay != 500*time.Millisecond {
+		t.Fatalf("expected demo stream delay 500ms, got %v", app.streamDelay)
+	}
+	if len(app.streamQueue) < 100 {
+		t.Fatalf("expected long demo stream queue, got %d chunks", len(app.streamQueue))
 	}
 }
 
@@ -114,17 +126,55 @@ func TestDoneTickReleasesQueuedSubmission(t *testing.T) {
 	if len(next.queuedSubmissions) != 0 {
 		t.Fatalf("expected queue drained, got %d", len(next.queuedSubmissions))
 	}
-	if len(next.pendingSubmissions) != 1 {
-		t.Fatalf("expected one pending submission remaining, got %d", len(next.pendingSubmissions))
+	if len(next.pendingSubmissions) != 0 {
+		t.Fatalf("expected pending queue drained, got %d", len(next.pendingSubmissions))
 	}
 	if len(next.messages) < 3 {
 		t.Fatalf("expected queued submission appended, got %d messages", len(next.messages))
 	}
-	if got := next.messages[len(next.messages)-2].content; got != "queued question" {
-		t.Fatalf("expected queued question submitted, got %q", got)
+	if got := next.messages[len(next.messages)-2].content; got != "queued question\n\nqueued question 2" {
+		t.Fatalf("expected merged queued content, got %q", got)
 	}
 	if !next.streaming {
 		t.Fatal("expected streaming restarted for queued submission")
+	}
+}
+
+func TestSubmitAfterStopWithBacklogPreservesQueueOrder(t *testing.T) {
+	app := New()
+	app.width = 120
+	app.height = 40
+	app.layout()
+	app.queuedSubmissions = []queuedSubmission{{content: "first queued"}, {content: "second queued"}}
+	app.input.SetValue("newest message")
+
+	cmd := app.submit()
+	if cmd == nil {
+		t.Fatal("expected queued release to start")
+	}
+	if len(app.queuedSubmissions) != 0 {
+		t.Fatalf("expected visible queue drained into pending, got %d queued", len(app.queuedSubmissions))
+	}
+	if len(app.pendingSubmissions) != 0 {
+		t.Fatalf("expected pending queue drained into merged submission, got %d", len(app.pendingSubmissions))
+	}
+	if got := app.messages[len(app.messages)-2].content; got != "first queued\n\nsecond queued\n\nnewest message" {
+		t.Fatalf("expected merged queued messages in FIFO order, got %q", got)
+	}
+	if len(app.messages[len(app.messages)-2].entries) != 3 {
+		t.Fatalf("expected 3 separate merged entries, got %d", len(app.messages[len(app.messages)-2].entries))
+	}
+}
+
+func TestToolDemoSessionRendersEvents(t *testing.T) {
+	app := New()
+	app.seedWithSession("Tool Demo")
+	app.width = 120
+	app.height = 40
+	app.layout()
+
+	if !strings.Contains(app.transcript.View(), "Permission required") {
+		t.Fatalf("expected permission event in transcript, got %q", app.transcript.View())
 	}
 }
 
@@ -136,6 +186,19 @@ func TestEscStopsActiveStream(t *testing.T) {
 
 	model, _ := app.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	next := model.(App)
+
+	if !next.interruptArmed {
+		t.Fatal("expected first escape to arm interrupt")
+	}
+	if next.streaming == false {
+		t.Fatal("expected streaming to continue after first escape")
+	}
+	if next.status != "Press Esc again to interrupt" {
+		t.Fatalf("expected interrupt warning, got %q", next.status)
+	}
+
+	model, _ = next.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	next = model.(App)
 
 	if next.streaming {
 		t.Fatal("expected streaming stopped")
@@ -151,12 +214,41 @@ func TestEscStopsActiveStream(t *testing.T) {
 	}
 }
 
+func TestStreamPulseAdvancesWorkingIndicator(t *testing.T) {
+	app := New()
+	app.width = 120
+	app.height = 40
+	app.layout()
+	app.streaming = true
+	app.messages = []message{{role: "assistant", content: "partial", streaming: true}}
+	app.refreshTranscript()
+
+	model, cmd := app.Update(streamPulseMsg{})
+	next := model.(App)
+
+	if cmd == nil {
+		t.Fatal("expected next pulse cmd")
+	}
+	if next.streamPulse != 1 {
+		t.Fatalf("expected pulse to advance, got %d", next.streamPulse)
+	}
+	if !strings.Contains(next.transcript.View(), "working.") {
+		t.Fatalf("expected working indicator in transcript, got %q", next.transcript.View())
+	}
+}
+
 func TestTabCyclesFocus(t *testing.T) {
 	app := New()
 	model, _ := app.Update(tea.KeyMsg{Type: tea.KeyTab})
 	next := model.(App)
 	if next.focus != focusTranscript {
 		t.Fatalf("expected transcript focus, got %v", next.focus)
+	}
+
+	model, _ = next.Update(tea.KeyMsg{Type: tea.KeyTab})
+	next = model.(App)
+	if next.focus != focusInput {
+		t.Fatalf("expected input focus when sidebar is closed, got %v", next.focus)
 	}
 }
 
@@ -270,20 +362,20 @@ func TestSidebarActionClearEmptyLeavesTranscriptEmpty(t *testing.T) {
 
 func TestCtrlBTogglesSidebar(t *testing.T) {
 	app := New()
-	if !app.sidebarOpen {
-		t.Fatal("expected sidebar open by default")
+	if app.sidebarOpen {
+		t.Fatal("expected sidebar closed by default")
 	}
 
 	model, _ := app.Update(tea.KeyMsg{Type: tea.KeyCtrlB})
 	next := model.(App)
-	if next.sidebarOpen {
-		t.Fatal("expected sidebar closed after ctrl+b")
+	if !next.sidebarOpen {
+		t.Fatal("expected sidebar open after ctrl+b")
 	}
 
 	model, _ = next.Update(tea.KeyMsg{Type: tea.KeyCtrlB})
 	next = model.(App)
-	if !next.sidebarOpen {
-		t.Fatal("expected sidebar open after second ctrl+b")
+	if next.sidebarOpen {
+		t.Fatal("expected sidebar closed after second ctrl+b")
 	}
 }
 
@@ -389,6 +481,7 @@ func TestSidebarCloseExpandsMainArea(t *testing.T) {
 	app := New()
 	app.width = 120
 	app.height = 40
+	app.sidebarOpen = true
 	app.layout()
 	withSidebar := app.transcript.Width
 
@@ -575,11 +668,32 @@ func TestTranscriptCanSelectSecondSubmittedToken(t *testing.T) {
 	})
 	app.refreshTranscript()
 
-	model, _ := app.Update(tea.KeyMsg{Type: tea.KeyDown})
+	model, _ := app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
 	next := model.(App)
 
 	if next.selectedTranscriptRef != 1 {
 		t.Fatalf("expected second transcript ref selected, got %d", next.selectedTranscriptRef)
+	}
+}
+
+func TestRefreshTranscriptPreservesScrollOffsetWhenNotAtBottom(t *testing.T) {
+	app := New()
+	app.width = 120
+	app.height = 20
+	app.layout()
+	var msgs []message
+	for i := 0; i < 20; i++ {
+		msgs = append(msgs, message{role: "assistant", content: "line"})
+	}
+	app.messages = msgs
+	app.refreshTranscript()
+	app.transcript.SetYOffset(3)
+
+	app.messages = append(app.messages, message{role: "assistant", content: "new line"})
+	app.refreshTranscript()
+
+	if app.transcript.YOffset != 3 {
+		t.Fatalf("expected scroll offset preserved, got %d", app.transcript.YOffset)
 	}
 }
 

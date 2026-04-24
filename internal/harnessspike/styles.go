@@ -104,6 +104,26 @@ var (
 			Padding(0, 1).
 			Background(lipgloss.Color("#2C2414")).
 			Foreground(lipgloss.Color("#F6E7B0"))
+	eventInfoStyle = lipgloss.NewStyle().
+			Padding(0, 1).
+			Background(lipgloss.Color("#1B2230")).
+			Foreground(lipgloss.Color("#C8D1DC"))
+	eventRequestedStyle = lipgloss.NewStyle().
+				Padding(0, 1).
+				Background(lipgloss.Color("#1B2230")).
+				Foreground(lipgloss.Color("#79C0FF"))
+	eventPermissionStyle = lipgloss.NewStyle().
+				Padding(0, 1).
+				Background(lipgloss.Color("#2C2414")).
+				Foreground(lipgloss.Color("#F2CC60"))
+	eventRunningStyle = lipgloss.NewStyle().
+				Padding(0, 1).
+				Background(lipgloss.Color("#1D2631")).
+				Foreground(lipgloss.Color("#E6EDF3"))
+	eventDoneStyle = lipgloss.NewStyle().
+			Padding(0, 1).
+			Background(lipgloss.Color("#16241C")).
+			Foreground(lipgloss.Color("#7EE787"))
 
 	assistantLabelStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#79C0FF"))
 	assistantBodyStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#F5F7FB"))
