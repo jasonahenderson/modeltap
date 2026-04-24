@@ -40,7 +40,7 @@ Checked off enough to evaluate:
 - Real overlay rendering
 - Multi-option modal instead of hardcoded yes/no
 - Polished modal styling
-- User message restyle to caret + gray block
+- User message restyle to `▎` marker on flat background
 - Large paste compaction into tokens
 - Terminal-style file-drop/path tokenization
 - Token preview before submit
@@ -62,6 +62,17 @@ Checked off enough to evaluate:
   - auto-release after current run completes
   - preserve FIFO order after interrupt and resumed processing
   - drain backlog into one merged resumed turn
+- Single scrolling surface with composer at transcript tail
+- Composer as top/bottom ruled section (no tinted slab)
+- Single-line default input height
+- `▎` blue prompt marker on input line
+- `▎` marker on user messages and queued items in transcript
+- Transcript rows on flat background (no per-row tints)
+- Main surface uses terminal-default background
+- `alt+enter` inserts newline in input
+- Input focus preserved after submit
+- Mouse/touchpad scroll preserves input focus
+- Startup seeded assistant message replaced with actionable test guidance
 
 Partially checked off:
 
@@ -88,7 +99,6 @@ Partially checked off:
 Not checked off yet:
 
 - Composer anchoring review
-  - fixed bottom composer vs single scrolling surface
   - Claude-style composer scroll-away behavior in tight vertical layouts
 - Packaging / extraction review
   - can the spike shell stand alone as a releasable component
@@ -107,11 +117,11 @@ Not checked off yet:
 
 ## Current priority order
 
-1. Composer anchoring review
+1. Packaging / extraction review
 2. Tool / permission event rendering in transcript
 3. Stop / retry / branch controls for streaming
 4. Split-view inspector
-5. Packaging / extraction review
+5. Composer scroll-away behavior in tight vertical layouts
 
 ## Checkpoint
 
@@ -126,12 +136,21 @@ Current checkpoint state before the next test pass:
 - `Esc` stop handling is implemented with a two-step interrupt flow.
 - Mouse/touchpad transcript scrolling is enabled and refreshes preserve scroll
   position instead of forcing the view back to the bottom.
-- The current layout still uses a fixed bottom composer, and the next design
-  review should test a single scrolling surface with the composer at the end.
+- The layout now uses a single scrolling surface with the composer rendered at
+  the end of the transcript content. Fixed-bottom anchoring has been set aside
+  in favor of the scrolling-surface model.
+- Composer reads as a top/bottom ruled section; per-row transcript tints are
+  removed and the main surface uses the terminal-default background.
+- `▎` is the shared visual marker for the input prompt and for user / queued
+  entries in the transcript.
+- `alt+enter` inserts a newline in the input; input focus is preserved after
+  submit; mouse scroll no longer steals focus.
+- `ctrl+k` / `ctrl+t` bindings are handled via explicit Bubble Tea key types
+  instead of stringly-typed matching.
 
 Immediate test targets after this checkpoint:
 
-- Compare the current anchored-composer layout against a single scrolling
-  surface with the composer at the bottom of the conversation.
 - Decide whether transcript tool / permission events belong inline before
   adding approval and denial interactions.
+- Begin packaging / extraction review: can the spike shell stand alone as a
+  releasable component, and what seams are required if the harness embeds it.
