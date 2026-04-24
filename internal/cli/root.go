@@ -71,6 +71,7 @@ Key capabilities:
 	rootCmd.AddCommand(
 		newStartCommand(),
 		newHarnessCommand(),
+		newHarnessSpikeCommand(),
 		newLogsCommand(),
 		newShowCommand(),
 		newExportCommand(),
