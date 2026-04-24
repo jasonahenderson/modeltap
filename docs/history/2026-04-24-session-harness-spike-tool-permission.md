@@ -79,7 +79,7 @@ transcript** — to a usable state without blocking on polish items.
 - Added transcript-cursor coverage for permission actions:
   - activating the selected action from the composer with `Enter`
   - moving across action chips with `Left` / `Right`
-  - deny-with-reason using the composer action list
+  - direct deny using the composer action list
 - Renamed `TestNewSeedsMessages` → `TestNewStartsWithEmptyTranscript`
   (asserts zero messages at startup).
 - Removed `TestDefaultSessionSeedsUsefulStartupMessage`.
@@ -92,7 +92,7 @@ transcript** — to a usable state without blocking on polish items.
 - "Partially checked off → Inline tool / permission event rendering":
   replaced the old stub with the actual scope landed this session plus
   the enumerated open items (scope option, multi-permission, parameter
-  display, mid-stream origination, deny-with-reason).
+  display, mid-stream origination).
 - Split the inline permission track into:
   - validated UI shape
   - remaining UI-side interaction work
@@ -132,7 +132,6 @@ UI-first:
   - `Approve once`
   - `Allow for session`
   - `Deny`
-  - `Deny with reason`
 - `y` / `n` still work from the empty input as fallback shortcuts, but they
   are no longer the primary UI model.
 

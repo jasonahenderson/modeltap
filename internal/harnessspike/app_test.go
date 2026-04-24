@@ -875,7 +875,7 @@ func TestPermCommandTriggersPendingPermission(t *testing.T) {
 	if !strings.Contains(app.transcript.View(), "Permission required") {
 		t.Fatal("expected transcript to retain the permission request")
 	}
-	if !strings.Contains(app.transcript.View(), "Approve once") || !strings.Contains(app.transcript.View(), "Deny with reason") {
+	if !strings.Contains(app.transcript.View(), "Approve once") || !strings.Contains(app.transcript.View(), "Allow for session") || !strings.Contains(app.transcript.View(), "Deny") {
 		t.Fatal("expected composer action list for permission controls")
 	}
 }
@@ -1019,7 +1019,7 @@ func TestInputAreaCanMoveAcrossPermissionActions(t *testing.T) {
 	}
 }
 
-func TestInputAreaCanDenyWithReason(t *testing.T) {
+func TestInputAreaCanDeny(t *testing.T) {
 	app := New()
 	app.width = 120
 	app.height = 40
@@ -1031,18 +1031,16 @@ func TestInputAreaCanDenyWithReason(t *testing.T) {
 	next := model.(App)
 	model, _ = next.Update(tea.KeyMsg{Type: tea.KeyRight})
 	next = model.(App)
-	model, _ = next.Update(tea.KeyMsg{Type: tea.KeyRight})
-	next = model.(App)
 
 	model, cmd := next.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	next = model.(App)
 	if cmd != nil {
-		t.Fatal("expected no stream when denying with reason")
+		t.Fatal("expected no stream when denying")
 	}
 	if next.pendingPermission != nil {
-		t.Fatal("expected pending permission cleared after deny-with-reason")
+		t.Fatal("expected pending permission cleared after deny")
 	}
-	if got := next.messages[len(next.messages)-1].content; !strings.Contains(got, "reason captured") {
-		t.Fatalf("expected deny-with-reason assistant note, got %q", got)
+	if got := next.messages[len(next.messages)-1].content; !strings.Contains(got, "Read request denied") {
+		t.Fatalf("expected deny assistant note, got %q", got)
 	}
 }

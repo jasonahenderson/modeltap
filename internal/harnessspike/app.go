@@ -119,7 +119,6 @@ type pendingPermission struct {
 	toolLabel      string
 	grantText      string
 	denyText       string
-	denyReasonText string
 	selectedAction int
 }
 
@@ -318,7 +317,7 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case a.pendingPermission != nil && a.focus == focusInput && a.input.Value() == "" && (msg.String() == "y" || msg.String() == "Y"):
 			return a, a.grantPermission(false)
 		case a.pendingPermission != nil && a.focus == focusInput && a.input.Value() == "" && (msg.String() == "n" || msg.String() == "N"):
-			return a, a.denyPermission(false)
+			return a, a.denyPermission()
 		case strings.ToLower(msg.String()) == "ctrl+b":
 			a.sidebarOpen = !a.sidebarOpen
 			if !a.sidebarOpen && a.focus == focusSidebar {
@@ -706,11 +705,10 @@ func (a *App) beginPermissionDemo(content string) tea.Cmd {
 		message{role: "event", content: "Permission required to read workspace file", eventState: "permission"},
 	)
 	a.pendingPermission = &pendingPermission{
-		eventIndex:     len(a.messages) - 1,
-		toolLabel:      "Read workspace/README.md",
-		grantText:      "Read the README. The spike is iterating on a replacement harness shell with inline tool events, transcript scroll stability, and queued follow-up messages.",
-		denyText:       "Read request denied. Skipping summary without file access.",
-		denyReasonText: "Read request denied: reason captured in the inline permission flow demo. Skipping summary without file access.",
+		eventIndex: len(a.messages) - 1,
+		toolLabel:  "Read workspace/README.md",
+		grantText:  "Read the README. The spike is iterating on a replacement harness shell with inline tool events, transcript scroll stability, and queued follow-up messages.",
+		denyText:   "Read request denied. Skipping summary without file access.",
 	}
 	a.input.Reset()
 	a.status = "Permission required"
@@ -744,21 +742,15 @@ func (a *App) grantPermission(sessionScope bool) tea.Cmd {
 	return tea.Batch(a.nextStreamCmd(), a.nextPulseCmd())
 }
 
-func (a *App) denyPermission(withReason bool) tea.Cmd {
+func (a *App) denyPermission() tea.Cmd {
 	if a.pendingPermission == nil {
 		return nil
 	}
 	p := *a.pendingPermission
 	a.pendingPermission = nil
 	a.messages[p.eventIndex].eventState = "denied"
-	denyText := p.denyText
-	if withReason {
-		denyText = p.denyReasonText
-		a.status = "Request denied with reason"
-	} else {
-		a.status = "Request denied"
-	}
-	a.messages = append(a.messages, message{role: "assistant", content: denyText})
+	a.status = "Request denied"
+	a.messages = append(a.messages, message{role: "assistant", content: p.denyText})
 	a.refreshTranscript()
 	return nil
 }
@@ -816,16 +808,16 @@ func (a *App) refreshTranscript() {
 				if userBlock.Len() > 0 {
 					userBlock.WriteString("\n")
 				}
-					ref := transcriptRef{messageIndex: i, tokenIndex: tokenIndex}
-					a.transcriptRefs = append(a.transcriptRefs, ref)
+				ref := transcriptRef{messageIndex: i, tokenIndex: tokenIndex}
+				a.transcriptRefs = append(a.transcriptRefs, ref)
 				selected := refCount == a.selectedTranscriptRef && a.focus == focusTranscript
 				refCount++
 				userBlock.WriteString(a.renderTranscriptToken(msg, tokenIndex, tok, selected))
 			}
 			b.WriteString(userBodyStyle.Render(userBlock.String()))
-			case "event":
-				b.WriteString(renderEventMessage(msg))
-			case "assistant":
+		case "event":
+			b.WriteString(renderEventMessage(msg))
+		case "assistant":
 			label := fmt.Sprintf("%s  %s", a.modelName, statusDot(msg.streaming, a.streamPulse, a.interruptArmed))
 			b.WriteString(assistantLabelStyle.Render(label))
 			b.WriteString("\n")
@@ -892,7 +884,6 @@ func (a App) renderPermissionActions(selected bool) string {
 		a.renderPermissionAction("Approve once", selected && a.pendingPermission.selectedAction == 0),
 		a.renderPermissionAction("Allow for session", selected && a.pendingPermission.selectedAction == 1),
 		a.renderPermissionAction("Deny", selected && a.pendingPermission.selectedAction == 2),
-		a.renderPermissionAction("Deny with reason", selected && a.pendingPermission.selectedAction == 3),
 	}
 	return permissionActionsStyle.Render(strings.Join(actions, " "))
 }
@@ -1934,8 +1925,8 @@ func (a *App) movePermissionAction(delta int) bool {
 	if a.pendingPermission.selectedAction < 0 {
 		a.pendingPermission.selectedAction = 0
 	}
-	if a.pendingPermission.selectedAction > 3 {
-		a.pendingPermission.selectedAction = 3
+	if a.pendingPermission.selectedAction > 2 {
+		a.pendingPermission.selectedAction = 2
 	}
 	a.status = "Permission action selected"
 	a.refreshTranscript()
@@ -1952,9 +1943,7 @@ func (a *App) activatePendingPermission() tea.Cmd {
 	case 1:
 		return a.grantPermission(true)
 	case 2:
-		return a.denyPermission(false)
-	case 3:
-		return a.denyPermission(true)
+		return a.denyPermission()
 	default:
 		return nil
 	}
