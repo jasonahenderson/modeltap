@@ -80,6 +80,32 @@ func TestLoad_ProjectLocal(t *testing.T) {
 	}
 }
 
+// TestLoad_ProjectModeltapDir: ./.modeltap/.env is picked up when
+// the project carries a .modeltap/ directory (common when config.yaml
+// lives there alongside the .env).
+func TestLoad_ProjectModeltapDir(t *testing.T) {
+	dir := t.TempDir()
+	withCwd(t, dir)
+	t.Setenv("HOME", dir)
+	t.Setenv("XDG_CONFIG_HOME", "")
+	unsetEnv(t, "PATCH7_MODELTAP_KEY")
+
+	mtDir := filepath.Join(dir, ".modeltap")
+	if err := os.MkdirAll(mtDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(mtDir, ".env"), []byte("PATCH7_MODELTAP_KEY=from-modeltap-dir\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Load(nil); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if got := os.Getenv("PATCH7_MODELTAP_KEY"); got != "from-modeltap-dir" {
+		t.Errorf("PATCH7_MODELTAP_KEY = %q, want from-modeltap-dir", got)
+	}
+}
+
 // TestLoad_ProcessEnvWins: a variable already set in the process env
 // is NOT overwritten by .env — matches Node/Python dotenv behavior.
 func TestLoad_ProcessEnvWins(t *testing.T) {

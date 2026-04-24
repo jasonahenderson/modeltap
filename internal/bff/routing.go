@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/jasonahenderson/modeltap/internal/protocol"
+	"github.com/jasonahenderson/modeltap/internal/storage"
 )
 
 // RoutingPolicy resolves model names from a hierarchical routing config
@@ -166,13 +168,37 @@ func handleModelSwitch(ctx context.Context, conn *Connection, params json.RawMes
 	}
 
 	srv := conn.server
-	sess, err := srv.store.GetSession(ctx, req.SessionID)
-	if err != nil || sess == nil {
-		return nil, &TransportError{Code: CodeSessionNotFound, Message: fmt.Sprintf("session %q not found", req.SessionID)}
+	sess, _ := srv.store.GetSession(ctx, req.SessionID)
+	if sess != nil {
+		if err := verifySessionAccess(conn, sess); err != nil {
+			return nil, err
+		}
 	}
-	if err := verifySessionAccess(conn, sess); err != nil {
-		return nil, err
+	if sess == nil {
+		// Auto-create session so model.switch works before the first
+		// turn.submit (consistent with handleTurnSubmit).
+		sess = &storage.Session{
+			ID:        req.SessionID,
+			UserID:    conn.UserID(),
+			Project:   conn.Capabilities().ProjectContext().Root,
+			Status:    "active",
+			CreatedAt: time.Now().UTC(),
+			UpdatedAt: time.Now().UTC(),
+		}
+		if err := srv.store.CreateSession(ctx, sess); err != nil {
+			return nil, &TransportError{Code: CodeInternalError, Message: "create session: " + err.Error()}
+		}
+		expiry := time.Now().Add(SessionLockTTL)
+		if _, _, err := srv.store.AcquireSessionLock(ctx, sess.ID, conn.ID(), expiry); err != nil {
+			return nil, &TransportError{Code: CodeInternalError, Message: "acquire lock: " + err.Error()}
+		}
 	}
+
+	// Ensure the connection is bound to this session.
+	if conn.SessionID() == "" {
+		conn.SetSessionID(req.SessionID)
+	}
+	_ = srv.sessions.EnsureActive(req.SessionID, conn)
 
 	var resp protocol.ModelSwitchResponse
 	if req.Model == "auto" {

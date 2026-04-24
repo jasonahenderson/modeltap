@@ -17,16 +17,24 @@ func NewPricingTable() *PricingTable {
 	return &PricingTable{
 		prices: map[string]map[string]ModelPricing{
 			"anthropic": {
+				"claude-opus-4-7":            {InputPerMTok: 5.00, OutputPerMTok: 25.00},
+				"claude-opus-4-6":            {InputPerMTok: 15.00, OutputPerMTok: 75.00},
 				"claude-opus-4-20250514":     {InputPerMTok: 15.00, OutputPerMTok: 75.00},
 				"claude-opus-4":              {InputPerMTok: 15.00, OutputPerMTok: 75.00},
+				"claude-sonnet-4-6":          {InputPerMTok: 3.00, OutputPerMTok: 15.00},
 				"claude-sonnet-4-20250514":   {InputPerMTok: 3.00, OutputPerMTok: 15.00},
 				"claude-sonnet-4":            {InputPerMTok: 3.00, OutputPerMTok: 15.00},
+				"claude-haiku-4-5":           {InputPerMTok: 1.00, OutputPerMTok: 5.00},
 				"claude-3-5-sonnet-20241022": {InputPerMTok: 3.00, OutputPerMTok: 15.00},
 				"claude-3-5-haiku-20241022":  {InputPerMTok: 0.80, OutputPerMTok: 4.00},
 				"claude-3-opus-20240229":     {InputPerMTok: 15.00, OutputPerMTok: 75.00},
 				"claude-3-haiku-20240307":    {InputPerMTok: 0.25, OutputPerMTok: 1.25},
 			},
 			"openai": {
+				"gpt-5.4":       {InputPerMTok: 5.00, OutputPerMTok: 15.00},
+				"gpt-5":         {InputPerMTok: 5.00, OutputPerMTok: 15.00},
+				"o3":            {InputPerMTok: 5.00, OutputPerMTok: 20.00},
+				"o4-mini":       {InputPerMTok: 1.10, OutputPerMTok: 4.40},
 				"gpt-4o":        {InputPerMTok: 2.50, OutputPerMTok: 10.00},
 				"gpt-4o-mini":   {InputPerMTok: 0.15, OutputPerMTok: 0.60},
 				"gpt-4-turbo":   {InputPerMTok: 10.00, OutputPerMTok: 30.00},
@@ -35,6 +43,12 @@ func NewPricingTable() *PricingTable {
 				"o1":            {InputPerMTok: 15.00, OutputPerMTok: 60.00},
 				"o1-mini":       {InputPerMTok: 3.00, OutputPerMTok: 12.00},
 				"o3-mini":       {InputPerMTok: 1.10, OutputPerMTok: 4.40},
+			},
+			"ollama": {
+				"qwen3:14b":        {InputPerMTok: 0.00, OutputPerMTok: 0.00},
+				"deepseek-r1:14b":  {InputPerMTok: 0.00, OutputPerMTok: 0.00},
+				"gemma3:27b":       {InputPerMTok: 0.00, OutputPerMTok: 0.00},
+				"llama3.2:8b":      {InputPerMTok: 0.00, OutputPerMTok: 0.00},
 			},
 		},
 	}

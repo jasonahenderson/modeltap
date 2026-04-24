@@ -216,10 +216,10 @@ func TestHandleModelSwitch_SessionNotFound(t *testing.T) {
 	params, _ := json.Marshal(&protocol.ModelSwitch{SessionID: "missing", Model: "x"})
 	_, err := handleModelSwitch(context.Background(), c, params)
 	if err == nil {
-		t.Fatalf("expected not-found")
+		t.Fatalf("expected model-unavailable error")
 	}
 	var te *TransportError
-	if !errors.As(err, &te) || te.Code != CodeSessionNotFound {
-		t.Errorf("expected CodeSessionNotFound, got %T %v", err, err)
+	if !errors.As(err, &te) || te.Code != CodeModelUnavailable {
+		t.Errorf("expected CodeModelUnavailable (session auto-created, model missing), got %T %v", err, err)
 	}
 }

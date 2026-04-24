@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jasonahenderson/modeltap/internal/protocol"
 )
 
@@ -133,8 +134,9 @@ type AppState struct {
 // the default ModeBuild and Focus on the input area.
 func NewAppState() *AppState {
 	return &AppState{
-		Focus: InputFocus,
-		Mode:  protocol.ModeBuild,
+		Focus:     InputFocus,
+		Mode:      protocol.ModeBuild,
+		SessionID: uuid.NewString(),
 		ConnState: ConnStateInfo{
 			State: ConnStateDiscovering,
 		},

@@ -314,11 +314,13 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		}
-			if msg.SessionID != "" {
-				a.state.SessionID = msg.SessionID
-			}
-			return a, nil
-
+		if msg.SessionID != "" {
+			a.state.SessionID = msg.SessionID
+			// Switch history to session scope so arrow-up shows only
+			// this session's commands instead of stale global history.
+			return a, a.history.SetScope(HistoryScopeSession)
+		}
+		return a, nil
 	case HistoryRefreshedMsg:
 		return a, func() tea.Msg {
 			return BannerMsg{
@@ -372,13 +374,18 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			a.state.ModelOverride = msg.Response.ModelOverride != ""
 		}
-		return a, func() tea.Msg {
-			id := ""
-			if msg.Response != nil {
-				id = msg.Response.SessionID
-			}
+		id := ""
+		if msg.Response != nil {
+			id = msg.Response.SessionID
+		}
+		banner := func() tea.Msg {
 			return BannerMsg{Text: "Resumed session " + id, Duration: 4 * time.Second}
 		}
+		// Switch history to session scope for resumed session.
+		if msg.Response != nil && msg.Response.SessionID != "" {
+			return a, tea.Batch(banner, a.history.SetScope(HistoryScopeSession))
+		}
+		return a, banner
 
 	case SessionClearedMsg:
 		cleared := 0

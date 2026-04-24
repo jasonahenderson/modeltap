@@ -178,7 +178,7 @@ func TestApp_ContextCommand_Success(t *testing.T) {
 func TestApp_ContextCommand_NoSession_Errors(t *testing.T) {
 	conn := &fakeConn{client: &fakeClient{}}
 	app := NewApp(AppOptions{Conn: conn})
-	// no SessionID
+	app.state.SessionID = "" // simulate no active session
 	_, cmd := app.Update(SubmitMsg{IsCommand: true, Command: "context"})
 	e, ok := drainCmdAny(cmd).(ContextErrMsg)
 	if !ok {

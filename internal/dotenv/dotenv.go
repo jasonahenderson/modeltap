@@ -5,7 +5,9 @@
 //  1. Existing process environment is never overridden.
 //  2. ./.env (project-local, relative to the current working directory)
 //     wins over user-level files.
-//  3. $HOME/.modeltap/.env and, when $XDG_CONFIG_HOME is set,
+//  3. ./.modeltap/.env (project-local when the repo carries a .modeltap
+//     directory) is checked next.
+//  4. $HOME/.modeltap/.env and, when $XDG_CONFIG_HOME is set,
 //     $XDG_CONFIG_HOME/modeltap/.env are loaded as user-level defaults.
 //
 // Missing files are silent (the common case for users not using
@@ -38,6 +40,23 @@ func Load(stderr io.Writer) error {
 	if len(paths) == 0 {
 		return nil
 	}
+	// Pre-scan: if a key is present in a .env file but is currently
+	// empty in the process environment, unset it so godotenv.Load
+	// can populate it. This handles the common case where a shell
+	// (or another tool like Claude Code) exports ANTHROPIC_API_KEY=
+	// with an empty value, which would otherwise block the real key
+	// from the .env file.
+	for _, p := range paths {
+		envMap, err := godotenv.Read(p)
+		if err != nil {
+			continue // missing or unreadable — godotenv.Load will report it
+		}
+		for k := range envMap {
+			if os.Getenv(k) == "" {
+				os.Unsetenv(k)
+			}
+		}
+	}
 	if err := godotenv.Load(paths...); err != nil {
 		return fmt.Errorf("dotenv: %w", err)
 	}
@@ -54,6 +73,9 @@ func candidates() []string {
 	var paths []string
 	if _, err := os.Stat(".env"); err == nil {
 		paths = append(paths, ".env")
+	}
+	if _, err := os.Stat(filepath.Join(".modeltap", ".env")); err == nil {
+		paths = append(paths, filepath.Join(".modeltap", ".env"))
 	}
 	seen := map[string]struct{}{}
 	for _, p := range userLevelPaths() {

@@ -5,11 +5,13 @@ import (
 	"strings"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jasonahenderson/modeltap/internal/protocol"
 )
 
 func TestApp_ShowCurrentSession(t *testing.T) {
 	app := NewApp(AppOptions{})
+	app.state.SessionID = "" // simulate fresh start with no session
 	_, cmd := app.Update(SubmitMsg{IsCommand: true, Command: "session"})
 	b, ok := drainCmdAny(cmd).(BannerMsg)
 	if !ok {
@@ -99,7 +101,19 @@ func TestApp_SessionResume_Success(t *testing.T) {
 	if !a.state.ModelOverride {
 		t.Errorf("ModelOverride should be true when server reports one")
 	}
-	b := drainCmdAny(bc).(BannerMsg)
+	cmdMsg := drainCmdAny(bc)
+	var b BannerMsg
+	switch v := cmdMsg.(type) {
+	case tea.BatchMsg:
+		for _, c := range v {
+			if m, ok := c().(BannerMsg); ok {
+				b = m
+				break
+			}
+		}
+	case BannerMsg:
+		b = v
+	}
 	if !strings.Contains(b.Text, "s-42") {
 		t.Errorf("banner should include session id: %q", b.Text)
 	}
@@ -152,7 +166,7 @@ func TestApp_SessionClear_NoActiveSession(t *testing.T) {
 	fc := &fakeClient{}
 	conn := &fakeConn{client: fc}
 	app := NewApp(AppOptions{Conn: conn})
-	// no app.state.SessionID
+	app.state.SessionID = "" // simulate no active session
 
 	_, cmd := app.Update(SubmitMsg{IsCommand: true, Command: "session", CommandArgs: "clear"})
 	e := drainCmdAny(cmd).(SessionErrMsg)
