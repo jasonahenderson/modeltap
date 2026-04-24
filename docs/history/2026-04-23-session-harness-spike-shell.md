@@ -105,8 +105,7 @@ Partially checked off:
     - replace instructional inline hint text with a composer-mounted action
       list while keeping the permission request itself in the transcript
     - define the initial action set and ordering (`approve once`, `always
-      allow for session`, `deny`, `deny with reason` unless testing suggests a
-      different shape)
+      allow for session`, `deny` unless testing suggests a different shape)
     - make permission actions keyboard-selectable from the input/composer area
       with `Left` / `Right` and `Enter`; treat raw `y` / `n` as optional
       shortcuts, not the primary UI
@@ -114,7 +113,6 @@ Partially checked off:
       spike surface after keyboard selection feels right
     - "always allow" affordance and placement in the inline UI
     - tool parameter / target display clarity
-    - deny-with-reason input and interaction shape
     - multiple pending permissions as a UI/interaction problem
     - permissions that originate mid-stream as a UI interruption problem
   - Packaging / productionization refactor is tracked separately under
@@ -171,8 +169,8 @@ Not checked off yet:
     approve/deny actions against a selected request
   - support multiple pending permissions and permissions that originate
     mid-stream
-  - add deny-with-reason and scoped approval (`once`, `session`, and any later
-    project/workspace policy if needed)
+  - add scoped approval (`once`, `session`, and any later project/workspace
+    policy if needed)
   - persist enough permission state that redraw/reflow does not lose context
 
 ## Checkpoint
@@ -215,6 +213,6 @@ Immediate test targets after this checkpoint:
 - Begin priority #2: stop / retry / branch controls for streaming.
 - Return to the remaining UI-side open items on the partial tool / permission
   track (composer action-list design, keyboard cursor interaction, scope
-  affordance, parameter display, deny-with-reason, multi-pending interaction,
-  mid-stream interruption handling) as they come up, not as a blocking set.
-  Leave the production model refactor to the packaging phase.
+  affordance, parameter display, multi-pending interaction, mid-stream
+  interruption handling) as they come up, not as a blocking set. Leave the
+  production model refactor to the packaging phase.
