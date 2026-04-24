@@ -46,3 +46,13 @@
 **Detail:** The feature says the harness parses files, extracts PDFs/DOCX/images/spreadsheets, detects large pastes, and can offer summarization via a cheap model while the BFF still captures the full content (`docs/features/0009-terminal-harness.md:84-106`). That leaves two unresolved questions: which side owns content transformation before model submission, and how the full raw payload versus summarized payload is represented on the wire. Those details matter for capture correctness, privacy, and reproducibility.
 
 **Recommendation:** Specify whether the harness always sends raw content plus user intent metadata, or whether it may send preprocessed artifacts. The protocol should distinguish raw capture payloads from transformed context payloads explicitly.
+
+## Dispositions
+
+| ID | Severity | Disposition | Rationale |
+|----|----------|-------------|-----------|
+| F1 | blocking | — | |
+| F2 | blocking | — | |
+| F3 | significant | — | |
+
+Dispositions: one of `accepted`, `rejected`, `deferred`. Leave as `—` until resolved. Add a rationale cell whenever a disposition is set (especially for `rejected` / `deferred`).

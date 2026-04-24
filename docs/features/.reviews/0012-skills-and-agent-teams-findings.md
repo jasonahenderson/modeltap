@@ -46,3 +46,13 @@
 **Detail:** The spec says skills are harness-side and need no new server capabilities (`docs/features/0012-skills-and-agent-teams.md:31-35`), but even the skill behavior described here requires per-turn model overrides, narrowed tool availability, skill discovery, and capture semantics that FEAT-0008 and FEAT-0009 do not yet formalize (`:76-86`, `:288-305`, `:427-432`). That does not mean skills are a bad idea; it means their implementation dependency surface is wider than the feature currently claims.
 
 **Recommendation:** Either narrow skills to pure prompt aliases in the first phase, or explicitly add the required protocol and session-state changes to the dependency story so the feature remains honest about scope.
+
+## Dispositions
+
+| ID | Severity | Disposition | Rationale |
+|----|----------|-------------|-----------|
+| F1 | blocking | — | |
+| F2 | blocking | — | |
+| F3 | significant | — | |
+
+Dispositions: one of `accepted`, `rejected`, `deferred`. Leave as `—` until resolved. Add a rationale cell whenever a disposition is set (especially for `rejected` / `deferred`).

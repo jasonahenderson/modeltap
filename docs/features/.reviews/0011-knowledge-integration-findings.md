@@ -46,3 +46,13 @@
 **Detail:** Criteria such as "semantic search returns relevant results" and "the model demonstrates awareness of prior decisions" are directionally right (`docs/features/0011-knowledge-integration.md:56-69`, `:141-152`), but they do not specify an evaluation dataset, ranking threshold, or pass/fail method. Without that, the feature can neither fail nor pass objectively, which makes review and implementation tracking weak.
 
 **Recommendation:** Add measurable evaluation rules such as a fixed benchmark set, top-k retrieval thresholds, latency limits, and a concrete before/after prompt-evaluation procedure for injection quality.
+
+## Dispositions
+
+| ID | Severity | Disposition | Rationale |
+|----|----------|-------------|-----------|
+| F1 | blocking | — | |
+| F2 | blocking | — | |
+| F3 | significant | — | |
+
+Dispositions: one of `accepted`, `rejected`, `deferred`. Leave as `—` until resolved. Add a rationale cell whenever a disposition is set (especially for `rejected` / `deferred`).

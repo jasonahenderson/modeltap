@@ -46,3 +46,13 @@
 **Detail:** FEAT-0008 promises per-turn cost updates, per-session totals, model-switch history, session inspection commands, and future concurrent harness support (`docs/features/0008-bff-server.md:143-175`, `:185-191`, `:247-250`). ADR-0007 only establishes hourly and daily provider/model aggregates, and the feature does not define the new tables or retention semantics for session/turn data. That leaves a gap between the proposed CLI behavior and the storage contract needed to support it.
 
 **Recommendation:** Add the minimal session/turn persistence model to this feature, or split the storage/reporting portion into a smaller supporting patch/ADR so the acceptance target is concrete.
+
+## Dispositions
+
+| ID | Severity | Disposition | Rationale |
+|----|----------|-------------|-----------|
+| F1 | blocking | — | |
+| F2 | significant | — | |
+| F3 | significant | — | |
+
+Dispositions: one of `accepted`, `rejected`, `deferred`. Leave as `—` until resolved. Add a rationale cell whenever a disposition is set (especially for `rejected` / `deferred`).

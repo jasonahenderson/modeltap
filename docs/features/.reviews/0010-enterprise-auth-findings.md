@@ -46,3 +46,13 @@
 **Detail:** The feature requires negative isolation tests for query paths and defines a `UserScopedStore` boundary (`docs/features/0010-enterprise-auth.md:96-107`, `:234-242`). That is good, but the spec also exposes admin metrics, background aggregation, token provisioning, and future knowledge integration. It does not explicitly require negative tests for rebuild jobs, export paths, MCP/search access, or any other non-request-path data access. On a multi-user feature, those are the paths that usually leak first.
 
 **Recommendation:** Expand the success criteria to require isolation tests for every data-access surface: request queries, session resume/list, metrics, export/search, background rebuild jobs, and any MCP-facing knowledge queries introduced by dependent features.
+
+## Dispositions
+
+| ID | Severity | Disposition | Rationale |
+|----|----------|-------------|-----------|
+| F1 | blocking | — | |
+| F2 | significant | — | |
+| F3 | significant | — | |
+
+Dispositions: one of `accepted`, `rejected`, `deferred`. Leave as `—` until resolved. Add a rationale cell whenever a disposition is set (especially for `rejected` / `deferred`).

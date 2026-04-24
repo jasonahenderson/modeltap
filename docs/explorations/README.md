@@ -109,9 +109,8 @@ If formal review artifacts are created for explorations, store them in:
 Use the exploration file stem for review artifacts:
 
 - `docs/explorations/.reviews/0001-some-topic-review.md`
-- `docs/explorations/.reviews/0001-some-topic-review.json`
 
-Exploration reviews are advisory. They should capture challenge, unresolved questions, and promotion recommendations, but they do not use the ADR acceptance process.
+Exploration reviews are advisory. They should capture challenge, unresolved questions, and promotion recommendations, but they do not use the ADR acceptance process. If findings warrant tracked resolution, append a Dispositions table at the bottom (same convention as `docs/adr/.reviews/README.md`).
 
 ## Promotion Rules
 

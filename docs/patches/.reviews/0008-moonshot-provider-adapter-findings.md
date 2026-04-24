@@ -20,8 +20,6 @@ As written, `type: moonshot` will still be rejected by the BFF provider registry
 
 **Recommendation:** Expand scope to include `internal/bff/providers.go`, `internal/bff/dispatch.go`, `internal/cli/bff_wiring.go`, relevant tests, and proxy/start registration if Moonshot capture is expected outside the harness path.
 
-**Disposition:** null
-
 ## F2: Config Example Uses Unsupported Fields
 
 **Reviewer:** Implementation Readiness  
@@ -31,8 +29,6 @@ As written, `type: moonshot` will still be rejected by the BFF provider registry
 The patch examples use provider-level `base_url`, `model`, and `max_tokens`, but current `config.ProviderConfig` supports only `upstream`, `type`, `api_key`, `host`, and `discover`. Those fields will be ignored by the loader. In addition, `kimi-k2-6` will not resolve through routing unless the model registry gains built-in Moonshot models or the sample config includes a `bff.models` manual override.
 
 **Recommendation:** Either revise examples to use existing fields (`host`, `bff.models`, `bff.routing`) or explicitly include config schema changes and model registry changes in the patch scope.
-
-**Disposition:** null
 
 ## F3: Mode Is Not Passed To Providers
 
@@ -46,8 +42,6 @@ The proposed mode-aware temperature defaults will not activate unless the BFF di
 
 **Recommendation:** Add `Mode protocol.Mode` to `bff.DispatchOpts`, set it from `submit.Mode` in `handleTurnSubmit`, pass it through in `TurnDispatcher.Dispatch`, and add regression tests that inspect the formatted Moonshot request for Plan, Build, and Auto.
 
-**Disposition:** null
-
 ## F4: Build Mode Does Not Disable Thinking
 
 **Reviewer:** Implementation Readiness  
@@ -57,8 +51,6 @@ The proposed mode-aware temperature defaults will not activate unless the BFF di
 The patch maps Build mode to Moonshot Instant mode / thinking disabled, but the implementation detail only changes temperature. If Moonshot defaults thinking to enabled, Build mode will still use Thinking mode unless the request body also emits Moonshot's thinking control field.
 
 **Recommendation:** Specify the exact request-body shape for Thinking enabled/disabled, include it in the Moonshot request struct, and test that Plan/Auto enable thinking while Build disables it unless the user explicitly overrides provider behavior.
-
-**Disposition:** null
 
 ## F5: Reasoning Stream Handling Is Underspecified
 
@@ -72,8 +64,6 @@ This creates ambiguity: either reasoning is silently discarded, stored only in p
 
 **Recommendation:** Pick one behavior in the patch doc. If reasoning is retained, include the protocol, BFF relay, conformance fixture, harness message, and persistence changes. If it is discarded for now, state that explicitly and remove references to `StreamCompleteMsg.Reasoning`.
 
-**Disposition:** null
-
 ## F6: Constructor Shape Does Not Match Current Providers
 
 **Reviewer:** Implementation Readiness  
@@ -84,4 +74,15 @@ The proposed `NewMoonshotProvider(cfg ProviderConfig)` does not match the curren
 
 **Recommendation:** Use a stateless `NewMoonshotProvider()` unless the patch also introduces and justifies a new provider-adapter configuration surface. Keep endpoint host/API key/model defaults in the existing BFF/config/model-registry layers.
 
-**Disposition:** null
+## Dispositions
+
+| ID | Severity | Disposition | Rationale |
+|----|----------|-------------|-----------|
+| F1 | blocking | — | |
+| F2 | blocking | — | |
+| F3 | blocking | — | |
+| F4 | blocking | — | |
+| F5 | significant | — | |
+| F6 | significant | — | |
+
+Dispositions: one of `accepted`, `rejected`, `deferred`. Leave as `—` until resolved. Add a rationale cell whenever a disposition is set (especially for `rejected` / `deferred`).

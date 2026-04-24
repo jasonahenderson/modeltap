@@ -7,33 +7,26 @@ This directory stores review artifacts for patch docs and patch-adjacent plannin
 Canonical per-patch findings stay at the root:
 
 - `docs/patches/.reviews/{patch-stem}-findings.md`
-- `docs/patches/.reviews/{patch-stem}-findings.json`
 
-Plan reviews (reviews of implementation plans derived from a patch, broader execution reviews not part of the canonical findings pair) live under:
+Plan reviews (reviews of implementation plans derived from a patch, broader execution reviews not part of the canonical findings file) live under:
 
 - `docs/patches/.reviews/plan-reviews/`
 
 When the reviewing model or harness is known, include it in the plan-review filename:
 
 - `docs/patches/.reviews/plan-reviews/codex-0001-openai-responses-api-support-plan-review.md`
-- `docs/patches/.reviews/plan-reviews/codex-0001-openai-responses-api-support-plan-review.json`
 
 Cross-cutting syntheses (multi-patch reviews, baseline crosswalks, security sweeps spanning several patches) live under:
 
 - `docs/patches/.reviews/syntheses/`
 
-## Canonical Files
+## Canonical File
 
-Each formally reviewed patch keeps exactly two canonical files:
-
-- `{stem}-findings.md` — markdown findings for humans
-- `{stem}-findings.json` — structured findings for tooling and tracking
-
-The `stem` matches the patch filename without the `.md` extension (e.g. `0001-openai-responses-api-support`).
+Each formally reviewed patch keeps a single canonical file: `{stem}-findings.md`. Findings and their dispositions live in one document so they cannot drift. The `stem` matches the patch filename without the `.md` extension (e.g. `0001-openai-responses-api-support`).
 
 ## Findings Schema
 
-Each finding in the JSON file should include:
+Each finding in the markdown file should include:
 
 - `id` — short identifier (e.g., `F1`, `F2`)
 - `summary` — one-line description
@@ -42,14 +35,27 @@ Each finding in the JSON file should include:
 - `affected_sections` — sections of the patch doc the finding touches
 - `detail` — full explanation
 - `recommendation` — concrete next action
-- `disposition` — `accepted` | `rejected` | `deferred` | `null` until resolved
-- `disposition_rationale` — why the disposition was chosen
 
-The markdown file mirrors this structure for human reading and includes a top-line summary block:
+A top-line summary block appears near the top of the file:
 
 ```
 total_findings, blocking, significant, advisory, top_line
 ```
+
+## Dispositions
+
+Each findings file ends with a Dispositions table. One row per finding, tracking how the author resolved it:
+
+```markdown
+## Dispositions
+
+| ID | Severity | Disposition | Rationale |
+|----|----------|-------------|-----------|
+| F1 | blocking | accepted | Fixed in commit abc123 |
+| F2 | advisory | rejected | Out of scope for this patch |
+```
+
+Disposition values are `accepted`, `rejected`, or `deferred`. Use `—` until resolved. Always include a rationale when the disposition is `rejected` or `deferred`; `accepted` rationales are optional but helpful.
 
 ## When to Write a Review
 
