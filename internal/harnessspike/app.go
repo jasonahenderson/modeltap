@@ -151,15 +151,26 @@ type App struct {
 	selectedTranscriptRef int
 	queuedSubmissions     []queuedSubmission
 	pendingSubmissions    []queuedSubmission
+
+	commandHistory []string
+	historyIndex   int
+	historyDraft   string
 }
 
 func New() App {
 	ta := textarea.New()
-	ta.Placeholder = "Ask something. Enter sends. Ctrl+J inserts a newline. /clear wipes the transcript."
-	ta.Prompt = "  > "
+	ta.Placeholder = "Ask something. Enter sends. Alt+Enter or Ctrl+J inserts a newline. /clear wipes the transcript."
+	ta.Prompt = "▎ "
 	ta.ShowLineNumbers = false
 	ta.CharLimit = 0
-	ta.SetHeight(5)
+	ta.SetHeight(1)
+	ta.FocusedStyle.Placeholder = lipgloss.NewStyle().Foreground(lipgloss.Color("#6F86A3"))
+	ta.BlurredStyle.Placeholder = lipgloss.NewStyle().Foreground(lipgloss.Color("#6F86A3"))
+	ta.FocusedStyle.Prompt = lipgloss.NewStyle().Foreground(lipgloss.Color("#79C0FF")).Bold(true)
+	ta.BlurredStyle.Prompt = lipgloss.NewStyle().Foreground(lipgloss.Color("#4A5668"))
+	ta.FocusedStyle.Text = lipgloss.NewStyle().Foreground(lipgloss.Color("#F5F7FB"))
+	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
+	ta.Cursor.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#79C0FF"))
 	ta.Focus()
 
 	app := App{
@@ -171,6 +182,7 @@ func New() App {
 		currentSession: "Spike Session",
 		sidebarOpen:    false,
 		streamDelay:    35 * time.Millisecond,
+		historyIndex:   -1,
 		sidebarItems: []sidebarItem{
 			{section: "Session", label: "Spike Session", kind: sidebarItemSession, value: "spike-session"},
 			{section: "Session", label: "Reference Layout", kind: sidebarItemSession, value: "reference-layout"},
@@ -224,7 +236,6 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.MouseMsg:
 		var cmd tea.Cmd
 		a.transcript, cmd = a.transcript.Update(msg)
-		a.focus = focusTranscript
 		return a, cmd
 
 	case tea.KeyMsg:
@@ -264,11 +275,24 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				a.input.Blur()
 			}
 			return a, nil
+		case msg.Type == tea.KeyEnter && msg.Alt && a.focus == focusInput:
+			a.input.InsertRune('\n')
+			a.syncInputHeight()
+			a.refreshTranscript()
+			return a, nil
 		case msg.Type == tea.KeyEnter && a.focus == focusInput:
 			cmd := a.submit()
 			return a, cmd
 		case msg.Type == tea.KeyCtrlJ && a.focus == focusInput:
 			a.input.InsertRune('\n')
+			a.syncInputHeight()
+			a.refreshTranscript()
+			return a, nil
+		case msg.Type == tea.KeyUp && a.focus == focusInput && !strings.Contains(a.input.Value(), "\n"):
+			a.recallPreviousCommand()
+			return a, nil
+		case msg.Type == tea.KeyDown && a.focus == focusInput && !strings.Contains(a.input.Value(), "\n"):
+			a.recallNextCommand()
 			return a, nil
 		case strings.ToLower(msg.String()) == "ctrl+b":
 			a.sidebarOpen = !a.sidebarOpen
@@ -287,10 +311,10 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				a.openSelectedTokenPreview()
 				return a, nil
 			}
-		case strings.ToLower(msg.String()) == "ctrl+k":
+		case msg.Type == tea.KeyCtrlK:
 			a.openPalette()
 			return a, nil
-		case strings.ToLower(msg.String()) == "ctrl+t":
+		case msg.Type == tea.KeyCtrlT:
 			a.openAgents()
 			return a, nil
 		case strings.ToLower(msg.String()) == "ctrl+n":
@@ -353,7 +377,12 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			prev := a.input.Value()
 			var cmd tea.Cmd
 			a.input, cmd = a.input.Update(msg)
+			if a.input.Value() != prev {
+				a.historyIndex = -1
+			}
 			a.handleInputMutation(prev, a.input.Value())
+			a.syncInputHeight()
+			a.refreshTranscript()
 			return a, cmd
 		default:
 			return a, nil
@@ -478,7 +507,7 @@ func sessionPreset(name string) []message {
 			},
 			{
 				role:    "assistant",
-				content: "Type a prompt and press Enter. Use Tab to move between sidebar, transcript, and input.",
+				content: "Try /demo for a long stream, queue a follow-up while it runs, or open Tool Demo to judge inline event rendering.",
 			},
 		}
 	}
@@ -487,6 +516,61 @@ func sessionPreset(name string) []message {
 func (a *App) seedWithSession(name string) {
 	a.currentSession = name
 	a.messages = sessionPreset(name)
+	a.refreshTranscript()
+}
+
+func (a *App) syncInputHeight() {
+	lines := strings.Count(a.input.Value(), "\n") + 1
+	if lines < 1 {
+		lines = 1
+	}
+	a.input.SetHeight(lines)
+}
+
+func (a *App) pushHistory(content string) {
+	a.historyIndex = -1
+	a.historyDraft = ""
+	if content == "" {
+		return
+	}
+	if n := len(a.commandHistory); n > 0 && a.commandHistory[n-1] == content {
+		return
+	}
+	a.commandHistory = append(a.commandHistory, content)
+}
+
+func (a *App) recallPreviousCommand() {
+	if len(a.commandHistory) == 0 {
+		return
+	}
+	if a.historyIndex == -1 {
+		a.historyDraft = a.input.Value()
+		a.historyIndex = len(a.commandHistory) - 1
+	} else if a.historyIndex > 0 {
+		a.historyIndex--
+	} else {
+		return
+	}
+	a.input.SetValue(a.commandHistory[a.historyIndex])
+	a.input.CursorEnd()
+	a.syncInputHeight()
+	a.refreshTranscript()
+}
+
+func (a *App) recallNextCommand() {
+	if a.historyIndex == -1 {
+		return
+	}
+	if a.historyIndex < len(a.commandHistory)-1 {
+		a.historyIndex++
+		a.input.SetValue(a.commandHistory[a.historyIndex])
+	} else {
+		a.historyIndex = -1
+		a.input.SetValue(a.historyDraft)
+		a.historyDraft = ""
+	}
+	a.input.CursorEnd()
+	a.syncInputHeight()
 	a.refreshTranscript()
 }
 
@@ -499,15 +583,13 @@ func (a *App) layout() {
 	if mainWidth < 24 {
 		mainWidth = 24
 	}
-	inputHeight := 8
 	headerHeight := 3
-	footerHeight := 2
-	bodyHeight := a.height - inputHeight - headerHeight - footerHeight
+	bodyHeight := a.height - headerHeight
 	if bodyHeight < 6 {
 		bodyHeight = 6
 	}
 	a.input.SetWidth(max(mainWidth-4, 20))
-	a.input.SetHeight(inputHeight - 1)
+	a.syncInputHeight()
 	a.transcript.Width = max(mainWidth-4, 20)
 	a.transcript.Height = bodyHeight
 	a.refreshTranscript()
@@ -518,6 +600,9 @@ func (a *App) submit() tea.Cmd {
 	if content == "" && len(a.inputTokens) == 0 {
 		return nil
 	}
+	a.pushHistory(content)
+	a.focus = focusInput
+	a.input.Focus()
 	if a.streaming || len(a.queuedSubmissions) > 0 || len(a.pendingSubmissions) > 0 {
 		a.enqueueSubmission(content, a.inputTokens)
 		a.input.Reset()
@@ -545,6 +630,8 @@ func (a *App) submit() tea.Cmd {
 }
 
 func (a *App) beginSubmission(content string, entries []string, submittedTokens []inputToken) tea.Cmd {
+	a.focus = focusInput
+	a.input.Focus()
 	userContent := strings.TrimSpace(content)
 	if len(submittedTokens) > 0 {
 		var refs []string
@@ -596,6 +683,9 @@ func (a *App) nextPulseCmd() tea.Cmd {
 func (a *App) refreshTranscript() {
 	followTail := a.transcript.AtBottom()
 	offset := a.transcript.YOffset
+	if a.focus == focusInput || a.transcript.TotalLineCount() == 0 {
+		followTail = true
+	}
 	var b strings.Builder
 	a.transcriptRefs = nil
 	refCount := 0
@@ -613,10 +703,10 @@ func (a *App) refreshTranscript() {
 					if idx > 0 {
 						userBlock.WriteString("\n\n")
 					}
-					userBlock.WriteString("> " + entry)
+					userBlock.WriteString("▎ " + entry)
 				}
 			} else if msg.content != "" {
-				userBlock.WriteString("> " + msg.content)
+				userBlock.WriteString("▎ " + msg.content)
 			}
 			for tokenIndex, tok := range msg.tokens {
 				if userBlock.Len() > 0 {
@@ -647,6 +737,10 @@ func (a *App) refreshTranscript() {
 		}
 		b.WriteString(a.renderQueuedSubmission(queued))
 	}
+	if b.Len() > 0 {
+		b.WriteString("\n\n")
+	}
+	b.WriteString(a.renderComposerSurface())
 	if len(a.transcriptRefs) == 0 {
 		a.selectedTranscriptRef = 0
 	} else if a.selectedTranscriptRef >= len(a.transcriptRefs) {
@@ -658,6 +752,15 @@ func (a *App) refreshTranscript() {
 	} else {
 		a.transcript.SetYOffset(offset)
 	}
+}
+
+func (a App) renderComposerSurface() string {
+	var b strings.Builder
+	b.WriteString(a.renderInputSurface())
+	b.WriteString("\n")
+	b.WriteString("\n")
+	b.WriteString(a.renderFooter(a.transcript.Width))
+	return composerBoxStyle.Render(b.String())
 }
 
 func (a App) renderTranscriptToken(msg message, tokenIndex int, tok inputToken, selected bool) string {
@@ -689,11 +792,11 @@ func (a App) renderQueuedSubmission(queued queuedSubmission) string {
 			if idx > 0 {
 				block.WriteString("\n")
 			}
-			block.WriteString("> " + entry)
+			block.WriteString("▎ " + entry)
 		}
 	} else if queued.content != "" {
 		block.WriteString("\n")
-		block.WriteString("> " + queued.content)
+		block.WriteString("▎ " + queued.content)
 	}
 	for _, tok := range queued.tokens {
 		if block.Len() > 0 {
@@ -774,9 +877,7 @@ func (a App) renderMain() string {
 		),
 	)
 	body := transcriptBoxStyle.Width(mainWidth).Height(max(a.transcript.Height+2, 8)).Render(a.transcript.View())
-	input := inputBoxStyle.Width(mainWidth).Render(a.renderInputSurface())
-	footer := footerBoxStyle.Width(mainWidth).Render(a.renderFooter(mainWidth))
-	return lipgloss.JoinVertical(lipgloss.Left, header, body, input, footer)
+	return lipgloss.JoinVertical(lipgloss.Left, header, body)
 }
 
 func (f focusZone) String() string {

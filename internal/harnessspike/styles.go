@@ -3,8 +3,6 @@ package harnessspike
 import "github.com/charmbracelet/lipgloss"
 
 var (
-	pageBg = lipgloss.Color("#101318")
-
 	sidebarBoxStyle = lipgloss.NewStyle().
 			Padding(1, 2).
 			Background(lipgloss.Color("#121923")).
@@ -26,21 +24,21 @@ var (
 	sidebarMetaStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#6F86A3")).Bold(true)
 
 	headerBoxStyle = lipgloss.NewStyle().
-			Padding(1, 2, 0, 2).
-			Background(pageBg)
+			Padding(1, 2, 0, 2)
 	headerTitleStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#F5F7FB"))
 	headerSubtitleStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#8EA2BC"))
 
 	transcriptBoxStyle = lipgloss.NewStyle().
-				Padding(1, 2).
-				Background(pageBg)
+				Padding(1, 2)
 
 	inputBoxStyle = lipgloss.NewStyle().
-			Padding(0, 2, 1, 2).
-			Background(pageBg)
+			Padding(0, 2, 1, 2)
 	footerBoxStyle = lipgloss.NewStyle().
-			Padding(0, 2, 1, 2).
-			Background(pageBg)
+			Padding(0, 2, 1, 2)
+	composerBoxStyle = lipgloss.NewStyle().
+				Padding(1, 1).
+				Border(lipgloss.NormalBorder(), true, false, true, false).
+				BorderForeground(lipgloss.Color("#2A3648"))
 	footerStatusStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#D9E1EC"))
 	footerHintStyle = lipgloss.NewStyle().
@@ -89,40 +87,32 @@ var (
 
 	systemStyle = lipgloss.NewStyle().
 			Padding(0, 1).
-			Foreground(lipgloss.Color("#8EA2BC")).
-			Background(lipgloss.Color("#171E28"))
+			Foreground(lipgloss.Color("#8EA2BC"))
 
 	userLabelStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#AAB7C6"))
 	userBodyStyle  = lipgloss.NewStyle().
 			Padding(0, 1).
-			Background(lipgloss.Color("#232B36")).
 			Foreground(lipgloss.Color("#E6EDF3"))
 	queuedLabelStyle = lipgloss.NewStyle().
 				Bold(true).
 				Foreground(lipgloss.Color("#F2CC60"))
 	queuedBodyStyle = lipgloss.NewStyle().
 			Padding(0, 1).
-			Background(lipgloss.Color("#2C2414")).
 			Foreground(lipgloss.Color("#F6E7B0"))
 	eventInfoStyle = lipgloss.NewStyle().
 			Padding(0, 1).
-			Background(lipgloss.Color("#1B2230")).
 			Foreground(lipgloss.Color("#C8D1DC"))
 	eventRequestedStyle = lipgloss.NewStyle().
 				Padding(0, 1).
-				Background(lipgloss.Color("#1B2230")).
 				Foreground(lipgloss.Color("#79C0FF"))
 	eventPermissionStyle = lipgloss.NewStyle().
 				Padding(0, 1).
-				Background(lipgloss.Color("#2C2414")).
 				Foreground(lipgloss.Color("#F2CC60"))
 	eventRunningStyle = lipgloss.NewStyle().
 				Padding(0, 1).
-				Background(lipgloss.Color("#1D2631")).
 				Foreground(lipgloss.Color("#E6EDF3"))
 	eventDoneStyle = lipgloss.NewStyle().
 			Padding(0, 1).
-			Background(lipgloss.Color("#16241C")).
 			Foreground(lipgloss.Color("#7EE787"))
 
 	assistantLabelStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#79C0FF"))

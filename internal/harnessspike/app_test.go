@@ -13,14 +13,45 @@ func TestNewSeedsMessages(t *testing.T) {
 	if len(app.messages) < 2 {
 		t.Fatalf("expected seeded transcript, got %d messages", len(app.messages))
 	}
+	if app.focus != focusInput {
+		t.Fatalf("expected input focus by default, got %v", app.focus)
+	}
 	if app.sidebarOpen {
 		t.Fatal("expected sidebar closed by default")
 	}
 	if app.input.ShowLineNumbers {
 		t.Fatal("expected input line numbers disabled")
 	}
+	if app.input.Height() != 1 {
+		t.Fatalf("expected single-line input by default, got %d", app.input.Height())
+	}
 	if !app.transcript.MouseWheelEnabled {
 		t.Fatal("expected transcript mouse wheel enabled")
+	}
+}
+
+func TestComposerRendersInsideTranscriptSurface(t *testing.T) {
+	app := New()
+	app.width = 120
+	app.height = 40
+	app.layout()
+
+	if !strings.Contains(app.transcript.View(), app.input.Placeholder) {
+		t.Fatalf("expected composer input inside transcript surface, got %q", app.transcript.View())
+	}
+	if strings.Contains(app.transcript.View(), "compose") {
+		t.Fatalf("expected composer label removed, got %q", app.transcript.View())
+	}
+	if app.input.Height() != 1 {
+		t.Fatalf("expected single-line input after layout, got %d", app.input.Height())
+	}
+}
+
+func TestDefaultSessionSeedsUsefulStartupMessage(t *testing.T) {
+	app := New()
+
+	if got := app.messages[1].content; got != "Try /demo for a long stream, queue a follow-up while it runs, or open Tool Demo to judge inline event rendering." {
+		t.Fatalf("unexpected default assistant seed: %q", got)
 	}
 }
 
@@ -38,8 +69,40 @@ func TestSubmitStartsStreaming(t *testing.T) {
 	if !app.streaming {
 		t.Fatal("expected streaming true")
 	}
+	if app.focus != focusInput {
+		t.Fatalf("expected input focus preserved after submit, got %v", app.focus)
+	}
 	if got := app.messages[len(app.messages)-1]; got.role != "assistant" || !got.streaming {
 		t.Fatalf("expected streaming assistant placeholder, got %#v", got)
+	}
+}
+
+func TestAltEnterInsertsNewlineInInput(t *testing.T) {
+	app := New()
+	app.width = 120
+	app.height = 40
+	app.layout()
+	app.input.SetValue("first line")
+
+	model, _ := app.Update(tea.KeyMsg{Type: tea.KeyEnter, Alt: true})
+	next := model.(App)
+
+	if got := next.input.Value(); got != "first line\n" {
+		t.Fatalf("expected alt+enter to insert newline, got %q", got)
+	}
+}
+
+func TestMouseScrollDoesNotStealInputFocus(t *testing.T) {
+	app := New()
+	app.width = 120
+	app.height = 40
+	app.layout()
+
+	model, _ := app.Update(tea.MouseMsg{})
+	next := model.(App)
+
+	if next.focus != focusInput {
+		t.Fatalf("expected input focus preserved after mouse scroll/update, got %v", next.focus)
 	}
 }
 
@@ -681,6 +744,7 @@ func TestRefreshTranscriptPreservesScrollOffsetWhenNotAtBottom(t *testing.T) {
 	app.width = 120
 	app.height = 20
 	app.layout()
+	app.focus = focusTranscript
 	var msgs []message
 	for i := 0; i < 20; i++ {
 		msgs = append(msgs, message{role: "assistant", content: "line"})
@@ -712,5 +776,86 @@ func TestSubmittedPasteStartsExpandedInTranscript(t *testing.T) {
 	}
 	if !strings.Contains(app.transcript.View(), "alpha") {
 		t.Fatal("expected transcript to include expanded paste content")
+	}
+}
+
+func TestInputArrowHistoryRecallAndRestoreDraft(t *testing.T) {
+	app := New()
+	app.width = 120
+	app.height = 40
+	app.layout()
+
+	app.input.SetValue("first")
+	_ = app.submit()
+	app.input.SetValue("second")
+	_ = app.submit()
+
+	app.input.SetValue("draft")
+
+	model, _ := app.Update(tea.KeyMsg{Type: tea.KeyUp})
+	next := model.(App)
+	if got := next.input.Value(); got != "second" {
+		t.Fatalf("expected most-recent history on up, got %q", got)
+	}
+
+	model, _ = next.Update(tea.KeyMsg{Type: tea.KeyUp})
+	next = model.(App)
+	if got := next.input.Value(); got != "first" {
+		t.Fatalf("expected older history on second up, got %q", got)
+	}
+
+	model, _ = next.Update(tea.KeyMsg{Type: tea.KeyUp})
+	next = model.(App)
+	if got := next.input.Value(); got != "first" {
+		t.Fatalf("expected to stay at oldest history, got %q", got)
+	}
+
+	model, _ = next.Update(tea.KeyMsg{Type: tea.KeyDown})
+	next = model.(App)
+	if got := next.input.Value(); got != "second" {
+		t.Fatalf("expected forward history on down, got %q", got)
+	}
+
+	model, _ = next.Update(tea.KeyMsg{Type: tea.KeyDown})
+	next = model.(App)
+	if got := next.input.Value(); got != "draft" {
+		t.Fatalf("expected draft restored past newest, got %q", got)
+	}
+
+	model, _ = next.Update(tea.KeyMsg{Type: tea.KeyDown})
+	next = model.(App)
+	if got := next.input.Value(); got != "draft" {
+		t.Fatalf("expected draft to remain when down pressed without browsing, got %q", got)
+	}
+}
+
+func TestInputArrowDownWithoutBrowsingDoesNothing(t *testing.T) {
+	app := New()
+	app.width = 120
+	app.height = 40
+	app.layout()
+	app.input.SetValue("typed")
+
+	model, _ := app.Update(tea.KeyMsg{Type: tea.KeyDown})
+	next := model.(App)
+
+	if got := next.input.Value(); got != "typed" {
+		t.Fatalf("expected input untouched when not browsing, got %q", got)
+	}
+}
+
+func TestConsecutiveDuplicateSubmissionsStoredOnce(t *testing.T) {
+	app := New()
+	app.width = 120
+	app.height = 40
+	app.layout()
+
+	app.input.SetValue("same")
+	_ = app.submit()
+	app.input.SetValue("same")
+	_ = app.submit()
+
+	if got := len(app.commandHistory); got != 1 {
+		t.Fatalf("expected consecutive duplicates collapsed, got %d entries", got)
 	}
 }
