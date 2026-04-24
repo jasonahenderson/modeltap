@@ -93,8 +93,33 @@ Partially checked off:
   - stop is implemented with a two-step Esc interrupt
   - retry / branch are still missing
 - Inline tool / permission event rendering
-  - first fake transcript event shapes are present
-  - approval / denial flow is still missing
+  - UI shape validated:
+    - inline placement decision locked in (events render in the transcript)
+    - `/perm` demo command drives a live request → permission → grant/deny
+      flow for evaluation
+    - inline `y` / `n` keybindings grant or deny the active permission
+    - `granted` and `denied` event states have distinct styling
+    - grant extends the trace with `running` / `done` events and streams the
+      assistant reply; deny short-circuits with a trailing assistant note
+  - UI work still open in the spike:
+    - replace instructional inline hint text with a composer-mounted action
+      list while keeping the permission request itself in the transcript
+    - define the initial action set and ordering (`approve once`, `always
+      allow for session`, `deny`, `deny with reason` unless testing suggests a
+      different shape)
+    - make permission actions keyboard-selectable from the input/composer area
+      with `Left` / `Right` and `Enter`; treat raw `y` / `n` as optional
+      shortcuts, not the primary UI
+    - evaluate whether mouse cursor selection/click is worth supporting in the
+      spike surface after keyboard selection feels right
+    - "always allow" affordance and placement in the inline UI
+    - tool parameter / target display clarity
+    - deny-with-reason input and interaction shape
+    - multiple pending permissions as a UI/interaction problem
+    - permissions that originate mid-stream as a UI interruption problem
+  - Packaging / productionization refactor is tracked separately under
+    "Required before merging back to `main`"; do not block UI iteration on
+    replacing the current demo/scaffolding path yet
 
 Not checked off yet:
 
@@ -117,11 +142,38 @@ Not checked off yet:
 
 ## Current priority order
 
-1. Packaging / extraction review
-2. Tool / permission event rendering in transcript
-3. Stop / retry / branch controls for streaming
-4. Split-view inspector
-5. Composer scroll-away behavior in tight vertical layouts
+1. Tool / permission event rendering in transcript *(partially finished — see "Partially checked off" for the open items)*
+2. Stop / retry / branch controls for streaming
+3. Split-view inspector
+4. Composer scroll-away behavior in tight vertical layouts
+
+## Required before merging back to `main`
+
+- **Packaging / extraction review.** Blocks the merge back. Must confirm:
+  - the spike shell can stand alone as a releasable component;
+  - the harness can consume it as an embedded package without tight
+    coupling;
+  - what seams are required if it remains in-repo.
+- **Packaging plan for inline permissions.** Keep iterating on the current
+  UI-first inline permission flow during the spike, but treat the present
+  `/perm` + singleton pending-permission path as temporary scaffolding.
+  Packaging must convert it into a production permission model without
+  changing the inline transcript placement that the spike is validating.
+  Required packaging-phase refactor targets:
+  - replace the single pending-permission pointer with a real collection
+    keyed by stable request ID
+  - move permission origination to the actual tool/runtime boundary instead
+    of the `/perm` demo path
+  - separate transcript display events from permission-control state
+  - define a structured permission contract (`request_id`, tool/action/target,
+    parameters, scope, status, created/run origin metadata)
+  - replace implicit `y` / `n` against "the current permission" with explicit
+    approve/deny actions against a selected request
+  - support multiple pending permissions and permissions that originate
+    mid-stream
+  - add deny-with-reason and scoped approval (`once`, `session`, and any later
+    project/workspace policy if needed)
+  - persist enough permission state that redraw/reflow does not lose context
 
 ## Checkpoint
 
@@ -147,10 +199,22 @@ Current checkpoint state before the next test pass:
   submit; mouse scroll no longer steals focus.
 - `ctrl+k` / `ctrl+t` bindings are handled via explicit Bubble Tea key types
   instead of stringly-typed matching.
+- Composer input now has shell-style `Up` / `Down` command history on a
+  single-line buffer; multi-line editing still uses arrows for cursor motion.
+- Inline tool / permission events are live: `/perm` triggers a request →
+  permission event, and `y` / `n` grant or deny while the input is empty.
+  Granted runs append `running` / `done` and stream a reply; denied runs
+  short-circuit with a trailing assistant note.
+- Default session starts with an empty transcript. `/clear` on the default
+  session also leaves the transcript empty.
 
 Immediate test targets after this checkpoint:
 
-- Decide whether transcript tool / permission events belong inline before
-  adding approval and denial interactions.
-- Begin packaging / extraction review: can the spike shell stand alone as a
-  releasable component, and what seams are required if the harness embeds it.
+- Interactive validation of the `/perm` flow (trigger, grant, deny, typing
+  does not grant, empty-transcript startup reads as expected).
+- Begin priority #2: stop / retry / branch controls for streaming.
+- Return to the remaining UI-side open items on the partial tool / permission
+  track (composer action-list design, keyboard cursor interaction, scope
+  affordance, parameter display, deny-with-reason, multi-pending interaction,
+  mid-stream interruption handling) as they come up, not as a blocking set.
+  Leave the production model refactor to the packaging phase.

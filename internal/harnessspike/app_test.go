@@ -8,10 +8,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-func TestNewSeedsMessages(t *testing.T) {
+func TestNewStartsWithEmptyTranscript(t *testing.T) {
 	app := New()
-	if len(app.messages) < 2 {
-		t.Fatalf("expected seeded transcript, got %d messages", len(app.messages))
+	if len(app.messages) != 0 {
+		t.Fatalf("expected empty transcript on startup, got %d messages", len(app.messages))
 	}
 	if app.focus != focusInput {
 		t.Fatalf("expected input focus by default, got %v", app.focus)
@@ -44,14 +44,6 @@ func TestComposerRendersInsideTranscriptSurface(t *testing.T) {
 	}
 	if app.input.Height() != 1 {
 		t.Fatalf("expected single-line input after layout, got %d", app.input.Height())
-	}
-}
-
-func TestDefaultSessionSeedsUsefulStartupMessage(t *testing.T) {
-	app := New()
-
-	if got := app.messages[1].content; got != "Try /demo for a long stream, queue a follow-up while it runs, or open Tool Demo to judge inline event rendering." {
-		t.Fatalf("unexpected default assistant seed: %q", got)
 	}
 }
 
@@ -127,11 +119,12 @@ func TestClearCommandResetsTranscript(t *testing.T) {
 	app.width = 120
 	app.height = 40
 	app.layout()
+	app.messages = append(app.messages, message{role: "user", content: "before clear"})
 	app.input.SetValue("/clear")
 
 	_ = app.submit()
-	if len(app.messages) < 2 {
-		t.Fatalf("expected reseeded transcript, got %d messages", len(app.messages))
+	if len(app.messages) != 0 {
+		t.Fatalf("expected empty transcript after clear, got %d messages", len(app.messages))
 	}
 }
 
@@ -359,7 +352,7 @@ func TestSidebarActionClearResetsTranscript(t *testing.T) {
 	if next.dialog == nil {
 		t.Fatal("expected choice dialog, got nil")
 	}
-	if len(next.messages) < 3 {
+	if len(next.messages) < 1 {
 		t.Fatalf("expected transcript untouched before choice, got %d messages", len(next.messages))
 	}
 
@@ -368,8 +361,8 @@ func TestSidebarActionClearResetsTranscript(t *testing.T) {
 	if next.dialog != nil {
 		t.Fatal("expected dialog cleared after confirm")
 	}
-	if len(next.messages) < 2 {
-		t.Fatalf("expected reseeded transcript after clear, got %d messages", len(next.messages))
+	if len(next.messages) != 0 {
+		t.Fatalf("expected empty transcript after clear, got %d messages", len(next.messages))
 	}
 }
 
@@ -857,5 +850,199 @@ func TestConsecutiveDuplicateSubmissionsStoredOnce(t *testing.T) {
 
 	if got := len(app.commandHistory); got != 1 {
 		t.Fatalf("expected consecutive duplicates collapsed, got %d entries", got)
+	}
+}
+
+func TestPermCommandTriggersPendingPermission(t *testing.T) {
+	app := New()
+	app.width = 120
+	app.height = 40
+	app.layout()
+	app.input.SetValue("/perm")
+
+	_ = app.submit()
+
+	if app.pendingPermission == nil {
+		t.Fatal("expected pending permission after /perm")
+	}
+	if app.streaming {
+		t.Fatal("expected no stream while awaiting permission")
+	}
+	last := app.messages[len(app.messages)-1]
+	if last.role != "event" || last.eventState != "permission" {
+		t.Fatalf("expected last message to be a permission event, got %+v", last)
+	}
+	if !strings.Contains(app.transcript.View(), "Permission required") {
+		t.Fatal("expected transcript to retain the permission request")
+	}
+	if !strings.Contains(app.transcript.View(), "Approve once") || !strings.Contains(app.transcript.View(), "Deny with reason") {
+		t.Fatal("expected composer action list for permission controls")
+	}
+}
+
+func TestPermGrantContinuesWithToolAndStream(t *testing.T) {
+	app := New()
+	app.width = 120
+	app.height = 40
+	app.layout()
+	app.input.SetValue("/perm")
+	_ = app.submit()
+
+	model, cmd := app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	next := model.(App)
+
+	if next.pendingPermission != nil {
+		t.Fatal("expected pending permission cleared after grant")
+	}
+	if cmd == nil {
+		t.Fatal("expected stream cmd after grant")
+	}
+	if !next.streaming {
+		t.Fatal("expected streaming after grant")
+	}
+	// Walk messages after the user message to find granted + running + done + assistant.
+	var grantedFound, runningFound, doneFound, assistantStreaming bool
+	for _, m := range next.messages {
+		if m.role == "event" && m.eventState == "granted" {
+			grantedFound = true
+		}
+		if m.role == "event" && m.eventState == "running" {
+			runningFound = true
+		}
+		if m.role == "event" && m.eventState == "done" {
+			doneFound = true
+		}
+		if m.role == "assistant" && m.streaming {
+			assistantStreaming = true
+		}
+	}
+	if !grantedFound || !runningFound || !doneFound || !assistantStreaming {
+		t.Fatalf("expected granted+running+done+streaming assistant, got granted=%v running=%v done=%v streaming=%v", grantedFound, runningFound, doneFound, assistantStreaming)
+	}
+}
+
+func TestPermDenyShortCircuitsWithoutStream(t *testing.T) {
+	app := New()
+	app.width = 120
+	app.height = 40
+	app.layout()
+	app.input.SetValue("/perm")
+	_ = app.submit()
+
+	model, cmd := app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
+	next := model.(App)
+
+	if next.pendingPermission != nil {
+		t.Fatal("expected pending permission cleared after deny")
+	}
+	if cmd != nil {
+		t.Fatal("expected no stream cmd after deny")
+	}
+	if next.streaming {
+		t.Fatal("expected no streaming after deny")
+	}
+	var deniedFound, hasRunningOrDone bool
+	for _, m := range next.messages {
+		if m.role == "event" && m.eventState == "denied" {
+			deniedFound = true
+		}
+		if m.role == "event" && (m.eventState == "running" || m.eventState == "done") {
+			hasRunningOrDone = true
+		}
+	}
+	if !deniedFound {
+		t.Fatal("expected a denied event")
+	}
+	if hasRunningOrDone {
+		t.Fatal("expected no tool running/done events after deny")
+	}
+	if next.messages[len(next.messages)-1].role != "assistant" {
+		t.Fatal("expected a trailing assistant message after deny")
+	}
+}
+
+func TestYKeyDoesNotTriggerGrantWhenInputNonEmpty(t *testing.T) {
+	app := New()
+	app.width = 120
+	app.height = 40
+	app.layout()
+	app.input.SetValue("/perm")
+	_ = app.submit()
+	app.input.SetValue("yes please")
+
+	model, _ := app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	next := model.(App)
+
+	if next.pendingPermission == nil {
+		t.Fatal("expected permission still pending when user is typing")
+	}
+}
+
+func TestInputAreaCanApprovePermissionWithEnter(t *testing.T) {
+	app := New()
+	app.width = 120
+	app.height = 40
+	app.layout()
+	app.input.SetValue("/perm")
+	_ = app.submit()
+
+	model, cmd := app.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	next := model.(App)
+	if next.pendingPermission != nil {
+		t.Fatal("expected pending permission cleared after composer approval")
+	}
+	if cmd == nil || !next.streaming {
+		t.Fatal("expected composer approval to start streaming")
+	}
+}
+
+func TestInputAreaCanMoveAcrossPermissionActions(t *testing.T) {
+	app := New()
+	app.width = 120
+	app.height = 40
+	app.layout()
+	app.input.SetValue("/perm")
+	_ = app.submit()
+
+	model, _ := app.Update(tea.KeyMsg{Type: tea.KeyRight})
+	next := model.(App)
+	model, _ = next.Update(tea.KeyMsg{Type: tea.KeyRight})
+	next = model.(App)
+	model, _ = next.Update(tea.KeyMsg{Type: tea.KeyLeft})
+	next = model.(App)
+
+	if next.pendingPermission == nil {
+		t.Fatal("expected permission to remain pending while moving action selection")
+	}
+	if next.pendingPermission.selectedAction != 1 {
+		t.Fatalf("expected selected action index 1, got %d", next.pendingPermission.selectedAction)
+	}
+}
+
+func TestInputAreaCanDenyWithReason(t *testing.T) {
+	app := New()
+	app.width = 120
+	app.height = 40
+	app.layout()
+	app.input.SetValue("/perm")
+	_ = app.submit()
+
+	model, _ := app.Update(tea.KeyMsg{Type: tea.KeyRight})
+	next := model.(App)
+	model, _ = next.Update(tea.KeyMsg{Type: tea.KeyRight})
+	next = model.(App)
+	model, _ = next.Update(tea.KeyMsg{Type: tea.KeyRight})
+	next = model.(App)
+
+	model, cmd := next.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	next = model.(App)
+	if cmd != nil {
+		t.Fatal("expected no stream when denying with reason")
+	}
+	if next.pendingPermission != nil {
+		t.Fatal("expected pending permission cleared after deny-with-reason")
+	}
+	if got := next.messages[len(next.messages)-1].content; !strings.Contains(got, "reason captured") {
+		t.Fatalf("expected deny-with-reason assistant note, got %q", got)
 	}
 }
