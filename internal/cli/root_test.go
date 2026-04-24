@@ -48,6 +48,7 @@ func TestSubcommandsRegistered(t *testing.T) {
 		{"show", "show"},
 		{"export", "export"},
 		{"config", "config"},
+		{"harness-spike", "harness-spike"},
 		{"status", "status"},
 		{"metrics", "metrics"},
 		{"dashboard", "dashboard"},
@@ -78,6 +79,7 @@ func TestSubcommandsAcceptHelp(t *testing.T) {
 		args []string
 	}{
 		{"start --help", []string{"start", "--help"}},
+		{"harness-spike --help", []string{"harness-spike", "--help"}},
 		{"logs --help", []string{"logs", "--help"}},
 		{"show --help", []string{"show", "--help"}},
 		{"export --help", []string{"export", "--help"}},
@@ -128,6 +130,7 @@ func TestHelpListsAllSubcommands(t *testing.T) {
 	output := buf.String()
 	expected := []string{
 		"start", "logs", "show", "export", "config",
+		"harness-spike",
 		"status", "metrics", "dashboard", "completion", "service",
 	}
 	for _, sub := range expected {
