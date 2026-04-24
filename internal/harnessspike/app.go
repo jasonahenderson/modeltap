@@ -20,11 +20,13 @@ const (
 )
 
 type message struct {
-	role      string
-	content   string
-	streaming bool
-	tokens    []inputToken
-	expanded  map[int]bool
+	role       string
+	content    string
+	streaming  bool
+	tokens     []inputToken
+	expanded   map[int]bool
+	entries    []string
+	eventState string
 }
 
 type inputToken struct {
@@ -53,6 +55,8 @@ type streamTickMsg struct {
 	part string
 	done bool
 }
+
+type streamPulseMsg struct{}
 
 type choiceOption struct {
 	label string
@@ -107,6 +111,7 @@ type transcriptRef struct {
 type queuedSubmission struct {
 	content string
 	tokens  []inputToken
+	entries []string
 }
 
 type App struct {
@@ -122,9 +127,11 @@ type App struct {
 	status    string
 	messages  []message
 
-	streamQueue []string
-	streaming   bool
-	streamDelay time.Duration
+	streamQueue    []string
+	streaming      bool
+	streamDelay    time.Duration
+	streamPulse    int
+	interruptArmed bool
 
 	sidebarItems []sidebarItem
 	sidebarIndex int
@@ -150,6 +157,7 @@ func New() App {
 	ta := textarea.New()
 	ta.Placeholder = "Ask something. Enter sends. Ctrl+J inserts a newline. /clear wipes the transcript."
 	ta.Prompt = "  > "
+	ta.ShowLineNumbers = false
 	ta.CharLimit = 0
 	ta.SetHeight(5)
 	ta.Focus()
@@ -161,7 +169,7 @@ func New() App {
 		modelName:      "fake-kimi-spike",
 		status:         "Ready",
 		currentSession: "Spike Session",
-		sidebarOpen:    true,
+		sidebarOpen:    false,
 		streamDelay:    35 * time.Millisecond,
 		sidebarItems: []sidebarItem{
 			{section: "Session", label: "Spike Session", kind: sidebarItemSession, value: "spike-session"},
@@ -170,6 +178,7 @@ func New() App {
 			{section: "Model", label: "fake-kimi-spike", kind: sidebarItemModel, value: "fake-kimi-spike"},
 			{section: "Actions", label: "Clear Transcript", kind: sidebarItemAction, value: "clear"},
 			{section: "Actions", label: "Replay Intro", kind: sidebarItemAction, value: "replay"},
+			{section: "Actions", label: "Replay Tool Demo", kind: sidebarItemAction, value: "tool-demo"},
 		},
 		agents: []backgroundAgent{
 			{
@@ -196,6 +205,8 @@ func New() App {
 			},
 		},
 	}
+	app.transcript.MouseWheelEnabled = true
+	app.transcript.MouseWheelDelta = 3
 	app.seed()
 	return app
 }
@@ -209,6 +220,12 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.height = msg.Height
 		a.layout()
 		return a, nil
+
+	case tea.MouseMsg:
+		var cmd tea.Cmd
+		a.transcript, cmd = a.transcript.Update(msg)
+		a.focus = focusTranscript
+		return a, cmd
 
 	case tea.KeyMsg:
 		if a.dialog != nil {
@@ -231,10 +248,16 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case msg.Type == tea.KeyCtrlC:
 			return a, tea.Quit
 		case msg.Type == tea.KeyEsc && a.streaming:
-			a.stopStreaming()
+			if a.interruptArmed {
+				a.stopStreaming()
+			} else {
+				a.interruptArmed = true
+				a.status = "Press Esc again to interrupt"
+				a.refreshTranscript()
+			}
 			return a, nil
 		case msg.Type == tea.KeyTab:
-			a.focus = nextFocus(a.focus)
+			a.focus = nextFocus(a.focus, a.sidebarOpen)
 			if a.focus == focusInput {
 				a.input.Focus()
 			} else {
@@ -305,16 +328,6 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case focusTranscript:
 			switch msg.Type {
-			case tea.KeyUp:
-				if len(a.transcriptRefs) > 0 {
-					a.moveTranscriptRef(-1)
-					return a, nil
-				}
-			case tea.KeyDown:
-				if len(a.transcriptRefs) > 0 {
-					a.moveTranscriptRef(1)
-					return a, nil
-				}
 			case tea.KeyEnter:
 				if len(a.transcriptRefs) > 0 {
 					a.openSelectedTranscriptRef()
@@ -356,6 +369,7 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.status = "Streaming fake response"
 		if msg.done {
 			a.streaming = false
+			a.interruptArmed = false
 			if len(a.queuedSubmissions) == 0 && len(a.pendingSubmissions) == 0 {
 				a.status = "Ready"
 			}
@@ -369,6 +383,14 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, nil
 		}
 		return a, a.nextStreamCmd()
+
+	case streamPulseMsg:
+		if !a.streaming {
+			return a, nil
+		}
+		a.streamPulse = (a.streamPulse + 1) % 4
+		a.refreshTranscript()
+		return a, a.nextPulseCmd()
 	}
 
 	return a, nil
@@ -405,6 +427,16 @@ func (a *App) seed() {
 
 func sessionPreset(name string) []message {
 	switch name {
+	case "Tool Demo":
+		return []message{
+			{role: "system", content: "Tool demo mode. Use this preset to judge how inline tool and permission events read inside the transcript."},
+			{role: "user", content: "Summarize the README and tell me what changed in the spike."},
+			{role: "event", content: "Read README.md", eventState: "requested"},
+			{role: "event", content: "Permission required to read workspace file", eventState: "permission"},
+			{role: "event", content: "Read README.md", eventState: "running"},
+			{role: "event", content: "Read README.md", eventState: "done"},
+			{role: "assistant", content: "The spike is evaluating a replacement harness shell with better transcript structure, queue handling, and interrupt behavior."},
+		}
 	case "Reference Layout":
 		return []message{
 			{
@@ -486,12 +518,15 @@ func (a *App) submit() tea.Cmd {
 	if content == "" && len(a.inputTokens) == 0 {
 		return nil
 	}
-	if a.streaming {
+	if a.streaming || len(a.queuedSubmissions) > 0 || len(a.pendingSubmissions) > 0 {
 		a.enqueueSubmission(content, a.inputTokens)
 		a.input.Reset()
 		a.inputTokens = nil
 		a.selectedToken = 0
 		a.refreshTranscript()
+		if !a.streaming {
+			return a.releaseQueuedSubmission()
+		}
 		return nil
 	}
 	if content == "/clear" {
@@ -506,10 +541,10 @@ func (a *App) submit() tea.Cmd {
 	if len(a.inputTokens) > 0 {
 		submittedTokens = append(submittedTokens, a.inputTokens...)
 	}
-	return a.beginSubmission(content, submittedTokens)
+	return a.beginSubmission(content, nil, submittedTokens)
 }
 
-func (a *App) beginSubmission(content string, submittedTokens []inputToken) tea.Cmd {
+func (a *App) beginSubmission(content string, entries []string, submittedTokens []inputToken) tea.Cmd {
 	userContent := strings.TrimSpace(content)
 	if len(submittedTokens) > 0 {
 		var refs []string
@@ -527,15 +562,17 @@ func (a *App) beginSubmission(content string, submittedTokens []inputToken) tea.
 			expanded[i] = true
 		}
 	}
-	a.messages = append(a.messages, message{role: "user", content: strings.TrimSpace(content), tokens: submittedTokens, expanded: expanded})
+	a.messages = append(a.messages, message{role: "user", content: strings.TrimSpace(content), entries: entries, tokens: submittedTokens, expanded: expanded})
 	a.messages = append(a.messages, message{role: "assistant", content: "", streaming: true})
 	a.input.Reset()
 	a.status = "Preparing fake response"
 	a.streamQueue = splitForStreaming(fakeReply(userContent))
 	a.streamDelay = streamDelayForPrompt(userContent)
+	a.streamPulse = 0
+	a.interruptArmed = false
 	a.streaming = true
 	a.refreshTranscript()
-	return a.nextStreamCmd()
+	return tea.Batch(a.nextStreamCmd(), a.nextPulseCmd())
 }
 
 func (a *App) nextStreamCmd() tea.Cmd {
@@ -550,7 +587,15 @@ func (a *App) nextStreamCmd() tea.Cmd {
 	})
 }
 
+func (a *App) nextPulseCmd() tea.Cmd {
+	return tea.Tick(2*time.Second, func(time.Time) tea.Msg {
+		return streamPulseMsg{}
+	})
+}
+
 func (a *App) refreshTranscript() {
+	followTail := a.transcript.AtBottom()
+	offset := a.transcript.YOffset
 	var b strings.Builder
 	a.transcriptRefs = nil
 	refCount := 0
@@ -563,7 +608,14 @@ func (a *App) refreshTranscript() {
 			b.WriteString(systemStyle.Render(msg.content))
 		case "user":
 			var userBlock strings.Builder
-			if msg.content != "" {
+			if len(msg.entries) > 0 {
+				for idx, entry := range msg.entries {
+					if idx > 0 {
+						userBlock.WriteString("\n\n")
+					}
+					userBlock.WriteString("> " + entry)
+				}
+			} else if msg.content != "" {
 				userBlock.WriteString("> " + msg.content)
 			}
 			for tokenIndex, tok := range msg.tokens {
@@ -580,8 +632,10 @@ func (a *App) refreshTranscript() {
 				userBlock.WriteString(a.renderTranscriptToken(msg, tokenIndex, tok, selected))
 			}
 			b.WriteString(userBodyStyle.Render(userBlock.String()))
+		case "event":
+			b.WriteString(renderEventMessage(msg))
 		case "assistant":
-			label := fmt.Sprintf("%s  %s", a.modelName, statusDot(msg.streaming))
+			label := fmt.Sprintf("%s  %s", a.modelName, statusDot(msg.streaming, a.streamPulse, a.interruptArmed))
 			b.WriteString(assistantLabelStyle.Render(label))
 			b.WriteString("\n")
 			b.WriteString(assistantBodyStyle.Render(msg.content))
@@ -599,7 +653,11 @@ func (a *App) refreshTranscript() {
 		a.selectedTranscriptRef = len(a.transcriptRefs) - 1
 	}
 	a.transcript.SetContent(b.String())
-	a.transcript.GotoBottom()
+	if followTail {
+		a.transcript.GotoBottom()
+	} else {
+		a.transcript.SetYOffset(offset)
+	}
 }
 
 func (a App) renderTranscriptToken(msg message, tokenIndex int, tok inputToken, selected bool) string {
@@ -625,7 +683,15 @@ func (a App) renderTranscriptToken(msg message, tokenIndex int, tok inputToken, 
 func (a App) renderQueuedSubmission(queued queuedSubmission) string {
 	var block strings.Builder
 	block.WriteString(queuedLabelStyle.Render("queued"))
-	if queued.content != "" {
+	if len(queued.entries) > 0 {
+		for idx, entry := range queued.entries {
+			block.WriteString("\n")
+			if idx > 0 {
+				block.WriteString("\n")
+			}
+			block.WriteString("> " + entry)
+		}
+	} else if queued.content != "" {
 		block.WriteString("\n")
 		block.WriteString("> " + queued.content)
 	}
@@ -726,11 +792,14 @@ func (f focusZone) String() string {
 	}
 }
 
-func nextFocus(current focusZone) focusZone {
+func nextFocus(current focusZone, sidebarOpen bool) focusZone {
 	switch current {
 	case focusInput:
 		return focusTranscript
 	case focusTranscript:
+		if !sidebarOpen {
+			return focusInput
+		}
 		return focusSidebar
 	default:
 		return focusInput
@@ -780,6 +849,9 @@ func (a *App) activateSidebar() {
 		case "replay":
 			a.seed()
 			a.status = "Intro replayed"
+		case "tool-demo":
+			a.seedWithSession("Tool Demo")
+			a.status = "Tool demo replayed"
 		default:
 			a.status = "Selected action: " + item.label
 		}
@@ -947,14 +1019,12 @@ func (a App) renderInputSurface() string {
 func (a App) renderFooter(width int) string {
 	count := len(a.agents)
 	label := fmt.Sprintf("%d background agents running", count)
-	hint := "Ctrl+T open"
+	hint := "Ctrl+B sidebar  Ctrl+T agents  Ctrl+K palette"
 	if count == 1 {
 		label = "1 background agent running"
-		hint = "Ctrl+T open agent"
 	}
-	label += "  |  Ctrl+K command palette"
-	if len(a.transcriptRefs) > 0 {
-		label += "  |  transcript items: Enter opens"
+	if a.focus == focusTranscript {
+		label += "  |  scroll: wheel/arrows  items: j/k  open: Enter"
 	}
 	if len(a.queuedSubmissions) > 0 {
 		label += fmt.Sprintf("  |  %d queued", len(a.queuedSubmissions))
@@ -1180,6 +1250,7 @@ func (a *App) filteredCommands() []paletteCommand {
 		paletteCommand{label: "Session: Spike Session", value: "Spike Session", kind: "session", filter: "session spike"},
 		paletteCommand{label: "Session: Reference Layout", value: "Reference Layout", kind: "session", filter: "session reference layout"},
 		paletteCommand{label: "Session: Dummy Stream", value: "Dummy Stream", kind: "session", filter: "session dummy stream"},
+		paletteCommand{label: "Session: Tool Demo", value: "Tool Demo", kind: "session", filter: "session tool demo permission events"},
 		paletteCommand{label: "Action: Clear Transcript", value: "clear", kind: "action", filter: "action clear transcript"},
 		paletteCommand{label: "Action: Replay Intro", value: "replay", kind: "action", filter: "action replay intro"},
 		paletteCommand{label: "View: Background Agents", value: "agents", kind: "view", filter: "view agents background"},
@@ -1458,8 +1529,13 @@ func (a *App) enqueueSubmission(content string, tokens []inputToken) {
 	if len(tokens) > 0 {
 		queuedTokens = append(queuedTokens, tokens...)
 	}
+	entries := []string{content}
+	if strings.TrimSpace(content) == "" {
+		entries = nil
+	}
 	a.queuedSubmissions = append(a.queuedSubmissions, queuedSubmission{
 		content: content,
+		entries: entries,
 		tokens:  queuedTokens,
 	})
 	a.status = fmt.Sprintf("Queued follow-up message (%d waiting)", len(a.queuedSubmissions))
@@ -1473,16 +1549,40 @@ func (a *App) releaseQueuedSubmission() tea.Cmd {
 	if len(a.pendingSubmissions) == 0 {
 		return nil
 	}
-	next := a.pendingSubmissions[0]
-	a.pendingSubmissions = a.pendingSubmissions[1:]
-	a.status = "Releasing queued follow-up"
+	next := mergeQueuedSubmissions(a.pendingSubmissions)
+	a.pendingSubmissions = nil
+	a.status = "Releasing merged queued follow-up"
 	a.refreshTranscript()
-	return a.beginSubmission(next.content, next.tokens)
+	return a.beginSubmission(next.content, next.entries, next.tokens)
+}
+
+func mergeQueuedSubmissions(items []queuedSubmission) queuedSubmission {
+	var merged queuedSubmission
+	if len(items) == 0 {
+		return merged
+	}
+	var parts []string
+	for _, item := range items {
+		if strings.TrimSpace(item.content) != "" {
+			parts = append(parts, strings.TrimSpace(item.content))
+		}
+		if len(item.entries) > 0 {
+			merged.entries = append(merged.entries, item.entries...)
+		} else if strings.TrimSpace(item.content) != "" {
+			merged.entries = append(merged.entries, strings.TrimSpace(item.content))
+		}
+		if len(item.tokens) > 0 {
+			merged.tokens = append(merged.tokens, item.tokens...)
+		}
+	}
+	merged.content = strings.Join(parts, "\n\n")
+	return merged
 }
 
 func (a *App) stopStreaming() {
 	a.streaming = false
 	a.streamQueue = nil
+	a.interruptArmed = false
 	if len(a.messages) > 0 {
 		last := &a.messages[len(a.messages)-1]
 		if last.role == "assistant" && last.streaming {
@@ -1518,6 +1618,21 @@ func summarizeQueuedToken(tok inputToken) string {
 	default:
 		return tok.label
 	}
+}
+
+func renderEventMessage(msg message) string {
+	style := eventInfoStyle
+	switch msg.eventState {
+	case "requested":
+		style = eventRequestedStyle
+	case "permission":
+		style = eventPermissionStyle
+	case "running":
+		style = eventRunningStyle
+	case "done":
+		style = eventDoneStyle
+	}
+	return style.Render(msg.content)
 }
 
 func (a *App) handlePreviewKey(msg tea.KeyMsg) tea.Cmd {
@@ -1581,13 +1696,7 @@ func fakeReply(prompt string) string {
 	lower := strings.ToLower(trimmed)
 	switch {
 	case strings.HasPrefix(lower, "/demo"):
-		return "Demo stream mode engaged.\n\n" +
-			"Phase 1: inspect the request and identify the active surface.\n" +
-			"Phase 2: check current focus, transcript shape, and footer signals.\n" +
-			"Phase 3: continue emitting enough tokens that queueing and follow-up submission behavior are easy to observe.\n" +
-			"Phase 4: keep the cadence slow enough to feel deliberate rather than instantaneous.\n" +
-			"Phase 5: confirm that the shell remains stable while content continues to arrive.\n" +
-			"Phase 6: finish with a clear stop so the next queued message can release."
+		return demoReply()
 	case strings.Contains(lower, "why"):
 		return "This spike exists to prove the shell before wiring the backend. If the shell feels wrong with fake data, real integrations will only make it worse."
 	default:
@@ -1597,9 +1706,27 @@ func fakeReply(prompt string) string {
 
 func streamDelayForPrompt(prompt string) time.Duration {
 	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(prompt)), "/demo") {
-		return 120 * time.Millisecond
+		return 500 * time.Millisecond
 	}
 	return 35 * time.Millisecond
+}
+
+func demoReply() string {
+	segments := []string{
+		"Demo stream mode engaged for long-run testing.",
+		"Watch the working indicator pulse while tokens continue to arrive.",
+		"Use this mode to test queue visibility, interrupt handling, and transcript stability.",
+		"Each numbered step is intentionally verbose so the stream lasts long enough to judge behavior clearly.",
+	}
+	var parts []string
+	for i := 1; i <= 12; i++ {
+		parts = append(parts, fmt.Sprintf("Step %02d.", i))
+		for _, segment := range segments {
+			parts = append(parts, segment)
+		}
+	}
+	parts = append(parts, "Demo stream complete. The queue should now release the next waiting message.")
+	return strings.Join(parts, " ")
 }
 
 func splitForStreaming(s string) []string {
@@ -1618,9 +1745,12 @@ func splitForStreaming(s string) []string {
 	return out
 }
 
-func statusDot(streaming bool) string {
+func statusDot(streaming bool, pulse int, interruptArmed bool) string {
 	if streaming {
-		return "streaming"
+		if interruptArmed {
+			return "press Esc again to interrupt"
+		}
+		return "working" + strings.Repeat(".", pulse)
 	}
 	return "done"
 }

@@ -16,7 +16,7 @@ integration, so layout and interaction can be judged independently of
 the current harness architecture.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			app := harnessspike.New()
-			p := tea.NewProgram(app, tea.WithAltScreen())
+			p := tea.NewProgram(app, tea.WithAltScreen(), tea.WithMouseAllMotion())
 			_, err := p.Run()
 			return err
 		},
