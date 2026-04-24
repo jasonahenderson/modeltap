@@ -114,6 +114,30 @@ var (
 	eventDoneStyle = lipgloss.NewStyle().
 			Padding(0, 1).
 			Foreground(lipgloss.Color("#7EE787"))
+	eventGrantedStyle = lipgloss.NewStyle().
+				Padding(0, 1).
+				Foreground(lipgloss.Color("#7EE787")).
+				Bold(true)
+	eventDeniedStyle = lipgloss.NewStyle().
+				Padding(0, 1).
+				Foreground(lipgloss.Color("#F85149")).
+				Bold(true)
+	permissionActionsStyle = lipgloss.NewStyle().
+				Padding(0, 1)
+	permissionPromptStyle = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(lipgloss.Color("#F2CC60"))
+	permissionMetaStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#8EA2BC"))
+	permissionActionStyle = lipgloss.NewStyle().
+				Padding(0, 1).
+				Background(lipgloss.Color("#1D2631")).
+				Foreground(lipgloss.Color("#F2CC60"))
+	permissionActionActiveStyle = lipgloss.NewStyle().
+					Padding(0, 1).
+					Background(lipgloss.Color("#F2CC60")).
+					Foreground(lipgloss.Color("#111821")).
+					Bold(true)
 
 	assistantLabelStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#79C0FF"))
 	assistantBodyStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#F5F7FB"))
