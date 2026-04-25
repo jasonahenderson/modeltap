@@ -91,43 +91,37 @@ Partially checked off:
   - no explicit interrupt-vs-queue choice yet
 - Stream interruption / stop / retry / branch
   - stop is implemented with a two-step Esc interrupt
-  - retry / branch are still missing
+  - retry / branch are deferred
 - Inline tool / permission event rendering
   - UI shape validated:
     - inline placement decision locked in (events render in the transcript)
     - `/perm` demo command drives a live request → permission → grant/deny
       flow for evaluation
-    - inline `y` / `n` keybindings grant or deny the active permission
+    - inline `y` / `n` keybindings still work as fallback shortcuts while the
+      composer is empty
     - `granted` and `denied` event states have distinct styling
     - grant extends the trace with `running` / `done` events and streams the
       assistant reply; deny short-circuits with a trailing assistant note
-  - UI work still open in the spike:
-    - replace instructional inline hint text with a composer-mounted action
-      list while keeping the permission request itself in the transcript
-    - define the initial action set and ordering (`approve once`, `always
-      allow for session`, `deny` unless testing suggests a different shape)
-    - make permission actions keyboard-selectable from the input/composer area
-      with `Left` / `Right` and `Enter`; treat raw `y` / `n` as optional
-      shortcuts, not the primary UI
-    - evaluate whether mouse cursor selection/click is worth supporting in the
-      spike surface after keyboard selection feels right
-    - "always allow" affordance and placement in the inline UI
-    - tool parameter / target display clarity
-    - multiple pending permissions as a UI/interaction problem
-    - permissions that originate mid-stream as a UI interruption problem
+    - permission controls live in the composer while the request stays in the
+      transcript
+    - permission target / summary details render in the composer
+    - `Allow for session` now persists within the spike session and
+      remains visible as session-policy state on repeated requests for the
+      same tool
+    - multiple pending permissions can coexist and the composer can switch
+      between them with `Up` / `Down`
+    - `/perm` during streaming pauses the stream and surfaces the permission
+      immediately instead of queueing it as a follow-up
   - Packaging / productionization refactor is tracked separately under
     "Required before merging back to `main`"; do not block UI iteration on
     replacing the current demo/scaffolding path yet
 
 Not checked off yet:
 
-- Composer anchoring review
-  - Claude-style composer scroll-away behavior in tight vertical layouts
 - Packaging / extraction review
   - can the spike shell stand alone as a releasable component
   - can the harness consume it as an embedded package without tight coupling
   - what seams are required if it remains in-repo
-- Split-view inspector
 - Slash command UX with suggestions
 - History recall semantics for tokenized input
 - Empty/loading/error states
@@ -140,10 +134,9 @@ Not checked off yet:
 
 ## Current priority order
 
-1. Tool / permission event rendering in transcript *(partially finished — see "Partially checked off" for the open items)*
-2. Stop / retry / branch controls for streaming
-3. Split-view inspector
-4. Composer scroll-away behavior in tight vertical layouts
+1. Packaging / extraction review
+2. Slash command UX with suggestions
+3. History recall semantics for tokenized input
 
 ## Required before merging back to `main`
 
@@ -200,19 +193,27 @@ Current checkpoint state before the next test pass:
 - Composer input now has shell-style `Up` / `Down` command history on a
   single-line buffer; multi-line editing still uses arrows for cursor motion.
 - Inline tool / permission events are live: `/perm` triggers a request →
-  permission event, and `y` / `n` grant or deny while the input is empty.
-  Granted runs append `running` / `done` and stream a reply; denied runs
-  short-circuit with a trailing assistant note.
+  permission event, and the composer hosts the approval controls. `Left` /
+  `Right` select actions, `Enter` applies, and `y` / `n` still work as
+  fallback shortcuts while the input is empty. Permission target details now
+  render in the composer.
+- `Allow for session` now persists for the spike session and surfaces as
+  remembered policy state on repeated `/perm` requests for the same tool.
+- Multiple pending permissions can coexist. `Up` / `Down` switch which
+  pending request the composer is controlling.
+- `/perm` during an active stream now pauses streaming and surfaces the
+  permission immediately.
+- Inline expansion remains the chosen detail model for paste tokens in the
+  transcript. Split-view inspector work is deferred unless the inline model
+  proves insufficient.
+- Composer no longer snaps back into view just because the input has focus;
+  when the user scrolls up in a tight layout, the composer can scroll away
+  with the rest of the single scrolling surface.
 - Default session starts with an empty transcript. `/clear` on the default
   session also leaves the transcript empty.
 
 Immediate test targets after this checkpoint:
 
-- Interactive validation of the `/perm` flow (trigger, grant, deny, typing
-  does not grant, empty-transcript startup reads as expected).
-- Begin priority #2: stop / retry / branch controls for streaming.
-- Return to the remaining UI-side open items on the partial tool / permission
-  track (composer action-list design, keyboard cursor interaction, scope
-  affordance, parameter display, multi-pending interaction, mid-stream
-  interruption handling) as they come up, not as a blocking set. Leave the
-  production model refactor to the packaging phase.
+- Packaging / extraction review and componentization read-through.
+- Review the remaining backlog items through the componentization lens before
+  promoting any of them into required scope.

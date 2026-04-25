@@ -222,6 +222,34 @@ func TestSubmitAfterStopWithBacklogPreservesQueueOrder(t *testing.T) {
 	}
 }
 
+func TestEmptySubmitReleasesQueuedWorkWhenIdle(t *testing.T) {
+	app := New()
+	app.width = 120
+	app.height = 40
+	app.layout()
+	app.queuedSubmissions = []queuedSubmission{{content: "first queued"}, {content: "second queued"}}
+
+	cmd := app.submit()
+	if cmd == nil {
+		t.Fatal("expected empty submit to release queued work when idle")
+	}
+	if len(app.queuedSubmissions) != 0 {
+		t.Fatalf("expected queued submissions drained, got %d", len(app.queuedSubmissions))
+	}
+	if len(app.pendingSubmissions) != 0 {
+		t.Fatalf("expected pending submissions drained, got %d", len(app.pendingSubmissions))
+	}
+	if len(app.messages) < 2 {
+		t.Fatalf("expected released queued submission appended, got %d messages", len(app.messages))
+	}
+	if got := app.messages[len(app.messages)-2].content; got != "first queued\n\nsecond queued" {
+		t.Fatalf("expected merged queued content, got %q", got)
+	}
+	if !app.streaming {
+		t.Fatal("expected streaming restarted for released queued work")
+	}
+}
+
 func TestToolDemoSessionRendersEvents(t *testing.T) {
 	app := New()
 	app.seedWithSession("Tool Demo")
@@ -754,6 +782,28 @@ func TestRefreshTranscriptPreservesScrollOffsetWhenNotAtBottom(t *testing.T) {
 	}
 }
 
+func TestRefreshTranscriptPreservesScrollOffsetWithInputFocus(t *testing.T) {
+	app := New()
+	app.width = 120
+	app.height = 20
+	app.layout()
+	app.focus = focusInput
+	var msgs []message
+	for i := 0; i < 20; i++ {
+		msgs = append(msgs, message{role: "assistant", content: "line"})
+	}
+	app.messages = msgs
+	app.refreshTranscript()
+	app.transcript.SetYOffset(3)
+
+	app.input.SetValue("typing while scrolled up")
+	app.refreshTranscript()
+
+	if app.transcript.YOffset != 3 {
+		t.Fatalf("expected scroll offset preserved with input focus, got %d", app.transcript.YOffset)
+	}
+}
+
 func TestSubmittedPasteStartsExpandedInTranscript(t *testing.T) {
 	app := New()
 	app.width = 120
@@ -862,7 +912,7 @@ func TestPermCommandTriggersPendingPermission(t *testing.T) {
 
 	_ = app.submit()
 
-	if app.pendingPermission == nil {
+	if app.currentPendingPermission() == nil {
 		t.Fatal("expected pending permission after /perm")
 	}
 	if app.streaming {
@@ -878,6 +928,9 @@ func TestPermCommandTriggersPendingPermission(t *testing.T) {
 	if !strings.Contains(app.transcript.View(), "Approve once") || !strings.Contains(app.transcript.View(), "Allow for session") || !strings.Contains(app.transcript.View(), "Deny") {
 		t.Fatal("expected composer action list for permission controls")
 	}
+	if !strings.Contains(app.transcript.View(), "workspace/README.md") || !strings.Contains(app.transcript.View(), "Read a workspace file") {
+		t.Fatal("expected composer to show permission target details")
+	}
 }
 
 func TestPermGrantContinuesWithToolAndStream(t *testing.T) {
@@ -891,7 +944,7 @@ func TestPermGrantContinuesWithToolAndStream(t *testing.T) {
 	model, cmd := app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
 	next := model.(App)
 
-	if next.pendingPermission != nil {
+	if next.currentPendingPermission() != nil {
 		t.Fatal("expected pending permission cleared after grant")
 	}
 	if cmd == nil {
@@ -932,7 +985,7 @@ func TestPermDenyShortCircuitsWithoutStream(t *testing.T) {
 	model, cmd := app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
 	next := model.(App)
 
-	if next.pendingPermission != nil {
+	if next.currentPendingPermission() != nil {
 		t.Fatal("expected pending permission cleared after deny")
 	}
 	if cmd != nil {
@@ -973,7 +1026,7 @@ func TestYKeyDoesNotTriggerGrantWhenInputNonEmpty(t *testing.T) {
 	model, _ := app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
 	next := model.(App)
 
-	if next.pendingPermission == nil {
+	if next.currentPendingPermission() == nil {
 		t.Fatal("expected permission still pending when user is typing")
 	}
 }
@@ -988,7 +1041,7 @@ func TestInputAreaCanApprovePermissionWithEnter(t *testing.T) {
 
 	model, cmd := app.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	next := model.(App)
-	if next.pendingPermission != nil {
+	if next.currentPendingPermission() != nil {
 		t.Fatal("expected pending permission cleared after composer approval")
 	}
 	if cmd == nil || !next.streaming {
@@ -1011,11 +1064,46 @@ func TestInputAreaCanMoveAcrossPermissionActions(t *testing.T) {
 	model, _ = next.Update(tea.KeyMsg{Type: tea.KeyLeft})
 	next = model.(App)
 
-	if next.pendingPermission == nil {
+	if next.currentPendingPermission() == nil {
 		t.Fatal("expected permission to remain pending while moving action selection")
 	}
-	if next.pendingPermission.selectedAction != 1 {
-		t.Fatalf("expected selected action index 1, got %d", next.pendingPermission.selectedAction)
+	if next.currentPendingPermission().selectedAction != 1 {
+		t.Fatalf("expected selected action index 1, got %d", next.currentPendingPermission().selectedAction)
+	}
+}
+
+func TestAllowForSessionPersistsWithoutAutoAnsweringLaterPermRequests(t *testing.T) {
+	app := New()
+	app.width = 120
+	app.height = 40
+	app.layout()
+	app.input.SetValue("/perm")
+	_ = app.submit()
+
+	model, _ := app.Update(tea.KeyMsg{Type: tea.KeyRight})
+	next := model.(App)
+	model, cmd := next.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	next = model.(App)
+
+	if cmd == nil || !next.streaming {
+		t.Fatal("expected allow-for-session to begin streaming")
+	}
+	if !next.sessionAllowedTools["Read workspace/README.md"] {
+		t.Fatal("expected session policy recorded for tool")
+	}
+
+	next.stopStreaming()
+	next.input.SetValue("/perm")
+	cmd = next.submit()
+
+	if cmd != nil {
+		t.Fatal("expected repeated /perm to remain interactive, not auto-continue")
+	}
+	if next.currentPendingPermission() == nil {
+		t.Fatal("expected repeated /perm to surface a fresh pending permission")
+	}
+	if !strings.Contains(next.transcript.View(), "session policy active for this tool") {
+		t.Fatal("expected repeated /perm to show the persisted session-policy hint")
 	}
 }
 
@@ -1037,10 +1125,72 @@ func TestInputAreaCanDeny(t *testing.T) {
 	if cmd != nil {
 		t.Fatal("expected no stream when denying")
 	}
-	if next.pendingPermission != nil {
+	if next.currentPendingPermission() != nil {
 		t.Fatal("expected pending permission cleared after deny")
 	}
 	if got := next.messages[len(next.messages)-1].content; !strings.Contains(got, "Read request denied") {
 		t.Fatalf("expected deny assistant note, got %q", got)
+	}
+}
+
+func TestPermCommandCanQueueMultiplePendingPermissions(t *testing.T) {
+	app := New()
+	app.width = 120
+	app.height = 40
+	app.layout()
+
+	app.input.SetValue("/perm")
+	_ = app.submit()
+	app.input.SetValue("/perm")
+	_ = app.submit()
+
+	if got := len(app.pendingPermissions); got != 2 {
+		t.Fatalf("expected 2 pending permissions, got %d", got)
+	}
+	if !strings.Contains(app.transcript.View(), "pending  2 of 2") {
+		t.Fatal("expected composer to show active pending permission position")
+	}
+
+	model, _ := app.Update(tea.KeyMsg{Type: tea.KeyUp})
+	next := model.(App)
+	if next.activePermissionIndex != 0 {
+		t.Fatalf("expected to move to first pending permission, got index %d", next.activePermissionIndex)
+	}
+	if !strings.Contains(next.transcript.View(), "pending  1 of 2") {
+		t.Fatal("expected composer to update pending permission position after navigation")
+	}
+}
+
+func TestPermDuringStreamingPausesAndWaitsForApproval(t *testing.T) {
+	app := New()
+	app.width = 120
+	app.height = 40
+	app.layout()
+	app.input.SetValue("/demo")
+	cmd := app.submit()
+	if cmd == nil || !app.streaming {
+		t.Fatal("expected /demo to begin streaming")
+	}
+
+	app.input.SetValue("/perm")
+	cmd = app.submit()
+
+	if cmd != nil {
+		t.Fatal("expected /perm during streaming to pause for approval, not stream immediately")
+	}
+	if app.streaming {
+		t.Fatal("expected streaming paused while permission is pending")
+	}
+	if app.pausedResponse == nil || app.pausedResponse.remaining == "" {
+		t.Fatal("expected paused response state captured for later resume")
+	}
+	if app.currentPendingPermission() == nil {
+		t.Fatal("expected pending permission after mid-stream /perm")
+	}
+
+	model, resume := app.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	next := model.(App)
+	if resume == nil || !next.streaming {
+		t.Fatal("expected approval to resume streaming after mid-stream pause")
 	}
 }
