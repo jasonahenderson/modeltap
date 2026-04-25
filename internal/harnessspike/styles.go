@@ -127,8 +127,16 @@ var (
 	permissionPromptStyle = lipgloss.NewStyle().
 				Bold(true).
 				Foreground(lipgloss.Color("#F2CC60"))
+	permissionDetailsStyle = lipgloss.NewStyle().
+				Padding(0, 1)
+	permissionLabelStyle = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(lipgloss.Color("#F5F7FB"))
 	permissionMetaStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#8EA2BC"))
+	permissionGrantedMetaStyle = lipgloss.NewStyle().
+					Foreground(lipgloss.Color("#7EE787")).
+					Bold(true)
 	permissionActionStyle = lipgloss.NewStyle().
 				Padding(0, 1).
 				Background(lipgloss.Color("#1D2631")).

@@ -117,9 +117,15 @@ type queuedSubmission struct {
 type pendingPermission struct {
 	eventIndex     int
 	toolLabel      string
+	toolTarget     string
+	toolSummary    string
 	grantText      string
 	denyText       string
 	selectedAction int
+}
+
+type pausedResponse struct {
+	remaining string
 }
 
 type App struct {
@@ -164,7 +170,10 @@ type App struct {
 	historyIndex   int
 	historyDraft   string
 
-	pendingPermission *pendingPermission
+	pendingPermissions    []pendingPermission
+	activePermissionIndex int
+	sessionAllowedTools   map[string]bool
+	pausedResponse        *pausedResponse
 }
 
 func New() App {
@@ -226,6 +235,7 @@ func New() App {
 				},
 			},
 		},
+		sessionAllowedTools: map[string]bool{},
 	}
 	app.transcript.MouseWheelEnabled = true
 	app.transcript.MouseWheelDelta = 3
@@ -290,7 +300,7 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.syncInputHeight()
 			a.refreshTranscript()
 			return a, nil
-		case msg.Type == tea.KeyEnter && a.focus == focusInput && a.pendingPermission != nil && a.input.Value() == "":
+		case msg.Type == tea.KeyEnter && a.focus == focusInput && a.currentPendingPermission() != nil && a.input.Value() == "":
 			return a, a.activatePendingPermission()
 		case msg.Type == tea.KeyEnter && a.focus == focusInput:
 			cmd := a.submit()
@@ -300,9 +310,17 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.syncInputHeight()
 			a.refreshTranscript()
 			return a, nil
+		case msg.Type == tea.KeyUp && a.focus == focusInput && a.input.Value() == "":
+			if a.movePendingPermission(-1) {
+				return a, nil
+			}
 		case msg.Type == tea.KeyUp && a.focus == focusInput && !strings.Contains(a.input.Value(), "\n"):
 			a.recallPreviousCommand()
 			return a, nil
+		case msg.Type == tea.KeyDown && a.focus == focusInput && a.input.Value() == "":
+			if a.movePendingPermission(1) {
+				return a, nil
+			}
 		case msg.Type == tea.KeyDown && a.focus == focusInput && !strings.Contains(a.input.Value(), "\n"):
 			a.recallNextCommand()
 			return a, nil
@@ -314,9 +332,9 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if a.movePermissionAction(1) {
 				return a, nil
 			}
-		case a.pendingPermission != nil && a.focus == focusInput && a.input.Value() == "" && (msg.String() == "y" || msg.String() == "Y"):
+		case a.currentPendingPermission() != nil && a.focus == focusInput && a.input.Value() == "" && (msg.String() == "y" || msg.String() == "Y"):
 			return a, a.grantPermission(false)
-		case a.pendingPermission != nil && a.focus == focusInput && a.input.Value() == "" && (msg.String() == "n" || msg.String() == "N"):
+		case a.currentPendingPermission() != nil && a.focus == focusInput && a.input.Value() == "" && (msg.String() == "n" || msg.String() == "N"):
 			return a, a.denyPermission()
 		case strings.ToLower(msg.String()) == "ctrl+b":
 			a.sidebarOpen = !a.sidebarOpen
@@ -619,9 +637,11 @@ func (a *App) layout() {
 	if bodyHeight < 6 {
 		bodyHeight = 6
 	}
-	a.input.SetWidth(max(mainWidth-4, 20))
+	transcriptInnerWidth := max(mainWidth-4, 20)
+	composerInnerWidth := max(transcriptInnerWidth-2, 18)
+	a.input.SetWidth(composerInnerWidth)
 	a.syncInputHeight()
-	a.transcript.Width = max(mainWidth-4, 20)
+	a.transcript.Width = transcriptInnerWidth
 	a.transcript.Height = bodyHeight
 	a.refreshTranscript()
 }
@@ -629,11 +649,19 @@ func (a *App) layout() {
 func (a *App) submit() tea.Cmd {
 	content := strings.TrimSpace(a.input.Value())
 	if content == "" && len(a.inputTokens) == 0 {
+		if !a.streaming && (len(a.queuedSubmissions) > 0 || len(a.pendingSubmissions) > 0) {
+			a.status = "Releasing queued follow-up"
+			a.refreshTranscript()
+			return a.releaseQueuedSubmission()
+		}
 		return nil
 	}
 	a.pushHistory(content)
 	a.focus = focusInput
 	a.input.Focus()
+	if content == "/perm" {
+		return a.beginPermissionDemo(content)
+	}
 	if a.streaming || len(a.queuedSubmissions) > 0 || len(a.pendingSubmissions) > 0 {
 		a.enqueueSubmission(content, a.inputTokens)
 		a.input.Reset()
@@ -652,9 +680,6 @@ func (a *App) submit() tea.Cmd {
 		a.status = "Transcript cleared"
 		a.refreshTranscript()
 		return nil
-	}
-	if content == "/perm" {
-		return a.beginPermissionDemo(content)
 	}
 	var submittedTokens []inputToken
 	if len(a.inputTokens) > 0 {
@@ -699,42 +724,65 @@ func (a *App) beginSubmission(content string, entries []string, submittedTokens 
 func (a *App) beginPermissionDemo(content string) tea.Cmd {
 	a.focus = focusInput
 	a.input.Focus()
+	a.pauseStreamingForPermission()
+	toolLabel := "Read workspace/README.md"
 	a.messages = append(a.messages,
 		message{role: "user", content: content},
-		message{role: "event", content: "Read workspace/README.md", eventState: "requested"},
+		message{role: "event", content: toolLabel, eventState: "requested"},
 		message{role: "event", content: "Permission required to read workspace file", eventState: "permission"},
 	)
-	a.pendingPermission = &pendingPermission{
-		eventIndex: len(a.messages) - 1,
-		toolLabel:  "Read workspace/README.md",
-		grantText:  "Read the README. The spike is iterating on a replacement harness shell with inline tool events, transcript scroll stability, and queued follow-up messages.",
-		denyText:   "Read request denied. Skipping summary without file access.",
-	}
+	a.pendingPermissions = append(a.pendingPermissions, pendingPermission{
+		eventIndex:  len(a.messages) - 1,
+		toolLabel:   toolLabel,
+		toolTarget:  "workspace/README.md",
+		toolSummary: "Read a workspace file to summarize the current harness spike state.",
+		grantText:   "Read the README. The spike is iterating on a replacement harness shell with inline tool events, transcript scroll stability, and queued follow-up messages.",
+		denyText:    "Read request denied. Skipping summary without file access.",
+	})
+	a.activePermissionIndex = len(a.pendingPermissions) - 1
 	a.input.Reset()
-	a.status = "Permission required"
+	if a.sessionAllowedTools[toolLabel] {
+		a.status = "Permission required (session policy active)"
+	} else if a.pausedResponse != nil {
+		a.status = "Streaming paused for permission"
+	} else {
+		a.status = "Permission required"
+	}
 	a.refreshTranscript()
 	return nil
 }
 
 func (a *App) grantPermission(sessionScope bool) tea.Cmd {
-	if a.pendingPermission == nil {
+	p, ok := a.removeActivePendingPermission()
+	if !ok {
 		return nil
 	}
-	p := *a.pendingPermission
-	a.pendingPermission = nil
+	if sessionScope {
+		a.sessionAllowedTools[p.toolLabel] = true
+	}
 	a.messages[p.eventIndex].eventState = "granted"
 	a.messages = append(a.messages,
 		message{role: "event", content: p.toolLabel, eventState: "running"},
 		message{role: "event", content: p.toolLabel, eventState: "done"},
-		message{role: "assistant", content: "", streaming: true},
 	)
-	a.streamQueue = splitForStreaming(p.grantText)
+	if a.currentPendingPermission() != nil {
+		a.status = fmt.Sprintf("Permission granted (%d still pending)", len(a.pendingPermissions))
+		a.refreshTranscript()
+		return nil
+	}
+	reply := p.grantText
+	if a.pausedResponse != nil && strings.TrimSpace(a.pausedResponse.remaining) != "" {
+		reply += "\n\n" + a.pausedResponse.remaining
+	}
+	a.pausedResponse = nil
+	a.messages = append(a.messages, message{role: "assistant", content: "", streaming: true})
+	a.streamQueue = splitForStreaming(reply)
 	a.streamDelay = 35 * time.Millisecond
 	a.streamPulse = 0
 	a.interruptArmed = false
 	a.streaming = true
 	if sessionScope {
-		a.status = "Approved for this session (demo)"
+		a.status = "Approved for this session"
 	} else {
 		a.status = "Preparing fake response"
 	}
@@ -743,12 +791,12 @@ func (a *App) grantPermission(sessionScope bool) tea.Cmd {
 }
 
 func (a *App) denyPermission() tea.Cmd {
-	if a.pendingPermission == nil {
+	p, ok := a.removeActivePendingPermission()
+	if !ok {
 		return nil
 	}
-	p := *a.pendingPermission
-	a.pendingPermission = nil
 	a.messages[p.eventIndex].eventState = "denied"
+	a.pausedResponse = nil
 	a.status = "Request denied"
 	a.messages = append(a.messages, message{role: "assistant", content: p.denyText})
 	a.refreshTranscript()
@@ -776,19 +824,20 @@ func (a *App) nextPulseCmd() tea.Cmd {
 func (a *App) refreshTranscript() {
 	followTail := a.transcript.AtBottom()
 	offset := a.transcript.YOffset
-	if a.focus == focusInput || a.transcript.TotalLineCount() == 0 {
+	if a.transcript.TotalLineCount() == 0 {
 		followTail = true
 	}
 	var b strings.Builder
 	a.transcriptRefs = nil
 	refCount := 0
+	contentWidth := max(a.transcript.Width-2, 10)
 	for i, msg := range a.messages {
 		if i > 0 {
 			b.WriteString("\n\n")
 		}
 		switch msg.role {
 		case "system":
-			b.WriteString(systemStyle.Render(msg.content))
+			b.WriteString(systemStyle.Width(contentWidth).Render(msg.content))
 		case "user":
 			var userBlock strings.Builder
 			if len(msg.entries) > 0 {
@@ -814,14 +863,14 @@ func (a *App) refreshTranscript() {
 				refCount++
 				userBlock.WriteString(a.renderTranscriptToken(msg, tokenIndex, tok, selected))
 			}
-			b.WriteString(userBodyStyle.Render(userBlock.String()))
+			b.WriteString(userBodyStyle.Width(contentWidth).Render(userBlock.String()))
 		case "event":
-			b.WriteString(renderEventMessage(msg))
+			b.WriteString(renderEventMessage(msg, contentWidth))
 		case "assistant":
 			label := fmt.Sprintf("%s  %s", a.modelName, statusDot(msg.streaming, a.streamPulse, a.interruptArmed))
-			b.WriteString(assistantLabelStyle.Render(label))
+			b.WriteString(assistantLabelStyle.Width(contentWidth).Render(label))
 			b.WriteString("\n")
-			b.WriteString(assistantBodyStyle.Render(msg.content))
+			b.WriteString(assistantBodyStyle.Width(contentWidth).Render(msg.content))
 		}
 	}
 	for _, queued := range a.queuedSubmissions {
@@ -877,13 +926,14 @@ func (a App) renderTranscriptToken(msg message, tokenIndex int, tok inputToken, 
 }
 
 func (a App) renderPermissionActions(selected bool) string {
-	if a.pendingPermission == nil {
+	p := a.currentPendingPermission()
+	if p == nil {
 		return ""
 	}
 	actions := []string{
-		a.renderPermissionAction("Approve once", selected && a.pendingPermission.selectedAction == 0),
-		a.renderPermissionAction("Allow for session", selected && a.pendingPermission.selectedAction == 1),
-		a.renderPermissionAction("Deny", selected && a.pendingPermission.selectedAction == 2),
+		a.renderPermissionAction("Approve once", selected && p.selectedAction == 0),
+		a.renderPermissionAction("Allow for session", selected && p.selectedAction == 1),
+		a.renderPermissionAction("Deny", selected && p.selectedAction == 2),
 	}
 	return permissionActionsStyle.Render(strings.Join(actions, " "))
 }
@@ -893,6 +943,25 @@ func (a App) renderPermissionAction(label string, active bool) string {
 		return permissionActionActiveStyle.Render(label)
 	}
 	return permissionActionStyle.Render(label)
+}
+
+func (a App) renderPermissionDetails() string {
+	p := a.currentPendingPermission()
+	if p == nil {
+		return ""
+	}
+	lines := []string{
+		permissionLabelStyle.Render(p.toolLabel),
+		permissionMetaStyle.Render("target  " + p.toolTarget),
+		permissionMetaStyle.Render(p.toolSummary),
+	}
+	if len(a.pendingPermissions) > 1 {
+		lines = append(lines, permissionMetaStyle.Render(fmt.Sprintf("pending  %d of %d", a.activePermissionIndex+1, len(a.pendingPermissions))))
+	}
+	if a.sessionAllowedTools[p.toolLabel] {
+		lines = append(lines, permissionGrantedMetaStyle.Render("session policy active for this tool"))
+	}
+	return permissionDetailsStyle.Render(strings.Join(lines, "\n"))
 }
 
 func (a App) renderQueuedSubmission(queued queuedSubmission) string {
@@ -1212,12 +1281,18 @@ func (a App) renderPreview() string {
 
 func (a App) renderInputSurface() string {
 	var b strings.Builder
-	if a.pendingPermission != nil {
+	if a.currentPendingPermission() != nil {
 		b.WriteString(permissionPromptStyle.Render("Permission required"))
+		b.WriteString("\n")
+		b.WriteString(a.renderPermissionDetails())
 		b.WriteString("\n")
 		b.WriteString(a.renderPermissionActions(a.focus == focusInput && a.input.Value() == ""))
 		b.WriteString("\n")
-		b.WriteString(permissionMetaStyle.Render("Left/Right select  Enter apply  y/n shortcuts while empty"))
+		meta := "Left/Right select  Enter apply"
+		if len(a.pendingPermissions) > 1 {
+			meta += "  Up/Down change request"
+		}
+		b.WriteString(permissionMetaStyle.Render(meta))
 		b.WriteString("\n\n")
 	}
 	if len(a.inputTokens) > 0 {
@@ -1841,7 +1916,7 @@ func summarizeQueuedToken(tok inputToken) string {
 	}
 }
 
-func renderEventMessage(msg message) string {
+func renderEventMessage(msg message, width int) string {
 	style := eventInfoStyle
 	switch msg.eventState {
 	case "requested":
@@ -1857,7 +1932,7 @@ func renderEventMessage(msg message) string {
 	case "denied":
 		style = eventDeniedStyle
 	}
-	return style.Render(msg.content)
+	return style.Width(width).Render(msg.content)
 }
 
 func (a *App) handlePreviewKey(msg tea.KeyMsg) tea.Cmd {
@@ -1918,15 +1993,16 @@ func (a *App) openSelectedTranscriptRef() tea.Cmd {
 }
 
 func (a *App) movePermissionAction(delta int) bool {
-	if a.pendingPermission == nil {
+	p := a.currentPendingPermission()
+	if p == nil {
 		return false
 	}
-	a.pendingPermission.selectedAction += delta
-	if a.pendingPermission.selectedAction < 0 {
-		a.pendingPermission.selectedAction = 0
+	p.selectedAction += delta
+	if p.selectedAction < 0 {
+		p.selectedAction = 0
 	}
-	if a.pendingPermission.selectedAction > 2 {
-		a.pendingPermission.selectedAction = 2
+	if p.selectedAction > 2 {
+		p.selectedAction = 2
 	}
 	a.status = "Permission action selected"
 	a.refreshTranscript()
@@ -1934,10 +2010,11 @@ func (a *App) movePermissionAction(delta int) bool {
 }
 
 func (a *App) activatePendingPermission() tea.Cmd {
-	if a.pendingPermission == nil {
+	p := a.currentPendingPermission()
+	if p == nil {
 		return nil
 	}
-	switch a.pendingPermission.selectedAction {
+	switch p.selectedAction {
 	case 0:
 		return a.grantPermission(false)
 	case 1:
@@ -1946,6 +2023,73 @@ func (a *App) activatePendingPermission() tea.Cmd {
 		return a.denyPermission()
 	default:
 		return nil
+	}
+}
+
+func (a *App) currentPendingPermission() *pendingPermission {
+	if len(a.pendingPermissions) == 0 {
+		return nil
+	}
+	if a.activePermissionIndex < 0 {
+		a.activePermissionIndex = 0
+	}
+	if a.activePermissionIndex >= len(a.pendingPermissions) {
+		a.activePermissionIndex = len(a.pendingPermissions) - 1
+	}
+	return &a.pendingPermissions[a.activePermissionIndex]
+}
+
+func (a *App) removeActivePendingPermission() (pendingPermission, bool) {
+	if len(a.pendingPermissions) == 0 {
+		return pendingPermission{}, false
+	}
+	if a.activePermissionIndex < 0 {
+		a.activePermissionIndex = 0
+	}
+	if a.activePermissionIndex >= len(a.pendingPermissions) {
+		a.activePermissionIndex = len(a.pendingPermissions) - 1
+	}
+	p := a.pendingPermissions[a.activePermissionIndex]
+	a.pendingPermissions = append(a.pendingPermissions[:a.activePermissionIndex], a.pendingPermissions[a.activePermissionIndex+1:]...)
+	if len(a.pendingPermissions) == 0 {
+		a.activePermissionIndex = 0
+	} else if a.activePermissionIndex >= len(a.pendingPermissions) {
+		a.activePermissionIndex = len(a.pendingPermissions) - 1
+	}
+	return p, true
+}
+
+func (a *App) movePendingPermission(delta int) bool {
+	if len(a.pendingPermissions) < 2 {
+		return false
+	}
+	a.activePermissionIndex += delta
+	if a.activePermissionIndex < 0 {
+		a.activePermissionIndex = 0
+	}
+	if a.activePermissionIndex >= len(a.pendingPermissions) {
+		a.activePermissionIndex = len(a.pendingPermissions) - 1
+	}
+	a.status = fmt.Sprintf("Pending permission %d of %d", a.activePermissionIndex+1, len(a.pendingPermissions))
+	a.refreshTranscript()
+	return true
+}
+
+func (a *App) pauseStreamingForPermission() {
+	if !a.streaming {
+		return
+	}
+	a.pausedResponse = &pausedResponse{
+		remaining: strings.Join(a.streamQueue, ""),
+	}
+	a.streaming = false
+	a.streamQueue = nil
+	a.interruptArmed = false
+	if len(a.messages) > 0 {
+		last := &a.messages[len(a.messages)-1]
+		if last.role == "assistant" && last.streaming {
+			last.streaming = false
+		}
 	}
 }
 
