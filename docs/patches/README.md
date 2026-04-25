@@ -19,6 +19,7 @@ Implementation-scoped work authorization documents. Patches are the lightweight 
 | [PATCH-0012](0012-lint-out-of-default-target.md) | Remove `lint` from the Makefile default target | proposed |
 | [PATCH-0013](0013-sqlite-busy-timeout.md) | Set SQLite `busy_timeout` on every pool connection | proposed |
 | [PATCH-0014](0014-bff-shutdown-waitgroup-race.md) | Fix BFF Server `sync.WaitGroup` race between accept and Shutdown | approved |
+| [PATCH-0015](0015-harness-shell-component-api.md) | Harness Shell Component API | approved |
 
 ## When to Use a Patch
 
