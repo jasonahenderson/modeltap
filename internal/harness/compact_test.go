@@ -122,7 +122,7 @@ func TestCompactHandler_IgnoresUnrelatedKeys(t *testing.T) {
 
 func TestApp_CompactCommand_NoSession(t *testing.T) {
 	app := NewApp(AppOptions{})
-	// no session id
+	app.state.SessionID = "" // simulate no active session
 	_, cmd := app.Update(SubmitMsg{IsCommand: true, Command: "compact"})
 	b, ok := drainCmdAny(cmd).(BannerMsg)
 	if !ok {

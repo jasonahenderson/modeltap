@@ -10,6 +10,7 @@ import (
 
 func TestApp_ShowCurrentSession(t *testing.T) {
 	app := NewApp(AppOptions{})
+	app.state.SessionID = "" // simulate fresh start with no session
 	_, cmd := app.Update(SubmitMsg{IsCommand: true, Command: "session"})
 	b, ok := drainCmdAny(cmd).(BannerMsg)
 	if !ok {
@@ -152,7 +153,7 @@ func TestApp_SessionClear_NoActiveSession(t *testing.T) {
 	fc := &fakeClient{}
 	conn := &fakeConn{client: fc}
 	app := NewApp(AppOptions{Conn: conn})
-	// no app.state.SessionID
+	app.state.SessionID = "" // simulate no active session
 
 	_, cmd := app.Update(SubmitMsg{IsCommand: true, Command: "session", CommandArgs: "clear"})
 	e := drainCmdAny(cmd).(SessionErrMsg)
