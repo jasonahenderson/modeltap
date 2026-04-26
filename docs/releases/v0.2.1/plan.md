@@ -63,15 +63,17 @@ See [track-a-harness-shell-componentization.md](track-a-harness-shell-componenti
 
 Per `.agents/process.md`, this release executes in three release-level phases:
 
-- **Phase 1 — Design (current):** design all WUs across the release. No code.
-- **Phase 2 — Review:** user-chosen HIL/design review of the completed designs.
-  No new designs. No code.
+- **Phase 1 — Design:** design all WUs across the release. No code.
+- **Phase 2 — Review (current):** user-chosen HIL/design review of the
+  completed designs. No new designs. No code.
 - **Phase 3 — Implementation:** implement all WUs in dependency-legal order.
 
-Current phase: **Phase 1 — Design.**
+Current phase: **Phase 2 — Review.**
 
-Pre-Phase-1 plan reviews have been commissioned and may be processed during
-Phase 1. Phase 2 remains reserved for review of the completed design set.
+Phase 1 closed on 2026-04-26 with all six WU designs complete and the
+pre-design plan reviews dispositioned. Phase 2 covers a full plan + design
+review pass. Reviews are commissioned to other models first; the human
+reviewer (HIL) processes review findings before Phase 3 begins.
 
 ### Phase 1 Completion Checklist
 
