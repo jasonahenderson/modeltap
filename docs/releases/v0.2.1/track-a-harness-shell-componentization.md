@@ -1,8 +1,8 @@
-# Track A: FEAT-0037 Harness Shell Componentization
+# Track A: FEAT-0014 Harness Shell Componentization
 
 **Release:** v0.2.1
 **WU Range:** WU-097 through WU-102 (6 work units)
-**Depends on:** FEAT-0037 accepted; PATCH-0015 approved; shell spike behavior established
+**Depends on:** FEAT-0014 accepted; PATCH-0015 approved; shell spike behavior established
 **Can parallelize with:** none
 
 ## Planning and Design
@@ -16,15 +16,16 @@ plan, then the detailed implementation design under that plan.
 
 Owns:
 
-- package split strategy
+- extraction seam map for `internal/harnessspike/`
 - migration sequencing from `internal/harnessspike/`
+- spike entanglement audit
+- demo/fake runtime destination decision
 - behavior-parity constraints
-- extraction seams and risk containment
-- host/runtime separation goals
+- risk containment
 
-**Done:** Accepted refactor plan identifies the package boundary, migration
-order, non-goals, and the exact parity rules the later design and
-implementation must preserve.
+**Done:** Accepted refactor plan identifies the extraction seams, migration
+order, demo/fake runtime destination, non-goals, and the exact parity rules
+the later design and implementation must preserve.
 
 ### WU-098: Shell Component API and Package-Boundary Design
 **Size:** Medium | **Dependencies:** WU-097 | **Parallelizes with:** WU-099
@@ -39,10 +40,12 @@ Owns:
 - transcript/composer/token/permission state boundaries
 - file/preview boundary from shell to host
 - serialization-friendly type strategy
+- concrete inheritance of `PATCH-0015` callback prohibition into typed structs,
+  IDs, and message shapes
 
 **Done:** A detailed design document specifies the component API, package
 structure, key types, ownership rules, and invariants required to preserve
-`FEAT-0037`.
+`FEAT-0014`.
 
 ### WU-099: Modeltap Host Adapter and Integration Design
 **Size:** Medium | **Dependencies:** WU-097 | **Parallelizes with:** WU-098
@@ -100,6 +103,10 @@ without reading the old spike implementation.
 
 Validate that componentization preserved the behavior contract.
 
+This WU intentionally runs after `WU-100`. The current spike behavior is the
+parity oracle, so the regression sweep is written against the extracted
+boundary rather than as a standard tester-first red phase.
+
 Owns:
 
 - parity tests for transcript/composer/queue behavior
@@ -117,4 +124,5 @@ regression during future extraction work.
 ```
 
 WU-101 runs alongside implementation once the API and host-adapter designs are
-accepted.
+accepted, but its deliverables must be reconciled once `WU-100` finalizes the
+actual exported names and event variants.
