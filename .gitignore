@@ -5,6 +5,10 @@ bin/
 *.dll
 *.so
 *.dylib
+/modeltap
+
+# Agent-team local worktrees
+.claude/worktrees/
 
 # Test and coverage
 *.test
