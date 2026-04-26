@@ -1,4 +1,4 @@
-# Implementation Plan: FEAT-0037 (Harness Conversation Shell) + PATCH-0015 (Harness Shell Component API)
+# Implementation Plan: FEAT-0014 (Harness Conversation Shell) + PATCH-0015 (Harness Shell Component API)
 
 ## Context
 
@@ -12,7 +12,7 @@ entered Phase 3 and established a more specific shell interaction contract:
 - composer-driven permission handling
 - inline paste expansion with file references previewed on demand
 
-That interaction contract now lives in `FEAT-0037`. The next step is not a UX
+That interaction contract now lives in `FEAT-0014`. The next step is not a UX
 redesign. It is behavior-preserving extraction of that shell into a reusable,
 well-documented component with a clean host/runtime API, as authorized by
 `PATCH-0015`.
@@ -31,7 +31,7 @@ This release covers:
 
 This release does not cover:
 
-- new shell UX beyond the current `FEAT-0037` behavior
+- new shell UX beyond the current `FEAT-0014` behavior
 - branch/retry semantics
 - production permission-object redesign beyond the agreed shell boundary
 - publishing the component as its own repository
@@ -39,7 +39,7 @@ This release does not cover:
 ## Approach
 
 **One track:**
-- **Track A** (6 WUs): FEAT-0037 shell componentization + PATCH-0015 API and docs work
+- **Track A** (6 WUs): FEAT-0014 shell componentization + PATCH-0015 API and docs work
 
 **Total: 6 work units (WU-097 through WU-102)**
 
@@ -55,7 +55,7 @@ This release does not cover:
 **Critical path:** 097 → 098/099 → 100 → 102. WU-101 runs from the accepted API
 and integration design and should complete before the release closes.
 
-## Track A: FEAT-0037 + PATCH-0015
+## Track A: FEAT-0014 + PATCH-0015
 
 See [track-a-harness-shell-componentization.md](track-a-harness-shell-componentization.md).
 
@@ -70,20 +70,32 @@ Per `.agents/process.md`, this release executes in three release-level phases:
 
 Current phase: **Phase 1 — Design.**
 
+Pre-Phase-1 plan reviews have been commissioned and may be processed during
+Phase 1. Phase 2 remains reserved for review of the completed design set.
+
 ### Phase 1 Completion Checklist
 
-- [ ] WU-097 design: refactor plan and migration sequencing
-- [ ] WU-098 design: shell component API and package boundary
-- [ ] WU-099 design: modeltap host adapter and integration
-- [ ] WU-100 design: behavior-preserving extraction implementation
-- [ ] WU-101 design: developer docs and embedding examples
-- [ ] WU-102 design: parity and regression verification
+- [x] WU-097 design: refactor plan and migration sequencing
+- [x] WU-098 design: shell component API and package boundary
+- [x] WU-099 design: modeltap host adapter and integration
+- [x] WU-100 design: behavior-preserving extraction implementation
+- [x] WU-101 design: developer docs and embedding examples
+- [x] WU-102 design: parity and regression verification
+
+### Review Gates
+
+- Pre-design plan reviews live under `docs/releases/v0.2.1/.reviews/` and may
+  update the release plan or early design artifacts during Phase 1.
+- Phase 2 begins only after every WU design in this release is complete.
+- Phase 2 closes only after the commissioned design-review artifacts are
+  recorded under `docs/releases/v0.2.1/.reviews/` and their findings are
+  dispositioned explicitly.
 
 ## Verification
 
 After all WUs complete:
 
-1. The extracted shell component preserves the current `FEAT-0037` behavior.
+1. The extracted shell component preserves the current `FEAT-0014` behavior.
 2. The component boundary is action/event oriented and avoids callback-shaped
    API contracts.
 3. The modeltap host adapter drives the extracted component without importing
