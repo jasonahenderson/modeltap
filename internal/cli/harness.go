@@ -251,17 +251,19 @@ func runHarness(cmd *cobra.Command, flags *harnessFlags) error {
 	defer cm.Disconnect()
 
 	// Resolve submit key from flags (none yet) → config → default.
+	// Default is Ctrl+Enter so Enter naturally inserts newlines in the
+	// textarea and Alt+Enter ambiguity is avoided.
 	effectiveSubmitKey := cfg.Harness.SubmitKey
 	if effectiveSubmitKey == "" {
-		effectiveSubmitKey = harness.SubmitKeyEnter
+		effectiveSubmitKey = harness.SubmitKeyCtrlEnter
 	}
-	// Validate; warn and fall back to enter on unknown.
+	// Validate; warn and fall back to ctrl+enter on unknown.
 	switch effectiveSubmitKey {
 	case harness.SubmitKeyEnter, harness.SubmitKeyCtrlEnter, harness.SubmitKeyEscEnter:
 		// ok
 	default:
-		fmt.Fprintf(os.Stderr, "Warning: unknown harness.submit_key %q, defaulting to enter\n", effectiveSubmitKey)
-		effectiveSubmitKey = harness.SubmitKeyEnter
+		fmt.Fprintf(os.Stderr, "Warning: unknown harness.submit_key %q, defaulting to ctrl+enter\n", effectiveSubmitKey)
+		effectiveSubmitKey = harness.SubmitKeyCtrlEnter
 	}
 
 	app := harness.NewApp(harness.AppOptions{

@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jasonahenderson/modeltap/internal/protocol"
 )
 
@@ -130,11 +131,13 @@ type AppState struct {
 }
 
 // NewAppState returns a freshly-initialized AppState with Mode set to
-// the default ModeBuild and Focus on the input area.
+// the default ModeBuild and Focus on the transcript so the user can
+// scroll history immediately on launch.
 func NewAppState() *AppState {
 	return &AppState{
-		Focus: InputFocus,
-		Mode:  protocol.ModeBuild,
+		Focus:     ViewportFocus,
+		Mode:      protocol.ModeBuild,
+		SessionID: uuid.NewString(),
 		ConnState: ConnStateInfo{
 			State: ConnStateDiscovering,
 		},

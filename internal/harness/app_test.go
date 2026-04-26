@@ -16,8 +16,8 @@ func TestNewApp_Defaults(t *testing.T) {
 	if app.state.Mode != protocol.ModeBuild {
 		t.Errorf("default Mode = %q, want build", app.state.Mode)
 	}
-	if app.state.Focus != InputFocus {
-		t.Errorf("default Focus = %v, want InputFocus", app.state.Focus)
+	if app.state.Focus != ViewportFocus {
+		t.Errorf("default Focus = %v, want ViewportFocus", app.state.Focus)
 	}
 	if app.state.ConnState.State != ConnStateDiscovering {
 		t.Errorf("initial ConnState = %q", app.state.ConnState.State)

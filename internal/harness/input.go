@@ -46,7 +46,7 @@ type InputArea struct {
 // remapping; today the App handles submit at the global key level.
 func NewInputArea(state *AppState) InputArea {
 	ta := textarea.New()
-	ta.Placeholder = "Type a message... (/help for commands, @file to attach)"
+	ta.Placeholder = "Type a message... (Ctrl+Enter to send, /help for commands, @file to attach)"
 	ta.Prompt = "❯ "
 	ta.ShowLineNumbers = false
 	ta.CharLimit = 0
