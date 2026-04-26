@@ -162,7 +162,7 @@ Future-feature confirmation (tracked under FEAT-0013 or successor):
 1. Which OpenHarness subsystems should be ported first — `coordinator/`, `memory/`, or `permissions/`?
 2. How much of the forward bet on orchestration-aware UI (the D2=4 score in O1) must be materialized before this ADR flips to `accepted`?
 3. When does orchestration-aware UI land — v0.2.0 or a later release?
-4. Should the selective porting of OpenHarness subsystems be treated as a feature spec (FEAT-0014+) or as an engineering strategy in the harness track?
+4. Should the selective porting of OpenHarness subsystems be treated as a future feature spec or as an engineering strategy in the harness track?
 
 ## Review Findings
 

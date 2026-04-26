@@ -8,7 +8,7 @@ the follow-on componentization work.
 ## What changed
 
 - Marked `PATCH-0015` approved and assigned it to `v0.2.1`
-- Marked `FEAT-0037` accepted
+- Marked `FEAT-0014` accepted
 - Added `docs/releases/v0.2.1/plan.md`
 - Added `docs/releases/v0.2.1/track-a-harness-shell-componentization.md`
 - Updated release indexing in `docs/releases/README.md`
@@ -19,7 +19,7 @@ the follow-on componentization work.
 componentization should not be added silently to that release. The shell
 componentization effort now has:
 
-- an accepted behavior target (`FEAT-0037`)
+- an accepted behavior target (`FEAT-0014`)
 - an approved implementation-scoped contract (`PATCH-0015`)
 - a separate patch release with its own phase state and WUs
 

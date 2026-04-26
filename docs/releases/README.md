@@ -8,7 +8,7 @@ This directory organizes implementation plans and delivery artifacts by semver r
 |---------|--------|-------|
 | [v0.1.0](v0.1.0/) | shipped | Proxy core, CLI, dashboard, service management |
 | [v0.2.0](v0.2.0/) | planning | BFF server + terminal harness (FEAT-0008, FEAT-0009) |
-| [v0.2.1](v0.2.1/) | planning | Harness conversation-shell componentization (FEAT-0037, PATCH-0015) |
+| [v0.2.1](v0.2.1/) | planning | Harness conversation-shell componentization (FEAT-0014, PATCH-0015) |
 
 ## Structure
 
@@ -81,6 +81,6 @@ Features are assigned to releases based on dependency chain and delivery priorit
 | FEAT-0011 (Knowledge Integration) | v0.3.0 or v0.4.0 | Planned |
 | FEAT-0012 (Skills) | v0.3.0 or v0.4.0 | Planned |
 | FEAT-0013 (Agent Teams) | v0.4.0+ | Planned |
-| FEAT-0037 (Harness Conversation Shell) | v0.2.1 | Planned |
+| FEAT-0014 (Harness Conversation Shell) | v0.2.1 | Planned |
 
 Release assignments for FEAT-0010+ are tentative and will be confirmed during their planning phase.

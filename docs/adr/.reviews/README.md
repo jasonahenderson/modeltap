@@ -57,7 +57,7 @@ Each findings file ends with a Dispositions table. One row per finding, tracking
 |----|----------|-------------|-----------|
 | F1 | blocking | accepted | Math corrected in commit abc123 |
 | F2 | significant | rejected | Scoring is intentional — see §"Why O1 beats O7" |
-| F3 | advisory | deferred | Tracked under FEAT-0014 |
+| F3 | advisory | deferred | Tracked under FEAT-NNNN |
 ```
 
 Disposition values are `accepted`, `rejected`, or `deferred`. Use `—` until resolved. Always include a rationale when the disposition is `rejected` or `deferred`; `accepted` rationales are optional but helpful.
