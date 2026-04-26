@@ -28,7 +28,7 @@ A terminal UI that connects to the modeltap server via the harness protocol (FEA
 This feature defines the terminal harness at the product and system level. The
 detailed interaction model for the primary conversation shell — transcript /
 composer layout, queue behavior, and permission-surface UX — is refined
-separately in FEAT-0037.
+separately in FEAT-0014.
 
 ## Key Capabilities
 
@@ -704,7 +704,7 @@ This feature can be built in parallel with FEAT-0008 (BFF Server). See FEAT-0008
 | Feature | Relationship |
 |---------|-------------|
 | FEAT-0008 (BFF Server) | FEAT-0008 defines the server-side protocol, routing, and session model the harness connects to. |
-| FEAT-0037 (Harness Conversation Shell) | FEAT-0037 is the canonical refinement for the main conversation-shell UX inside the broader terminal harness defined here. |
+| FEAT-0014 (Harness Conversation Shell) | FEAT-0014 is the canonical refinement for the main conversation-shell UX inside the broader terminal harness defined here. |
 
 ## Open Questions
 

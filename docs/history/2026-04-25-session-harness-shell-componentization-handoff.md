@@ -20,11 +20,11 @@ Further work should continue on the feature branch under `v0.2.1`.
 
 The accepted behavior target is:
 
-- `FEAT-0037` — [0037-harness-conversation-shell.md](../features/0037-harness-conversation-shell.md)
+- `FEAT-0014` — [0014-harness-conversation-shell.md](../features/0014-harness-conversation-shell.md)
 
 Important clarification:
 
-- parity is measured against the spike behavior captured in `FEAT-0037`
+- parity is measured against the spike behavior captured in `FEAT-0014`
 - parity is **not** measured against the currently broken `internal/harness`
   conversation UI
 
@@ -54,7 +54,7 @@ above are the concrete baseline for the conversation-shell behavior.
 
 ### Feature / patch / release docs
 
-- `docs/features/0037-harness-conversation-shell.md`
+- `docs/features/0014-harness-conversation-shell.md`
 - `docs/features/0009-terminal-harness.md`
 - `docs/features/README.md`
 - `docs/patches/0015-harness-shell-component-api.md`
@@ -86,7 +86,7 @@ above are the concrete baseline for the conversation-shell behavior.
 
 The release and artifact state after transfer should be:
 
-- `FEAT-0037` accepted
+- `FEAT-0014` accepted
 - `PATCH-0015` approved
 - `v0.2.1` created as a separate patch release
 - `v0.2.1` starts in **Phase 1 — Design**

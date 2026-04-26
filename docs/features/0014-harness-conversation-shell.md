@@ -1,5 +1,5 @@
 ---
-feature: FEAT-0037
+feature: FEAT-0014
 title: Harness Conversation Shell
 status: accepted
 date: 2026-04-24
@@ -12,7 +12,7 @@ adr-constraints:
   - ADR-0013: Terminal UI framework (Bubbletea from day one)
 ---
 
-# FEAT-0037: Harness Conversation Shell
+# FEAT-0014: Harness Conversation Shell
 
 ## Problem
 
@@ -372,7 +372,7 @@ semantics that any future configuration must preserve:
 
 | Feature | Relationship |
 |---------|-------------|
-| FEAT-0009 (Terminal Harness) | FEAT-0009 defines the harness at the product/system level. FEAT-0037 defines the canonical interaction model for the primary conversation shell inside that harness. |
+| FEAT-0009 (Terminal Harness) | FEAT-0009 defines the harness at the product/system level. FEAT-0014 defines the canonical interaction model for the primary conversation shell inside that harness. |
 
 ## Open Questions
 

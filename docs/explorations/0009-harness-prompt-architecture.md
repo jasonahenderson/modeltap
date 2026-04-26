@@ -119,5 +119,5 @@ The cheaper option: accept that FEAT-0009, FEAT-0012, FEAT-0013 will each invent
 2. In Phase 2 peer review of v0.2.0, flag FEAT-0009 / FEAT-0012 / FEAT-0013 for a cross-cutting consistency check against this exploration's composition contract.
 3. After Phase 2, decide whether to:
    - Promote the composition contract to an ADR (if the decision becomes constraining and hard to reverse), and/or
-   - Promote traffic hardening to a feature spec (likely FEAT-0014 or similar), separately from the composition work.
+   - Promote traffic hardening to a future feature spec, separately from the composition work.
 4. Do **not** treat this exploration as implementation authorization. No code changes until the downstream artifact exists.

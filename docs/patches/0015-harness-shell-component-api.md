@@ -2,7 +2,7 @@
 
 **Status:** approved
 **Date:** 2026-04-24
-**Related:** FEAT-0009, FEAT-0037
+**Related:** FEAT-0009, FEAT-0014
 **Branch:** patch/0015-harness-shell-component-api
 **Release:** v0.2.1
 
@@ -66,7 +66,7 @@ place or accidentally redesign behavior during refactoring.
 - [ ] Define permission request/decision boundary
 - [ ] Define queue, run, and permission lifecycle invariants
 - [ ] Ensure the API shape avoids callback/closure-based boundary contracts
-- [ ] Keep the contract aligned with FEAT-0037 behavior
+- [ ] Keep the contract aligned with FEAT-0014 behavior
 - [ ] Document how a host application instantiates, drives, and consumes the component
 - [ ] Document extraction seams required for moving the component into its own project later
 - [ ] Keep package boundaries clean enough that the component can be promoted out of the repo with minimal rewiring
