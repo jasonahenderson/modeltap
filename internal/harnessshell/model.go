@@ -180,6 +180,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, drainCmd)
 	}
 
+	// FEAT-0014 SC3: keep the persistent viewport's content in sync
+	// with the latest transcript state and apply followTail/scroll-
+	// preservation. View() then just renders m.state.transcript.View().
+	m.state.refresh()
+
 	return m, tea.Batch(cmds...)
 }
 
@@ -391,18 +396,84 @@ func (m *Model) drainPendingActions() tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-// View renders the current shell. Stage C projects shell-owned state into
-// [RenderInput], calls [Render], pipes the result string into a local copy
-// of the transcript viewport, and returns the viewport view. The viewport
-// copy isolates the per-frame [SetContent] mutation from the persisted
-// state in `m.state.transcript`, so View remains pure (no observable
-// mutation of `m`) per the [tea.Model] convention.
+// View renders the current shell. Returns the transcript viewport's
+// rendered string. [Model.Update] is responsible for keeping the
+// viewport's content in sync with the shell's transcript state via
+// [refresh] — View itself does no projection or content mutation, so
+// it remains pure under the [tea.Model] value-receiver convention.
 func (m Model) View() string {
-	in := m.toRenderInput()
-	result := Render(in)
+	return m.state.transcript.View()
+}
+
+// ViewportState is the read-only snapshot of the shell's transcript
+// viewport state. It reflects the scroll position the user would see
+// at this point in the Bubble Tea update loop.
+type ViewportState struct {
+	// YOffset is the current top-line offset into the rendered content.
+	// Zero when scrolled all the way to the top.
+	YOffset int
+	// AtBottom reports whether the viewport is currently following tail
+	// (additional content would auto-scroll into view).
+	AtBottom bool
+	// Width and Height are the viewport's current dimensions.
+	Width  int
+	Height int
+}
+
+// ViewportState returns a snapshot of the transcript viewport's current
+// scroll state. Reads from the persistent viewport that [refresh]
+// mutates each [Model.Update] tick.
+func (m Model) ViewportState() ViewportState {
 	vp := m.state.transcript
-	vp.SetContent(result.Content)
-	return vp.View()
+	return ViewportState{
+		YOffset:  vp.YOffset,
+		AtBottom: vp.AtBottom(),
+		Width:    vp.Width,
+		Height:   vp.Height,
+	}
+}
+
+// refresh re-projects shell state into [RenderInput], calls [Render],
+// and applies the resulting content to the persistent transcript
+// viewport with FEAT-0014 SC3 followTail semantics: if the user was
+// at the bottom (or no content existed), the viewport auto-scrolls
+// to the new bottom; otherwise the YOffset is preserved.
+//
+// refresh is called at the end of [Model.Update] so every state
+// change (transcript items, queue state, permission state, mouse
+// scroll, window resize) lands in the viewport before the next
+// [Model.View] call.
+func (s *state) refresh() {
+	in := stateToRenderInput(s)
+	result := Render(in)
+
+	// Save followTail and YOffset before SetContent so the
+	// invariants survive content size changes.
+	followTail := s.transcript.AtBottom() || s.transcript.TotalLineCount() == 0
+	savedOffset := s.transcript.YOffset
+
+	s.transcript.SetContent(result.Content)
+	s.transcriptRefs = nil
+	for _, ref := range result.TranscriptRefs {
+		s.transcriptRefs = append(s.transcriptRefs, TranscriptRef{
+			MessageIndex: ref.MessageIndex,
+			TokenIndex:   ref.TokenIndex,
+		})
+	}
+
+	if followTail {
+		s.transcript.GotoBottom()
+	} else {
+		s.transcript.SetYOffset(savedOffset)
+	}
+}
+
+// stateToRenderInput is the package-level analogue of [Model.toRenderInput]
+// used by [refresh] (which operates on the state pointer). Both call into
+// the same projection logic; the Model-receiver wrapper exists for
+// callers that already have a Model in hand.
+func stateToRenderInput(s *state) RenderInput {
+	return Model{state: *s}.toRenderInput()
 }
 
 // toRenderInput projects shell-owned state into the [RenderInput] consumed

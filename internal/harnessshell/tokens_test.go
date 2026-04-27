@@ -110,17 +110,14 @@ func TestTranscriptEnterTogglesPasteTokenExpansion(t *testing.T) {
 	}
 	m, _ = drainActions(t, m, enterKey())
 
-	// Focus transcript and let View build transcriptRefs.
+	// transcriptRefs are populated by refresh inside Update (post
+	// WU-107 refactor). Refresh already ran from the Enter dispatch
+	// above; we just need a selection.
 	m.state.focus = FocusTranscript
-	_ = m.View()
 	if len(m.state.transcriptRefs) == 0 {
-		// transcriptRefs is built during Render; the public View
-		// computes RenderInput from state but discards the rebuilt
-		// refs back into m. For the test we set it directly using
-		// the indices we know.
-		m.state.transcriptRefs = []TranscriptRef{{MessageIndex: 0, TokenIndex: 0}}
-		m.state.selectedTranscriptRef = 0
+		t.Fatalf("expected transcriptRefs populated by refresh after submit")
 	}
+	m.state.selectedTranscriptRef = 0
 
 	// Initially expanded (set by submit).
 	if !m.state.transcriptItems[0].Expanded["paste-1"] {
