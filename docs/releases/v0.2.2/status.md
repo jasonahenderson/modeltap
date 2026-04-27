@@ -1,9 +1,9 @@
 # v0.2.2 — Status
 
-**Current phase:** Phase 1 — Design (complete; awaiting Phase 2 review)
+**Current phase:** Phase 2 — Review (designs complete; awaiting reviewers)
 **Branch:** `spike/scrolling-surface-eval` inherited from v0.2.1;
 should retarget to a release branch before tagging
-**Phase 1 closed:** _pending explicit ADMIN commit; designs complete_
+**Phase 1 closed:** 2026-04-27
 **Phase 2 closed:** —
 **Phase 3 closed:** —
 
@@ -21,7 +21,7 @@ should retarget to a release branch before tagging
 
 ```
 Phase 1 (design) ──→ Phase 2 (review) ──→ Phase 3 (impl)
-       ✅                  ⚠ awaiting           ⚠ blocked
+       ✅                  ▶ active              ⚠ blocked
 ```
 
 Within Phase 3:

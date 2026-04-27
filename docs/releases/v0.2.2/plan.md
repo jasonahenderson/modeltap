@@ -155,6 +155,8 @@ v0.2.2 is complete when:
 
 ## Current phase
 
-**Phase 1 — Design (in progress).** All Phase 1 design docs land
-under `docs/releases/v0.2.2/designs/`. Phase 1 closure is an explicit
-`ADMIN:` commit per process Prime Directive #6.
+**Phase 2 — Review (in progress).** Phase 1 closed
+2026-04-27 with all three design bundles landed under
+`docs/releases/v0.2.2/designs/`. Phase 2 begins with the user
+deciding the review path (read directly, send to external models,
+or both); reviews land under `docs/releases/v0.2.2/.reviews/`.
