@@ -43,39 +43,101 @@ This release does not cover:
 
 ## Approach
 
-The release executes as a single track. There is no Phase 1 design
-gate because the design is the WU-099 Runtime contract that already
-shipped; the work is implementation-and-audit only.
+The release executes as a single track. Per
+`.agents/process.md` §"Release-Level Workflow", the three release
+phases apply:
 
-Work units (provisional, may shift after the audit):
+1. **Phase 1 — Design**: every WU produces a design doc under
+   `designs/`.
+2. **Phase 2 — Review**: user-chosen review of the Phase 1 designs.
+3. **Phase 3 — Implementation**: implement all WUs in dependency-
+   legal order.
 
-| WU | Title | Dependencies | Size | Notes |
-|----|-------|-------------|------|-------|
-| 103 | internal/harness audit and salvage report | — | M | Catalogs every file as keep / refactor / delete with Runtime method mapping. Deliverable is the audit doc; no code changes |
-| 104 | Concrete `harnesshost.Runtime` implementation | 103 | L | Production Runtime impl backed by surviving plumbing; tests against in-memory fakes for the BFF and tool layers |
-| 105 | Production conversation-shell CLI entrypoint | 104 | M | New CLI command (provisional name TBD: `modeltap shell` or `modeltap chat`) that constructs the Adapter + production Runtime and runs as tea.Program |
-| 106 | Plumbing cleanup | 104, 105 | M | Deletes anything 103 categorized as delete; renames or relocates anything 103 categorized as refactor |
-| 107 | WU-102 SC3 follow-up | — | S | View-side accessor for viewport state so the manual-scroll-preservation assertion lands as a real test |
+The current phase lives below; phase transitions are explicit
+`ADMIN:` commits.
 
-**Critical path:** 103 → 104 → 105 → 106. WU-107 runs in parallel with
-the rest.
+### Carried-over designs (still authoritative)
+
+v0.2.2 implementation builds on these accepted v0.2.1 designs without
+duplicating them:
+
+- [WU-098 Shell Component API and Package-Boundary Design](../v0.2.1/designs/2026-04-25-design-shell-component-api-098.md)
+  — defines the closed-typed action/event boundary
+  (`harnessshell.Action`, `harnessshell.HostEvent`,
+  `harnessshell.ActionMsg`). The new `Runtime` impl emits events that
+  satisfy this contract without redefining it.
+- [WU-099 Modeltap Host Adapter and Integration Design](../v0.2.1/designs/2026-04-25-design-host-adapter-integration-099.md)
+  — defines the `harnesshost.Runtime` interface that v0.2.2's WU-104
+  implements. Implementation strictly conforms; no new methods are
+  added to `Runtime` in v0.2.2 unless WU-104's design explicitly
+  amends WU-099 and that amendment is reviewed in Phase 2.
+
+### Work units
+
+| WU | Title | Dependencies | Size | Phase 1 design |
+|----|-------|-------------|------|----------------|
+| 103 | `internal/harness` audit and salvage report | — | M | [`designs/2026-04-27-design-harness-audit-103.md`](designs/2026-04-27-design-harness-audit-103.md) |
+| 104 | Concrete `harnesshost.Runtime` implementation | 103 | L | bundled with 105 + 106 in [`designs/2026-04-27-design-production-wiring-104-106.md`](designs/2026-04-27-design-production-wiring-104-106.md) |
+| 105 | Production conversation-shell CLI entrypoint | 104 | M | bundled, see above |
+| 106 | Plumbing cleanup | 104, 105 | M | bundled, see above |
+| 107 | WU-102 SC3 follow-up: viewport-state accessor | — | S | [`designs/2026-04-27-design-viewport-state-accessor-107.md`](designs/2026-04-27-design-viewport-state-accessor-107.md) |
+
+WU-104 / WU-105 / WU-106 share a contract surface (the `Runtime` impl
+and the production CLI together replace the deleted legacy harness;
+the cleanup that follows removes the files the audit categorized as
+delete). Per `.agents/process.md` §"Design Artifact Placement"
+("Bundle related WUs that share a contract surface"), they share one
+design document.
+
+WU-107 is independent — it adds a viewport-state accessor on
+`harnessshell.Model` and a parity test that uses it; no Runtime or
+CLI surface area is touched.
+
+**Critical path:** 103 → 104 → 105 → 106. WU-107 runs in parallel
+with the rest.
+
+### Phase 1 design checklist
+
+Phase 1 is complete when every WU has a design doc under
+`docs/releases/v0.2.2/designs/`:
+
+- ✅ WU-103: `2026-04-27-design-harness-audit-103.md`
+- ✅ WU-104 + WU-105 + WU-106: `2026-04-27-design-production-wiring-104-106.md`
+- ✅ WU-107: `2026-04-27-design-viewport-state-accessor-107.md`
 
 ## Risk register
 
-- **R1 — plumbing turns out wholly broken.** If 103 reveals that the
-  surviving `internal/harness/` files don't actually work end-to-end,
-  104 expands to "build a fresh Runtime impl from scratch with new
-  BFF connection / protocol / tool / context layers." That is a much
-  larger scope; 104 likely splits into per-subsystem WUs. The release
-  may slip or scope down to a subset of the FEAT-0014 boundary
-  (e.g., ship without MCP).
+- **R1 — plumbing turns out wholly broken.** If WU-103 audit's
+  optimism doesn't survive contact with WU-104 implementation, WU-104
+  expands to "build a fresh Runtime impl from scratch with new BFF
+  connection / protocol / tool / context layers." That is a much
+  larger scope; WU-104 likely splits into per-subsystem WUs. The
+  release may slip or scope down (e.g., ship without MCP).
+  Mitigation: WU-104's design explicitly identifies the order of
+  Runtime methods to land (`SubmitTurn` first, foundational; others
+  follow) so a partial impl can ship if the bottom of the plumbing
+  is unsound.
 - **R2 — partial salvage with awkward shape.** Some plumbing might
-  compile but couple awkwardly to the deleted App's tea.Msg lifecycle.
-  The audit must call this out and 104 either refactors the surviving
-  code to expose Go-native APIs or wraps it in shell-of-shell layers.
+  compile but couple awkwardly to the deleted App's `tea.Msg`
+  lifecycle. WU-104's design calls out the refactor seams (sync
+  helpers replacing `tea.Cmd`-returning App handlers).
 - **R3 — branch retarget still pending.** v0.2.1 was tagged on
   `spike/scrolling-surface-eval`. Before tagging v0.2.2 the branch
   should retarget; this is a TPM decision not blocking code work.
+- **R4 — interrupt RPC may not exist on the BFF.** WU-103 audit
+  flagged that `client.go`'s `ConnProtocolClient` interface didn't
+  show an explicit Interrupt method during the survey. WU-104 either
+  adds one (server-side change too) or surfaces
+  `RunFailedEvent{Message: "interrupt unsupported"}`. If a server-
+  side change is required, that bumps scope and may need an
+  ADR.
+- **R5 — MCP autostart side effects.** `mcp.go` orchestrates external
+  MCP processes. WU-104's design specifies when in the new Runtime's
+  lifecycle MCP starts; if the Runtime construction is too early,
+  bare `shell-demo` (which doesn't need MCP) starts spending wallclock
+  on MCP boot. Mitigation: lazy MCP start triggered only by
+  `DispatchCommand("/mcp ...")` or the first MCP-namespaced tool
+  call.
 
 ## Definition of done
 
@@ -90,3 +152,9 @@ v0.2.2 is complete when:
 4. Files categorized as delete in the audit are gone.
 5. WU-102 SC3 has a real automated assertion.
 6. Release tagged on a release branch (TPM decision pending).
+
+## Current phase
+
+**Phase 1 — Design (in progress).** All Phase 1 design docs land
+under `docs/releases/v0.2.2/designs/`. Phase 1 closure is an explicit
+`ADMIN:` commit per process Prime Directive #6.
