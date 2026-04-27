@@ -9,6 +9,8 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/jasonahenderson/modeltap/internal/harnessshell"
 )
 
 type focusZone int
@@ -821,74 +823,32 @@ func (a *App) nextPulseCmd() tea.Cmd {
 	})
 }
 
+// refreshTranscript projects spike-local App state into the new
+// harnessshell renderer (Stage A→B bridge per WU-100 §"Stage A → Stage B
+// bridge"). The spike retains ownership of the textarea and the viewport;
+// the renderer is pure and produces the conversation-surface content
+// string that the spike then sets onto a.transcript. Manual scroll
+// preservation, follow-tail behavior, and transcript-ref bookkeeping
+// remain shell-local during Stage B and continue to live here in the
+// spike wrapper.
 func (a *App) refreshTranscript() {
 	followTail := a.transcript.AtBottom()
 	offset := a.transcript.YOffset
 	if a.transcript.TotalLineCount() == 0 {
 		followTail = true
 	}
-	var b strings.Builder
+	in := a.toShellRenderInput()
+	result := harnessshell.Render(in)
 	a.transcriptRefs = nil
-	refCount := 0
-	contentWidth := max(a.transcript.Width-2, 10)
-	for i, msg := range a.messages {
-		if i > 0 {
-			b.WriteString("\n\n")
-		}
-		switch msg.role {
-		case "system":
-			b.WriteString(systemStyle.Width(contentWidth).Render(msg.content))
-		case "user":
-			var userBlock strings.Builder
-			if len(msg.entries) > 0 {
-				for idx, entry := range msg.entries {
-					if idx > 0 {
-						userBlock.WriteString("\n\n")
-					}
-					userBlock.WriteString("▎ " + entry)
-				}
-			} else if msg.content != "" {
-				userBlock.WriteString("▎ " + msg.content)
-			}
-			for tokenIndex, tok := range msg.tokens {
-				if userBlock.Len() > 0 {
-					userBlock.WriteString("\n")
-				}
-				if userBlock.Len() > 0 {
-					userBlock.WriteString("\n")
-				}
-				ref := transcriptRef{messageIndex: i, tokenIndex: tokenIndex}
-				a.transcriptRefs = append(a.transcriptRefs, ref)
-				selected := refCount == a.selectedTranscriptRef && a.focus == focusTranscript
-				refCount++
-				userBlock.WriteString(a.renderTranscriptToken(msg, tokenIndex, tok, selected))
-			}
-			b.WriteString(userBodyStyle.Width(contentWidth).Render(userBlock.String()))
-		case "event":
-			b.WriteString(renderEventMessage(msg, contentWidth))
-		case "assistant":
-			label := fmt.Sprintf("%s  %s", a.modelName, statusDot(msg.streaming, a.streamPulse, a.interruptArmed))
-			b.WriteString(assistantLabelStyle.Width(contentWidth).Render(label))
-			b.WriteString("\n")
-			b.WriteString(assistantBodyStyle.Width(contentWidth).Render(msg.content))
-		}
+	for _, r := range result.TranscriptRefs {
+		a.transcriptRefs = append(a.transcriptRefs, transcriptRef{messageIndex: r.MessageIndex, tokenIndex: r.TokenIndex})
 	}
-	for _, queued := range a.queuedSubmissions {
-		if b.Len() > 0 {
-			b.WriteString("\n\n")
-		}
-		b.WriteString(a.renderQueuedSubmission(queued))
-	}
-	if b.Len() > 0 {
-		b.WriteString("\n\n")
-	}
-	b.WriteString(a.renderComposerSurface())
 	if len(a.transcriptRefs) == 0 {
 		a.selectedTranscriptRef = 0
 	} else if a.selectedTranscriptRef >= len(a.transcriptRefs) {
 		a.selectedTranscriptRef = len(a.transcriptRefs) - 1
 	}
-	a.transcript.SetContent(b.String())
+	a.transcript.SetContent(result.Content)
 	if followTail {
 		a.transcript.GotoBottom()
 	} else {
@@ -896,100 +856,108 @@ func (a *App) refreshTranscript() {
 	}
 }
 
-func (a App) renderComposerSurface() string {
-	var b strings.Builder
-	b.WriteString(a.renderInputSurface())
-	b.WriteString("\n")
-	b.WriteString("\n")
-	b.WriteString(a.renderFooter(a.transcript.Width))
-	return composerBoxStyle.Render(b.String())
-}
-
-func (a App) renderTranscriptToken(msg message, tokenIndex int, tok inputToken, selected bool) string {
-	style := transcriptTokenStyle
-	if selected {
-		style = transcriptTokenActiveStyle
+// toShellRenderInput projects the spike's local App state into the
+// harnessshell.RenderInput struct consumed by harnessshell.Render. This
+// helper is the explicit Stage A→B bridge: subsequent stages will replace
+// this projection with shell-owned state on harnessshell.Model.
+func (a *App) toShellRenderInput() harnessshell.RenderInput {
+	in := harnessshell.RenderInput{
+		Width:                 a.transcript.Width,
+		ModelLabel:            a.modelName,
+		InputView:             a.input.View(),
+		SelectedToken:         a.selectedToken,
+		SelectedTranscriptRef: a.selectedTranscriptRef,
+		Focus:                 toShellFocus(a.focus),
+		Streaming:             a.streaming,
+		StreamPulse:           a.streamPulse,
+		InterruptArmed:        a.interruptArmed,
+		QueuedCount:           len(a.queuedSubmissions),
+		AgentCount:            len(a.agents),
 	}
-	var lines []string
-	lines = append(lines, style.Render(tok.label))
-	switch tok.kind {
-	case "paste":
-		if msg.expanded[tokenIndex] {
-			lines = append(lines, transcriptMetaStyle.Render(tok.payload))
-		} else {
-			lines = append(lines, transcriptMetaStyle.Render(summarizePasteToken(tok.payload)))
+	if len(a.messages) > 0 {
+		in.Messages = make([]harnessshell.RenderMessage, len(a.messages))
+		for i, m := range a.messages {
+			in.Messages[i] = toShellRenderMessage(m)
 		}
-	case "file":
-		lines = append(lines, transcriptMetaStyle.Render(tok.payload))
 	}
-	return transcriptTokenBlockStyle.Render(strings.Join(lines, "\n"))
-}
-
-func (a App) renderPermissionActions(selected bool) string {
-	p := a.currentPendingPermission()
-	if p == nil {
-		return ""
-	}
-	actions := []string{
-		a.renderPermissionAction("Approve once", selected && p.selectedAction == 0),
-		a.renderPermissionAction("Allow for session", selected && p.selectedAction == 1),
-		a.renderPermissionAction("Deny", selected && p.selectedAction == 2),
-	}
-	return permissionActionsStyle.Render(strings.Join(actions, " "))
-}
-
-func (a App) renderPermissionAction(label string, active bool) string {
-	if active {
-		return permissionActionActiveStyle.Render(label)
-	}
-	return permissionActionStyle.Render(label)
-}
-
-func (a App) renderPermissionDetails() string {
-	p := a.currentPendingPermission()
-	if p == nil {
-		return ""
-	}
-	lines := []string{
-		permissionLabelStyle.Render(p.toolLabel),
-		permissionMetaStyle.Render("target  " + p.toolTarget),
-		permissionMetaStyle.Render(p.toolSummary),
-	}
-	if len(a.pendingPermissions) > 1 {
-		lines = append(lines, permissionMetaStyle.Render(fmt.Sprintf("pending  %d of %d", a.activePermissionIndex+1, len(a.pendingPermissions))))
-	}
-	if a.sessionAllowedTools[p.toolLabel] {
-		lines = append(lines, permissionGrantedMetaStyle.Render("session policy active for this tool"))
-	}
-	return permissionDetailsStyle.Render(strings.Join(lines, "\n"))
-}
-
-func (a App) renderQueuedSubmission(queued queuedSubmission) string {
-	var block strings.Builder
-	block.WriteString(queuedLabelStyle.Render("queued"))
-	if len(queued.entries) > 0 {
-		for idx, entry := range queued.entries {
-			block.WriteString("\n")
-			if idx > 0 {
-				block.WriteString("\n")
+	if len(a.queuedSubmissions) > 0 {
+		in.Queued = make([]harnessshell.RenderQueued, len(a.queuedSubmissions))
+		for i, q := range a.queuedSubmissions {
+			in.Queued[i] = harnessshell.RenderQueued{
+				Content: q.content,
+				Tokens:  toShellRenderTokens(q.tokens),
+				Entries: q.entries,
 			}
-			block.WriteString("▎ " + entry)
 		}
-	} else if queued.content != "" {
-		block.WriteString("\n")
-		block.WriteString("▎ " + queued.content)
 	}
-	for _, tok := range queued.tokens {
-		if block.Len() > 0 {
-			block.WriteString("\n\n")
+	if len(a.inputTokens) > 0 {
+		in.InputTokens = toShellRenderTokens(a.inputTokens)
+	}
+	if p := a.currentPendingPermission(); p != nil {
+		in.PendingPermission = &harnessshell.RenderPendingPermission{
+			ToolLabel:       p.toolLabel,
+			ToolTarget:      p.toolTarget,
+			ToolSummary:     p.toolSummary,
+			SelectedAction:  p.selectedAction,
+			SessionPolicyOn: a.sessionAllowedTools[p.toolLabel],
+			PendingTotal:    len(a.pendingPermissions),
+			ActiveIndex:     a.activePermissionIndex,
 		}
-		block.WriteString(transcriptTokenBlockStyle.Render(strings.Join([]string{
-			transcriptTokenStyle.Render(tok.label),
-			transcriptMetaStyle.Render(summarizeQueuedToken(tok)),
-		}, "\n")))
+		// Per the spike's prior renderInputSurface rule, the active
+		// permission button is highlighted only when the composer is
+		// focused and its buffer is empty. The shell renderer takes
+		// this as a precomputed boolean.
+		in.PermissionComposerActive = a.focus == focusInput && a.input.Value() == ""
 	}
-	return queuedBodyStyle.Render(block.String())
+	return in
 }
+
+func toShellFocus(f focusZone) harnessshell.RenderFocus {
+	switch f {
+	case focusTranscript:
+		return harnessshell.RenderFocusTranscript
+	case focusSidebar:
+		return harnessshell.RenderFocusSidebar
+	default:
+		return harnessshell.RenderFocusInput
+	}
+}
+
+func toShellRenderMessage(m message) harnessshell.RenderMessage {
+	out := harnessshell.RenderMessage{
+		Role:       m.role,
+		Content:    m.content,
+		Streaming:  m.streaming,
+		Entries:    m.entries,
+		EventState: m.eventState,
+		Expanded:   m.expanded,
+	}
+	if len(m.tokens) > 0 {
+		out.Tokens = toShellRenderTokens(m.tokens)
+	}
+	return out
+}
+
+func toShellRenderTokens(tokens []inputToken) []harnessshell.RenderToken {
+	if len(tokens) == 0 {
+		return nil
+	}
+	out := make([]harnessshell.RenderToken, len(tokens))
+	for i, t := range tokens {
+		out[i] = harnessshell.RenderToken{
+			ID:      t.id,
+			Kind:    t.kind,
+			Label:   t.label,
+			Payload: t.payload,
+		}
+	}
+	return out
+}
+
+// Conversation-surface rendering (composer, transcript tokens, permission
+// controls, queued rows) moved to internal/harnessshell in Stage B of
+// WU-100. The spike retains only the host-side chrome below (sidebar,
+// header, overlays).
 
 func (a App) renderSidebar() string {
 	if !a.sidebarOpen {
@@ -1261,77 +1229,7 @@ func (a App) renderPreview() string {
 	if a.preview == nil {
 		return ""
 	}
-	var b strings.Builder
-	b.WriteString(dialogTitleStyle.Render(a.preview.title))
-	b.WriteString("\n")
-	b.WriteString(dialogDividerStyle.Render(strings.Repeat("─", 42)))
-	b.WriteString("\n")
-	b.WriteString(previewBodyStyle.Render(a.preview.content))
-	b.WriteString("\n\n")
-	b.WriteString(dialogHintStyle.Render(
-		lipgloss.JoinHorizontal(
-			lipgloss.Left,
-			keycapStyle.Render("Esc"),
-			" ",
-			dialogHintStyle.Render("close"),
-		),
-	))
-	return dialogBoxStyle.Render(b.String())
-}
-
-func (a App) renderInputSurface() string {
-	var b strings.Builder
-	if a.currentPendingPermission() != nil {
-		b.WriteString(permissionPromptStyle.Render("Permission required"))
-		b.WriteString("\n")
-		b.WriteString(a.renderPermissionDetails())
-		b.WriteString("\n")
-		b.WriteString(a.renderPermissionActions(a.focus == focusInput && a.input.Value() == ""))
-		b.WriteString("\n")
-		meta := "Left/Right select  Enter apply"
-		if len(a.pendingPermissions) > 1 {
-			meta += "  Up/Down change request"
-		}
-		b.WriteString(permissionMetaStyle.Render(meta))
-		b.WriteString("\n\n")
-	}
-	if len(a.inputTokens) > 0 {
-		for i, tok := range a.inputTokens {
-			style := tokenStyle
-			if i == a.selectedToken {
-				style = tokenActiveStyle
-			}
-			b.WriteString(style.Render(tok.label))
-			b.WriteString(" ")
-		}
-		b.WriteString("\n")
-		b.WriteString(tokenHintStyle.Render("Ctrl+P/Ctrl+N select token • Ctrl+O preview token"))
-		b.WriteString("\n")
-	}
-	b.WriteString(a.input.View())
-	return b.String()
-}
-
-func (a App) renderFooter(width int) string {
-	count := len(a.agents)
-	label := fmt.Sprintf("%d background agents running", count)
-	hint := "Ctrl+B sidebar  Ctrl+T agents  Ctrl+K palette"
-	if count == 1 {
-		label = "1 background agent running"
-	}
-	if a.focus == focusTranscript {
-		label += "  |  scroll: wheel/arrows  items: j/k  open: Enter"
-	}
-	if len(a.queuedSubmissions) > 0 {
-		label += fmt.Sprintf("  |  %d queued", len(a.queuedSubmissions))
-	}
-	left := footerStatusStyle.Render(label)
-	right := footerHintStyle.Render(hint)
-	space := width - lipgloss.Width(left) - lipgloss.Width(right) - 4
-	if space < 1 {
-		space = 1
-	}
-	return lipgloss.JoinHorizontal(lipgloss.Left, left, strings.Repeat(" ", space), right)
+	return harnessshell.RenderPreview(a.preview.title, a.preview.content)
 }
 
 func (a App) renderAgentList() string {
@@ -1892,49 +1790,6 @@ func (a *App) stopStreaming() {
 	a.refreshTranscript()
 }
 
-func summarizePasteToken(payload string) string {
-	lines := strings.Split(strings.TrimSpace(payload), "\n")
-	if len(lines) == 0 || lines[0] == "" {
-		return "empty paste"
-	}
-	summaryLines := min(len(lines), 3)
-	preview := strings.Join(lines[:summaryLines], " / ")
-	if len(lines) > summaryLines {
-		return fmt.Sprintf("%d lines: %s ...", len(lines), preview)
-	}
-	return fmt.Sprintf("%d lines: %s", len(lines), preview)
-}
-
-func summarizeQueuedToken(tok inputToken) string {
-	switch tok.kind {
-	case "paste":
-		return summarizePasteToken(tok.payload)
-	case "file":
-		return tok.payload
-	default:
-		return tok.label
-	}
-}
-
-func renderEventMessage(msg message, width int) string {
-	style := eventInfoStyle
-	switch msg.eventState {
-	case "requested":
-		style = eventRequestedStyle
-	case "permission":
-		style = eventPermissionStyle
-	case "running":
-		style = eventRunningStyle
-	case "done":
-		style = eventDoneStyle
-	case "granted":
-		style = eventGrantedStyle
-	case "denied":
-		style = eventDeniedStyle
-	}
-	return style.Width(width).Render(msg.content)
-}
-
 func (a *App) handlePreviewKey(msg tea.KeyMsg) tea.Cmd {
 	if a.preview == nil {
 		return nil
@@ -2145,16 +2000,6 @@ func splitForStreaming(s string) []string {
 		}
 	}
 	return out
-}
-
-func statusDot(streaming bool, pulse int, interruptArmed bool) string {
-	if streaming {
-		if interruptArmed {
-			return "press Esc again to interrupt"
-		}
-		return "working" + strings.Repeat(".", pulse)
-	}
-	return "done"
 }
 
 func clamp(v, lo, hi int) int {
