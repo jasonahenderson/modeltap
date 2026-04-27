@@ -296,6 +296,62 @@ func TestSubmissionFailedRemovesPlaceholder(t *testing.T) {
 	}
 }
 
+func TestEscArmsThenEmitsInterrupt(t *testing.T) {
+	m := newWithFixedClock()
+	m.state.input.SetValue("ping")
+	m, _ = drainActions(t, m, enterKey())
+	m, _ = drainActions(t, m, SubmissionAcceptedEvent{SubmissionID: "sub-1", RunID: "run-1"})
+	if !m.state.streaming {
+		t.Fatalf("streaming should be true after submit")
+	}
+
+	// First Esc arms the interrupt without emitting.
+	m, actions := drainActions(t, m, tea.KeyMsg{Type: tea.KeyEsc})
+	if len(actions) != 0 {
+		t.Fatalf("first Esc should not emit; got %d actions", len(actions))
+	}
+	if !m.state.interruptArmed {
+		t.Fatalf("first Esc should arm interrupt")
+	}
+	if m.state.statusKind != StatusInterruptArmed {
+		t.Fatalf("statusKind = %v, want StatusInterruptArmed", m.state.statusKind)
+	}
+
+	// Second Esc emits InterruptRunAction.
+	m, actions = drainActions(t, m, tea.KeyMsg{Type: tea.KeyEsc})
+	if len(actions) != 1 {
+		t.Fatalf("second Esc should emit 1 action, got %d", len(actions))
+	}
+	interrupt, ok := actions[0].(InterruptRunAction)
+	if !ok {
+		t.Fatalf("action[0] = %T, want InterruptRunAction", actions[0])
+	}
+	if interrupt.RunID != "run-1" {
+		t.Fatalf("interrupt RunID = %q, want %q", interrupt.RunID, "run-1")
+	}
+	if m.state.interruptArmed {
+		t.Fatalf("interruptArmed should reset after emit")
+	}
+
+	// The host then emits RunStoppedEvent which clears streaming and
+	// preserves any queued work per FEAT-0014.
+	m, _ = drainActions(t, m, RunStoppedEvent{RunID: "run-1", Reason: StopReasonInterrupt})
+	if m.state.streaming {
+		t.Fatalf("streaming should clear after RunStoppedEvent")
+	}
+}
+
+func TestEscWhileNotStreamingIsIgnored(t *testing.T) {
+	m := newWithFixedClock()
+	m, actions := drainActions(t, m, tea.KeyMsg{Type: tea.KeyEsc})
+	if len(actions) != 0 {
+		t.Fatalf("Esc while idle should not emit; got %d", len(actions))
+	}
+	if m.state.interruptArmed {
+		t.Fatalf("Esc while idle should not arm interrupt")
+	}
+}
+
 func TestRunDeltaWithoutCorrelationFallsBackToLastStreaming(t *testing.T) {
 	m := newWithFixedClock()
 	m.state.input.SetValue("ping")

@@ -189,6 +189,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // miss it returns (false, m, nil) so the caller can pass the key through
 // to the focused widget.
 func (m Model) handleKey(msg tea.KeyMsg) (bool, Model, tea.Cmd) {
+	if msg.Type == tea.KeyEsc && m.state.streaming {
+		if m.state.interruptArmed {
+			// Second Esc emits the interrupt; the host's RunStoppedEvent
+			// (or RunFailedEvent) intake clears streaming chrome and
+			// preserves the queue per FEAT-0014 ("stop does not
+			// auto-resume the stopped run").
+			m.state.pendingActions = append(m.state.pendingActions, InterruptRunAction{RunID: m.state.activeRunID})
+			m.state.interruptArmed = false
+			m.state.status = "Stopping run"
+			m.state.statusKind = StatusStreaming
+		} else {
+			m.state.interruptArmed = true
+			m.state.status = "Press Esc again to interrupt"
+			m.state.statusKind = StatusInterruptArmed
+		}
+		return true, m, nil
+	}
+
 	if msg.Type == tea.KeyTab {
 		m.state.focus = nextFocus(m.state.focus, m.state.sidebarOpen)
 		if m.state.focus == FocusInput {
