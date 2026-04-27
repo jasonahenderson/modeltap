@@ -13,8 +13,8 @@ before tagging; pending TPM decision)
 | 097 | Refactor Plan and Migration Sequencing | M | Done (Phase 1 design) | Deliverable is the design doc |
 | 098 | Shell Component API and Package-Boundary Design | M | Done (Phase 1 design) | Deliverable is the design doc |
 | 099 | Modeltap Host Adapter and Integration Design | M | Done (Phase 1 design) | Deliverable is the design doc |
-| 100 | Behavior-Preserving Shell Extraction Implementation | L | In progress | Stage A in flight |
-| 101 | Developer Documentation and Embedding Examples | M | In progress | Structural pass in flight |
+| 100 | Behavior-Preserving Shell Extraction Implementation | L | In progress | Stage A done (`1cb1eb4`); Stage B (rendering cutover) up next |
+| 101 | Developer Documentation and Embedding Examples | M | In progress | Structural pass done (`a40e4b9`); reconciliation pass after WU-100 cutover |
 | 102 | Parity and Regression Test Sweep | M | Up next | Starts after WU-100 cutover |
 
 ## Phase 3 dependency graph
@@ -32,20 +32,24 @@ deliverables are already present.
 
 ## Up next
 
-- **WU-100 Stage A** — introduce `internal/harnessshell` package skeleton with
-  mirror types from spike. No behavior change. Building blocks for later
-  stages.
-- **WU-101 structural pass** — three doc skeletons (`internal/harnessshell/README.md`,
-  `internal/harnesshost/README.md`, `docs/guides/harness-shell-embedding.md`)
-  with provisional names per WU-098/WU-099. Reconciled with final names after
-  WU-100 cutover.
+- **WU-100 Stage B** — move pure rendering/layout from spike into
+  `internal/harnessshell`. Use Stage A translation helpers as the
+  spike→shell-state bridge per the WU-100 design's Stage A→B bridge note.
+  Preserve scroll/focus invariants. The reusable package contains only
+  conversation-surface chrome (no sidebar/palette/agent overlays per HIL-001).
 
 ## In progress
 
-| Item | Owner | Started | Notes |
-|------|-------|---------|-------|
-| WU-100 Stage A | backend agent | 2026-04-26 | Type-duplication phase only |
-| WU-101 structural pass | docs agent | 2026-04-26 | Provisional names; reconciliation pass after WU-100 |
+(none — Stage B is queued for dispatch)
+
+## Done this phase
+
+- WU-100 Stage A (`1cb1eb4`) — `internal/harnessshell` skeleton with action/event
+  boundary types, state structs, and styles. Build clean, no
+  `internal/harness/theme` import.
+- WU-101 structural pass (`a40e4b9`) — `internal/harnessshell/README.md`,
+  `internal/harnesshost/README.md`, `docs/guides/harness-shell-embedding.md`
+  with 57 provisional placeholders to be reconciled after WU-100 cutover.
 
 ## Open items
 
