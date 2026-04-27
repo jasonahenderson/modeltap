@@ -173,6 +173,8 @@ Required assertions:
 - transcript and composer remain one scrolling surface
 - composer remains tail-mounted, not fixed
 - transcript lines wrap within viewport width
+- **incremental `RunDeltaEvent` output wraps within viewport width during
+  active streaming** (not just static transcript lines)
 - submitted user rows and queued rows preserve the shared `▎` marker model
 
 Primary sources:
@@ -200,9 +202,14 @@ Required assertions:
 - submit while streaming queues follow-up work
 - queued work stays visible
 - queue merge preserves FIFO order
+- multi-item queue release preserves FIFO across the
+  `pendingSubmissions` merge buffer (per WU-098 queue invariants)
 - empty `Enter` while idle releases queued work
 - interrupted runs do not auto-release queued work
 - normal completion does auto-release queued work
+- **end-to-end queue+interrupt sequence**: queue a follow-up during an active
+  stream, interrupt the stream, then idle-empty-`Enter` releases the queued
+  work (matches FEAT-0014 success criterion 4 verbatim)
 
 Primary sources:
 
@@ -253,11 +260,27 @@ Required assertions:
 - mid-stream permission requests pause the active stream and resume or end
   cleanly
 
+#### Mid-stream permission verification approach
+
+Mid-stream pause/resume is now adapter-driven (see WU-099 Mid-stream pause and
+stream buffering). A pure shell unit test cannot trigger the pause without a
+fake host. WU-102 therefore requires:
+
+- the test fake host must support **injecting `PermissionRequestedEvent`
+  while `RunDeltaEvent` deltas are actively in-flight**, so Layer 1 tests can
+  verify shell pause/render/resume state transitions
+- Layer 1 tests assert the shell pauses delta application and renders
+  composer permission controls
+- Layer 2 (host adapter) tests assert the adapter actually buffers
+  `RunDeltaEvent` forwarding while a permission is pending and replays the
+  buffer in arrival order on resolution
+
 Primary sources:
 
 - `FEAT-0014` success criteria 5, 6, and 7
 - permission tests in `app_test.go`
 - permission invariants in `WU-098`
+- adapter pause/resume contract in `WU-099`
 
 ### 7. Host integration contract
 
@@ -274,6 +297,30 @@ Primary sources:
 - `PATCH-0015`
 - `WU-098`
 - `WU-099`
+
+## Test Fake Host Capability Matrix
+
+The shell unit tests in Layer 1 depend on a fake host that can drive every
+shell-visible behavior the action/event boundary supports. WU-102's fake
+host must implement at least:
+
+| Capability | Why it's needed |
+|---|---|
+| Acknowledge submissions (`SubmissionAcceptedEvent`) | Verifies optimistic assistant-row reconciliation |
+| Reject submissions (`SubmissionFailedEvent`) | Verifies placeholder removal and failure rendering |
+| Start runs (`RunStartedEvent`) | Drives transition from submitted to streaming state |
+| Emit stream deltas (`RunDeltaEvent`) | Drives streaming-output wrap and follow-tail behavior |
+| Complete runs (`RunCompletedEvent`) | Drives queue auto-release path |
+| Stop runs (`RunStoppedEvent`) | Verifies interrupt-driven non-release of queue |
+| Fail runs (`RunFailedEvent`) | Verifies failure rendering without retry semantics |
+| Inject permissions mid-stream (`PermissionRequestedEvent`) | Required for FEAT-0014 success criterion 7 |
+| Resolve permissions (`PermissionResolvedEvent`) | Drives composer-controls clear and assistant-row update |
+| Provide preview payloads (`PreviewLoadedEvent`) | Drives file-token preview rendering |
+| Update host status (`HostStatusEvent` with `Kind`) | Drives chrome-state assertions |
+
+Capability anti-pattern: the fake host must not reach into shell-internal
+state to assert behavior. Tests should assert via shell action emissions and
+rendered view output only.
 
 ## Test Layout Proposal
 
@@ -322,6 +369,21 @@ Suggested files:
 5. run the parity sweep against the extracted package structure
 6. confirm that every `FEAT-0014` success criterion has at least one direct
    automated assertion
+
+### Test compatibility during cutover
+
+WU-100's "Test compatibility during cutover" rule is binding for WU-102:
+
+- the spike `app_test.go` is treated as a migration checklist, not as a
+  continuously-passing suite during cutover stages
+- new shell-package tests must be passing before any spike test is deleted
+- there are no type aliases bridging spike test names to shell-package names
+- the spike test file is allowed to be compile-broken on a per-stage basis
+
+WU-102's verification job is to confirm that, by Stage E completion, the
+spike test file holds only the cutover-compatibility checks listed below
+and that all migrated assertions are passing in their new shell-package or
+host-adapter homes.
 
 ## Regression Gates
 
