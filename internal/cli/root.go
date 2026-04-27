@@ -72,6 +72,7 @@ Key capabilities:
 		newStartCommand(),
 		newHarnessCommand(),
 		newHarnessSpikeCommand(),
+		newShellDemoCommand(),
 		newLogsCommand(),
 		newShowCommand(),
 		newExportCommand(),
