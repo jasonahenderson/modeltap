@@ -48,6 +48,12 @@ type Adapter struct {
 	// forwarding.
 	pendingPermissions map[string]struct{}
 	pauseBuffer        []harnessshell.RunDeltaEvent
+
+	// tokenAttachments correlates shell-emitted token IDs to the
+	// resolved Attachment so LoadPreviewAction can populate
+	// PreviewRequest.Path. Populated on dispatchSubmit (from
+	// Submission.Tokens). Per Codex #3 in the v0.2.2 Phase 2 review.
+	tokenAttachments map[string]Attachment
 }
 
 // AttachmentResolver translates a shell InputToken into an Attachment
@@ -93,6 +99,7 @@ func New(shell harnessshell.Model, runtime Runtime, opts ...Option) Adapter {
 		submissionToRun:    map[string]string{},
 		runToSubmission:    map[string]string{},
 		pendingPermissions: map[string]struct{}{},
+		tokenAttachments:   map[string]Attachment{},
 	}
 	for _, opt := range opts {
 		opt(&a)
@@ -263,6 +270,11 @@ func (a Adapter) dispatchSubmit(act harnessshell.SubmitTurnAction) tea.Cmd {
 			}
 		}
 		attachments = append(attachments, att)
+		// Record the resolved attachment by tokenID so a later
+		// LoadPreviewAction can populate PreviewRequest.Path.
+		if att.TokenID != "" {
+			a.tokenAttachments[att.TokenID] = att
+		}
 	}
 	req := SubmitRequest{
 		SubmissionID: sub.ID,
@@ -332,6 +344,13 @@ func (a Adapter) dispatchLoadPreview(act harnessshell.LoadPreviewAction) tea.Cmd
 	req := PreviewRequest{
 		TokenID: target.TokenID,
 		Source:  target.Source,
+	}
+	// Look up the resolved attachment recorded at submit time so the
+	// runtime has a path to read. Misses (token never submitted, or
+	// submitted before adapter construction) leave Path empty and
+	// the runtime returns a clear error.
+	if att, ok := a.tokenAttachments[target.TokenID]; ok {
+		req.Path = att.Path
 	}
 	return func() tea.Msg {
 		payload, err := runtime.LoadPreview(ctx, req)
