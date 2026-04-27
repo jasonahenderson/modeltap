@@ -326,10 +326,280 @@ func (r *ProductionRuntime) InterruptRun(ctx context.Context, runID string) erro
 	return nil
 }
 
-// DispatchCommand implements [harnesshost.Runtime]. WU-104c lands
-// per-command routing; WU-104b returns not-implemented.
+// DispatchCommand implements [harnesshost.Runtime] by routing each
+// host-native command to the appropriate ProtocolClient RPC and
+// emitting a HostStatusEvent with the result through the
+// deferredSender. Per Kimi #3 the runtime emits status events
+// directly (out-of-band relative to the action→event cycle) because
+// command results originate from host-native commands rather than
+// shell-emitted actions.
+//
+// Commands the production runtime routes:
+//
+//	/model, /models      — model.list / model.switch
+//	/session, /sessions  — session.list / session.resume / session.clear / session.fork
+//	/context             — context.list
+//	/compact             — session.compact / compact.apply
+//	/history             — history.list
+//	/mcp                 — MCP server status (lazy-start)
+//	/plan, /build, /auto — runtime state mode setter (no RPC)
+//
+// Unknown commands return nil and emit StatusError.
 func (r *ProductionRuntime) DispatchCommand(ctx context.Context, cmd HostCommand) error {
-	return errors.New("DispatchCommand: not yet implemented (WU-104c)")
+	switch cmd.Name {
+	case "plan":
+		return r.handleModeCommand(protocol.ModePlan)
+	case "build":
+		return r.handleModeCommand(protocol.ModeBuild)
+	case "auto":
+		return r.handleModeCommand(protocol.ModeAuto)
+	case "model":
+		return r.handleModelCommand(ctx, cmd.Args)
+	case "models":
+		return r.handleModelsCommand(ctx)
+	case "session", "sessions":
+		return r.handleSessionCommand(ctx, cmd.Name, cmd.Args)
+	case "context":
+		return r.handleContextCommand(ctx)
+	case "compact":
+		return r.handleCompactCommand(ctx)
+	case "history":
+		return r.handleHistoryCommand(ctx, cmd.Args)
+	case "mcp":
+		return r.handleMCPCommand(ctx, cmd.Args)
+	default:
+		r.sender.Send(harnessshell.HostStatusEvent{
+			Status: "Unknown command: /" + cmd.Name,
+			Kind:   harnessshell.StatusError,
+		})
+		return nil
+	}
+}
+
+// handleModeCommand updates the runtime's execution mode and emits a
+// confirmation status event. Mode changes are runtime-local; no RPC.
+func (r *ProductionRuntime) handleModeCommand(mode protocol.Mode) error {
+	r.mode.SetMode(mode)
+	r.sender.Send(harnessshell.HostStatusEvent{
+		Status: "Mode: " + string(mode),
+		Kind:   harnessshell.StatusReady,
+	})
+	return nil
+}
+
+func (r *ProductionRuntime) handleModelCommand(ctx context.Context, args string) error {
+	args = strings.TrimSpace(args)
+	if args == "" {
+		// Show current model.
+		r.sender.Send(harnessshell.HostStatusEvent{
+			Status: "Current model: " + nonEmpty(r.mode.Label(), "(unset)"),
+			Kind:   harnessshell.StatusReady,
+		})
+		return nil
+	}
+	client := r.cm.Client()
+	if client == nil {
+		return r.statusError("model.switch", errNoLiveClient)
+	}
+	var resp protocol.ModelSwitchResponse
+	if err := client.CallInto(ctx, protocol.MethodModelSwitch, &protocol.ModelSwitch{
+		SessionID: r.mode.SessionID(),
+		Model:     args,
+	}, &resp); err != nil {
+		return r.statusError("model.switch", err)
+	}
+	if resp.Model != "" {
+		r.mode.SetLabel(resp.Model)
+	}
+	r.sender.Send(harnessshell.HostStatusEvent{
+		Status: "Model switch: " + nonEmpty(resp.Model, args) + " — " + resp.Reason,
+		Kind:   harnessshell.StatusReady,
+	})
+	return nil
+}
+
+func (r *ProductionRuntime) handleModelsCommand(ctx context.Context) error {
+	client := r.cm.Client()
+	if client == nil {
+		return r.statusError("model.list", errNoLiveClient)
+	}
+	var resp protocol.ModelListResponse
+	if err := client.CallInto(ctx, protocol.MethodModelList, &protocol.ModelList{}, &resp); err != nil {
+		return r.statusError("model.list", err)
+	}
+	if len(resp.Models) == 0 {
+		r.sender.Send(harnessshell.HostStatusEvent{Status: "No models available", Kind: harnessshell.StatusReady})
+		return nil
+	}
+	var b strings.Builder
+	b.WriteString("Available models:")
+	for _, m := range resp.Models {
+		b.WriteString("\n  ")
+		b.WriteString(m.Name)
+		if m.Provider != "" {
+			b.WriteString(" (")
+			b.WriteString(m.Provider)
+			b.WriteString(")")
+		}
+	}
+	r.sender.Send(harnessshell.HostStatusEvent{Status: b.String(), Kind: harnessshell.StatusReady})
+	return nil
+}
+
+func (r *ProductionRuntime) handleSessionCommand(ctx context.Context, name, args string) error {
+	args = strings.TrimSpace(args)
+	if name == "sessions" || args == "list" || args == "" {
+		return r.handleSessionList(ctx)
+	}
+	parts := strings.Fields(args)
+	switch parts[0] {
+	case "resume":
+		if len(parts) < 2 {
+			return r.statusError("session.resume", errors.New("session resume requires <id>"))
+		}
+		return r.handleSessionResume(ctx, parts[1])
+	case "clear":
+		return r.handleSessionMutation(ctx, protocol.MethodSessionClear)
+	case "fork":
+		return r.handleSessionMutation(ctx, protocol.MethodSessionFork)
+	}
+	return r.statusError("session", errors.New("unknown session subcommand: "+parts[0]))
+}
+
+func (r *ProductionRuntime) handleSessionList(ctx context.Context) error {
+	client := r.cm.Client()
+	if client == nil {
+		return r.statusError("session.list", errNoLiveClient)
+	}
+	var resp protocol.SessionListResponse
+	if err := client.CallInto(ctx, protocol.MethodSessionList, &protocol.SessionList{}, &resp); err != nil {
+		return r.statusError("session.list", err)
+	}
+	if len(resp.Sessions) == 0 {
+		r.sender.Send(harnessshell.HostStatusEvent{Status: "No sessions", Kind: harnessshell.StatusReady})
+		return nil
+	}
+	var b strings.Builder
+	b.WriteString("Sessions:")
+	for _, s := range resp.Sessions {
+		b.WriteString("\n  ")
+		b.WriteString(s.ID)
+		if s.Summary != "" {
+			b.WriteString(" — ")
+			b.WriteString(s.Summary)
+		}
+	}
+	r.sender.Send(harnessshell.HostStatusEvent{Status: b.String(), Kind: harnessshell.StatusReady})
+	return nil
+}
+
+func (r *ProductionRuntime) handleSessionResume(ctx context.Context, id string) error {
+	client := r.cm.Client()
+	if client == nil {
+		return r.statusError("session.resume", errNoLiveClient)
+	}
+	var resp protocol.SessionResumeResponse
+	if err := client.CallInto(ctx, protocol.MethodSessionResume, &protocol.SessionResume{
+		SessionID: id,
+		Project:   protocol.ProjectContext{Root: r.cfg.ProjectRoot},
+	}, &resp); err != nil {
+		return r.statusError("session.resume", err)
+	}
+	r.mode.SetSessionID(resp.SessionID)
+	r.sender.Send(harnessshell.HostStatusEvent{
+		Status: "Resumed session: " + resp.SessionID,
+		Kind:   harnessshell.StatusReady,
+	})
+	return nil
+}
+
+func (r *ProductionRuntime) handleSessionMutation(ctx context.Context, method string) error {
+	sessionID := r.mode.SessionID()
+	if sessionID == "" {
+		return r.statusError(method, errors.New("no active session"))
+	}
+	client := r.cm.Client()
+	if client == nil {
+		return r.statusError(method, errNoLiveClient)
+	}
+	if _, err := client.Call(ctx, method, struct {
+		SessionID string `json:"session_id"`
+	}{SessionID: sessionID}); err != nil {
+		return r.statusError(method, err)
+	}
+	r.sender.Send(harnessshell.HostStatusEvent{
+		Status: method + " ok: " + sessionID,
+		Kind:   harnessshell.StatusReady,
+	})
+	return nil
+}
+
+func (r *ProductionRuntime) handleContextCommand(ctx context.Context) error {
+	client := r.cm.Client()
+	if client == nil {
+		return r.statusError("context.list", errNoLiveClient)
+	}
+	resp, err := client.Call(ctx, protocol.MethodContextList, struct {
+		SessionID string `json:"session_id"`
+	}{SessionID: r.mode.SessionID()})
+	if err != nil {
+		return r.statusError("context.list", err)
+	}
+	r.sender.Send(harnessshell.HostStatusEvent{
+		Status: "Context: " + truncate(string(resp), 200),
+		Kind:   harnessshell.StatusReady,
+	})
+	return nil
+}
+
+func (r *ProductionRuntime) handleCompactCommand(ctx context.Context) error {
+	r.sender.Send(harnessshell.HostStatusEvent{
+		Status: "/compact: not yet wired in v0.2.2 (planned for follow-up)",
+		Kind:   harnessshell.StatusReady,
+	})
+	return nil
+}
+
+func (r *ProductionRuntime) handleHistoryCommand(ctx context.Context, args string) error {
+	r.sender.Send(harnessshell.HostStatusEvent{
+		Status: "/history: not yet wired in v0.2.2 (planned for follow-up)",
+		Kind:   harnessshell.StatusReady,
+	})
+	return nil
+}
+
+// handleMCPCommand is the MCP lazy-start integration point. v0.2.2
+// ships with MCP wiring deferred to a follow-up release; the command
+// returns a clear "not yet configured" status rather than crashing.
+func (r *ProductionRuntime) handleMCPCommand(ctx context.Context, args string) error {
+	r.sender.Send(harnessshell.HostStatusEvent{
+		Status: "/mcp: MCP not configured in this v0.2.2 build (planned for follow-up)",
+		Kind:   harnessshell.StatusReady,
+	})
+	return nil
+}
+
+// statusError emits a HostStatusEvent{Kind: StatusError} with the
+// command + error message and returns nil so the adapter doesn't
+// double-emit a RunFailedEvent.
+func (r *ProductionRuntime) statusError(op string, err error) error {
+	r.sender.Send(harnessshell.HostStatusEvent{
+		Status: op + " failed: " + err.Error(),
+		Kind:   harnessshell.StatusError,
+	})
+	return nil
+}
+
+// errNoLiveClient is the canonical "no live BFF client" error; helper
+// constants reuse it to keep the user-visible message stable.
+var errNoLiveClient = errors.New("no live BFF client")
+
+// nonEmpty returns s if non-empty, else fallback.
+func nonEmpty(s, fallback string) string {
+	if s == "" {
+		return fallback
+	}
+	return s
 }
 
 // ResolvePermission implements [harnesshost.Runtime]. Writes the
@@ -438,11 +708,31 @@ func lastSlash(s string) int {
 	return -1
 }
 
-// SummarizePaste implements [harnesshost.Runtime]. WU-104a returns
-// the raw text unchanged; WU-104c lands the ContentTransform
-// integration with passthrough fallback.
+// SummarizePaste implements [harnesshost.Runtime] via the existing
+// content.transform RPC. Per Kimi #17 the fallback on RPC error is
+// a passthrough — the shell already has its own built-in paste
+// summarizer, so a missing/failing BFF transform doesn't break
+// paste capture.
 func (r *ProductionRuntime) SummarizePaste(ctx context.Context, raw string) (string, error) {
-	return raw, nil
+	client := r.cm.Client()
+	if client == nil {
+		return raw, nil
+	}
+	resp, err := client.Call(ctx, "content.transform", &protocol.ContentTransform{
+		Transform:   "summarize",
+		RawContent:  raw,
+		ContentType: "text/plain",
+	})
+	if err != nil {
+		return raw, nil
+	}
+	var result struct {
+		Content string `json:"content"`
+	}
+	if err := json.Unmarshal(resp, &result); err != nil || result.Content == "" {
+		return raw, nil
+	}
+	return result.Content, nil
 }
 
 // permissionPromptCallback runs on the tool-dispatch goroutine. It

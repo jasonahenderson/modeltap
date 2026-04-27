@@ -179,9 +179,17 @@ func TestProductionRuntimeWU104bWU104cStubs(t *testing.T) {
 	}
 	defer r.Close()
 
-	// WU-104c stubs:
-	if err := r.DispatchCommand(context.Background(), HostCommand{Name: "model"}); err == nil {
-		t.Fatalf("DispatchCommand should return not-implemented at WU-104b")
+	// DispatchCommand returns nil for known commands (status events
+	// surface result/errors via the sender). Unknown commands also
+	// return nil but emit StatusError.
+	if err := r.DispatchCommand(context.Background(), HostCommand{Name: "build"}); err != nil {
+		t.Fatalf("DispatchCommand mode change should not error, got %v", err)
+	}
+	if r.mode.CurrentMode() != protocol.ModeBuild {
+		t.Fatalf("mode = %v, want ModeBuild", r.mode.CurrentMode())
+	}
+	if err := r.DispatchCommand(context.Background(), HostCommand{Name: "definitely-unknown"}); err != nil {
+		t.Fatalf("DispatchCommand unknown command should not error (status event surfaces)")
 	}
 
 	// SummarizePaste passes through.
