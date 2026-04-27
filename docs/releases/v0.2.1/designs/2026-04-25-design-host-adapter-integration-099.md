@@ -26,12 +26,13 @@ callback-shaped API.
 
 `WU-099` defines the modeltap-specific side of that boundary.
 
-The complication is branch-local: the `feature/harness-shell-componentization`
-worktree does not contain the later `v0.2.0` harness/runtime line that will
-ultimately host the extracted shell. So this WU explicitly inventories that
-line from the sibling checkout at
-`/Users/jasonhenderson/Projects/jasonahenderson/modeltap` and uses it to
-define the host adapter plan.
+The integration inventory below was captured from `internal/harness/` on the
+`spike/scrolling-surface-eval` branch — the canonical home of the v0.2.0
+harness/runtime line. The Phase 1 design work was authored on the
+`feature/harness-shell-componentization` worktree, which did not yet contain
+that line, so the inventory is recorded here in full. Phase 3 implementation
+should rely on this in-doc inventory rather than reaching across local
+checkouts.
 
 ## Inventory From The Later Harness Line
 
@@ -207,8 +208,9 @@ This package is modeltap-specific and should contain:
   file preview / token inspection requests
 - `permissions.go`
   permission request origination and decision application
-- `projection.go`
+- `runtime_events.go`
   projection from modeltap connection/runtime messages into shell host events
+  (filename matches `WU-100`'s package-and-file plan)
 
 `WU-100` may collapse or rename files, but this separation of responsibilities
 should stand.
@@ -255,11 +257,16 @@ type Runtime interface {
     SubmitTurn(ctx context.Context, req SubmitRequest) (SubmitAccepted, error)
     InterruptRun(ctx context.Context, runID string) error
     DispatchCommand(ctx context.Context, cmd HostCommand) error
-    ResolvePermission(ctx context.Context, decision PermissionDecision) error
+    ResolvePermission(ctx context.Context, requestID string, decision PermissionDecision) error
     LoadPreview(ctx context.Context, req PreviewRequest) (PreviewPayload, error)
     SummarizePaste(ctx context.Context, raw string) (string, error)
 }
 ```
+
+The `requestID` argument on `ResolvePermission` carries the same identity
+used by WU-098's `ResolvePermissionAction.RequestID`. With multiple pending
+permissions, the host needs the request identity to apply the decision to
+the correct request.
 
 This is intentionally narrower than `ConnProtocolClient`. The adapter may use
 `ConnSurface`, `ContextManager`, tool services, and permission enforcement
@@ -323,16 +330,18 @@ Behavior:
 - emit explicit completion/failure host events so the shell can leave its
   armed-stop state deterministically
 
-### `RunShellCommandAction`
+### Shell-native commands (no action emission)
 
-Consumed by:
+Shell-native commands do not emit a host-bound action. They are dispatched
+inside the shell's update loop and the host adapter is not involved. There
+is no `RunShellCommandAction` type.
 
-- the shell itself, not the host adapter
-
-Examples:
+Examples handled entirely inside `internal/harnessshell`:
 
 - `/clear`
-- queue release on empty `Enter` while idle
+- queue release on empty `Enter` while idle (the trigger is shell-native; the
+  resulting submission crosses the boundary as `SubmitTurnAction` with
+  `Source = queue_release`, see WU-098)
 - transcript/token-local expansion or collapse actions
 
 Design rule:
@@ -524,10 +533,58 @@ The extracted design should replace that modal approach with:
 
 1. runtime/tool layer originates a permission request
 2. host adapter translates it into a shell `PermissionRequestedEvent`
-3. the shell renders the request in transcript history and composer controls
-4. user decision emits `ResolvePermissionAction`
-5. host adapter applies the decision to the runtime/tool layer
-6. host adapter emits `PermissionResolvedEvent` or failure
+3. if a run is currently streaming, the adapter pauses delta projection (see
+   "Mid-stream pause and stream buffering" below) before or alongside the
+   shell event so shell-visible behavior matches `FEAT-0014`
+4. the shell renders the request in transcript history and composer controls
+5. user decision emits `ResolvePermissionAction` carrying `RequestID` and
+   `Decision`
+6. host adapter applies the decision via `Runtime.ResolvePermission(ctx,
+   requestID, decision)`
+7. host adapter emits `PermissionResolvedEvent` (with `Message`) or a
+   resolution-failure event
+8. on resolution, the adapter resumes delta projection and replays any
+   buffered deltas
+
+### Mid-stream pause and stream buffering
+
+`FEAT-0014` requires that a permission request arriving during streaming
+pauses the active stream immediately and resumes only after approval. The
+spike implements this with a local stream queue (`pauseStreamingForPermission`
+saves remaining stream chunks into `pausedResponse`).
+
+After extraction, the shell no longer drives streaming directly — runtime
+deltas arrive via `RunDeltaEvent` projected by the adapter. The adapter is
+therefore responsible for the pause/resume effect:
+
+- on `PermissionRequestedEvent` while a run is active, the adapter stops
+  forwarding `RunDeltaEvent` to the shell and buffers any further runtime
+  deltas internally
+- on `PermissionResolvedEvent`, the adapter replays buffered deltas in
+  arrival order before resuming live forwarding
+- if the runtime/server itself naturally pauses streaming at the tool
+  boundary (so no further deltas arrive while the tool is awaiting approval),
+  the adapter's buffer remains empty — but the buffer logic must still exist,
+  because nothing in the boundary contract requires server-side pausing
+
+This places pause/resume semantics on the adapter rather than on the shell or
+the `Runtime` interface, keeping the shell unaware of streaming-pause
+mechanics and avoiding new mandatory `Runtime.PauseRun`/`ResumeRun` methods.
+
+### Post-permission message construction
+
+`PermissionResolvedEvent.Message` is the sole text appended to the assistant
+row on resolution. The adapter constructs it from the runtime tool result
+payload:
+
+- if the runtime returns plain text, the adapter forwards it verbatim
+- if the runtime returns a structured payload, the adapter renders a host-side
+  text projection (typical: a brief tool-result summary) and uses that
+- if the runtime returns no payload, the adapter falls back to a generic
+  granted/denied message
+
+The shell does not interpret structured runtime payloads itself; that logic
+stays adapter-side.
 
 ### Stable placeholder boundary
 
