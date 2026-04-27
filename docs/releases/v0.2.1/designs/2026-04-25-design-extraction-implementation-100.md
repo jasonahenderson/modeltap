@@ -41,7 +41,8 @@ and integration-level test layout.
 
 ## Extraction Outcome
 
-At the end of `WU-100`, the codebase should have three distinct layers:
+At the end of `WU-100`, the codebase should have three distinct layers and
+**no `internal/harnessspike` package**:
 
 1. `internal/harnessshell`
    Owns reusable shell state, Bubble Tea interaction rules, transcript/composer
@@ -50,15 +51,24 @@ At the end of `WU-100`, the codebase should have three distinct layers:
 2. `internal/harnesshost`
    Owns modeltap-specific integration between `internal/harnessshell` and the
    actual harness/runtime surfaces described in `WU-099`.
-3. `internal/harnessspike`
-   No longer owns the canonical shell implementation. It becomes either:
-   - a thin demo embedding of `internal/harnessshell` through a fake host, or
-   - a temporary compatibility wrapper during cutover.
+3. `internal/harnessdemo`
+   Owns the fake/demo runtime that drives the shell with synthetic events for
+   examples and test fixtures. This is the only post-extraction home for
+   shell-with-fake-data behavior.
+
+`internal/harnessspike` is deleted as part of this WU (Stage E). Its current
+roles split:
+
+- canonical shell logic → `internal/harnessshell`
+- fake reply generation, session presets, demo commands → `internal/harnessdemo`
+- the existing CLI demo entrypoint will be replaced/renamed during cutover;
+  the final command name is a Phase 3 implementation detail flagged in
+  `FEAT-0014`'s CLI section
+- cutover-only tests → `internal/harnesshost` integration tests per WU-102
 
 Per `WU-099`, fake/demo runtime behavior must not remain embedded in the
-reusable shell package. If a demo runtime remains useful after extraction, it
-must live beside the host adapter as a separate adapter-style package or thin
-spike host, not inside `internal/harnessshell`.
+reusable shell package. After Stage E the repo contains no package called
+"spike."
 
 ## Behavior Invariants To Preserve
 
@@ -136,26 +146,30 @@ Expected file split:
 - `submission.go`
   submit/interrupt/permission/preview orchestration against modeltap runtime
 
-### Spike compatibility package
+### Spike package deletion
 
-Retain `internal/harnessspike/`, but narrow it to compatibility/demo use.
+`internal/harnessspike/` is deleted at the end of this WU. There is no
+"narrowed" or "compatibility" variant in the final tree.
 
 Expected end state:
 
-- `internal/harnessspike/app.go` becomes a thin constructor/wrapper around
-  `internal/harnessshell` plus a fake/demo host adapter
-- spike-only presets, fake replies, or demo commands move out of the reusable
-  shell package
-- spike-owned tests become temporary compatibility tests only until `WU-102`
-  relocates parity coverage
+- `internal/harnessspike/` does not exist
+- fake/demo behavior (presets, fake replies, demo commands, fake stream
+  generation) lives in `internal/harnessdemo`
+- the demo CLI entrypoint imports `internal/harnessshell` + `internal/harnessdemo`
+  directly; the entrypoint name is a Phase 3 implementation detail
+- cutover-only tests live in `internal/harnesshost` integration tests per WU-102
+- spike test file is removed at the same time as the spike package; no aliases,
+  no forwards
 
 ### Movement rules
 
 - do not move modeltap runtime logic into `internal/harnessshell`
 - do not move fake reply generation into `internal/harnessshell`
 - do not keep callback-valued API seams between shell and host
-- do not let `internal/harnessspike` remain the source of truth for shell
-  behavior after cutover
+- do not preserve `internal/harnessspike` past Stage E for any reason — if a
+  capability needs to survive, it lives in `internal/harnessdemo`,
+  `internal/harnesshost`, or `internal/harnessshell` (whichever owns it)
 
 ## Extraction Sequence
 
@@ -324,19 +338,23 @@ Exit criteria:
 - modeltap can drive the shell with no direct import from `internal/harnessshell`
   into runtime-specific packages
 
-### Step 7: Cut `internal/harnessspike` over to embedding mode
+### Step 7: Delete `internal/harnessspike`
 
-- replace the spike’s monolithic app implementation with:
-  - a reusable shell model instance
-  - a fake/demo host adapter, if still needed
-  - thin Bubble Tea plumbing only
-- move fake reply generation, session presets, and demo-only commands into the
-  spike-side host or a sibling fake host package
-- ensure the spike package no longer duplicates shell logic already extracted
+- move any remaining fake reply generation, session presets, and demo-only
+  commands from the spike into `internal/harnessdemo`
+- relocate the cutover-only tests identified by WU-102 to
+  `internal/harnesshost` integration tests
+- replace or rename the existing `modeltap harness-spike` CLI entrypoint;
+  the demo CLI program becomes a thin client of `internal/harnessshell` +
+  `internal/harnessdemo` with a name decided during Phase 3 implementation
+- delete the `internal/harnessspike/` directory
 
 Exit criteria:
 
-- spike is now a client of the reusable shell, not its home
+- `internal/harnessspike` does not exist on disk
+- the demo CLI capability is preserved under a new entrypoint that imports
+  `internal/harnessshell` + `internal/harnessdemo` directly
+- no test or runtime file imports a path containing "harnessspike"
 
 ## Intermediate Compatibility Steps
 
@@ -381,11 +399,15 @@ Caveat:
 - bind the shell to `internal/harnesshost`
 - route all runtime effects through the host adapter
 
-### Stage E: Spike de-thickening
+### Stage E: Spike package deletion
 
-- delete or reduce duplicated spike-local shell logic
-- preserve only demo wiring, fake host behavior, and any explicitly
-  non-reusable spike surfaces
+- migrate any surviving demo wiring (presets, fake replies, demo commands)
+  from the spike into `internal/harnessdemo`
+- delete `internal/harnessspike/` entirely once nothing imports it
+- relocate Layer 3 cutover-only tests to `internal/harnesshost` per WU-102
+- replace or rename the `modeltap harness-spike` CLI entrypoint; the new
+  demo program imports `internal/harnessshell` + `internal/harnessdemo`
+  directly
 
 At each stage, the code must compile and the still-relevant parity tests must
 continue passing.
@@ -436,14 +458,24 @@ long-lived dual implementation.
 
 ### Spike cutover
 
-- once the shell package is canonical, reduce the spike package to one of:
-  - a demo application using a fake host
-  - a temporary compatibility launcher used only during parity transition
+- once the shell package is canonical, the spike package has no remaining
+  responsibilities beyond what `internal/harnessdemo` and `internal/harnesshost`
+  cover
+- the spike is deleted at Stage E end; there is no surviving "thin demo"
+  variant
 
 ### Deletion rule
 
-- do not delete spike compatibility code until the replacement package compiles
-  and the parity suite has equivalent coverage identified for `WU-102`
+- the spike package may be deleted only after:
+  - `internal/harnessshell` is the canonical implementation and compiles
+  - `internal/harnessdemo` provides the fake-runtime capability the spike
+    previously did
+  - `internal/harnesshost` integration tests cover what WU-102 Layer 3
+    requires
+  - the replacement CLI entrypoint exists or has been removed deliberately
+- if any of those preconditions fail, the spike removal is paused at the
+  appropriate stage rollback boundary, but the design intent remains
+  deletion (not retention)
 
 ## Risk Controls And Rollback Plan
 
@@ -505,7 +537,8 @@ Rollback boundaries should align to the compatibility stages:
 
 - `internal/harnessshell` is the canonical home of the extracted shell behavior
 - `internal/harnesshost` owns modeltap-specific integration
-- `internal/harnessspike` has been reduced to embedding/demo compatibility
+- `internal/harnessdemo` owns fake/demo runtime behavior
+- `internal/harnessspike` has been deleted
 - the extraction preserves the listed invariants
 - the implementation is concrete enough that `WU-102` can write parity and
   regression coverage against the new package structure without redesign work
@@ -514,8 +547,11 @@ Rollback boundaries should align to the compatibility stages:
 
 This implementation design intentionally leaves two follow-on expectations:
 
-- `WU-101` should document the final embedding shape after spike cutover, not
-  the temporary Stage B/C compatibility shims
-- `WU-102` should treat the current spike tests as the migration checklist and
-  redistribute them into shell-unit and host-integration coverage once
-  extraction lands
+- `WU-101` should document the final post-extraction architecture
+  (`internal/harnessshell` + `internal/harnesshost` + `internal/harnessdemo`),
+  not the temporary Stage B/C compatibility shims and not the deleted
+  `internal/harnessspike`
+- `WU-102` should treat the current spike tests as the migration checklist
+  and redistribute them into shell-unit and host-integration coverage once
+  extraction lands. Layer 3 tests live in `internal/harnesshost` integration
+  tests after Stage E, not in the deleted spike package
