@@ -6,9 +6,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/jasonahenderson/modeltap/internal/protocol"
 )
 
 // PlanStep records one tool call that would have run if the harness
@@ -112,36 +109,6 @@ func defaultPlanSummary(toolName string, input json.RawMessage) string {
 }
 
 // handleModeCommand handles /plan, /build, /auto. Each sets the mode
-// directly (no conn round-trip) and emits ModeChangeMsg which the
-// App Update handler already applies to AppState. Plan entry is
-// announced via a transient banner so the user knows the next tool
-// call won't execute.
-func (a *App) handleModeCommand(msg SubmitMsg) tea.Cmd {
-	var target protocol.Mode
-	switch strings.ToLower(msg.Command) {
-	case "plan":
-		target = protocol.ModePlan
-	case "build":
-		target = protocol.ModeBuild
-	case "auto":
-		target = protocol.ModeAuto
-	default:
-		return nil
-	}
-	return a.setMode(target)
-}
-
-// setMode is the shared entrypoint for both slash commands and
-// Ctrl+P. Idempotent — switching to the current mode is a no-op.
-func (a *App) setMode(m protocol.Mode) tea.Cmd {
-	if a.state.Mode == m {
-		return nil
-	}
-	banner := BannerMsg{
-		Text:     fmt.Sprintf("Mode: %s", m),
-		Duration: 3 * time.Second,
-	}
-	announce := func() tea.Msg { return banner }
-	change := func() tea.Msg { return ModeChangeMsg{Mode: m} }
-	return tea.Batch(change, announce)
-}
+// (App-coupled handleModeCommand / setMode removed in WU-106; mode
+// transitions in the post-extraction architecture flow through
+// internal/harnesshost.ProductionRuntime.DispatchCommand.)

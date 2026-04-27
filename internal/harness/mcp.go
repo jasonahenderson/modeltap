@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jasonahenderson/modeltap/internal/harness/tools"
 )
 
@@ -365,81 +364,6 @@ func (m *MCPManager) unwireLocked(s *managedServer) {
 	s.stop = nil
 }
 
-// -----------------------------------------------------------------------
-// /mcp slash command
-// -----------------------------------------------------------------------
-
-// MCPStatusLoadedMsg carries the snapshot shown by /mcp status.
-type MCPStatusLoadedMsg struct {
-	Servers []MCPServerStatus
-}
-
-// MCPReconnectedMsg fires when /mcp reconnect <name> completes.
-type MCPReconnectedMsg struct {
-	Name string
-}
-
-// MCPErrMsg carries failures from /mcp slash commands.
-type MCPErrMsg struct {
-	Command string
-	Err     error
-}
-
-// handleMCPCommand routes /mcp status and /mcp reconnect <name>.
-// Unknown forms produce a usage banner.
-func (a *App) handleMCPCommand(msg SubmitMsg) tea.Cmd {
-	args := strings.TrimSpace(msg.CommandArgs)
-	if a.mcp == nil {
-		return func() tea.Msg {
-			return BannerMsg{Text: "MCP manager not wired", Duration: 4 * time.Second}
-		}
-	}
-	parts := strings.SplitN(args, " ", 2)
-	sub := ""
-	if len(parts) > 0 {
-		sub = strings.ToLower(parts[0])
-	}
-	rest := ""
-	if len(parts) == 2 {
-		rest = strings.TrimSpace(parts[1])
-	}
-	switch sub {
-	case "", "status":
-		return func() tea.Msg { return MCPStatusLoadedMsg{Servers: a.mcp.Status()} }
-	case "reconnect":
-		if rest == "" {
-			return func() tea.Msg {
-				return BannerMsg{Text: "Usage: /mcp reconnect <server-name>", Duration: 4 * time.Second}
-			}
-		}
-		mgr := a.mcp
-		name := rest
-		return func() tea.Msg {
-			if err := mgr.Reconnect(context.Background(), name); err != nil {
-				return MCPErrMsg{Command: "mcp reconnect", Err: err}
-			}
-			return MCPReconnectedMsg{Name: name}
-		}
-	}
-	return func() tea.Msg {
-		return BannerMsg{Text: "Unknown /mcp subcommand: " + sub, Duration: 4 * time.Second}
-	}
-}
-
-// formatMCPStatus renders the /mcp status banner. Keeps each server
-// on its own line: "<name> [<state>] N tools" with an error line for
-// failed servers.
-func formatMCPStatus(servers []MCPServerStatus) string {
-	if len(servers) == 0 {
-		return "No MCP servers configured."
-	}
-	var b strings.Builder
-	fmt.Fprintf(&b, "MCP servers (%d):", len(servers))
-	for _, s := range servers {
-		fmt.Fprintf(&b, "\n  %s [%s] %d tools", s.Name, s.State, s.ToolCount)
-		if s.LastError != "" {
-			fmt.Fprintf(&b, " — %s", s.LastError)
-		}
-	}
-	return b.String()
-}
+// (App-coupled /mcp slash-command handler removed in WU-106;
+// internal/harnesshost.ProductionRuntime.DispatchCommand owns the
+// /mcp routing in the post-extraction architecture.)

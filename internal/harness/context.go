@@ -6,9 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jasonahenderson/modeltap/internal/harness/tools"
 	"github.com/jasonahenderson/modeltap/internal/protocol"
 )
@@ -152,86 +150,16 @@ func containsGlobMeta(ref string) bool {
 }
 
 // ContextListLoadedMsg fires when /context successfully fetches the
-// server-side context breakdown. The App surfaces a multi-line
-// banner.
-type ContextListLoadedMsg struct {
-	Response *protocol.ContextListResponse
-}
+// (Slash-command handlers and App-coupled helpers removed in WU-106.
+// ContextManager and FileAttacher remain; they're consumed directly
+// by internal/harnesshost.ProductionRuntime.)
 
-// ContextErrMsg carries a failure from /context.
-type ContextErrMsg struct {
-	Err error
-}
-
-// handleContextCommand dispatches /context (no args → list).
-func (a *App) handleContextCommand(msg SubmitMsg) tea.Cmd {
-	args := strings.TrimSpace(msg.CommandArgs)
-	if args != "" {
-		return func() tea.Msg {
-			return BannerMsg{
-				Text:     fmt.Sprintf("/context takes no arguments (got %q)", args),
-				Duration: 4 * time.Second,
-			}
-		}
+// nonEmpty returns s when non-empty, fallback otherwise. Survives
+// here (rather than moving with app.go) because context.go and
+// mcp_tool.go both depend on it for fallback strings.
+func nonEmpty(s, fallback string) string {
+	if s == "" {
+		return fallback
 	}
-	return a.dispatchContextList()
-}
-
-func (a *App) dispatchContextList() tea.Cmd {
-	conn := a.conn
-	sessionID := a.state.SessionID
-	return func() tea.Msg {
-		if sessionID == "" {
-			return ContextErrMsg{Err: errNoActiveSession}
-		}
-		if conn == nil {
-			return ContextErrMsg{Err: errNoConnection}
-		}
-		client := conn.Client()
-		if client == nil {
-			return ContextErrMsg{Err: errNotConnected}
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		resp, err := client.ContextList(ctx, sessionID)
-		if err != nil {
-			return ContextErrMsg{Err: err}
-		}
-		return ContextListLoadedMsg{Response: resp}
-	}
-}
-
-// formatContextList renders a multi-line banner summarizing files +
-// knowledge injections + token budget. Keeps rendering out of the
-// controller so the App can evolve the surface (dedicated pane,
-// sidebar) without rewriting the data path.
-func formatContextList(resp *protocol.ContextListResponse) string {
-	if resp == nil {
-		return "No context data."
-	}
-	var b strings.Builder
-	fmt.Fprintf(&b, "Context: %d tokens (%.0f%% of %d) — system prompt %d, injections %d",
-		resp.ContextTokens, resp.ContextPct*100, resp.ContextWindow,
-		resp.SystemPromptTokens, resp.KnowledgeInjectionTokens)
-	if len(resp.Files) > 0 {
-		b.WriteString("\nFiles:")
-		for _, f := range resp.Files {
-			stale := ""
-			if f.Stale {
-				stale = " [stale]"
-			}
-			fmt.Fprintf(&b, "\n  %s (%d bytes, turn %d)%s",
-				f.Path, f.SizeBytes, f.AttachedTurn, stale)
-		}
-	}
-	if len(resp.KnowledgeInjections) > 0 {
-		b.WriteString("\nKnowledge:")
-		for _, k := range resp.KnowledgeInjections {
-			fmt.Fprintf(&b, "\n  [%.2f] %s (%s)", k.Relevance, k.Summary, k.SourceDate)
-		}
-	}
-	if len(resp.PinnedItems) > 0 {
-		fmt.Fprintf(&b, "\nPinned: %s", strings.Join(resp.PinnedItems, ", "))
-	}
-	return b.String()
+	return s
 }

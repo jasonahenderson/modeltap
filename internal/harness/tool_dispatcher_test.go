@@ -264,11 +264,19 @@ func TestToolDispatcher_DuplicateToolCallID(t *testing.T) {
 	}
 }
 
-func TestToolDispatcher_AppStateAsModeReader(t *testing.T) {
-	// AppState itself implements ModeReader — verify that path works
-	// with a real state pointer and reflects mode changes.
-	state := NewAppState()
-	state.Mode = protocol.ModePlan
+// fakeModeReader is a minimal ModeReader for tests now that AppState
+// is gone (deleted in WU-106). harnesshost.runtimeState is the
+// production implementation; tests synthesize their own.
+type fakeModeReader struct {
+	mode protocol.Mode
+}
+
+func (f *fakeModeReader) CurrentMode() protocol.Mode { return f.mode }
+
+func TestToolDispatcher_ModeReaderIntegration(t *testing.T) {
+	// Verify ToolDispatcher reads CurrentMode via the ModeReader
+	// interface and reflects changes.
+	state := &fakeModeReader{mode: protocol.ModePlan}
 
 	registry := tools.NewRegistry()
 	registry.Register(&fakeTool{name: "Write", risk: tools.RiskWrite})
@@ -282,11 +290,11 @@ func TestToolDispatcher_AppStateAsModeReader(t *testing.T) {
 		Input: json.RawMessage(`{}`),
 	})
 	if d.Intercepted() != 1 {
-		t.Errorf("plan mode via AppState should intercept; intercepted=%d", d.Intercepted())
+		t.Errorf("plan mode should intercept; intercepted=%d", d.Intercepted())
 	}
 
 	// Flip to build and a second call should execute.
-	state.Mode = protocol.ModeBuild
+	state.mode = protocol.ModeBuild
 	_ = d.HandleToolCall(protocol.ToolCall{
 		ToolCallID: "tc2", Tool: "Write",
 		Input: json.RawMessage(`{}`),
