@@ -253,6 +253,11 @@ func (m Model) handleKey(msg tea.KeyMsg) (bool, Model, tea.Cmd) {
 	switch m.state.focus {
 	case FocusTranscript:
 		switch msg.Type {
+		case tea.KeyEnter:
+			if len(m.state.transcriptRefs) > 0 {
+				m.state.activateSelectedTranscriptRef()
+				return true, m, nil
+			}
 		case tea.KeyUp:
 			if len(m.state.transcriptRefs) > 0 {
 				m.state.moveTranscriptRef(-1)
