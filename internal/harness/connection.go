@@ -694,7 +694,7 @@ func (cm *ConnectionManager) HandleEvent(method string, params json.RawMessage) 
 				text = fmt.Sprintf("Context at %.0f%% — consider /compact", ev.ContextPct*100)
 			}
 		}
-		cm.sender.Send(BannerMsg{Text: text, Duration: 8 * time.Second})
+		cm.sender.Send(StatusUpdateMsg{Message: text})
 
 	case protocol.EventCompactNotice:
 		var ev protocol.CompactNotice
@@ -706,20 +706,19 @@ func (cm *ConnectionManager) HandleEvent(method string, params json.RawMessage) 
 				text = fmt.Sprintf("Auto-compacted: freed %d tokens", ev.TokensFreed)
 			}
 		}
-		cm.sender.Send(BannerMsg{Text: text, Duration: 5 * time.Second})
+		cm.sender.Send(StatusUpdateMsg{Message: text})
 
 	case protocol.EventCompactPlan:
 		// Compaction plan UI is WU-061 territory (still in design);
 		// surface the event as a transient banner so the user at
 		// least knows a plan arrived.
-		cm.sender.Send(BannerMsg{Text: "Compaction plan available — /compact to apply", Duration: 8 * time.Second})
+		cm.sender.Send(StatusUpdateMsg{Message: "Compaction plan available — /compact to apply"})
 
 	case protocol.EventKnowledgeHit:
 		var ev protocol.KnowledgeHit
 		if err := json.Unmarshal(params, &ev); err == nil && ev.Summary != "" {
-			cm.sender.Send(BannerMsg{
-				Text:     "Knowledge: " + ev.Summary,
-				Duration: 4 * time.Second,
+			cm.sender.Send(StatusUpdateMsg{
+				Message: "Knowledge: " + ev.Summary,
 			})
 		}
 
@@ -733,7 +732,7 @@ func (cm *ConnectionManager) HandleEvent(method string, params json.RawMessage) 
 			if text == "" {
 				text = "Server error"
 			}
-			cm.sender.Send(BannerMsg{Text: text, Duration: 8 * time.Second})
+			cm.sender.Send(StatusUpdateMsg{Message: text})
 		}
 
 	case protocol.EventStatusUpdate:

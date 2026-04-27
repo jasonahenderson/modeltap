@@ -274,11 +274,7 @@ func (d *ToolDispatcher) sendError(call protocol.ToolCall, reason string) error 
 	return d.sender.SendToolResult(ctx, result)
 }
 
-// AppState CurrentMode satisfies ModeReader. Declared here (not
-// model.go) so the accessor lives next to the only consumer.
-func (s *AppState) CurrentMode() protocol.Mode {
-	if s == nil {
-		return ""
-	}
-	return s.Mode
-}
+// (The AppState.CurrentMode helper was removed in WU-106 alongside
+// AppState itself. The new ProductionRuntime in
+// internal/harnesshost owns a runtimeState struct that satisfies
+// ModeReader directly.)

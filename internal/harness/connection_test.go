@@ -62,8 +62,8 @@ func (r *recordingSender) firstOfType(want any) (tea.Msg, bool) {
 			if v, ok := m.(ModelUpdateMsg); ok {
 				return v, true
 			}
-		case BannerMsg:
-			if v, ok := m.(BannerMsg); ok {
+		case StatusUpdateMsg:
+			if v, ok := m.(StatusUpdateMsg); ok {
 				return v, true
 			}
 		}
@@ -254,14 +254,14 @@ func TestHandleEvent_ModelSelected_SingleModel(t *testing.T) {
 	}
 }
 
-func TestHandleEvent_CompactSuggest_BannerMsg(t *testing.T) {
+func TestHandleEvent_CompactSuggest_StatusUpdateMsg(t *testing.T) {
 	sender := &recordingSender{}
 	cm := NewConnectionManager(ConnectionConfig{}, sender)
 
 	cm.HandleEvent(protocol.EventCompactSuggest, json.RawMessage(`{}`))
-	m := sender.waitFor(t, BannerMsg{}).(BannerMsg)
-	if m.Text == "" {
-		t.Errorf("BannerMsg empty")
+	m := sender.waitFor(t, StatusUpdateMsg{}).(StatusUpdateMsg)
+	if m.Message == "" {
+		t.Errorf("StatusUpdateMsg empty")
 	}
 }
 
@@ -293,9 +293,9 @@ func TestHandleEvent_CompactSuggest_WithPayload(t *testing.T) {
 		TurnID: "t1", ContextPct: 0.85, Threshold: 0.8, Message: "",
 	})
 	cm.HandleEvent(protocol.EventCompactSuggest, raw)
-	m := sender.waitFor(t, BannerMsg{}).(BannerMsg)
-	if !contains(m.Text, "85%") {
-		t.Errorf("banner should reference context pct; got %q", m.Text)
+	m := sender.waitFor(t, StatusUpdateMsg{}).(StatusUpdateMsg)
+	if !contains(m.Message, "85%") {
+		t.Errorf("banner should reference context pct; got %q", m.Message)
 	}
 }
 
@@ -307,9 +307,9 @@ func TestHandleEvent_CompactNotice(t *testing.T) {
 		TurnID: "t", TriggeredBy: "auto", TokensFreed: 4200,
 	})
 	cm.HandleEvent(protocol.EventCompactNotice, raw)
-	m := sender.waitFor(t, BannerMsg{}).(BannerMsg)
-	if !contains(m.Text, "4200") {
-		t.Errorf("banner should reference tokens freed; got %q", m.Text)
+	m := sender.waitFor(t, StatusUpdateMsg{}).(StatusUpdateMsg)
+	if !contains(m.Message, "4200") {
+		t.Errorf("banner should reference tokens freed; got %q", m.Message)
 	}
 }
 
@@ -318,9 +318,9 @@ func TestHandleEvent_CompactPlan(t *testing.T) {
 	cm := NewConnectionManager(ConnectionConfig{}, sender)
 
 	cm.HandleEvent(protocol.EventCompactPlan, json.RawMessage(`{}`))
-	m := sender.waitFor(t, BannerMsg{}).(BannerMsg)
-	if !contains(m.Text, "/compact") {
-		t.Errorf("banner should mention /compact; got %q", m.Text)
+	m := sender.waitFor(t, StatusUpdateMsg{}).(StatusUpdateMsg)
+	if !contains(m.Message, "/compact") {
+		t.Errorf("banner should mention /compact; got %q", m.Message)
 	}
 }
 
@@ -332,9 +332,9 @@ func TestHandleEvent_KnowledgeHit(t *testing.T) {
 		TurnID: "t", Summary: "prior discussion of FEAT-0008 reconnect", Relevance: 0.82,
 	})
 	cm.HandleEvent(protocol.EventKnowledgeHit, raw)
-	m := sender.waitFor(t, BannerMsg{}).(BannerMsg)
-	if !contains(m.Text, "prior discussion") {
-		t.Errorf("banner should include summary; got %q", m.Text)
+	m := sender.waitFor(t, StatusUpdateMsg{}).(StatusUpdateMsg)
+	if !contains(m.Message, "prior discussion") {
+		t.Errorf("banner should include summary; got %q", m.Message)
 	}
 }
 
@@ -350,9 +350,9 @@ func TestHandleEvent_Error(t *testing.T) {
 		},
 	})
 	cm.HandleEvent(protocol.EventError, raw)
-	m := sender.waitFor(t, BannerMsg{}).(BannerMsg)
-	if !contains(m.Text, "MT-PROV-001") || !contains(m.Text, "upstream refused") {
-		t.Errorf("banner should include diagnostic + message; got %q", m.Text)
+	m := sender.waitFor(t, StatusUpdateMsg{}).(StatusUpdateMsg)
+	if !contains(m.Message, "MT-PROV-001") || !contains(m.Message, "upstream refused") {
+		t.Errorf("banner should include diagnostic + message; got %q", m.Message)
 	}
 }
 

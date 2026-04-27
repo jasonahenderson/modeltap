@@ -196,13 +196,15 @@ func TestProjectModelContextCostUpdateAreHostStatus(t *testing.T) {
 }
 
 func TestProjectIgnoresUnrelatedMessages(t *testing.T) {
+	// After WU-106 the App-only msg types (BannerMsg, PasteDetectedMsg,
+	// etc.) are deleted; the projection layer continues to ignore any
+	// unknown type. We verify with a couple of tea.Msg shapes that
+	// don't match the runtime-event keep list.
 	for _, msg := range []interface{}{
-		harness.PasteDetectedMsg{Content: "x"},
-		harness.PasteResolvedMsg{Strategy: harness.PasteStrategyFull, Content: "x"},
-		harness.PasteSummarizeRequestMsg{Content: "x"},
-		harness.BannerMsg{Text: "hi"},
-		harness.BannerClearMsg{},
-		harness.TickMsg{},
+		struct{ unrelatedFooMsg int }{},
+		"plain string",
+		42,
+		nil,
 	} {
 		if got := projectRuntimeMessage(msg); got != nil {
 			t.Fatalf("projectRuntimeMessage(%T) = %T, want nil", msg, got)
