@@ -159,7 +159,7 @@ v0.2.2 is complete when:
 
 ## Current phase
 
-**Phase 2 — Review (complete).** Codex and Kimi reviews dispositioned
-2026-04-27; design docs revised to address every blocking and
-significant finding. Phase 2 closure is an explicit `ADMIN:` commit;
-Phase 3 implementation begins with WU-104a.
+**Phase 3 — Implementation (active).** WU-104a kicks off the slice;
+WU-107 runs in parallel as an independent unit. Implementation
+proceeds in dependency-legal order (104a → 104b → 104c, 105 after
+104a, 106 last).
