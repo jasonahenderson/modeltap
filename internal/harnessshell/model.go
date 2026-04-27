@@ -189,6 +189,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // miss it returns (false, m, nil) so the caller can pass the key through
 // to the focused widget.
 func (m Model) handleKey(msg tea.KeyMsg) (bool, Model, tea.Cmd) {
+	// Esc dismisses an open shell-local preview before reaching any
+	// other Esc handler. Mirrors the spike's overlay-dismiss
+	// precedence for the in-scope dialog.
+	if msg.Type == tea.KeyEsc && m.state.preview != nil {
+		m.state.preview = nil
+		m.state.status = "Preview closed"
+		return true, m, nil
+	}
+
 	if msg.Type == tea.KeyEsc && m.state.streaming {
 		if m.state.interruptArmed {
 			// Second Esc emits the interrupt; the host's RunStoppedEvent
@@ -226,6 +235,17 @@ func (m Model) handleKey(msg tea.KeyMsg) (bool, Model, tea.Cmd) {
 	case "ctrl+p":
 		if m.state.focus == FocusInput && len(m.state.inputTokens) > 0 {
 			m.state.moveTokenSelection(-1)
+			return true, m, nil
+		}
+	case "ctrl+o":
+		// Composer-token preview when input focused with tokens;
+		// transcript-token preview when transcript focused with refs.
+		if m.state.focus == FocusInput && len(m.state.inputTokens) > 0 {
+			m.state.previewSelectedComposerToken()
+			return true, m, nil
+		}
+		if m.state.focus == FocusTranscript && len(m.state.transcriptRefs) > 0 {
+			m.state.previewSelectedTranscriptRef()
 			return true, m, nil
 		}
 	}

@@ -32,6 +32,34 @@ func (s *state) applyHostEvent(evt HostEvent) {
 		s.applyPermissionRequested(e)
 	case PermissionResolvedEvent:
 		s.applyPermissionResolved(e)
+	case PreviewLoadedEvent:
+		s.applyPreviewLoaded(e)
+	case HostStatusEvent:
+		s.applyHostStatus(e)
+	}
+}
+
+// applyPreviewLoaded paints the host-supplied preview payload into the
+// shell-local preview dialog. The dialog shows immediately; Esc closes
+// it (handled in Model.Update).
+func (s *state) applyPreviewLoaded(e PreviewLoadedEvent) {
+	title := e.Preview.Title
+	if title == "" {
+		title = e.Target.TokenID
+	}
+	s.preview = &PreviewDialog{Title: title, Content: e.Preview.Content}
+	s.status = "Preview loaded"
+}
+
+// applyHostStatus applies a host-supplied status string and structured
+// kind. The shell uses Kind (not the string) to drive chrome decisions
+// (pulsing dot, interrupt-armed styling, permission-pending highlight).
+func (s *state) applyHostStatus(e HostStatusEvent) {
+	if e.Status != "" {
+		s.status = e.Status
+	}
+	if e.Kind != "" {
+		s.statusKind = e.Kind
 	}
 }
 
