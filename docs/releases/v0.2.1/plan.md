@@ -48,7 +48,7 @@ This release does not cover:
 | 097 | Refactor plan and migration sequencing | — | M | — |
 | 098 | Shell component API and package-boundary design | 097 | M | 099 |
 | 099 | Modeltap host adapter and integration design | 097 | M | 098 |
-| 100 | Behavior-preserving shell extraction implementation | 098, 099 | L | 101, 102 |
+| 100 | Behavior-preserving shell extraction implementation | 098, 099 | L | 101 |
 | 101 | Developer documentation and embedding examples | 098, 099 | M | 100, 102 |
 | 102 | Parity and regression test sweep | 100 | M | 101 |
 

@@ -67,7 +67,7 @@ current behavior during migration.
 ## Implementation
 
 ### WU-100: Behavior-Preserving Shell Extraction Implementation
-**Size:** Large | **Dependencies:** WU-098, WU-099 | **Parallelizes with:** WU-101, WU-102
+**Size:** Large | **Dependencies:** WU-098, WU-099 | **Parallelizes with:** WU-101
 
 Implement the extracted shell component and move the current spike behavior
 behind the defined API boundary without redesigning the shell UX.
