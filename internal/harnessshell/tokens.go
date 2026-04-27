@@ -115,6 +115,48 @@ func (s *state) previewSelectedComposerToken() {
 	}
 }
 
+// activateSelectedTranscriptRef handles transcript-token Enter:
+// paste tokens toggle inline expansion (the renderer reads
+// TranscriptItem.Expanded to decide between summary and full
+// payload), file/reference tokens emit a preview action exactly as
+// Ctrl+O would.
+func (s *state) activateSelectedTranscriptRef() {
+	if len(s.transcriptRefs) == 0 || s.selectedTranscriptRef < 0 || s.selectedTranscriptRef >= len(s.transcriptRefs) {
+		return
+	}
+	ref := s.transcriptRefs[s.selectedTranscriptRef]
+	if ref.MessageIndex < 0 || ref.MessageIndex >= len(s.transcriptItems) {
+		return
+	}
+	item := &s.transcriptItems[ref.MessageIndex]
+	if ref.TokenIndex < 0 || ref.TokenIndex >= len(item.Tokens) {
+		return
+	}
+	tok := item.Tokens[ref.TokenIndex]
+	switch tok.Kind {
+	case TokenKindPaste:
+		if item.Expanded == nil {
+			item.Expanded = map[string]bool{}
+		}
+		item.Expanded[tok.ID] = !item.Expanded[tok.ID]
+		if item.Expanded[tok.ID] {
+			s.status = "Expanded " + tok.Label
+		} else {
+			s.status = "Collapsed " + tok.Label
+		}
+	case TokenKindFile:
+		s.pendingActions = append(s.pendingActions, LoadPreviewAction{
+			Target: PreviewTarget{
+				TokenID:      tok.ID,
+				Source:       "transcript",
+				MessageIndex: ref.MessageIndex,
+				TokenIndex:   ref.TokenIndex,
+			},
+		})
+		s.status = "Loading preview for " + tok.Label
+	}
+}
+
 // previewSelectedTranscriptRef opens a preview for the currently
 // selected transcript-token reference. Paste tokens render locally;
 // file/reference tokens emit a [LoadPreviewAction].
