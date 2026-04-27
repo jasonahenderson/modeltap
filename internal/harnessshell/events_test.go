@@ -352,6 +352,162 @@ func TestEscWhileNotStreamingIsIgnored(t *testing.T) {
 	}
 }
 
+func TestPermissionRequestedAppendsTranscriptAndPending(t *testing.T) {
+	m := newWithFixedClock()
+	req := PermissionRequest{
+		ID:        "perm-1",
+		ToolLabel: "Read README",
+		Target:    "README.md",
+		Summary:   "Read workspace file",
+	}
+	m, _ = drainActions(t, m, PermissionRequestedEvent{Request: req})
+
+	if len(m.state.transcriptItems) != 1 {
+		t.Fatalf("expected 1 transcript event row, got %d", len(m.state.transcriptItems))
+	}
+	row := m.state.transcriptItems[0]
+	if row.Kind != TranscriptItemKindEvent || row.Event == nil || row.Event.Status != "requested" || row.Event.RequestID != "perm-1" {
+		t.Fatalf("event row badly initialized: %+v", row)
+	}
+	if len(m.state.pendingPermissions) != 1 {
+		t.Fatalf("expected 1 pending permission, got %d", len(m.state.pendingPermissions))
+	}
+	if m.state.statusKind != StatusPermissionPending {
+		t.Fatalf("statusKind = %v, want StatusPermissionPending", m.state.statusKind)
+	}
+}
+
+func TestPermissionEnterEmitsResolveAction(t *testing.T) {
+	m := newWithFixedClock()
+	m, _ = drainActions(t, m, PermissionRequestedEvent{Request: PermissionRequest{
+		ID: "perm-1", ToolLabel: "Read", Target: "x", Summary: "do x",
+	}})
+
+	// Default selectedAction is 0 → DecisionApproveOnce.
+	m, actions := drainActions(t, m, enterKey())
+	if len(actions) != 1 {
+		t.Fatalf("expected 1 ResolvePermissionAction, got %d", len(actions))
+	}
+	resolve, ok := actions[0].(ResolvePermissionAction)
+	if !ok {
+		t.Fatalf("action[0] = %T, want ResolvePermissionAction", actions[0])
+	}
+	if resolve.RequestID != "perm-1" || resolve.Decision != DecisionApproveOnce {
+		t.Fatalf("resolve = %+v, want ID=perm-1 Decision=approve_once", resolve)
+	}
+}
+
+func TestPermissionYNShortcutsEmitResolve(t *testing.T) {
+	cases := []struct {
+		name     string
+		key      tea.KeyMsg
+		decision PermissionDecision
+	}{
+		{"approve y", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}}, DecisionApproveOnce},
+		{"approve Y", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'Y'}}, DecisionApproveOnce},
+		{"deny n", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}}, DecisionDeny},
+		{"deny N", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'N'}}, DecisionDeny},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			m := newWithFixedClock()
+			m, _ = drainActions(t, m, PermissionRequestedEvent{Request: PermissionRequest{
+				ID: "perm-1", ToolLabel: "Read", Target: "x", Summary: "do x",
+			}})
+			_, actions := drainActions(t, m, tc.key)
+			if len(actions) != 1 {
+				t.Fatalf("expected 1 action, got %d", len(actions))
+			}
+			r, ok := actions[0].(ResolvePermissionAction)
+			if !ok {
+				t.Fatalf("action[0] = %T", actions[0])
+			}
+			if r.Decision != tc.decision {
+				t.Fatalf("decision = %v, want %v", r.Decision, tc.decision)
+			}
+		})
+	}
+}
+
+func TestPermissionLeftRightWalkActionSelector(t *testing.T) {
+	m := newWithFixedClock()
+	m, _ = drainActions(t, m, PermissionRequestedEvent{Request: PermissionRequest{
+		ID: "perm-1", ToolLabel: "Read", Target: "x", Summary: "do x",
+	}})
+	if got := m.state.pendingPermissions[0].SelectedAction; got != 0 {
+		t.Fatalf("initial SelectedAction = %d, want 0", got)
+	}
+	m, _ = drainActions(t, m, tea.KeyMsg{Type: tea.KeyRight})
+	if got := m.state.pendingPermissions[0].SelectedAction; got != 1 {
+		t.Fatalf("after Right SelectedAction = %d, want 1", got)
+	}
+	m, _ = drainActions(t, m, tea.KeyMsg{Type: tea.KeyRight})
+	if got := m.state.pendingPermissions[0].SelectedAction; got != 2 {
+		t.Fatalf("after Right Right SelectedAction = %d, want 2", got)
+	}
+	// Clamps at 2 (Deny).
+	m, _ = drainActions(t, m, tea.KeyMsg{Type: tea.KeyRight})
+	if got := m.state.pendingPermissions[0].SelectedAction; got != 2 {
+		t.Fatalf("clamp failed; SelectedAction = %d", got)
+	}
+	// Enter now emits Deny.
+	_, actions := drainActions(t, m, enterKey())
+	r := actions[0].(ResolvePermissionAction)
+	if r.Decision != DecisionDeny {
+		t.Fatalf("decision = %v, want DecisionDeny", r.Decision)
+	}
+}
+
+func TestPermissionUpDownWalksMultiplePending(t *testing.T) {
+	m := newWithFixedClock()
+	m, _ = drainActions(t, m, PermissionRequestedEvent{Request: PermissionRequest{ID: "p1", Summary: "first"}})
+	m, _ = drainActions(t, m, PermissionRequestedEvent{Request: PermissionRequest{ID: "p2", Summary: "second"}})
+	if got := m.state.activePermissionIndex; got != 1 {
+		t.Fatalf("activePermissionIndex = %d, want 1 after second request", got)
+	}
+	m, _ = drainActions(t, m, tea.KeyMsg{Type: tea.KeyUp})
+	if got := m.state.activePermissionIndex; got != 0 {
+		t.Fatalf("after Up activePermissionIndex = %d, want 0", got)
+	}
+	m, _ = drainActions(t, m, tea.KeyMsg{Type: tea.KeyDown})
+	if got := m.state.activePermissionIndex; got != 1 {
+		t.Fatalf("after Down activePermissionIndex = %d, want 1", got)
+	}
+}
+
+func TestPermissionResolvedUpdatesTranscriptAndStatus(t *testing.T) {
+	m := newWithFixedClock()
+	m, _ = drainActions(t, m, PermissionRequestedEvent{Request: PermissionRequest{
+		ID: "perm-1", ToolLabel: "Read", Summary: "do x",
+	}})
+	m, _ = drainActions(t, m, PermissionResolvedEvent{
+		RequestID: "perm-1",
+		Outcome:   OutcomeApprovedOnce,
+		Message:   "ok",
+	})
+	if len(m.state.pendingPermissions) != 0 {
+		t.Fatalf("pending permissions should be empty after resolve, got %d", len(m.state.pendingPermissions))
+	}
+	if got := m.state.transcriptItems[0].Event.Status; got != "granted" {
+		t.Fatalf("event row status = %q, want granted", got)
+	}
+	if m.state.statusKind != StatusReady {
+		t.Fatalf("statusKind = %v, want StatusReady", m.state.statusKind)
+	}
+	if m.state.status != "ok" {
+		t.Fatalf("status = %q, want %q", m.state.status, "ok")
+	}
+}
+
+func TestPermissionResolvedDeniedFlipsTranscript(t *testing.T) {
+	m := newWithFixedClock()
+	m, _ = drainActions(t, m, PermissionRequestedEvent{Request: PermissionRequest{ID: "perm-1", Summary: "x"}})
+	m, _ = drainActions(t, m, PermissionResolvedEvent{RequestID: "perm-1", Outcome: OutcomeDenied})
+	if got := m.state.transcriptItems[0].Event.Status; got != "denied" {
+		t.Fatalf("event row status = %q, want denied", got)
+	}
+}
+
 func TestRunDeltaWithoutCorrelationFallsBackToLastStreaming(t *testing.T) {
 	m := newWithFixedClock()
 	m.state.input.SetValue("ping")

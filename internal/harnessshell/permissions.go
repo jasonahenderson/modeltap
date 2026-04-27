@@ -111,3 +111,21 @@ func permissionDecisionFromAction(idx int) PermissionDecision {
 		return DecisionDeny
 	}
 }
+
+// resolveActivePermission emits a [ResolvePermissionAction] for the
+// currently-active pending permission with the given decision. The host
+// owns the terminal outcome — the shell does not pre-decide locally; the
+// transcript event row flips to granted/denied only on
+// [PermissionResolvedEvent] intake.
+func (s *state) resolveActivePermission(decision PermissionDecision) {
+	p := s.currentPendingPermission()
+	if p == nil {
+		return
+	}
+	s.pendingActions = append(s.pendingActions, ResolvePermissionAction{
+		RequestID: p.Request.ID,
+		Decision:  decision,
+	})
+	s.status = "Resolving permission"
+	s.statusKind = StatusPermissionPending
+}

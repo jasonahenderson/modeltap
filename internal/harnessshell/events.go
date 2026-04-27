@@ -28,6 +28,86 @@ func (s *state) applyHostEvent(evt HostEvent) {
 		s.applyRunStopped(e)
 	case RunFailedEvent:
 		s.applyRunFailed(e)
+	case PermissionRequestedEvent:
+		s.applyPermissionRequested(e)
+	case PermissionResolvedEvent:
+		s.applyPermissionResolved(e)
+	}
+}
+
+// applyPermissionRequested appends a transcript event row for the request
+// and registers a [PendingPermission] in shell-owned state. The composer
+// permission UI then surfaces controls automatically via [Render].
+func (s *state) applyPermissionRequested(e PermissionRequestedEvent) {
+	if e.Request.ID == "" {
+		return
+	}
+	transcriptID := "perm-" + e.Request.ID
+	s.transcriptItems = append(s.transcriptItems, TranscriptItem{
+		ID:    transcriptID,
+		Kind:  TranscriptItemKindEvent,
+		Role:  RoleEvent,
+		Text:  e.Request.Summary,
+		Event: &EventState{Status: "requested", RequestID: e.Request.ID},
+	})
+	s.pendingPermissions = append(s.pendingPermissions, PendingPermission{
+		Request:        e.Request,
+		TranscriptID:   transcriptID,
+		SelectedAction: 0,
+	})
+	s.activePermissionIndex = len(s.pendingPermissions) - 1
+	s.statusKind = StatusPermissionPending
+	if e.Request.SessionPolicyState.SessionApproved {
+		s.status = "Permission required (session policy active)"
+	} else {
+		s.status = "Permission required"
+	}
+}
+
+// applyPermissionResolved updates the matching transcript event row with
+// the host-reported outcome and removes the pending permission from
+// shell-owned state. The composer permission controls disappear once the
+// pending list is empty.
+func (s *state) applyPermissionResolved(e PermissionResolvedEvent) {
+	if e.RequestID == "" {
+		return
+	}
+	for i := range s.transcriptItems {
+		item := &s.transcriptItems[i]
+		if item.Event != nil && item.Event.RequestID == e.RequestID {
+			item.Event.Status = transcriptStatusForOutcome(e.Outcome)
+			break
+		}
+	}
+	s.removePendingPermissionByID(e.RequestID)
+	if len(s.pendingPermissions) == 0 {
+		if s.streaming {
+			s.statusKind = StatusStreaming
+			s.status = "Resuming run"
+		} else {
+			s.statusKind = StatusReady
+			if e.Message != "" {
+				s.status = e.Message
+			} else {
+				s.status = "Permission resolved"
+			}
+		}
+	} else {
+		s.statusKind = StatusPermissionPending
+		s.status = "Permission resolved; more pending"
+	}
+}
+
+// transcriptStatusForOutcome maps a host-reported [PermissionOutcome] to
+// the transcript-event-row status string consumed by [Render].
+func transcriptStatusForOutcome(o PermissionOutcome) string {
+	switch o {
+	case OutcomeApprovedOnce, OutcomeApprovedSession:
+		return "granted"
+	case OutcomeDenied:
+		return "denied"
+	default:
+		return "done"
 	}
 }
 

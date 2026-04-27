@@ -259,8 +259,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (bool, Model, tea.Cmd) {
 	case FocusInput:
 		// Enter (without Alt) submits unless the textarea has been
 		// instructed to insert a newline via Alt+Enter / Ctrl+J. The
-		// shell-native /clear command, queue release, and queue
-		// follow-up paths are all routed through emitSubmitOnEnter.
+		// shell-native /clear command, queue release, queue follow-up,
+		// and permission-resolve paths are all routed through
+		// emitSubmitOnEnter.
 		if msg.Type == tea.KeyEnter && !msg.Alt {
 			if m.state.emitSubmitOnEnter() {
 				return true, m, nil
@@ -275,6 +276,41 @@ func (m Model) handleKey(msg tea.KeyMsg) (bool, Model, tea.Cmd) {
 			m.state.input.InsertRune('\n')
 			m.state.syncInputHeight()
 			return true, m, nil
+		}
+
+		// Permission shortcuts when the composer is empty: y/Y approves
+		// once, n/N denies, Left/Right walks the action selector,
+		// Up/Down (also empty) walks between multiple pending
+		// permissions before falling through to history recall.
+		if m.state.input.Value() == "" && m.state.currentPendingPermission() != nil {
+			switch msg.String() {
+			case "y", "Y":
+				m.state.resolveActivePermission(DecisionApproveOnce)
+				return true, m, nil
+			case "n", "N":
+				m.state.resolveActivePermission(DecisionDeny)
+				return true, m, nil
+			}
+			switch msg.Type {
+			case tea.KeyLeft:
+				if m.state.movePermissionAction(-1) {
+					return true, m, nil
+				}
+			case tea.KeyRight:
+				if m.state.movePermissionAction(1) {
+					return true, m, nil
+				}
+			}
+		}
+		if msg.Type == tea.KeyUp && m.state.input.Value() == "" {
+			if m.state.movePendingPermission(-1) {
+				return true, m, nil
+			}
+		}
+		if msg.Type == tea.KeyDown && m.state.input.Value() == "" {
+			if m.state.movePendingPermission(1) {
+				return true, m, nil
+			}
 		}
 		// Single-line Up/Down recall the command history. Multi-line
 		// buffers fall through to the textarea so cursor navigation
