@@ -1,12 +1,22 @@
 package harnessshell
 
-// Queued submission lifecycle and merge rules. Stage C wires the
-// queuedSubmissions / pendingSubmissions invariants from WU-098.
+// Queued submission lifecycle, merge rules, and submit-action emission.
+// Stage C wires the queuedSubmissions / pendingSubmissions invariants from
+// WU-098 and the SubmitTurnAction emission contract (including the
+// optimistic transcript rendering required by WU-098 §"Optimistic
+// transcript rendering").
 
 import (
 	"fmt"
 	"strings"
+	"time"
 )
+
+// shellNativeClearCommand is the buffer text the shell handles locally
+// without crossing the boundary as an action. Per WU-100 §"Definite scope
+// rule for the reusable package", /clear is shell-native; host-native
+// commands cross via [RunHostCommandAction] (added in a later commit).
+const shellNativeClearCommand = "/clear"
 
 // enqueueSubmission appends a queued follow-up entry to the visible queue.
 // Per WU-098 queue invariants, the visible queue is FIFO and merges happen
@@ -76,4 +86,142 @@ func mergeQueuedSubmissions(items []QueuedSubmission) QueuedSubmission {
 func (s *state) nextSubmissionID() string {
 	s.submissionCounter++
 	return fmt.Sprintf("sub-%d", s.submissionCounter)
+}
+
+// emitSubmitOnEnter routes the Enter key for the composer into the
+// shell-owned submit pipeline. Returns true if the key was consumed by
+// shell-native logic (submit, queue follow-up, queue release, /clear); a
+// false return means Enter should be forwarded to the textarea (for
+// instance an empty Enter while idle with no queued work).
+//
+// The pipeline matches the FEAT-0014 invariants:
+//   - empty Enter while idle with non-empty queue releases queued work
+//   - non-empty Enter while streaming or with queued work enqueues a
+//     follow-up; if idle, the queue then auto-releases
+//   - the shell-native /clear command resets the transcript without
+//     crossing the boundary
+//   - any other non-empty submit emits SubmitTurnAction with optimistic
+//     user + assistant placeholder transcript rows
+func (s *state) emitSubmitOnEnter() bool {
+	content := strings.TrimSpace(s.input.Value())
+
+	if content == "" && len(s.inputTokens) == 0 {
+		if !s.streaming && (len(s.queuedSubmissions) > 0 || len(s.pendingSubmissions) > 0) {
+			s.status = "Releasing queued follow-up"
+			s.statusKind = StatusReady
+			s.releaseQueuedSubmission()
+			return true
+		}
+		return false
+	}
+
+	s.pushHistory(content)
+
+	if s.streaming || len(s.queuedSubmissions) > 0 || len(s.pendingSubmissions) > 0 {
+		s.enqueueSubmission(content, s.inputTokens)
+		s.input.Reset()
+		s.syncInputHeight()
+		s.inputTokens = nil
+		s.selectedToken = -1
+		if !s.streaming {
+			s.releaseQueuedSubmission()
+		}
+		return true
+	}
+
+	if content == shellNativeClearCommand && len(s.inputTokens) == 0 {
+		s.transcriptItems = nil
+		s.transcriptRefs = nil
+		s.selectedTranscriptRef = -1
+		s.input.Reset()
+		s.syncInputHeight()
+		s.status = "Transcript cleared"
+		s.statusKind = StatusReady
+		return true
+	}
+
+	var submittedTokens []InputToken
+	if len(s.inputTokens) > 0 {
+		submittedTokens = append(submittedTokens, s.inputTokens...)
+	}
+	s.beginSubmission(content, nil, submittedTokens, SubmissionSourceDirect)
+	return true
+}
+
+// releaseQueuedSubmission promotes queued work into a single merged
+// submission and emits SubmitTurnAction with Source=queue_release. No-op
+// when both queue buffers are empty.
+func (s *state) releaseQueuedSubmission() {
+	merged, ok := s.drainQueueIntoMerged()
+	if !ok {
+		return
+	}
+	s.beginSubmission(merged.Text, merged.Entries, merged.Tokens, SubmissionSourceQueueRelease)
+}
+
+// beginSubmission appends the optimistic user and assistant placeholder
+// transcript rows, resets composer state, and queues a SubmitTurnAction
+// for the host. Per WU-098 §"Optimistic transcript rendering" the user
+// must never see a state in which the user row exists without an
+// accompanying assistant placeholder row.
+func (s *state) beginSubmission(content string, entries []string, tokens []InputToken, source SubmissionSource) {
+	submissionID := s.nextSubmissionID()
+
+	expanded := map[string]bool{}
+	for _, tok := range tokens {
+		if tok.Kind == TokenKindPaste {
+			expanded[tok.ID] = true
+		}
+	}
+
+	s.transcriptItems = append(s.transcriptItems,
+		TranscriptItem{
+			ID:           "msg-user-" + submissionID,
+			Kind:         TranscriptItemKindMessage,
+			Role:         RoleUser,
+			Text:         strings.TrimSpace(content),
+			Entries:      entries,
+			Tokens:       tokens,
+			Expanded:     expanded,
+			SubmissionID: submissionID,
+		},
+		TranscriptItem{
+			ID:           "msg-assistant-" + submissionID,
+			Kind:         TranscriptItemKindMessage,
+			Role:         RoleAssistant,
+			Streaming:    true,
+			SubmissionID: submissionID,
+		},
+	)
+
+	s.input.Reset()
+	s.syncInputHeight()
+	s.inputTokens = nil
+	s.selectedToken = -1
+	s.status = "Submitted"
+	s.statusKind = StatusStreaming
+	s.streaming = true
+	s.streamPulse = 0
+	s.interruptArmed = false
+
+	s.pendingActions = append(s.pendingActions, SubmitTurnAction{
+		Submission: Submission{
+			ID:          submissionID,
+			Entries:     entries,
+			Text:        strings.TrimSpace(content),
+			Tokens:      tokens,
+			Source:      source,
+			RequestedAt: s.nowOrDefault(),
+		},
+	})
+}
+
+// nowOrDefault returns the time source, defaulting to time.Now when
+// unset. The injectable clock keeps tests deterministic without
+// committing to a specific clock implementation in the public API.
+func (s *state) nowOrDefault() time.Time {
+	if s.now != nil {
+		return s.now()
+	}
+	return time.Now()
 }
