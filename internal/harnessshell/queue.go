@@ -106,6 +106,10 @@ func (s *state) emitSubmitOnEnter() bool {
 	content := strings.TrimSpace(s.input.Value())
 
 	if content == "" && len(s.inputTokens) == 0 {
+		if s.currentPendingPermission() != nil {
+			s.resolveActivePermission(permissionDecisionFromAction(s.pendingPermissions[s.activePermissionIndex].SelectedAction))
+			return true
+		}
 		if !s.streaming && (len(s.queuedSubmissions) > 0 || len(s.pendingSubmissions) > 0) {
 			s.status = "Releasing queued follow-up"
 			s.statusKind = StatusReady
