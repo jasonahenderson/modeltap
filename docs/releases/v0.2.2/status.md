@@ -1,7 +1,6 @@
 # v0.2.2 — Status
 
-**Current phase:** Phase 3 — Implementation (queued; awaiting explicit
-phase-transition ADMIN commit)
+**Current phase:** Phase 3 — Implementation (active)
 **Branch:** `spike/scrolling-surface-eval` inherited from v0.2.1;
 should retarget to a release branch before tagging
 **Phase 1 closed:** 2026-04-27
