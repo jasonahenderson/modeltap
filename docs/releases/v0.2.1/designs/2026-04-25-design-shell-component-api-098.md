@@ -100,6 +100,16 @@ This package is the extraction target for the shell component in `v0.2.1`. It
 is repo-internal for now, but must be organized so it can later promote out of
 the repo with minimal contract churn.
 
+#### Theme/style import boundary
+
+The reusable shell package must not import `internal/harness/theme` or any
+modeltap-specific style constants. The package owns its own theme-neutral
+style definitions in `styles.go`, exposed as `lipgloss` styles or simple
+configuration values. Theme integration with a host program happens via
+shell-local options, not via cross-package style imports. This rule is
+binding for `WU-100` and is one of the separation requirements PATCH-0015
+defines for future repository promotion.
+
 ### Internal files within the reusable package
 
 Suggested layout:
@@ -193,6 +203,14 @@ type HostEvent interface {
 Each concrete host event is a plain struct so it can be logged, replayed, and
 constructed in tests without hidden closures.
 
+#### Test package layout note
+
+The `isHostEvent()` marker is unexported, so external test packages
+(`package harnessshell_test`) cannot satisfy `HostEvent` directly. Tests that
+need to construct custom host events must either live in `package harnessshell`
+or use the exported concrete event types. This is intentional: the boundary
+is closed-typed, and ad-hoc host events would defeat replay/serialization.
+
 ### Shell emits
 
 The shell emits typed outbound actions by appending them to an internal action
@@ -210,6 +228,15 @@ type Action interface {
 The host loop drains these actions, performs real effects, and sends back host
 events. This preserves Bubble Tea ergonomics without coupling the reusable
 package to a specific runtime implementation.
+
+#### Concrete forwarding shape
+
+The exact `tea.Msg` envelope used to deliver actions from the shell into the
+host program is intentionally deferred to `WU-100`. Either an `ActionMsg`
+struct (`type ActionMsg struct { Action Action }`) or a per-action concrete
+message type is acceptable, provided the host loop can pattern-match on
+exported types and forward to the adapter without a callback hook. The
+boundary contract here is the action set itself, not the Bubble Tea wrapper.
 
 ## Action Contract
 
@@ -243,6 +270,20 @@ type SubmitTurnAction struct {
 
 The host uses `Submission.ID` to correlate lifecycle events.
 
+##### Optimistic transcript rendering
+
+When emitting `SubmitTurnAction`, the shell appends both the user-visible row
+**and** the placeholder assistant row (with `Streaming: true`) to the
+transcript before the host has acknowledged the submission. The user must
+never see a state in which the user row exists without an accompanying
+assistant placeholder. `RunStartedEvent` (below) carries no UX requirement
+to insert that row — its only jobs are run-ID correlation and signaling that
+streaming is now active. If the host fails the submission, `SubmissionFailedEvent`
+removes the placeholder assistant row and surfaces failure text in its place.
+
+This preserves the spike's `beginSubmission()` behavior, where the assistant
+row exists immediately on submit and is gradually filled by stream deltas.
+
 #### `InterruptRunAction`
 
 Emitted on the second `Esc` when an active run is armed for interrupt.
@@ -267,11 +308,19 @@ type ResolvePermissionAction struct {
 }
 ```
 
-`PermissionDecision` values:
+`PermissionDecision` is a closed string type:
 
-- `approve_once`
-- `approve_session`
-- `deny`
+```go
+type PermissionDecision string
+
+const (
+    DecisionApproveOnce    PermissionDecision = "approve_once"
+    DecisionApproveSession PermissionDecision = "approve_session"
+    DecisionDeny           PermissionDecision = "deny"
+)
+```
+
+The string form keeps payloads serialization-friendly for replay and logging.
 
 #### `LoadPreviewAction`
 
@@ -291,23 +340,54 @@ The target identifies whether the preview request originated from:
 
 and includes the referenced token identity.
 
-#### `RunCommandAction`
+#### `RunHostCommandAction`
 
 Emitted for host-native slash commands only.
 
 ```go
-type RunCommandAction struct {
+type RunHostCommandAction struct {
     Invocation CommandInvocation
 }
 ```
 
 Shell-native commands such as `/clear` remain local and never emit this action.
+There is no `RunShellCommandAction` — shell-native commands are dispatched
+inside the shell's update loop without crossing the boundary.
 
 ## Host Event Contract
 
 The host sends events whenever external state changes.
 
 ### Required inbound events
+
+#### `SubmissionAcceptedEvent`
+
+```go
+type SubmissionAcceptedEvent struct {
+    SubmissionID string
+    RunID        string
+}
+```
+
+Confirms that the host has accepted a submission and assigned a `RunID`. The
+shell uses this event to correlate the optimistically-rendered assistant row
+with the host run. `SubmissionAcceptedEvent` may arrive before, with, or
+after the first `RunStartedEvent`; if it arrives after, the shell must
+reconcile run-ID correlation against the placeholder row.
+
+#### `SubmissionFailedEvent`
+
+```go
+type SubmissionFailedEvent struct {
+    SubmissionID string
+    Message      string
+}
+```
+
+Indicates that the host could not accept the submission. The shell removes
+the placeholder assistant row, surfaces failure text in its place, and
+re-enables composer input. Queue state is not auto-released on submission
+failure.
 
 #### `RunStartedEvent`
 
@@ -320,6 +400,10 @@ type RunStartedEvent struct {
 ```
 
 Transitions the shell from submitted/queued state into active streaming state.
+This event does not create or move the assistant transcript row — see
+`SubmitTurnAction`'s optimistic-rendering rule. It carries `Label` (e.g., model
+or agent label) for display, plus the run-ID correlation needed to scope
+delta/completion events.
 
 #### `RunDeltaEvent`
 
@@ -389,7 +473,12 @@ type PermissionResolvedEvent struct {
 ```
 
 Updates transcript event state to granted or denied and clears the active
-composer controls for that request.
+composer controls for that request. `Message` is the sole text appended to
+the assistant row on resolution. The shell does not synthesize this text —
+the host adapter constructs `Message` from the runtime's tool-result payload,
+or from a generic granted/denied fallback when the payload is empty or
+structured (see WU-099 Permission Integration Points). This keeps the
+shell free of runtime-specific result interpretation.
 
 #### `PreviewLoadedEvent`
 
@@ -410,11 +499,28 @@ Optional but recommended:
 ```go
 type HostStatusEvent struct {
     Status string
+    Kind   StatusKind
 }
+
+type StatusKind string
+
+const (
+    StatusReady             StatusKind = "ready"
+    StatusStreaming         StatusKind = "streaming"
+    StatusInterruptArmed    StatusKind = "interrupt_armed"
+    StatusPermissionPending StatusKind = "permission_pending"
+    StatusError             StatusKind = "error"
+)
 ```
 
-Allows the host adapter to update footer/status text without coupling status
-rendering to runtime internals.
+`Status` carries display text supplied by the host. `Kind` lets the shell make
+chrome decisions (e.g., pulsing dot during streaming, interrupt-armed
+styling, permission-pending highlight) without parsing the display string.
+`Kind` may be left empty for backward-compatible status updates that should
+not affect chrome behavior.
+
+This split keeps the host's freedom to choose display text while giving the
+shell enough signal to drive its own status surfaces.
 
 ## Data Types
 
@@ -599,6 +705,29 @@ Remain local in the reusable shell package:
 - transcript token expand/collapse
 - local preview open for already-owned paste-token payloads
 
+#### Empty-Enter queue release: trigger vs effect
+
+Empty `Enter` queue release is "shell-native" in the sense that the **trigger
+condition** is evaluated locally: only the shell knows that the composer
+buffer is empty, the run state is idle, and queued submissions are present.
+But the **effect** of that release — submitting the queued work — crosses the
+boundary as a normal `SubmitTurnAction` with `Source = queue_release`. There
+is no second submission path.
+
+Concretely:
+
+1. shell observes empty Enter while idle with non-empty queue
+2. shell promotes the head of `queuedSubmissions` into `pendingSubmissions`
+3. shell emits `SubmitTurnAction{Submission.Source = queue_release}`
+4. shell transitions to optimistic-rendering state on submit per the
+   SubmitTurnAction contract above
+5. host acknowledges via `SubmissionAcceptedEvent` / `SubmissionFailedEvent`
+   and runs the lifecycle as for a direct submit
+
+This avoids the host needing two intake paths while preserving the spike's
+property that queue-release is initiated by shell-local logic, not by an
+external command.
+
 ### Host-native commands
 
 Cross the boundary as `RunCommandAction`:
@@ -624,6 +753,17 @@ The reusable package must preserve these invariants exactly.
 - empty `Enter` while idle releases queued work
 - interrupted runs do not auto-release queued work
 - normal completion auto-releases queued work
+- the shell maintains two queue buffers internally:
+  - `queuedSubmissions` — the visible queue rendered in the transcript
+  - `pendingSubmissions` — a transient merge buffer used during release; this
+    buffer holds submissions that have been promoted out of `queuedSubmissions`
+    but have not yet been emitted as `SubmitTurnAction` (typically because a
+    merge is in progress)
+
+The pending merge buffer is shell-owned internal state. It is not exposed at
+the action/event boundary. `WU-100` must encode this distinction in shell
+state and `WU-102` must verify multi-item queue release preserves FIFO
+across the merge.
 
 ### Permission invariants
 
@@ -670,6 +810,8 @@ the reusable package depend on modeltap runtime packages.
 ### Mechanical extractions expected in `WU-100`
 
 - extract token types and queue helpers from `app.go` into reusable package
+- preserve `pendingSubmissions` as shell-owned state alongside
+  `queuedSubmissions` per the queue invariants above
 - replace fake streaming ticks with host lifecycle events
 - replace `/perm` demo internals with host-fed permission requests
 - keep rendering/layout logic largely intact for first extraction pass
