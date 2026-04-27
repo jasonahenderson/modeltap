@@ -7,11 +7,8 @@ import (
 )
 
 func TestRootCommandExecutes(t *testing.T) {
-	// Bare `modeltap` invocation now launches the harness (WU-089).
-	// The harness needs a TTY, which `go test` doesn't provide, so
-	// this test verifies --help executes cleanly instead. Actual
-	// harness execution is covered by the integration tests in
-	// internal/integration.
+	// Bare `modeltap` invocation falls back to cobra's default help
+	// behavior since the legacy harness CLI was scrapped in v0.2.1.
 	cmd := NewRootCommand("test")
 	buf := new(bytes.Buffer)
 	cmd.SetOut(buf)
