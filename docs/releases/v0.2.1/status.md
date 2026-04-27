@@ -1,10 +1,12 @@
 # v0.2.1 — Status
 
-**Current phase:** Phase 3 — Implementation
-**Branch:** `spike/scrolling-surface-eval` (should retarget to a release branch
-before tagging; pending TPM decision)
+**Current phase:** Released (annotated tag `v0.2.1` at the close commit)
+**Branch:** `spike/scrolling-surface-eval` (TPM-decision-pending retarget
+to a release branch is acceptable post-tag for an unpublished release)
 **Phase 1 closed:** 2026-04-26
 **Phase 2 closed:** 2026-04-26
+**Phase 3 closed:** 2026-04-27 (production-wiring scope deferred to v0.2.2)
+**Released:** 2026-04-27
 
 ## Phase 3 work units
 
