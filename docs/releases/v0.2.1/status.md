@@ -13,7 +13,7 @@ before tagging; pending TPM decision)
 | 097 | Refactor Plan and Migration Sequencing | M | Done (Phase 1 design) | Deliverable is the design doc |
 | 098 | Shell Component API and Package-Boundary Design | M | Done (Phase 1 design) | Deliverable is the design doc |
 | 099 | Modeltap Host Adapter and Integration Design | M | Done (Phase 1 design) | Deliverable is the design doc |
-| 100 | Behavior-Preserving Shell Extraction Implementation | L | In progress | Stages A+B done (`1cb1eb4`, `1e32b57`); Stage C (action/event cutover) up next |
+| 100 | Behavior-Preserving Shell Extraction Implementation | L | In progress | Stages A+B done (`1cb1eb4`, `1e32b57`); Stage C in flight (`19a546b` scaffolding, `d106fc6` Model wire-up); submit/permission/preview emission and host-event intake still ahead |
 | 101 | Developer Documentation and Embedding Examples | M | In progress | Structural pass done (`a40e4b9`); reconciliation pass after WU-100 cutover |
 | 102 | Parity and Regression Test Sweep | M | Up next | Starts after WU-100 cutover |
 
@@ -32,15 +32,20 @@ deliverables are already present.
 
 ## Up next
 
-- **WU-100 Stage C** — action/event cutover. Refactor submit/interrupt/preview/
-  permission paths so the shell emits typed actions instead of mutating spike
-  state directly; add host-event intake so the shell can be driven entirely by
-  inbound events. Spike becomes a translation shim that catches shell actions,
-  drives fake-runtime behavior, and feeds host events back into the shell.
+- **WU-100 Stage C continuation** — wire submit/interrupt/permission/preview
+  key paths into Model.Update so the shell emits the corresponding typed
+  Actions (SubmitTurnAction, InterruptRunAction, ResolvePermissionAction,
+  LoadPreviewAction) instead of leaving these flows on the spike. Add host-
+  event intake methods so the shell can be driven entirely by inbound
+  HostEvents. Then narrow the spike into a translation shim that drives
+  Model + fake runtime + host-event feedback.
 
 ## In progress
 
-(none — Stage C is queued for dispatch)
+- **WU-100 Stage C** — scaffolding helpers and Model wire-up have landed
+  (`19a546b`, `d106fc6`); next commits cover action emission for submit/
+  interrupt/permission/preview and host-event intake. Spike still owns
+  submit/interrupt/permission paths through its own event loop.
 
 ## Done this phase
 
@@ -51,6 +56,18 @@ deliverables are already present.
   → RenderResult` value-type bridge. Spike's `refreshTranscript` now delegates
   to `harnessshell.Render`. Sidebar/palette/agent overlays remain in spike.
   Spike tests + build clean.
+- WU-100 Stage C scaffolding (`19a546b`) — shell-owned helpers for composer
+  history, paste/dropped-path detection, queue merge (FIFO + transient
+  pendingSubmissions buffer), and pending-permission lifecycle. Pure additive;
+  no behavior change. Stage A out-of-scope chrome fields removed from the
+  state struct per WU-100 §"Definite scope rule".
+- WU-100 Stage C wire-up (`d106fc6`) — Model.New/Init/Update/View wired for
+  shell-local keys (Tab focus cycle, single-line Up/Down history, Ctrl+P/N
+  composer-token selection, Up/Down/j/k transcript-token movement) and
+  shell-owned RenderInput projection. Resolves the WU-098-deferred envelope
+  choice with `ActionMsg{Action Action}` (single envelope; concrete dispatch
+  at the host adapter). Smoke tests cover wire-up only — WU-102 still owns
+  parity coverage.
 - WU-101 structural pass (`a40e4b9`) — `internal/harnessshell/README.md`,
   `internal/harnesshost/README.md`, `docs/guides/harness-shell-embedding.md`
   with 57 provisional placeholders to be reconciled after WU-100 cutover.
