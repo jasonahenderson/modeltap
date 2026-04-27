@@ -54,7 +54,12 @@ place or accidentally redesign behavior during refactoring.
 - Revisiting backlog items unless extraction requires them
 - Publishing the component as a separate project during this patch
 
-## Checklist
+## Implementation Checklist
+
+This checklist tracks the **Phase 3 implementation work** under v0.2.1, not
+the design-time gating that produced this patch. Items are checked off by
+the relevant work units (WU-097 through WU-102) as they land. Approval of
+this patch authorized the work; the checklist measures completion of it.
 
 - [ ] Define the extracted shell as a component with a clear host boundary
 - [ ] Define shell-owned responsibilities
