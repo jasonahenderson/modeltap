@@ -157,6 +157,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.state.transcript, cmd = m.state.transcript.Update(msg)
 		cmds = append(cmds, cmd)
 
+	case HostEvent:
+		m.state.applyHostEvent(msg)
+
 	default:
 		// Forward other messages to the focused widget so cursor blink
 		// timers, paste events, and similar bubble-internal traffic still
@@ -236,6 +239,25 @@ func (m Model) handleKey(msg tea.KeyMsg) (bool, Model, tea.Cmd) {
 			}
 		}
 	case FocusInput:
+		// Enter (without Alt) submits unless the textarea has been
+		// instructed to insert a newline via Alt+Enter / Ctrl+J. The
+		// shell-native /clear command, queue release, and queue
+		// follow-up paths are all routed through emitSubmitOnEnter.
+		if msg.Type == tea.KeyEnter && !msg.Alt {
+			if m.state.emitSubmitOnEnter() {
+				return true, m, nil
+			}
+		}
+		if msg.Type == tea.KeyEnter && msg.Alt {
+			m.state.input.InsertRune('\n')
+			m.state.syncInputHeight()
+			return true, m, nil
+		}
+		if msg.Type == tea.KeyCtrlJ {
+			m.state.input.InsertRune('\n')
+			m.state.syncInputHeight()
+			return true, m, nil
+		}
 		// Single-line Up/Down recall the command history. Multi-line
 		// buffers fall through to the textarea so cursor navigation
 		// still works inside the composer.

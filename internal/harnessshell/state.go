@@ -1,6 +1,8 @@
 package harnessshell
 
 import (
+	"time"
+
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
 )
@@ -224,4 +226,8 @@ type state struct {
 	// pendingActions is the outbound action queue drained by Update on each
 	// tick to forward typed actions to the host program.
 	pendingActions []Action
+
+	// now is the time source for stamping outbound Submission.RequestedAt.
+	// Tests can inject a deterministic clock; production code uses time.Now.
+	now func() time.Time
 }
