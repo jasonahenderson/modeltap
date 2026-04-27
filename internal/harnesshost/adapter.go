@@ -38,6 +38,16 @@ type Adapter struct {
 	// versa. Populated on SubmissionAcceptedEvent dispatch.
 	submissionToRun map[string]string
 	runToSubmission map[string]string
+
+	// pendingPermissions tracks active permission requests by ID per
+	// WU-099 §"Mid-stream Pause". While the set is non-empty, the
+	// adapter buffers RunDeltaEvent forwarding to the shell so the
+	// active stream visually pauses for the user. The set drains as
+	// PermissionResolvedEvents arrive; when it empties, the adapter
+	// replays buffered deltas in arrival order and resumes live
+	// forwarding.
+	pendingPermissions map[string]struct{}
+	pauseBuffer        []harnessshell.RunDeltaEvent
 }
 
 // AttachmentResolver translates a shell InputToken into an Attachment
@@ -76,12 +86,13 @@ func WithContextSource(ctx func() context.Context) Option {
 // implementation. Options apply in order.
 func New(shell harnessshell.Model, runtime Runtime, opts ...Option) Adapter {
 	a := Adapter{
-		shell:           shell,
-		runtime:         runtime,
-		resolver:        defaultAttachmentResolver,
-		ctx:             context.Background,
-		submissionToRun: map[string]string{},
-		runToSubmission: map[string]string{},
+		shell:              shell,
+		runtime:            runtime,
+		resolver:           defaultAttachmentResolver,
+		ctx:                context.Background,
+		submissionToRun:    map[string]string{},
+		runToSubmission:    map[string]string{},
+		pendingPermissions: map[string]struct{}{},
 	}
 	for _, opt := range opts {
 		opt(&a)
@@ -104,19 +115,16 @@ func (a Adapter) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case harnessshell.ActionMsg:
 		return a, a.dispatchAction(m.Action)
 	case submissionAcceptedAdapterMsg:
-		// Record correlation so later runtime-message projection
-		// (Stage D-2) can map runtime RunIDs back to shell
-		// submissions, then forward as the typed shell event.
+		// Record correlation so later runtime-message projection can
+		// map runtime RunIDs back to shell submissions, then forward
+		// as the typed shell event through the pause-aware helper.
 		a.submissionToRun[m.SubmissionID] = m.RunID
 		a.runToSubmission[m.RunID] = m.SubmissionID
-		evt := harnessshell.SubmissionAcceptedEvent{
+		var cmd tea.Cmd
+		a, cmd = a.forwardEvent(harnessshell.SubmissionAcceptedEvent{
 			SubmissionID: m.SubmissionID,
 			RunID:        m.RunID,
-		}
-		var cmd tea.Cmd
-		var inner tea.Model
-		inner, cmd = a.shell.Update(evt)
-		a.shell = inner.(harnessshell.Model)
+		})
 		if m.Label != "" {
 			// RunStartedEvent carries the label; without a real
 			// runtime stream message the adapter synthesizes a
@@ -139,15 +147,77 @@ func (a Adapter) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	if evt := projectRuntimeMessage(msg); evt != nil {
 		var cmd tea.Cmd
-		var inner tea.Model
-		inner, cmd = a.shell.Update(evt)
-		a.shell = inner.(harnessshell.Model)
+		a, cmd = a.forwardEvent(evt)
+		return a, cmd
+	}
+
+	// Direct HostEvent injection (e.g., synthetic RunStartedEvent
+	// produced by the submissionAccepted Cmd, or events sent by
+	// integration tests) also flows through the pause-aware path.
+	if evt, ok := msg.(harnessshell.HostEvent); ok {
+		var cmd tea.Cmd
+		a, cmd = a.forwardEvent(evt)
 		return a, cmd
 	}
 
 	var cmd tea.Cmd
 	var inner tea.Model
 	inner, cmd = a.shell.Update(msg)
+	a.shell = inner.(harnessshell.Model)
+	return a, cmd
+}
+
+// forwardEvent routes a HostEvent into the inner shell with the WU-099
+// mid-stream pause buffering layered on top:
+//
+//   - PermissionRequestedEvent registers the request in pending
+//     permissions; subsequent RunDeltaEvents buffer until resolution
+//   - RunDeltaEvent is buffered (not forwarded) while any permission
+//     is pending; the shell visually pauses without needing a
+//     PauseRun method on Runtime per WU-099 §"Mid-stream Pause"
+//   - PermissionResolvedEvent decrements pending; when the set
+//     empties, the resolve is forwarded first and then any buffered
+//     deltas replay in arrival order before live forwarding resumes
+//
+// All other events forward straight through to shell.Update.
+func (a Adapter) forwardEvent(evt harnessshell.HostEvent) (Adapter, tea.Cmd) {
+	switch e := evt.(type) {
+	case harnessshell.PermissionRequestedEvent:
+		if e.Request.ID != "" {
+			a.pendingPermissions[e.Request.ID] = struct{}{}
+		}
+	case harnessshell.PermissionResolvedEvent:
+		delete(a.pendingPermissions, e.RequestID)
+		if len(a.pendingPermissions) == 0 && len(a.pauseBuffer) > 0 {
+			// Forward the resolve event first so the shell flips
+			// the transcript event row and clears composer
+			// permission UI before the replayed deltas land.
+			inner, cmd := a.shell.Update(evt)
+			a.shell = inner.(harnessshell.Model)
+			cmds := []tea.Cmd{}
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+			for _, d := range a.pauseBuffer {
+				inner, replayCmd := a.shell.Update(d)
+				a.shell = inner.(harnessshell.Model)
+				if replayCmd != nil {
+					cmds = append(cmds, replayCmd)
+				}
+			}
+			a.pauseBuffer = nil
+			if len(cmds) == 0 {
+				return a, nil
+			}
+			return a, tea.Batch(cmds...)
+		}
+	case harnessshell.RunDeltaEvent:
+		if len(a.pendingPermissions) > 0 {
+			a.pauseBuffer = append(a.pauseBuffer, e)
+			return a, nil
+		}
+	}
+	inner, cmd := a.shell.Update(evt)
 	a.shell = inner.(harnessshell.Model)
 	return a, cmd
 }
