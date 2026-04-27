@@ -68,6 +68,14 @@ type TranscriptItem struct {
 	Event     *EventState
 	Streaming bool
 	Entries   []string
+	// SubmissionID, when non-empty on a user or assistant row, correlates the
+	// row with the SubmitTurnAction that produced it. Assistant placeholders
+	// use this to pair with [SubmissionAcceptedEvent].
+	SubmissionID string
+	// RunID, when non-empty on an assistant row, is set after a
+	// [RunStartedEvent] / [SubmissionAcceptedEvent] correlates the run to
+	// the optimistic placeholder.
+	RunID string
 }
 
 // QueuedSubmission is a follow-up that the user submitted while a run was
@@ -148,8 +156,7 @@ type SidebarItem struct {
 // API surface is [Model] plus the action/event types in types.go.
 //
 // The fields here mirror the spike's App state per WU-098 §"Ownership Split /
-// Shell-owned state". Stage A introduces the struct; subsequent stages wire
-// it into Update/View.
+// Shell-owned state". Stage C wires them into Update/View.
 type state struct {
 	width  int
 	height int
@@ -197,31 +204,24 @@ type state struct {
 	pendingPermissions    []PendingPermission
 	activePermissionIndex int
 
+	// streaming reflects whether an active host run is producing deltas; it
+	// is set by RunStartedEvent and cleared by Run terminal events.
+	streaming      bool
+	streamPulse    int
 	interruptArmed bool
 
-	sidebarOpen  bool
-	sidebarItems []SidebarItem
-	sidebarIndex int
+	// activeRunID is the run-ID currently associated with the streaming
+	// assistant row (set on RunStartedEvent / SubmissionAcceptedEvent).
+	activeRunID string
 
-	dialog      *ChoiceDialog
-	preview     *PreviewDialog
-	palette     *CommandPaletteState
-	agentList   *agentListState
-	agentDetail *agentDetailState
+	// submissionCounter monotonically generates submission IDs.
+	submissionCounter int
+
+	sidebarOpen bool
+
+	preview *PreviewDialog
 
 	// pendingActions is the outbound action queue drained by Update on each
 	// tick to forward typed actions to the host program.
 	pendingActions []Action
-}
-
-// agentListState and agentDetailState are placeholders for spike-only overlays
-// that may or may not survive into the reusable shell. They are kept private
-// during Stage A to mirror the spike's App fields without committing them to
-// the public API.
-type agentListState struct {
-	Index int
-}
-
-type agentDetailState struct {
-	AgentID string
 }
