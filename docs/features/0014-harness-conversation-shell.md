@@ -298,11 +298,20 @@ The shell emits permission decisions:
 
 ## CLI / UI Integration
 
-CLI entrypoint:
+CLI entrypoint (current spike — placeholder):
 
 ```text
 modeltap harness-spike
 ```
+
+The `harness-spike` entrypoint exists only because the shell currently lives
+in `internal/harnessspike`. v0.2.1 deletes that package and replaces or
+renames the entrypoint as part of the extraction; the new demo CLI builds
+on `internal/harnessshell` + `internal/harnessdemo` directly. The final
+command name is a Phase 3 implementation detail and is not part of this
+feature's behavior contract — what FEAT-0014 requires is that *some*
+entrypoint exists for launching the conversation shell, not that it be
+named `harness-spike`.
 
 In-shell behaviors covered by this feature:
 
