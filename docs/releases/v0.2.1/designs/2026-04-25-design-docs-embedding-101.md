@@ -67,7 +67,8 @@ the following set.
 
 Location:
 
-- package doc adjacent to the extracted reusable shell package
+- `internal/harnessshell/README.md` (package-level developer doc adjacent to
+  the extracted reusable shell package)
 
 Purpose:
 
@@ -94,7 +95,8 @@ Minimum content:
 
 Location:
 
-- package doc adjacent to the modeltap-specific host adapter package
+- `internal/harnesshost/README.md` (package-level developer doc adjacent to
+  the modeltap-specific host adapter package)
 
 Purpose:
 
@@ -116,8 +118,10 @@ Minimum content:
 
 Location:
 
-- release-local design says this should become a developer-facing markdown doc
-  under repo docs for the implementation phase
+- `docs/guides/harness-shell-embedding.md` — the canonical developer-facing
+  embedding guide for the extracted shell. The `docs/guides/` directory is
+  introduced by this WU if it does not already exist; the guide is the
+  primary how-to artifact and should be linked from both package READMEs.
 
 Purpose:
 
@@ -357,7 +361,9 @@ prototype.
 
 That requires:
 
-- the documentation set is explicitly enumerated
+- the documentation set is explicitly enumerated with named file paths:
+  `internal/harnessshell/README.md`, `internal/harnesshost/README.md`,
+  and `docs/guides/harness-shell-embedding.md`
 - ownership and boundary rules are unambiguous
 - one minimal embedding example is defined
 - submit, stream, permission, and preview examples are defined
