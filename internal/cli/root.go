@@ -10,25 +10,27 @@ import (
 // NewRootCommand creates and returns the root cobra.Command for modeltap.
 // The version string is injected by the caller (typically main.go).
 func NewRootCommand(version string) *cobra.Command {
-	// rootFlags are the harness flags the root command accepts so
-	// `modeltap --model X` works the same as `modeltap harness --model X`.
-	var rootFlags harnessFlags
-
 	rootCmd := &cobra.Command{
 		Use:   "modeltap",
-		Short: "AI API reverse-proxy and interactive terminal harness",
-		Long: `modeltap is both a reverse proxy for AI/LLM APIs and an interactive
-Bubbletea-based terminal harness for driving those providers.
+		Short: "AI API reverse-proxy with a reusable conversation shell",
+		Long: `modeltap is a reverse proxy for AI/LLM APIs and a reusable Bubble Tea
+conversation-shell component for driving those providers.
 
-Run with no subcommand to launch the interactive harness (the default),
-which auto-starts a local BFF server when needed and connects over a
-unix socket. Subcommands control the proxy directly — ` + "`start`" + ` to
-run the proxy server, ` + "`logs`" + ` / ` + "`show`" + ` / ` + "`export`" + ` / ` + "`metrics`" + ` to
-inspect captured traffic, ` + "`dashboard`" + ` for the web UI, ` + "`status`" + ` /
-` + "`service`" + ` / ` + "`config`" + ` / ` + "`completion`" + ` for administrative tasks.
+The legacy interactive harness (` + "`modeltap harness`" + `) was scrapped in v0.2.1.
+The post-extraction conversation surface lives in ` + "`internal/harnessshell`" + `
+and is exercised end-to-end by ` + "`modeltap shell-demo`" + ` against the fake
+runtime in ` + "`internal/harnessdemo`" + `. Production provider integration via
+` + "`harnesshost`" + ` ships in a follow-up release.
+
+Subcommands control the proxy and tooling — ` + "`start`" + ` to run the proxy
+server, ` + "`logs`" + ` / ` + "`show`" + ` / ` + "`export`" + ` / ` + "`metrics`" + ` to inspect captured
+traffic, ` + "`dashboard`" + ` for the web UI, ` + "`status`" + ` / ` + "`service`" + ` / ` + "`config`" + ` /
+` + "`completion`" + ` for administrative tasks, and ` + "`shell-demo`" + ` for the
+extracted conversation shell with a fake backend.
 
 Key capabilities:
-  - Interactive harness (session-aware, tool-enabled, MCP-ready)
+  - Reusable conversation shell (FEAT-0014: single scrolling surface,
+    composer-hosted permissions, queued follow-ups, paste-token expansion)
   - Transparent proxying with zero code changes in your application
   - Per-request token counting and cost estimation
   - Filtering and search across provider, model, status, and time range
@@ -36,13 +38,10 @@ Key capabilities:
   - Aggregated usage metrics grouped by provider, model, day, or hour
   - Built-in web dashboard for visual exploration`,
 		Version: version,
-		Example: `  # Launch the interactive harness (default)
-  modeltap
+		Example: `  # Launch the conversation-shell demo (fake backend)
+  modeltap shell-demo
 
-  # Resume a specific session in the harness
-  modeltap --resume 7d9f…
-
-  # Start the proxy server explicitly
+  # Start the proxy server
   modeltap start --port 9090 --dashboard
 
   # View recent captured logs
@@ -53,16 +52,8 @@ Key capabilities:
 
   # Check proxy and database status
   modeltap status`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			// No subcommand → launch the harness. Unknown subcommands
-			// are still caught by Cobra's own handling; this RunE only
-			// fires for bare `modeltap` invocations.
-			return runHarness(cmd, &rootFlags)
-		},
 		SilenceUsage: true,
 	}
-
-	bindHarnessFlags(rootCmd, &rootFlags)
 
 	// Set version template so --version prints cleanly.
 	rootCmd.SetVersionTemplate(fmt.Sprintf("modeltap %s\n", version))
@@ -70,7 +61,6 @@ Key capabilities:
 	// Register all subcommands.
 	rootCmd.AddCommand(
 		newStartCommand(),
-		newHarnessCommand(),
 		newShellDemoCommand(),
 		newLogsCommand(),
 		newShowCommand(),
