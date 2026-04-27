@@ -185,21 +185,59 @@ Exit criteria:
   `internal/harnessshell`
 - keep the single scrolling transcript/composer surface intact
 - preserve current style-driven visual grouping and transcript token rendering
-- keep sidebar, palette, preview, agent overlay, and footer rendering in the
-  shell package only if they are part of the shell-owned interaction contract
-  and do not depend on modeltap-specific runtime state
 
-Compatibility rule:
+#### Definite scope rule for the reusable package
 
-- if a visual surface is spike/demo-only and not part of the reusable shell
-  contract, keep it out of the reusable package and let the spike wrapper own
-  it temporarily
+`internal/harnessshell` may contain only the conversation-surface chrome that
+FEAT-0014 defines:
+
+- transcript and queued-row rendering
+- composer rendering (including permission controls hosted in the composer)
+- shell-local preview dialog for paste-token payloads
+- token rendering (paste and file/reference)
+- shell-local status/footer presentation
+
+`internal/harnessshell` must **not** contain:
+
+- sidebar, command palette, agent list, agent detail overlay
+- session explorer, model catalog, history catalog surfaces
+- any background-agent or multi-agent orchestration UI
+
+Those surfaces are spike/demo or modeltap-specific app chrome. They stay in
+the spike wrapper or the modeltap top-level harness package, not in the
+reusable shell. FEAT-0014 narrows scope to the conversation shell; WU-099
+keeps sidebar/session-explorer surfaces top-level. This rule is binding for
+WU-100 and is the criterion WU-102 should use to flag scope creep.
+
+#### Theme/style import boundary
+
+Per WU-098, `internal/harnessshell` may not import `internal/harness/theme`
+or any other modeltap-specific style constants. Move only theme-neutral
+styles into the new `styles.go`. If the spike currently relies on theme
+values, leave a temporary translation in the spike wrapper that maps theme
+output into shell-local style configuration; the reusable package itself
+must remain theme-agnostic.
+
+#### Stage A → Stage B bridge
+
+Step 2 (rendering cutover) depends on shell-owned state being available in
+the new package. Stage A (type duplication) introduced the shell-state types
+but did not yet move spike state into them. Step 2 must therefore include a
+short translation pass: the spike's existing `App` state is projected into
+the new shell state structs immediately before the new renderer is invoked.
+This bridge is local to the spike package and can be deleted once Stage C
+(action/event cutover) lands.
+
+Without this bridge, Step 2 would either reach back into spike-local state
+or duplicate state in two places. Both are explicitly disallowed.
 
 Exit criteria:
 
 - `View`, layout, transcript refresh, token rendering, and composer surface can
   run from `internal/harnessshell`
 - scroll preservation behavior remains shell-local
+- the in-scope chrome list above is the only chrome rendered from
+  `internal/harnessshell`
 
 ### Step 3: Replace direct fake-runtime transitions with emitted shell actions
 
@@ -248,16 +286,20 @@ Exit criteria:
 - move queue merge/release logic verbatim in behavior, not verbatim in file
   shape
 - preserve the distinction between:
-  - visible queued submissions
-  - pending released submissions
-  - paused response state during mid-stream permission gating
+  - visible `queuedSubmissions`
+  - transient `pendingSubmissions` merge buffer (per WU-098 queue invariants)
+  - paused response state during mid-stream permission gating — but note that
+    after extraction the runtime-side pause/resume is owned by the host
+    adapter (WU-099), so the shell's residual responsibility is solely the
+    UI gating, not the stream-queue replay
 - move permission UI behavior as shell-owned state:
   - active permission selection
   - left/right action selection
   - `y`/`n` fallback when composer is empty
   - visible session-policy hinting
 - leave production permission identity and runtime pause/resume orchestration in
-  the host package
+  the host package (the adapter buffers `RunDeltaEvent` forwarding while a
+  permission is pending, per WU-099 Mid-stream pause section)
 
 Exit criteria:
 
@@ -306,16 +348,27 @@ compatibility stages:
 - introduce new shell types and translation helpers
 - keep spike using its current implementation
 - allow temporary adapters between old spike-local structs and new shell types
+- this stage's translation helpers are what unblocks Stage B; the new
+  renderer cannot be invoked without them
 
 ### Stage B: Rendering cutover
 
 - switch transcript/composer rendering to the new shell package first
+- the spike calls Stage A's translation helpers immediately before invoking
+  the new renderer so the spike's `App` state is projected into the new
+  shell state structs at each render
 - keep submit/runtime behavior temporarily bridged if needed
 
 Reason:
 
 - rendering and scroll behavior are high-risk and easy to regress visually
 - isolating them first makes later action/event cutover easier to inspect
+
+Caveat:
+
+- this is the order with the highest test-migration risk because the spike
+  test file still tests against the old `App` type. See "Test compatibility
+  during cutover" below.
 
 ### Stage C: Action/event cutover
 
@@ -336,6 +389,32 @@ Reason:
 
 At each stage, the code must compile and the still-relevant parity tests must
 continue passing.
+
+### Test compatibility during cutover
+
+The spike's `internal/harnessspike/app_test.go` tests the monolithic `App`
+struct and references types (`queuedSubmission`, `inputToken`,
+`pendingPermission`, etc.) that move into `internal/harnessshell` during this
+WU. We deliberately do **not** keep type aliases in `internal/harnessspike`
+that forward to the new package — that re-entangles the layers we are trying
+to separate.
+
+Test-migration rule:
+
+1. Treat `internal/harnessspike/app_test.go` as a **migration checklist**, not
+   as a continuously-passing test suite, during Stages B–D.
+2. WU-102's new tests in `internal/harnessshell/*_test.go` must be passing
+   before any spike test is deleted.
+3. When a spike test moves to a new shell-package home, delete it from the
+   spike test file at the same time.
+4. The spike test file is allowed to have its compile broken during cutover
+   on a per-stage basis, provided each commit explicitly states which stage
+   is in progress and which spike tests are migrated/pending.
+5. Stage E ends with `app_test.go` reduced to compatibility-only checks per
+   WU-102's "Tests that remain as thin cutover checks" list.
+
+This rule is binding for WU-100 and is the migration contract WU-102 will
+verify.
 
 ## Cutover Strategy
 
