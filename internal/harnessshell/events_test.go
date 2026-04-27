@@ -508,6 +508,85 @@ func TestPermissionResolvedDeniedFlipsTranscript(t *testing.T) {
 	}
 }
 
+func TestCtrlOPasteTokenPreviewsLocally(t *testing.T) {
+	m := newWithFixedClock()
+	m.state.inputTokens = []InputToken{{
+		ID: "paste-1", Kind: TokenKindPaste, Label: "paste-1", Payload: "long content",
+	}}
+	m.state.selectedToken = 0
+
+	m, actions := drainActions(t, m, tea.KeyMsg{Type: tea.KeyCtrlO})
+	if len(actions) != 0 {
+		t.Fatalf("paste preview should not emit actions, got %d", len(actions))
+	}
+	if m.state.preview == nil || m.state.preview.Content != "long content" {
+		t.Fatalf("preview not populated for paste token: %+v", m.state.preview)
+	}
+}
+
+func TestCtrlOFileTokenEmitsLoadPreview(t *testing.T) {
+	m := newWithFixedClock()
+	m.state.inputTokens = []InputToken{{
+		ID: "file-1", Kind: TokenKindFile, Label: "file-1 (foo.txt)", Payload: "/abs/foo.txt",
+	}}
+	m.state.selectedToken = 0
+
+	m, actions := drainActions(t, m, tea.KeyMsg{Type: tea.KeyCtrlO})
+	if len(actions) != 1 {
+		t.Fatalf("file preview should emit LoadPreviewAction, got %d actions", len(actions))
+	}
+	a, ok := actions[0].(LoadPreviewAction)
+	if !ok {
+		t.Fatalf("action[0] = %T, want LoadPreviewAction", actions[0])
+	}
+	if a.Target.TokenID != "file-1" || a.Target.Source != "composer" {
+		t.Fatalf("target = %+v, want composer/file-1", a.Target)
+	}
+	if m.state.preview != nil {
+		t.Fatalf("file preview should defer painting until PreviewLoadedEvent; preview = %+v", m.state.preview)
+	}
+}
+
+func TestPreviewLoadedEventPaintsDialog(t *testing.T) {
+	m := newWithFixedClock()
+	m, _ = drainActions(t, m, PreviewLoadedEvent{
+		Target:  PreviewTarget{TokenID: "file-1"},
+		Preview: PreviewPayload{Title: "foo.txt", Content: "file contents here"},
+	})
+	if m.state.preview == nil {
+		t.Fatalf("preview dialog should be set after PreviewLoadedEvent")
+	}
+	if m.state.preview.Title != "foo.txt" || m.state.preview.Content != "file contents here" {
+		t.Fatalf("preview = %+v, mismatch", m.state.preview)
+	}
+}
+
+func TestEscClosesPreviewBeforeArmingInterrupt(t *testing.T) {
+	m := newWithFixedClock()
+	// Make streaming so without preview Esc would arm interrupt.
+	m.state.streaming = true
+	m.state.preview = &PreviewDialog{Title: "x", Content: "y"}
+
+	m, _ = drainActions(t, m, tea.KeyMsg{Type: tea.KeyEsc})
+	if m.state.preview != nil {
+		t.Fatalf("Esc should close preview")
+	}
+	if m.state.interruptArmed {
+		t.Fatalf("Esc should not arm interrupt while preview was open")
+	}
+}
+
+func TestHostStatusEventAppliesTextAndKind(t *testing.T) {
+	m := newWithFixedClock()
+	m, _ = drainActions(t, m, HostStatusEvent{Status: "Connecting", Kind: StatusStreaming})
+	if m.state.status != "Connecting" {
+		t.Fatalf("status = %q, want %q", m.state.status, "Connecting")
+	}
+	if m.state.statusKind != StatusStreaming {
+		t.Fatalf("statusKind = %v, want StatusStreaming", m.state.statusKind)
+	}
+}
+
 func TestRunDeltaWithoutCorrelationFallsBackToLastStreaming(t *testing.T) {
 	m := newWithFixedClock()
 	m.state.input.SetValue("ping")

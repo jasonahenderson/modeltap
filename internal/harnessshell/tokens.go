@@ -94,6 +94,60 @@ func looksLikeDroppedPath(path string) bool {
 	return true
 }
 
+// previewSelectedComposerToken opens a preview for the active composer
+// token. Paste tokens are previewed locally because the shell owns the
+// payload; file tokens emit a [LoadPreviewAction] so the host can
+// supply the content via [PreviewLoadedEvent].
+func (s *state) previewSelectedComposerToken() {
+	if len(s.inputTokens) == 0 || s.selectedToken < 0 || s.selectedToken >= len(s.inputTokens) {
+		return
+	}
+	tok := s.inputTokens[s.selectedToken]
+	switch tok.Kind {
+	case TokenKindPaste:
+		s.preview = &PreviewDialog{Title: tok.Label, Content: tok.Payload}
+		s.status = "Previewing " + tok.Label
+	case TokenKindFile:
+		s.pendingActions = append(s.pendingActions, LoadPreviewAction{
+			Target: PreviewTarget{TokenID: tok.ID, Source: "composer"},
+		})
+		s.status = "Loading preview for " + tok.Label
+	}
+}
+
+// previewSelectedTranscriptRef opens a preview for the currently
+// selected transcript-token reference. Paste tokens render locally;
+// file/reference tokens emit a [LoadPreviewAction].
+func (s *state) previewSelectedTranscriptRef() {
+	if len(s.transcriptRefs) == 0 || s.selectedTranscriptRef < 0 || s.selectedTranscriptRef >= len(s.transcriptRefs) {
+		return
+	}
+	ref := s.transcriptRefs[s.selectedTranscriptRef]
+	if ref.MessageIndex < 0 || ref.MessageIndex >= len(s.transcriptItems) {
+		return
+	}
+	item := s.transcriptItems[ref.MessageIndex]
+	if ref.TokenIndex < 0 || ref.TokenIndex >= len(item.Tokens) {
+		return
+	}
+	tok := item.Tokens[ref.TokenIndex]
+	switch tok.Kind {
+	case TokenKindPaste:
+		s.preview = &PreviewDialog{Title: tok.Label, Content: tok.Payload}
+		s.status = "Previewing " + tok.Label
+	case TokenKindFile:
+		s.pendingActions = append(s.pendingActions, LoadPreviewAction{
+			Target: PreviewTarget{
+				TokenID:      tok.ID,
+				Source:       "transcript",
+				MessageIndex: ref.MessageIndex,
+				TokenIndex:   ref.TokenIndex,
+			},
+		})
+		s.status = "Loading preview for " + tok.Label
+	}
+}
+
 // detectFileLabel chooses a display label for a file token based on the
 // filename extension, distinguishing image from generic file references.
 func detectFileLabel(path string, n int) string {
