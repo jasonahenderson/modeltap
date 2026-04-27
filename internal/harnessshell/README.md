@@ -1,12 +1,4 @@
-<!--
-WU-101 structural pass.
-This README uses provisional names from WU-098 and WU-099 designs. Anywhere
-this file uses a name that may be renamed during WU-100 implementation, an
-HTML comment of the form `<!-- provisional: ... -->` flags it for the
-reconciliation pass that follows WU-100 cutover.
--->
-
-# `harnessshell` — Reusable Conversation Shell <!-- provisional: subject to WU-100 reconciliation -->
+# `harnessshell` — Reusable Conversation Shell
 
 `harnessshell` is the reusable Bubble Tea conversation-shell component for
 the modeltap harness. It owns the single scrolling transcript surface, the
@@ -22,10 +14,11 @@ cross the package boundary as typed actions and events per
 
 ## Status
 
-Stage A skeleton at the time of this writing. Mirror types from
-`internal/harnessspike` are being landed without behavior change; runtime
-effects move out behind the action/event boundary in later stages of WU-100.
-`internal/harnessspike` is deleted at end of release v0.2.1.
+Feature-complete reusable component. `harnessshell.Model` accepts every
+`HostEvent` defined by WU-098 and emits every required `Action` reachable
+from shell-local key paths. The package is the canonical home of the
+extracted shell behavior; the previous spike package
+(`internal/harnessspike`) was deleted in WU-100 Stage E.
 
 ## Ownership
 
@@ -60,7 +53,7 @@ PATCH-0015 §"Separation Requirements For Future Extraction".
 
 ## Preserved FEAT-0014 Invariants
 
-The first-extraction goal is behavior parity with the spike, not redesign.
+The first-extraction goal was behavior parity with the spike, not redesign.
 The reusable component preserves these shell-level invariants exactly:
 
 - **Single scrolling surface.** The transcript and composer share one
@@ -76,8 +69,8 @@ The reusable component preserves these shell-level invariants exactly:
   completion auto-releases queued work; interrupt does not. **Pressing
   `Enter` on an empty composer while idle releases queued work** — this
   trigger is shell-local; the resulting submission still crosses the
-  boundary as a normal `SubmitTurnAction` <!-- provisional: subject to WU-100 reconciliation -->
-  with `Source = queue_release`.
+  boundary as a normal `SubmitTurnAction`
+  with `Source = SubmissionSourceQueueRelease`.
 - **Composer-driven permissions.** Permission requests render durable
   history rows in the transcript and the active approval controls live in
   the composer area, not in a modal. Multiple pending permissions may
@@ -99,29 +92,40 @@ host responsibilities and must cross the action/event boundary as typed
 data:
 
 - **Provider logic.** No direct provider/RPC calls from the shell package.
-  Submitted turns leave the shell as a `SubmitTurnAction` <!-- provisional: subject to WU-100 reconciliation -->
-  and the host returns lifecycle events (`SubmissionAcceptedEvent`, <!-- provisional: subject to WU-100 reconciliation -->
-  `RunStartedEvent`, `RunDeltaEvent`, `RunCompletedEvent`, <!-- provisional: subject to WU-100 reconciliation -->
-  `RunStoppedEvent`, `RunFailedEvent`). <!-- provisional: subject to WU-100 reconciliation -->
+  Submitted turns leave the shell as a `SubmitTurnAction`
+  and the host returns lifecycle events (`SubmissionAcceptedEvent`,
+  `RunStartedEvent`, `RunDeltaEvent`, `RunCompletedEvent`,
+  `RunStoppedEvent`, `RunFailedEvent`).
 - **Filesystem access.** Path validation, file reads, and preview payload
-  loading happen host-side. The shell emits `LoadPreviewAction` <!-- provisional: subject to WU-100 reconciliation -->
-  and the host returns `PreviewLoadedEvent` (or a failure event). <!-- provisional: subject to WU-100 reconciliation -->
+  loading happen host-side. The shell emits `LoadPreviewAction`
+  and the host returns `PreviewLoadedEvent` (or a failure event).
 - **Production permission handling.** Stable permission request identity,
   policy persistence, and runtime pause/resume execution are host-owned.
   The shell renders the request and emits a typed
-  `ResolvePermissionAction` <!-- provisional: subject to WU-100 reconciliation -->
+  `ResolvePermissionAction`
   carrying `RequestID` and `Decision`.
 - **Mid-stream permission pause.** Per WU-099, the host adapter is
-  responsible for pausing and replaying `RunDeltaEvent` <!-- provisional: subject to WU-100 reconciliation -->
+  responsible for pausing and replaying `RunDeltaEvent`
   forwarding while a permission is pending. The shell does not directly
   pause streams; it simply receives no further deltas until the host
-  resumes them after `PermissionResolvedEvent`. <!-- provisional: subject to WU-100 reconciliation -->
+  resumes them after `PermissionResolvedEvent`.
+
+## Action / Event Envelope
+
+Outbound shell actions cross the boundary inside a single `tea.Msg`
+envelope: `harnessshell.ActionMsg{Action Action}`. The host program (or
+the modeltap host adapter at `internal/harnesshost`) pattern-matches
+`ActionMsg` once and dispatches the concrete `Action` to the appropriate
+runtime call. Inbound host events are concrete typed values that satisfy
+the closed `harnessshell.HostEvent` interface; the host sends them as
+`tea.Msg` values and the shell processes them in `Model.Update`.
 
 ## Minimal Embedding Example
 
-The following sketch shows the smallest useful Bubble Tea host. It is
-illustrative; example code follows the WU-098 typed action/event contract
-and does not need to compile against the Stage A skeleton.
+Most modeltap embeddings drive the shell through
+[`internal/harnesshost.Adapter`](../harnesshost/README.md), which wraps
+the shell as a `tea.Model` decorator and bridges the action/event
+boundary to a `Runtime` implementation. A minimal embedding looks like:
 
 ```go
 package main
@@ -129,53 +133,39 @@ package main
 import (
     tea "github.com/charmbracelet/bubbletea"
 
-    "modeltap/internal/harnessshell" // provisional package path
-    "modeltap/internal/harnesshost"  // provisional package path
+    "github.com/jasonahenderson/modeltap/internal/harnessshell"
+    "github.com/jasonahenderson/modeltap/internal/harnesshost"
 )
 
-type model struct {
-    shell   harnessshell.Model      // shell-owned state
-    adapter *harnesshost.Adapter    // host adapter; modeltap-specific
-}
-
-func newModel(rt harnesshost.Runtime) model {
-    return model{
-        shell:   harnessshell.New(),
-        adapter: harnesshost.NewAdapter(rt),
-    }
-}
-
-func (m model) Init() tea.Cmd { return m.shell.Init() }
-
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-    // 1. Forward terminal/UI input and host events into the shell.
-    var cmd tea.Cmd
-    m.shell, cmd = m.shell.Update(msg)
-    cmds := []tea.Cmd{cmd}
-
-    // 2. Drain shell-emitted actions and route them to the host adapter.
-    for _, action := range m.shell.DrainActions() {
-        cmds = append(cmds, m.adapter.Dispatch(action))
-    }
-
-    return m, tea.Batch(cmds...)
-}
-
-func (m model) View() string { return m.shell.View() }
-
 func main() {
-    rt := /* your modeltap Runtime implementation */
-    p := tea.NewProgram(newModel(rt), tea.WithAltScreen())
+    shell := harnessshell.New(
+        harnessshell.WithLabel("my-model"),
+        harnessshell.WithPlaceholder("Type a message and press Enter."),
+    )
+    runtime := /* your harnesshost.Runtime implementation */
+
+    // Adapter wraps the shell: Update intercepts ActionMsg and
+    // dispatches to runtime; runtime tea.Msgs project to HostEvents.
+    adapter := harnesshost.New(shell, runtime)
+
+    p := tea.NewProgram(adapter, tea.WithAltScreen(), tea.WithMouseAllMotion())
     if _, err := p.Run(); err != nil {
         panic(err)
     }
 }
 ```
 
-The host adapter's `Dispatch` returns a `tea.Cmd` that performs the real
-runtime effect off the UI goroutine and delivers the resulting host event
-back through the program's `Update` loop, where the shell consumes it as
-input.
+For non-modeltap hosts that prefer to forward shell actions manually
+without `harnesshost`, treat the shell as a normal `tea.Model`: forward
+`tea.Msg` values to `Model.Update`, and pattern-match `ActionMsg` in your
+own outer loop:
+
+```go
+inner, cmd := m.shell.Update(msg)
+m.shell = inner.(harnessshell.Model)
+// In your top-level Update, dispatch ActionMsg to your runtime
+// service. The shell never invokes runtime calls directly.
+```
 
 For a fuller host integration walkthrough — submit, stream, permission,
 and preview flows — see
@@ -183,18 +173,8 @@ and preview flows — see
 
 ## Related Packages
 
-- [`internal/harnesshost/README.md`](../harnesshost/README.md) — modeltap-specific host adapter that consumes actions and produces events. <!-- provisional: subject to WU-100 reconciliation -->
-- `internal/harnessdemo` — fake/demo runtime adapter used by the shell-with-fake-data CLI and integration fixtures. Lives outside this package per WU-099. <!-- provisional: subject to WU-100 reconciliation -->
+- [`internal/harnesshost/README.md`](../harnesshost/README.md) — modeltap-specific host adapter that consumes actions and produces events.
+- [`internal/harnessdemo`](../harnessdemo) — fake/demo runtime adapter used by the `modeltap shell-demo` CLI and integration fixtures. Lives outside this package per WU-099.
 - [`docs/guides/harness-shell-embedding.md`](../../docs/guides/harness-shell-embedding.md) — canonical embedding guide.
 - [`docs/features/0014-harness-conversation-shell.md`](../../docs/features/0014-harness-conversation-shell.md) — behavior contract.
 - [`docs/patches/0015-harness-shell-component-api.md`](../../docs/patches/0015-harness-shell-component-api.md) — extraction policy and API-shape rules.
-
-## Reconciliation
-
-Names in this README that end with the HTML comment
-`<!-- provisional: subject to WU-100 reconciliation -->` are drawn from the
-WU-098 / WU-099 designs and may be renamed when WU-100 lands. The
-reconciliation pass performs a final sweep against the implemented names
-before release v0.2.1 ships; see
-[`docs/guides/harness-shell-embedding.md`](../../docs/guides/harness-shell-embedding.md)
-§"Reconciliation With Final WU-100 Names" for the canonical mapping table.
