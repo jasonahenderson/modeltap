@@ -97,22 +97,26 @@ This layer owns:
 - host-native slash-command routing
 - correlation between shell IDs and runtime IDs
 
-### Layer 3: Cutover and compatibility tests
+### Layer 3: Cutover and integration tests
 
 Target packages:
 
-- `internal/harnessspike`
-- and/or a narrow top-level harness integration package if needed
+- `internal/harnesshost` integration tests, or
+- a narrow top-level harness integration test if that yields clearer
+  ownership
 
 Purpose:
 
-- verify that the spike/demo wrapper and the cutover path now embed the
-  extracted shell correctly
-- ensure the extracted shell is the canonical implementation and the spike is
-  no longer behavior authority
+- verify that modeltap's composition of `internal/harnessshell` +
+  `internal/harnesshost` (+ `internal/harnessdemo` for the demo CLI) wires
+  correctly end-to-end
+- ensure the extracted shell is the canonical implementation and no spike-
+  shaped surface remains as a behavior authority
 
-This layer should stay small. Its job is not to duplicate Layer 1 and Layer 2,
-but to confirm that the new composition path is wired correctly.
+This layer does **not** live in `internal/harnessspike` — that package is
+deleted as part of WU-100 Stage E. Layer 3 should stay small; its job is
+not to duplicate Layer 1 and Layer 2 coverage, but to confirm the
+composition path is wired correctly.
 
 ## Oracle Migration Plan
 
@@ -155,14 +159,17 @@ These should become host adapter tests:
 - permission decisions map to runtime policy application
 - host-native command actions route to the correct underlying services
 
-### Tests that remain as thin cutover checks
+### Tests that move to host adapter / top-level integration
 
-These may remain in the spike or top-level harness as compatibility checks:
+After Stage E these become `internal/harnesshost` integration tests (or
+focused top-level harness integration tests):
 
-- spike wrapper still launches a shell-backed program
-- fake/demo host can still drive the extracted shell for examples or parity
-  fixtures
-- no duplicate shell logic remains in the spike wrapper after cutover
+- the demo CLI program (built on `internal/harnessshell` + `internal/harnessdemo`)
+  launches and renders a shell-backed program correctly
+- `internal/harnessdemo` can drive the extracted shell with synthetic events
+  for examples and parity fixtures
+- no duplicate shell logic survives anywhere outside `internal/harnessshell`
+- nothing in the repo imports a path containing "harnessspike"
 
 ## Required Parity Coverage Areas
 
@@ -349,14 +356,20 @@ Suggested files:
 - `internal/harnesshost/permissions_test.go`
 - `internal/harnesshost/projection_test.go`
 
-### Cutover tests
+### Cutover / integration tests
 
 Suggested files:
 
-- `internal/harnessspike/app_test.go`
-  reduced to compatibility-only checks after parity migration
-- or a focused integration test near the final harness composition point if
-  that yields clearer ownership
+- `internal/harnesshost/integration_test.go`
+  end-to-end composition checks for `internal/harnessshell` +
+  `internal/harnesshost`
+- `internal/harnessdemo/demo_test.go` (if needed)
+  end-to-end composition checks for the demo CLI's shell + demo runtime
+  composition
+
+The deleted `internal/harnessspike/app_test.go` does not survive — its
+assertions are redistributed into Layer 1 (shell), Layer 2 (host adapter),
+and Layer 3 (integration) per the migration plan.
 
 ## Verification Sequence
 
@@ -365,9 +378,12 @@ Suggested files:
 1. inventory and label existing spike tests by target layer
 2. port shell-owned tests into `internal/harnessshell`
 3. add host adapter tests for action/event and runtime projection behavior
-4. reduce spike tests to compatibility-only coverage
-5. run the parity sweep against the extracted package structure
-6. confirm that every `FEAT-0014` success criterion has at least one direct
+4. add `internal/harnesshost` (and if needed `internal/harnessdemo`)
+   integration tests for the small set of cutover / composition checks
+5. delete `internal/harnessspike/app_test.go` (and the rest of the
+   `harnessspike` package) at the same time as WU-100 Stage E
+6. run the parity sweep against the extracted package structure
+7. confirm that every `FEAT-0014` success criterion has at least one direct
    automated assertion
 
 ### Test compatibility during cutover
@@ -381,9 +397,9 @@ WU-100's "Test compatibility during cutover" rule is binding for WU-102:
 - the spike test file is allowed to be compile-broken on a per-stage basis
 
 WU-102's verification job is to confirm that, by Stage E completion, the
-spike test file holds only the cutover-compatibility checks listed below
-and that all migrated assertions are passing in their new shell-package or
-host-adapter homes.
+`internal/harnessspike` package and its test file are deleted, and that all
+migrated assertions are passing in their new shell-package, host-adapter,
+or host-integration homes.
 
 ## Regression Gates
 
@@ -407,8 +423,10 @@ Cause:
 
 Mitigation:
 
-- redistribute tests by ownership layer
-- keep only cutover checks in the spike package
+- redistribute tests by ownership layer (Layer 1 shell, Layer 2 host adapter,
+  Layer 3 host-integration)
+- delete `internal/harnessspike` and its test file once redistribution is
+  complete; do not leave a residual spike test suite
 
 ### Risk 2 — host adapter regressions are missed
 
