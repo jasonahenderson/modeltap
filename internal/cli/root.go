@@ -61,6 +61,7 @@ Key capabilities:
 	// Register all subcommands.
 	rootCmd.AddCommand(
 		newStartCommand(),
+		newShellCommand(),
 		newShellDemoCommand(),
 		newLogsCommand(),
 		newShowCommand(),
