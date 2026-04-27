@@ -137,6 +137,14 @@ func (a Adapter) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, cmd
 	}
 
+	if evt := projectRuntimeMessage(msg); evt != nil {
+		var cmd tea.Cmd
+		var inner tea.Model
+		inner, cmd = a.shell.Update(evt)
+		a.shell = inner.(harnessshell.Model)
+		return a, cmd
+	}
+
 	var cmd tea.Cmd
 	var inner tea.Model
 	inner, cmd = a.shell.Update(msg)
