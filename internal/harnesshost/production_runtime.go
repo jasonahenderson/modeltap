@@ -287,29 +287,155 @@ func (r *ProductionRuntime) SubmitTurn(ctx context.Context, req SubmitRequest) (
 	}, nil
 }
 
-// InterruptRun implements [harnesshost.Runtime]. WU-104a returns
-// not-implemented; WU-104b lands the CancelTurn integration.
+// InterruptRun implements [harnesshost.Runtime] using the existing
+// ProtocolClient.CancelTurn against protocol.MethodTurnCancel (per
+// the Phase 2 review's Codex #4 disposition — no new RPC needed).
+//
+// On error the runtime synthesizes harnessshell.RunStoppedEvent
+// (per Kimi #7) so the shell's transcript shows a clean stop instead
+// of a red error when the BFF doesn't support cancellation.
 func (r *ProductionRuntime) InterruptRun(ctx context.Context, runID string) error {
-	return errors.New("InterruptRun: not yet implemented (WU-104b)")
+	client := r.cm.Client()
+	if client == nil {
+		// Synthesize the stop event directly through the sender so
+		// the shell sees a clean RunStoppedEvent rather than a
+		// failed run from the adapter's default error path.
+		r.sender.Send(harnessshell.RunStoppedEvent{
+			RunID:   runID,
+			Reason:  harnessshell.StopReasonInterrupt,
+			Message: "stopped — no live BFF client",
+		})
+		return nil
+	}
+	if err := client.CancelTurn(ctx, runID); err != nil {
+		r.sender.Send(harnessshell.RunStoppedEvent{
+			RunID:   runID,
+			Reason:  harnessshell.StopReasonInterrupt,
+			Message: "stopped — backend reported: " + err.Error(),
+		})
+		return nil
+	}
+	// Success: the BFF accepted the cancel. Synthesize the stop
+	// event ourselves; the existing harness streaming layer doesn't
+	// emit a terminal Run* message on cancel, so we surface one
+	// directly to keep the shell's chrome consistent.
+	r.sender.Send(harnessshell.RunStoppedEvent{
+		RunID:  runID,
+		Reason: harnessshell.StopReasonInterrupt,
+	})
+	return nil
 }
 
-// DispatchCommand implements [harnesshost.Runtime]. WU-104a returns
-// not-implemented; WU-104c lands the per-command routing.
+// DispatchCommand implements [harnesshost.Runtime]. WU-104c lands
+// per-command routing; WU-104b returns not-implemented.
 func (r *ProductionRuntime) DispatchCommand(ctx context.Context, cmd HostCommand) error {
 	return errors.New("DispatchCommand: not yet implemented (WU-104c)")
 }
 
-// ResolvePermission implements [harnesshost.Runtime]. WU-104a returns
-// not-implemented; WU-104b lands the channel-based bridge.
+// ResolvePermission implements [harnesshost.Runtime]. Writes the
+// user's decision into the per-ToolCallID channel that the
+// permissionPromptCallback is blocking on. Idempotent: unknown
+// requestIDs are no-ops (the gate may have already resolved or
+// timed out).
 func (r *ProductionRuntime) ResolvePermission(ctx context.Context, requestID string, decision harnessshell.PermissionDecision) error {
-	return errors.New("ResolvePermission: not yet implemented (WU-104b)")
+	raw, ok := r.permPromises.Load(requestID)
+	if !ok {
+		return nil
+	}
+	promise := raw.(chan harnessshell.PermissionDecision)
+	select {
+	case promise <- decision:
+		// Synthesize PermissionResolvedEvent into the projection
+		// stream so the adapter's pause buffer drains and the
+		// transcript event row flips to granted/denied.
+		r.sender.Send(harnessshell.PermissionResolvedEvent{
+			RequestID: requestID,
+			Outcome:   outcomeFromDecision(decision),
+		})
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+		// Channel full: the gate already received a decision.
+		return nil
+	}
 }
 
-// LoadPreview implements [harnesshost.Runtime]. WU-104a returns
-// not-implemented; WU-104b lands the path-resolution + Read tool
-// integration.
+// LoadPreview implements [harnesshost.Runtime]. Path comes from the
+// adapter's tokenAttachments map (populated on submit); the runtime
+// validates via ContextManager.Resolve and reads via the Read tool.
 func (r *ProductionRuntime) LoadPreview(ctx context.Context, req PreviewRequest) (harnessshell.PreviewPayload, error) {
-	return harnessshell.PreviewPayload{}, errors.New("LoadPreview: not yet implemented (WU-104b)")
+	if req.Path == "" {
+		return harnessshell.PreviewPayload{}, errors.New("preview: path unresolved for token " + req.TokenID)
+	}
+
+	// Validate the path against the project root via Resolve. We
+	// expect a single non-glob path; reject globs to keep preview
+	// scoped to one file.
+	resolved, err := r.ctxMgr.Resolve(ctx, []string{req.Path})
+	if err != nil {
+		return harnessshell.PreviewPayload{}, err
+	}
+	if len(resolved) == 0 {
+		return harnessshell.PreviewPayload{}, errors.New("preview: path resolved to no files")
+	}
+	att := resolved[0]
+
+	// Run the Read tool to produce the rendered text. The tool
+	// applies its own size cap and format detection.
+	read := r.registry.Get(tools.ToolNameRead)
+	if read == nil {
+		return harnessshell.PreviewPayload{}, errors.New("preview: Read tool not registered")
+	}
+	input, _ := json.Marshal(map[string]any{"file_path": att.Path})
+	result, err := read.Execute(ctx, input)
+	if err != nil {
+		return harnessshell.PreviewPayload{}, err
+	}
+	if result.Status != tools.StatusSuccess {
+		msg := result.Error
+		if msg == "" {
+			msg = result.Reason
+		}
+		return harnessshell.PreviewPayload{}, errors.New("preview: " + msg)
+	}
+
+	title := att.Path
+	if i := lastSlash(title); i >= 0 && i+1 < len(title) {
+		title = title[i+1:]
+	}
+	return harnessshell.PreviewPayload{
+		Title:   title,
+		Content: result.Output,
+		Metadata: map[string]string{
+			"path": att.Path,
+			"type": result.OutputType,
+		},
+	}, nil
+}
+
+// outcomeFromDecision translates a shell-side PermissionDecision
+// into the adapter-side PermissionOutcome the shell expects on
+// PermissionResolvedEvent.
+func outcomeFromDecision(d harnessshell.PermissionDecision) harnessshell.PermissionOutcome {
+	switch d {
+	case harnessshell.DecisionApproveOnce:
+		return harnessshell.OutcomeApprovedOnce
+	case harnessshell.DecisionApproveSession:
+		return harnessshell.OutcomeApprovedSession
+	default:
+		return harnessshell.OutcomeDenied
+	}
+}
+
+// lastSlash returns the index of the last '/' or '\\' in s, or -1.
+func lastSlash(s string) int {
+	for i := len(s) - 1; i >= 0; i-- {
+		if s[i] == '/' || s[i] == '\\' {
+			return i
+		}
+	}
+	return -1
 }
 
 // SummarizePaste implements [harnesshost.Runtime]. WU-104a returns

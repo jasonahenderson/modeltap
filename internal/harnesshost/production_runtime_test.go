@@ -3,6 +3,7 @@ package harnesshost
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -167,9 +168,10 @@ func TestProductionRuntimeSubmitTurnFailsWithoutClient(t *testing.T) {
 	}
 }
 
-func TestProductionRuntimeStubMethodsReturnNotImplemented(t *testing.T) {
+func TestProductionRuntimeWU104bWU104cStubs(t *testing.T) {
 	cfg := ProductionRuntimeConfig{
-		ConnConfig: harness.ConnectionConfig{SocketPath: "/nonexistent.sock"},
+		ConnConfig:        harness.ConnectionConfig{SocketPath: "/nonexistent.sock"},
+		PermissionTimeout: 10 * time.Millisecond,
 	}
 	r, err := NewProductionRuntime(cfg)
 	if err != nil {
@@ -177,24 +179,107 @@ func TestProductionRuntimeStubMethodsReturnNotImplemented(t *testing.T) {
 	}
 	defer r.Close()
 
-	if err := r.InterruptRun(context.Background(), "run-1"); err == nil {
-		t.Fatalf("InterruptRun should return not-implemented at WU-104a")
-	}
-	if _, err := r.LoadPreview(context.Background(), PreviewRequest{}); err == nil {
-		t.Fatalf("LoadPreview should return not-implemented at WU-104a")
-	}
-	if err := r.ResolvePermission(context.Background(), "perm-1", harnessshell.DecisionApproveOnce); err == nil {
-		t.Fatalf("ResolvePermission should return not-implemented at WU-104a")
-	}
+	// WU-104c stubs:
 	if err := r.DispatchCommand(context.Background(), HostCommand{Name: "model"}); err == nil {
-		t.Fatalf("DispatchCommand should return not-implemented at WU-104a")
+		t.Fatalf("DispatchCommand should return not-implemented at WU-104b")
 	}
-	// SummarizePaste passes through at WU-104a.
+
+	// SummarizePaste passes through.
 	got, err := r.SummarizePaste(context.Background(), "raw text")
-	if err != nil {
-		t.Fatalf("SummarizePaste: %v", err)
+	if err != nil || got != "raw text" {
+		t.Fatalf("SummarizePaste = (%q,%v), want (raw text, nil)", got, err)
 	}
-	if got != "raw text" {
-		t.Fatalf("SummarizePaste = %q, want passthrough %q", got, "raw text")
+
+	// InterruptRun without a live client synthesizes RunStoppedEvent
+	// rather than returning an error. The error return is nil.
+	if err := r.InterruptRun(context.Background(), "run-1"); err != nil {
+		t.Fatalf("InterruptRun: should return nil even without client, got %v", err)
+	}
+
+	// ResolvePermission with no pending request is a no-op.
+	if err := r.ResolvePermission(context.Background(), "perm-unknown", harnessshell.DecisionApproveOnce); err != nil {
+		t.Fatalf("ResolvePermission unknown ID should be no-op, got %v", err)
+	}
+
+	// LoadPreview without path returns an unresolved error.
+	if _, err := r.LoadPreview(context.Background(), PreviewRequest{}); err == nil {
+		t.Fatalf("LoadPreview without path should error")
+	}
+}
+
+func TestProductionRuntimeLoadPreviewReadsFile(t *testing.T) {
+	stub, err := testutil.NewBFFStub()
+	if err != nil {
+		t.Fatalf("NewBFFStub: %v", err)
+	}
+	defer stub.Close()
+
+	// Write a fixture file in a temp project root.
+	dir := t.TempDir()
+	fixture := dir + "/hello.txt"
+	if err := os.WriteFile(fixture, []byte("PREVIEW-CONTENT-MARKER"), 0644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+
+	cfg := ProductionRuntimeConfig{
+		ConnConfig:  harness.ConnectionConfig{SocketPath: stub.SocketPath()},
+		ProjectRoot: dir,
+	}
+	r, err := NewProductionRuntime(cfg)
+	if err != nil {
+		t.Fatalf("NewProductionRuntime: %v", err)
+	}
+	defer r.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := r.Start(ctx); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+
+	payload, err := r.LoadPreview(ctx, PreviewRequest{
+		TokenID: "tok-1",
+		Path:    "hello.txt",
+		Source:  "composer",
+	})
+	if err != nil {
+		t.Fatalf("LoadPreview: %v", err)
+	}
+	if payload.Title == "" {
+		t.Fatalf("preview title empty")
+	}
+	if !strings.Contains(payload.Content, "PREVIEW-CONTENT-MARKER") {
+		t.Fatalf("preview content missing marker; got %q", payload.Content)
+	}
+}
+
+func TestProductionRuntimeResolvePermissionUnblocksCallback(t *testing.T) {
+	cfg := ProductionRuntimeConfig{
+		ConnConfig:        harness.ConnectionConfig{SocketPath: "/nonexistent.sock"},
+		PermissionTimeout: 100 * time.Millisecond,
+	}
+	r, err := NewProductionRuntime(cfg)
+	if err != nil {
+		t.Fatalf("NewProductionRuntime: %v", err)
+	}
+	defer r.Close()
+
+	// Register a fake promise channel directly to simulate the
+	// permissionPromptCallback being mid-flight.
+	requestID := "perm-test"
+	promise := make(chan harnessshell.PermissionDecision, 1)
+	r.permPromises.Store(requestID, promise)
+	defer r.permPromises.Delete(requestID)
+
+	if err := r.ResolvePermission(context.Background(), requestID, harnessshell.DecisionApproveOnce); err != nil {
+		t.Fatalf("ResolvePermission: %v", err)
+	}
+	select {
+	case got := <-promise:
+		if got != harnessshell.DecisionApproveOnce {
+			t.Fatalf("decision = %v, want DecisionApproveOnce", got)
+		}
+	case <-time.After(50 * time.Millisecond):
+		t.Fatalf("ResolvePermission did not unblock the channel")
 	}
 }
