@@ -323,3 +323,13 @@ type HostStatusEvent struct {
 }
 
 func (HostStatusEvent) isHostEvent() {}
+
+// ActionMsg is the [tea.Msg] envelope used to forward outbound shell actions
+// to the host program. Per WU-098 §"Concrete forwarding shape", the exact
+// envelope shape was deferred to WU-100. The reusable shell uses a single
+// envelope so adding a new [Action] type does not require host loops to grow
+// new outermost cases; hosts pattern-match `ActionMsg` once and dispatch on
+// the concrete `Action` type at the host-adapter layer.
+type ActionMsg struct {
+	Action Action
+}
