@@ -250,7 +250,7 @@ The extracted shell component should expose:
 - state inputs
 - user-event inputs
 - rendered view output
-- explicit messages/callbacks for shell actions
+- typed action and event messages for shell actions and host responses
 
 At minimum, the component API should support these boundary shapes.
 
@@ -307,8 +307,12 @@ modeltap harness-spike
 In-shell behaviors covered by this feature:
 
 - `/clear`
-- `/perm`
-- `/demo`
+- a permission request arriving from the runtime/tool layer surfaces in the
+  composer (the spike exposes this via the `/perm` demo command, which is
+  not part of the FEAT-0014 contract — it is a spike-only convenience for
+  exercising the permission flow without a real tool)
+- a streaming assistant response runs to completion (the spike exposes this
+  via the `/demo` command, also not part of the FEAT-0014 contract)
 - composer submission and queue release
 - transcript scrolling
 - permission action selection
@@ -348,15 +352,17 @@ semantics that any future configuration must preserve:
    releases queued work after an interrupt. **Test**: queue a message during a
    stream, interrupt the stream, then press `Enter` on an empty composer and
    verify the queued work starts.
-5. The permission flow is non-modal and composer-driven. **Test**: run `/perm`,
-   verify the request appears in the transcript and the approval controls appear
-   in the composer.
+5. The permission flow is non-modal and composer-driven. **Test**: inject a
+   permission request from the runtime/tool layer (or the test fake host, or
+   the spike `/perm` convenience) and verify the request appears in the
+   transcript and the approval controls appear in the composer.
 6. Multiple pending permissions can coexist and be switched with `Up` / `Down`.
-   **Test**: submit `/perm` twice and verify the composer can switch between
-   pending requests.
+   **Test**: inject two permission requests and verify the composer can switch
+   between pending requests.
 7. Mid-stream permissions pause the active stream immediately and resume or end
-   cleanly based on approval/denial. **Test**: start `/demo`, trigger `/perm`,
-   approve it, and verify streaming resumes.
+   cleanly based on approval/denial. **Test**: start an assistant streaming
+   response, inject a permission request mid-stream, approve it, and verify
+   streaming resumes.
 8. Pasted content remains inspectable inline in the transcript while file
    references remain compact path/reference tokens with on-demand preview.
 
