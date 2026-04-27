@@ -1,79 +1,101 @@
 # v0.2.2 — Status
 
-**Current phase:** Phase 2 — Review (designs complete; awaiting reviewers)
+**Current phase:** Phase 3 — Implementation (queued; awaiting explicit
+phase-transition ADMIN commit)
 **Branch:** `spike/scrolling-surface-eval` inherited from v0.2.1;
 should retarget to a release branch before tagging
 **Phase 1 closed:** 2026-04-27
-**Phase 2 closed:** —
+**Phase 2 closed:** 2026-04-27
 **Phase 3 closed:** —
 
 ## Phase 3 work units
 
+After the Phase 2 review processing, WU-104 split into three slices
+(per Codex #1) so WU-105 has a tight dependency on WU-104a alone.
+
 | WU | Title | Size | State | Phase 1 design |
 |----|-------|------|-------|----------------|
-| 103 | `internal/harness` audit and salvage report | M | Phase 1 done | [`designs/2026-04-27-design-harness-audit-103.md`](designs/2026-04-27-design-harness-audit-103.md) |
-| 104 | Concrete `harnesshost.Runtime` implementation | L | Phase 1 done | [`designs/2026-04-27-design-production-wiring-104-106.md`](designs/2026-04-27-design-production-wiring-104-106.md) |
-| 105 | Production conversation-shell CLI entrypoint | M | Phase 1 done | bundled, see above |
-| 106 | Plumbing cleanup | M | Phase 1 done | bundled, see above |
-| 107 | WU-102 SC3 follow-up: viewport-state accessor | S | Phase 1 done | [`designs/2026-04-27-design-viewport-state-accessor-107.md`](designs/2026-04-27-design-viewport-state-accessor-107.md) |
+| 103  | `internal/harness` audit and salvage report | M | Phase 1 done | [`designs/2026-04-27-design-harness-audit-103.md`](designs/2026-04-27-design-harness-audit-103.md) |
+| 104a | `Runtime.SubmitTurn` + scaffolding + BFF stub | M | Phase 1 done | bundled |
+| 104b | `LoadPreview` + `ResolvePermission` + `InterruptRun` | M | Phase 1 done | bundled |
+| 104c | `DispatchCommand` + `SummarizePaste` + MCP lazy-start | M | Phase 1 done | bundled |
+| 105  | Production CLI entrypoint (`modeltap shell`) | M | Phase 1 done | bundled |
+| 106  | Plumbing cleanup | M | Phase 1 done | bundled |
+| 107  | Viewport-state accessor (SC3 follow-up) | S | Phase 1 done | [`designs/2026-04-27-design-viewport-state-accessor-107.md`](designs/2026-04-27-design-viewport-state-accessor-107.md) |
 
 ## Phase dependency graph
 
 ```
 Phase 1 (design) ──→ Phase 2 (review) ──→ Phase 3 (impl)
-       ✅                  ▶ active              ⚠ blocked
+       ✅                  ✅                  ▶ queued
 ```
 
 Within Phase 3:
 
 ```
-WU-103 audit (no impl; doc-as-deliverable already complete in design)
-WU-104 ──→ WU-105 ──→ WU-106
+WU-103 (already an analysis-as-deliverable; treat as done at design time)
+WU-104a ──→ WU-104b ──→ WU-104c
+   │
+   └────→ WU-105 (parallel after 104a)
+                      │
+                      ▼
+                  WU-106 (cleanup; runs after 104b lands; finishes after 104c)
+
 WU-107 (independent)
 ```
 
 ## Up next
 
-- **Phase 2 — Review.** User-chosen review of the three Phase 1
-  design docs:
-  - `designs/2026-04-27-design-harness-audit-103.md`
-  - `designs/2026-04-27-design-production-wiring-104-106.md`
-  - `designs/2026-04-27-design-viewport-state-accessor-107.md`
-  Reviews land under `docs/releases/v0.2.2/.reviews/` per
-  `.agents/process.md` §"Review Artifact Placement".
-
-  Specific review questions raised by the production-wiring design:
-  1. Does the BFF already implement `turn.interrupt` (or
-     equivalent)? If not, scope decision for the server-side change.
-  2. Does `ConnectionManager` already expose a sync-promise wrapper
-     around `Client.SubmitTurn`? If yes, the design's "add one"
-     plan becomes "use the existing one".
-  3. Final CLI command name: design recommends `shell`; alternatives
-     are `chat` or keeping `harness`.
-
-- After Phase 2 closes, an explicit `ADMIN:` commit transitions to
-  Phase 3.
+- **Phase 2 → Phase 3 transition.** Explicit `ADMIN:` commit per
+  Prime Directive #6, after which Phase 3 implementation begins.
+- **WU-104a** kicks off Phase 3. Lands `Runtime.SubmitTurn` plus
+  the supporting scaffolding (constructor, `deferredSender`,
+  `AttachProgram`, correlation tables, BFF promise integration,
+  `testutil/bffstub`).
 
 ## In progress
 
-(none — Phase 1 designs complete; awaiting Phase 2 dispatch)
+(none — Phase 2 closed; Phase 3 queued)
 
 ## Done this phase
 
-- v0.2.2 plan opened (`e788d30`, then revised under
-  `ADMIN: open v0.2.2 Phase 1 — Design`).
-- WU-103 audit moved to `designs/2026-04-27-design-harness-audit-103.md`
-  per process §"Design Artifact Placement". Original location
-  (root of v0.2.2/) was non-conformant.
-- WU-104 + WU-105 + WU-106 design bundle landed at
-  `designs/2026-04-27-design-production-wiring-104-106.md`. Resolves
-  the v0.2.1-deferred async/sync `SubmitTurn` bridge (block-inside-
-  tea.Cmd-via-sync-promise-on-ConnectionManager) and identifies the
-  state-holder story for the deleted `AppState`.
+- v0.2.2 plan opened `e788d30`, restructured to Phase 1 in
+  `9cf82e4` (`ADMIN: open v0.2.2 Phase 1 — Design`).
+- WU-103 audit landed at
+  `designs/2026-04-27-design-harness-audit-103.md`.
+- WU-104+105+106 design bundle landed at
+  `a595c4d` then revised post-Phase-2 review (this commit).
 - WU-107 design landed at
   `designs/2026-04-27-design-viewport-state-accessor-107.md`.
-  Read-only `ViewportState` accessor on `harnessshell.Model` plus a
-  parity test that asserts FEAT-0014 SC3.
+- Phase 1 closed at `7a4f063` (`ADMIN: close v0.2.2 Phase 1 — Design`).
+- Codex Phase 2 design review accepted with 5 findings accepted +
+  1 rejected (bare-`modeltap` shell launch). Disposition table at
+  the bottom of `.reviews/codex-phase2-design-review.md`.
+- Kimi Phase 2 design review accepted with 17 findings accepted
+  (1 moot under the bare-`modeltap` rejection). Disposition table
+  at the bottom of `.reviews/kimi-phase2-design-review.md`.
+- All design docs revised to apply the accepted findings. Major
+  changes:
+  - WU-104 split into 104a / 104b / 104c (Codex #1).
+  - Permission gating architecture moved into `ProductionRuntime`
+    via `sync.Map` of per-`ToolCallID` channels (Codex #2 / Kimi #2).
+  - `Runtime.InterruptRun` uses existing `CancelTurn` instead of
+    inventing a new RPC (Codex #4).
+  - `LoadPreview` path resolution via adapter token-attachment
+    table (Codex #3).
+  - `SubmitTurnSync` resolves the double-notify problem with a
+    promise-router that the existing event bridge writes to in
+    addition to `ProgramSender` (Kimi #4).
+  - `deferredSender` concretely defined (Kimi #5).
+  - `AttachProgram` runs before `Start` (Kimi #6).
+  - `DispatchCommand` emits `HostStatusEvent` directly via the
+    runtime's `ProgramSender` reference (Kimi #3).
+  - Viewport-state cache pointer preallocated in `New()` so View
+    can mutate through the pointer (Codex #5 / Kimi #13).
+  - Layer 3 test scope changed to `net.Listener`-backed BFF stub
+    (Kimi #9).
+  - Bare `modeltap` does NOT change to launch shell (Codex #6
+    rejected).
 
 ## Carried-over designs (still authoritative)
 
@@ -85,13 +107,16 @@ duplicating them:
 
 ## Open items
 
-- **Phase 2 dispatch.** Reviewers TBD (TPM may handle inline or
-  delegate to external tools per v0.2.1 precedent — Codex / Kimi /
-  HIL passes).
+- **Phase 3 dispatch.** Pending the explicit ADMIN phase-transition
+  commit. WU-104a is the first implementation unit.
 - **Branch retarget.** Inherited from v0.2.1; pending TPM decision.
-- **Production CLI command name.** Recommendation `shell`; final
-  decision happens at Phase 2 review.
-- **MCP scope.** v0.2.0 added `internal/harness/mcp*.go`. The
-  audit categorized them as keep; the production-wiring design lazy-
-  starts MCP only on first MCP-namespaced command. Whether MCP ships
-  in v0.2.2 vs. defers to a later release is a Phase 2 decision.
+- **MCP scope.** v0.2.0 added `internal/harness/mcp*.go`. The audit
+  categorized them as keep; the production-wiring design lazy-starts
+  MCP only on first MCP-namespaced command. Whether MCP ships in
+  v0.2.2 vs. defers to a later release is decided at WU-104c
+  implementation time based on whether the lazy-start integration
+  works against the real MCP processes.
+- **Permission timeout.** WU-104b adds a default 5-minute timeout
+  on the permission-promise channel plus a cancellation path
+  triggered by `Runtime.Close`. If users want a different default,
+  it surfaces as a config option in WU-104b.

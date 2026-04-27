@@ -74,18 +74,22 @@ duplicating them:
 
 ### Work units
 
+The Phase 2 review (Codex finding #1) split WU-104 into three
+slices so WU-105 can begin as soon as `SubmitTurn` lands:
+
 | WU | Title | Dependencies | Size | Phase 1 design |
 |----|-------|-------------|------|----------------|
-| 103 | `internal/harness` audit and salvage report | — | M | [`designs/2026-04-27-design-harness-audit-103.md`](designs/2026-04-27-design-harness-audit-103.md) |
-| 104 | Concrete `harnesshost.Runtime` implementation | 103 | L | bundled with 105 + 106 in [`designs/2026-04-27-design-production-wiring-104-106.md`](designs/2026-04-27-design-production-wiring-104-106.md) |
-| 105 | Production conversation-shell CLI entrypoint | 104 | M | bundled, see above |
-| 106 | Plumbing cleanup | 104, 105 | M | bundled, see above |
-| 107 | WU-102 SC3 follow-up: viewport-state accessor | — | S | [`designs/2026-04-27-design-viewport-state-accessor-107.md`](designs/2026-04-27-design-viewport-state-accessor-107.md) |
+| 103  | `internal/harness` audit and salvage report | — | M | [`designs/2026-04-27-design-harness-audit-103.md`](designs/2026-04-27-design-harness-audit-103.md) |
+| 104a | `Runtime.SubmitTurn` + `ProductionRuntime` scaffolding + `testutil/bffstub` | 103 | M | bundled in [`designs/2026-04-27-design-production-wiring-104-106.md`](designs/2026-04-27-design-production-wiring-104-106.md) |
+| 104b | `Runtime.LoadPreview` + `Runtime.ResolvePermission` + `Runtime.InterruptRun` | 104a | M | bundled, see above |
+| 104c | `Runtime.DispatchCommand` + `Runtime.SummarizePaste` + MCP lazy-start | 104b, 106 (refactor pass) | M | bundled, see above |
+| 105  | Production conversation-shell CLI entrypoint (`modeltap shell`) | 104a | M | bundled, see above |
+| 106  | Plumbing cleanup (delete + refactor passes) | 104b, 105 | M | bundled, see above |
+| 107  | WU-102 SC3 follow-up: viewport-state accessor | — | S | [`designs/2026-04-27-design-viewport-state-accessor-107.md`](designs/2026-04-27-design-viewport-state-accessor-107.md) |
 
-WU-104 / WU-105 / WU-106 share a contract surface (the `Runtime` impl
-and the production CLI together replace the deleted legacy harness;
-the cleanup that follows removes the files the audit categorized as
-delete). Per `.agents/process.md` §"Design Artifact Placement"
+WU-104a / WU-104b / WU-104c / WU-105 / WU-106 share a contract
+surface (the `Runtime` impl, the production CLI, and the cleanup
+that follows). Per `.agents/process.md` §"Design Artifact Placement"
 ("Bundle related WUs that share a contract surface"), they share one
 design document.
 
@@ -93,8 +97,8 @@ WU-107 is independent — it adds a viewport-state accessor on
 `harnessshell.Model` and a parity test that uses it; no Runtime or
 CLI surface area is touched.
 
-**Critical path:** 103 → 104 → 105 → 106. WU-107 runs in parallel
-with the rest.
+**Critical path:** 103 → 104a → 104b → 104c → 106. WU-105 starts
+in parallel with WU-104b once WU-104a lands. WU-107 is independent.
 
 ### Phase 1 design checklist
 
@@ -102,21 +106,21 @@ Phase 1 is complete when every WU has a design doc under
 `docs/releases/v0.2.2/designs/`:
 
 - ✅ WU-103: `2026-04-27-design-harness-audit-103.md`
-- ✅ WU-104 + WU-105 + WU-106: `2026-04-27-design-production-wiring-104-106.md`
+- ✅ WU-104a + WU-104b + WU-104c + WU-105 + WU-106:
+  `2026-04-27-design-production-wiring-104-106.md`
 - ✅ WU-107: `2026-04-27-design-viewport-state-accessor-107.md`
 
 ## Risk register
 
 - **R1 — plumbing turns out wholly broken.** If WU-103 audit's
-  optimism doesn't survive contact with WU-104 implementation, WU-104
-  expands to "build a fresh Runtime impl from scratch with new BFF
-  connection / protocol / tool / context layers." That is a much
-  larger scope; WU-104 likely splits into per-subsystem WUs. The
-  release may slip or scope down (e.g., ship without MCP).
-  Mitigation: WU-104's design explicitly identifies the order of
-  Runtime methods to land (`SubmitTurn` first, foundational; others
-  follow) so a partial impl can ship if the bottom of the plumbing
-  is unsound.
+  optimism doesn't survive contact with WU-104 implementation, the
+  remaining 104 slices expand to "build a fresh impl from scratch
+  with new BFF connection / protocol / tool / context layers." That
+  is a much larger scope; the release may slip or scope down (e.g.,
+  ship without MCP). Mitigation: the WU-104 split (104a / b / c)
+  and the WU-105 dependency tightening to 104a-only (per Codex #1)
+  mean a partial impl can ship as soon as `SubmitTurn` works; b and
+  c can fall back to documented not-implemented errors if needed.
 - **R2 — partial salvage with awkward shape.** Some plumbing might
   compile but couple awkwardly to the deleted App's `tea.Msg`
   lifecycle. WU-104's design calls out the refactor seams (sync
@@ -124,13 +128,13 @@ Phase 1 is complete when every WU has a design doc under
 - **R3 — branch retarget still pending.** v0.2.1 was tagged on
   `spike/scrolling-surface-eval`. Before tagging v0.2.2 the branch
   should retarget; this is a TPM decision not blocking code work.
-- **R4 — interrupt RPC may not exist on the BFF.** WU-103 audit
-  flagged that `client.go`'s `ConnProtocolClient` interface didn't
-  show an explicit Interrupt method during the survey. WU-104 either
-  adds one (server-side change too) or surfaces
-  `RunFailedEvent{Message: "interrupt unsupported"}`. If a server-
-  side change is required, that bumps scope and may need an
-  ADR.
+- **R4 — interrupt RPC.** Resolved by Phase 2 review (Codex #4):
+  the existing `ProtocolClient.CancelTurn` (against
+  `protocol.MethodTurnCancel`) is the production interrupt
+  channel. WU-104b uses it. If `CancelTurn` returns an error, the
+  runtime synthesizes `harnessshell.RunStoppedEvent` (per Kimi #7)
+  rather than `RunFailedEvent` so the UX preserves clean stop
+  semantics. No server-side change required.
 - **R5 — MCP autostart side effects.** `mcp.go` orchestrates external
   MCP processes. WU-104's design specifies when in the new Runtime's
   lifecycle MCP starts; if the Runtime construction is too early,
@@ -155,8 +159,7 @@ v0.2.2 is complete when:
 
 ## Current phase
 
-**Phase 2 — Review (in progress).** Phase 1 closed
-2026-04-27 with all three design bundles landed under
-`docs/releases/v0.2.2/designs/`. Phase 2 begins with the user
-deciding the review path (read directly, send to external models,
-or both); reviews land under `docs/releases/v0.2.2/.reviews/`.
+**Phase 2 — Review (complete).** Codex and Kimi reviews dispositioned
+2026-04-27; design docs revised to address every blocking and
+significant finding. Phase 2 closure is an explicit `ADMIN:` commit;
+Phase 3 implementation begins with WU-104a.
