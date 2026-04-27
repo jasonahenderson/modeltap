@@ -664,8 +664,10 @@ Recompose the later harness App around:
 
 ### Stage 5
 
-Delete spike-only fake/demo logic from the reusable shell package and from any
-temporary extraction seams that kept fake runtime behavior inside shell code.
+Move any remaining fake/demo behavior into `internal/harnessdemo` and delete
+`internal/harnessspike` entirely. Cutover-only tests relocate to
+`internal/harnesshost` integration tests per WU-102. After Stage 5 the repo
+contains no package called "spike."
 
 ## Fake/Demo Runtime Placement
 
@@ -688,11 +690,16 @@ Responsibilities:
 `internal/harnessdemo` should consume the same shell action contract and emit
 the same host event contract as `internal/harnesshost`.
 
-That gives three valid hosts for the same shell package:
+That gives two valid host packages for the reusable shell, plus pure test
+fakes for unit tests:
 
 - `internal/harnesshost` for real modeltap integration
-- `internal/harnessdemo` for examples/spike parity/test fixtures
-- test fakes for focused shell tests
+- `internal/harnessdemo` for examples and test fixtures
+- test fakes constructed inline by shell unit tests
+
+`internal/harnessspike` is **not** a fourth host. It is deleted as part of
+v0.2.1 (see WU-100 Stage E). The shell-with-fake-data CLI capability that
+`harnessspike` currently provides moves to `internal/harnessdemo`.
 
 ### Anti-goal
 
@@ -727,6 +734,9 @@ Specific extraction guardrails:
 1. reusable shell package: `internal/harnessshell`
 2. modeltap host adapter: `internal/harnesshost`
 3. optional demo host: `internal/harnessdemo`
+
+`WU-101` must not document `internal/harnessspike` as part of the post-
+extraction architecture; that package is deleted at end of release.
 
 The embedding docs should show:
 
