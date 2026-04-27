@@ -78,12 +78,61 @@ func (m Model) ViewportState() ViewportState
 The local copy's YOffset etc. are computed inside SetContent based on
 the prior YOffset of `state.transcript` and the new content size.
 
-To populate `ViewportState()` without breaking View's purity, View
-captures the post-SetContent viewport state into a private cache on
-`Model.state` via a pointer field that is allowed to mutate (`*ViewportState`,
-allocated lazily). The `Model` value still does not change observable
-behavior — the cache is read-only from the outside, only the
-`ViewportState()` accessor reads it.
+The cache pointer is **preallocated in `New()`** so that View can
+mutate the pointed-to `ViewportState` value through a value receiver:
+
+```go
+type state struct {
+    // ... existing fields ...
+    viewportCache *ViewportState  // set once in New(), mutated by View
+}
+
+func New(opts ...Option) Model {
+    m := Model{state: state{
+        // ... existing init ...
+        viewportCache: &ViewportState{},
+    }}
+    // ...
+}
+
+func (m Model) View() string {
+    in := m.toRenderInput()
+    result := Render(in)
+    vp := m.state.transcript
+    vp.SetContent(result.Content)
+    *m.state.viewportCache = ViewportState{
+        YOffset:  vp.YOffset,
+        AtBottom: vp.AtBottom(),
+        Width:    vp.Width,
+        Height:   vp.Height,
+    }
+    return vp.View()
+}
+
+func (m Model) ViewportState() ViewportState {
+    if m.state.viewportCache == nil {
+        return ViewportState{}
+    }
+    return *m.state.viewportCache
+}
+```
+
+The pointer is set once at construction; `View()` mutates the
+pointed-to value, which is observable to `ViewportState()` because
+both `m`-copies share the same pointer. **Lazy allocation in `View()`
+would not work** through a value receiver (the assignment to
+`m.state.viewportCache = new(...)` only mutates the local copy of
+`m`); preallocating in `New()` is the only mechanism that survives
+the value-receiver semantics. This is the resolution to Codex finding
+#5.
+
+The "purity" framing of the original design is reworded here: View
+intentionally mutates a lazy-allocated internal cache through a
+pointer field. The cache is **not part of the shell's semantic
+state** — it is only a snapshot of the last rendered frame, and is
+only observable through the read-only `ViewportState()` accessor. The
+shell's behavior under the same `Model` value with the same input
+sequence remains deterministic; the cache is purely a host-test seam.
 
 Alternative considered and rejected: change View to (string,
 ViewportState) signature. Rejected because Bubble Tea's `tea.Model`
@@ -97,7 +146,12 @@ than reading after a real View call.
 
 ### Test: SC3 parity assertion
 
-`internal/harnessshell/viewport_test.go` (new file):
+`internal/harnessshell/viewport_test.go` (new file). The test lives
+in `package harnessshell` (not `package harnessshell_test`) because
+it reads unexported `state` fields to seed the transcript. If a
+future external test needs the same coverage without internal
+access, the `ViewportState` accessor already exposes enough signal
+for a black-box test.
 
 ```go
 package harnessshell
