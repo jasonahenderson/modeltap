@@ -12,6 +12,7 @@ Explorations are upstream product and design artifacts. They capture problem fra
 | [EXP-0007](0007-multi-model-orchestration.md) | Multi-Model Orchestration | exploring |
 | [EXP-0008](0008-integrated-harness.md) | Integrated Harness — Modeltap as Professional AI Environment | exploring |
 | [EXP-0009](0009-harness-prompt-architecture.md) | Harness Prompt Architecture — Lessons from the Claude Code Leak | exploring |
+| [EXP-0013](0013-ultron-evaluation.md) | Ultron Evaluation — Tiered Memory and Skill Evolution from ModelScope | watching |
 
 ## Lifecycle
 
@@ -82,6 +83,8 @@ Optional fields:
 Use one of:
 
 - `exploring` — active problem-space exploration
+- `watching` — not actively pursuing, but tracking an external project or
+  development for changes that might shift our decision
 - `deferred` — intentionally parked for later
 - `promoted` — exploration produced downstream canonical artifact(s)
 - `superseded` — replaced by another exploration or a more canonical document
