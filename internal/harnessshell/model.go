@@ -293,6 +293,12 @@ func (m Model) handleKey(msg tea.KeyMsg) (bool, Model, tea.Cmd) {
 		// and permission-resolve paths are all routed through
 		// emitSubmitOnEnter.
 		if msg.Type == tea.KeyEnter && !msg.Alt {
+			if isShellNativeQuitCommand(m.state.input.Value()) && len(m.state.inputTokens) == 0 {
+				m.state.input.Reset()
+				m.state.syncInputHeight()
+				m.state.status = "Exiting"
+				return true, m, tea.Quit
+			}
 			if m.state.emitSubmitOnEnter() {
 				return true, m, nil
 			}

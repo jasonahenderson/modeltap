@@ -18,6 +18,15 @@ import (
 // commands cross via [RunHostCommandAction] (added in a later commit).
 const shellNativeClearCommand = "/clear"
 
+func isShellNativeQuitCommand(content string) bool {
+	switch strings.TrimSpace(content) {
+	case "/quit", "/exit":
+		return true
+	default:
+		return false
+	}
+}
+
 // enqueueSubmission appends a queued follow-up entry to the visible queue.
 // Per WU-098 queue invariants, the visible queue is FIFO and merges happen
 // only at release time.

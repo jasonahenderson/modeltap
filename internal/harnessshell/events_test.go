@@ -110,6 +110,27 @@ func TestEnterSubmitShellNativeClearDoesNotEmit(t *testing.T) {
 	}
 }
 
+func TestEnterShellNativeQuitCommandsReturnQuit(t *testing.T) {
+	for _, command := range []string{"/quit", "/exit"} {
+		t.Run(command, func(t *testing.T) {
+			m := newWithFixedClock()
+			m.state.input.SetValue(command)
+
+			updated, cmd := m.Update(enterKey())
+			mu := updated.(Model)
+			if cmd == nil {
+				t.Fatalf("%s returned nil cmd, want tea.Quit", command)
+			}
+			if _, ok := cmd().(tea.QuitMsg); !ok {
+				t.Fatalf("%s returned cmd %T, want tea.QuitMsg", command, cmd())
+			}
+			if got := mu.state.input.Value(); got != "" {
+				t.Fatalf("input should reset after %s, got %q", command, got)
+			}
+		})
+	}
+}
+
 func TestEnterWhileStreamingEnqueues(t *testing.T) {
 	m := newWithFixedClock()
 	m.state.streaming = true
