@@ -46,8 +46,8 @@ type FakeRuntime struct {
 	// ResolvePermission lifts the gate.
 	pendingPermissions map[string]string // requestID → runID
 
-	nextRunID    int
-	streamDelay  time.Duration
+	nextRunID   int
+	streamDelay time.Duration
 }
 
 type fakeStream struct {

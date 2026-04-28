@@ -330,7 +330,7 @@ func (s *Server) startTLSListener() (net.Listener, error) {
 		return nil, fmt.Errorf(
 			"TLS listener refuses to bind without tls_client_ca_file configured: " +
 				"auth is not yet implemented, so any reachable client would be accepted " +
-				"as the solo user. Configure mTLS or use the unix socket profile.")
+				"as the solo user. Configure mTLS or use the unix socket profile")
 	}
 	cert, err := tls.LoadX509KeyPair(s.config.TLSCertFile, s.config.TLSKeyFile)
 	if err != nil {

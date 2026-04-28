@@ -298,15 +298,6 @@ type openaiToolCallFunction struct {
 	Arguments string `json:"arguments"`
 }
 
-// openaiMessageWire is the wire format for an OpenAI chat message.
-// Content can be either a string or array of content blocks.
-type openaiMessageWire struct {
-	Role       string               `json:"role"`
-	Content    any                  `json:"content"`
-	ToolCalls  []openaiToolCallWire `json:"tool_calls,omitempty"`
-	ToolCallID string               `json:"tool_call_id,omitempty"`
-}
-
 // openaiContentBlock represents a content block in the array form.
 type openaiContentBlock struct {
 	Type     string          `json:"type"`

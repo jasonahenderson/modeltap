@@ -11,8 +11,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/jasonahenderson/modeltap/internal/harness"
-	"github.com/jasonahenderson/modeltap/internal/harnessshell"
 	"github.com/jasonahenderson/modeltap/internal/harnesshost"
+	"github.com/jasonahenderson/modeltap/internal/harnessshell"
 )
 
 // Driver is a tea.Model that owns a harnesshost.Adapter plus the

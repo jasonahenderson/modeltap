@@ -24,7 +24,7 @@ func TestProxyForwardsRequests(t *testing.T) {
 	upstream := newTestUpstream(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"message":"hello from upstream"}`))
+		_, _ = w.Write([]byte(`{"message":"hello from upstream"}`))
 	})
 
 	srv, err := proxy.NewServer(proxy.ServerConfig{
@@ -143,7 +143,7 @@ func TestProxyReturnsResponseBody(t *testing.T) {
 	upstream := newTestUpstream(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(expectedBody))
+		_, _ = w.Write([]byte(expectedBody))
 	})
 
 	srv, err := proxy.NewServer(proxy.ServerConfig{
@@ -220,7 +220,7 @@ func TestNewServerValidation(t *testing.T) {
 func TestGracefulShutdown(t *testing.T) {
 	upstream := newTestUpstream(t, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
+		_, _ = w.Write([]byte("ok"))
 	})
 
 	srv, err := proxy.NewServer(proxy.ServerConfig{
@@ -250,7 +250,7 @@ func TestProxyForwardsRequestBody(t *testing.T) {
 		body, _ := io.ReadAll(r.Body)
 		receivedBody = string(body)
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
+		_, _ = w.Write([]byte("ok"))
 	})
 
 	srv, err := proxy.NewServer(proxy.ServerConfig{

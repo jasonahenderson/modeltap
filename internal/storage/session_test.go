@@ -466,7 +466,11 @@ func TestReleaseSessionLock(t *testing.T) {
 	}
 
 	expires := time.Now().UTC().Add(5 * time.Minute)
-	store.AcquireSessionLock(ctx, "sess-1", "harness-1", expires)
+	if acquired, owner, err := store.AcquireSessionLock(ctx, "sess-1", "harness-1", expires); err != nil {
+		t.Fatalf("AcquireSessionLock: %v", err)
+	} else if !acquired || owner != "" {
+		t.Fatalf("AcquireSessionLock = (%v, %q), want (true, \"\")", acquired, owner)
+	}
 
 	if err := store.ReleaseSessionLock(ctx, "sess-1", "harness-1"); err != nil {
 		t.Fatalf("ReleaseSessionLock: %v", err)
@@ -491,7 +495,11 @@ func TestForceReleaseSessionLock(t *testing.T) {
 	}
 
 	expires := time.Now().UTC().Add(5 * time.Minute)
-	store.AcquireSessionLock(ctx, "sess-1", "harness-1", expires)
+	if acquired, owner, err := store.AcquireSessionLock(ctx, "sess-1", "harness-1", expires); err != nil {
+		t.Fatalf("AcquireSessionLock: %v", err)
+	} else if !acquired || owner != "" {
+		t.Fatalf("AcquireSessionLock = (%v, %q), want (true, \"\")", acquired, owner)
+	}
 
 	// Force release by admin (no owner check)
 	if err := store.ForceReleaseSessionLock(ctx, "sess-1"); err != nil {

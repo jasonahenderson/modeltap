@@ -18,20 +18,6 @@ func unmarshalMap(t *testing.T, data []byte) map[string]any {
 	return m
 }
 
-// helper: re-marshal and unmarshal for deep comparison.
-func jsonRoundTrip(t *testing.T, v any) any {
-	t.Helper()
-	data, err := json.Marshal(v)
-	if err != nil {
-		t.Fatalf("json.Marshal failed: %v", err)
-	}
-	var out any
-	if err := json.Unmarshal(data, &out); err != nil {
-		t.Fatalf("json.Unmarshal failed: %v", err)
-	}
-	return out
-}
-
 func TestOpenAI_FormatMessages_SimpleTextTurn(t *testing.T) {
 	p := NewOpenAIProvider()
 	opts := FormatMessagesOpts{

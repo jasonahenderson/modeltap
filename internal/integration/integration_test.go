@@ -183,7 +183,7 @@ func TestProxyForwarding(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"ok":true}`))
+		_, _ = w.Write([]byte(`{"ok":true}`))
 	}))
 	t.Cleanup(upstream.Close)
 
@@ -208,7 +208,7 @@ func TestRequestCapture(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(anthropicNonStreamingResponse))
+		_, _ = w.Write([]byte(anthropicNonStreamingResponse))
 	}))
 	t.Cleanup(upstream.Close)
 
@@ -246,7 +246,7 @@ func TestAnthropicNonStreamingCapture(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(anthropicNonStreamingResponse))
+		_, _ = w.Write([]byte(anthropicNonStreamingResponse))
 	}))
 	t.Cleanup(upstream.Close)
 
@@ -287,7 +287,7 @@ func TestOpenAINonStreamingCapture(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(openaiNonStreamingResponse))
+		_, _ = w.Write([]byte(openaiNonStreamingResponse))
 	}))
 	t.Cleanup(upstream.Close)
 
@@ -330,7 +330,7 @@ func TestAnthropicSSEStreaming(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(sseData))
+		_, _ = w.Write([]byte(sseData))
 	}))
 	t.Cleanup(upstream.Close)
 
@@ -387,7 +387,7 @@ func TestOpenAISSEStreaming(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(sseData))
+		_, _ = w.Write([]byte(sseData))
 	}))
 	t.Cleanup(upstream.Close)
 
@@ -443,7 +443,7 @@ func TestMultiProviderRouting(t *testing.T) {
 		anthropicHit = true
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(anthropicNonStreamingResponse))
+		_, _ = w.Write([]byte(anthropicNonStreamingResponse))
 	}))
 	t.Cleanup(anthropicUpstream.Close)
 
@@ -451,7 +451,7 @@ func TestMultiProviderRouting(t *testing.T) {
 		openaiHit = true
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(openaiNonStreamingResponse))
+		_, _ = w.Write([]byte(openaiNonStreamingResponse))
 	}))
 	t.Cleanup(openaiUpstream.Close)
 
@@ -512,7 +512,7 @@ func TestMetricsAggregation(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(anthropicNonStreamingResponse))
+		_, _ = w.Write([]byte(anthropicNonStreamingResponse))
 	}))
 	t.Cleanup(upstream.Close)
 
@@ -637,7 +637,7 @@ func TestCostEstimation(t *testing.T) {
 			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(tt.respBody))
+				_, _ = w.Write([]byte(tt.respBody))
 			}))
 			t.Cleanup(upstream.Close)
 
@@ -679,7 +679,7 @@ func TestCostEstimationMetricsAggregated(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(anthropicNonStreamingResponse))
+		_, _ = w.Write([]byte(anthropicNonStreamingResponse))
 	}))
 	t.Cleanup(upstream.Close)
 
@@ -718,7 +718,7 @@ func TestStreamingCostEstimation(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(sseData))
+		_, _ = w.Write([]byte(sseData))
 	}))
 	t.Cleanup(upstream.Close)
 
@@ -733,7 +733,7 @@ func TestStreamingCostEstimation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("POST: %v", err)
 	}
-	io.ReadAll(resp.Body)
+	_, _ = io.ReadAll(resp.Body)
 	resp.Body.Close()
 
 	reqs := pollStore(t, env.Store, 1, 2*time.Second)
@@ -753,7 +753,7 @@ func TestMultiProviderRoutingIsolation(t *testing.T) {
 		anthropicCount++
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(anthropicNonStreamingResponse))
+		_, _ = w.Write([]byte(anthropicNonStreamingResponse))
 	}))
 	t.Cleanup(anthropicUpstream.Close)
 
@@ -761,7 +761,7 @@ func TestMultiProviderRoutingIsolation(t *testing.T) {
 		openaiCount++
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(openaiNonStreamingResponse))
+		_, _ = w.Write([]byte(openaiNonStreamingResponse))
 	}))
 	t.Cleanup(openaiUpstream.Close)
 
@@ -809,7 +809,7 @@ func TestResponseHeadersPreserved(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("X-Request-Id", "req-abc-123")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"ok":true}`))
+		_, _ = w.Write([]byte(`{"ok":true}`))
 	}))
 	t.Cleanup(upstream.Close)
 
@@ -831,7 +831,7 @@ func TestCaptureStoresResponseHeaders(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("X-Custom", "test-val")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(anthropicNonStreamingResponse))
+		_, _ = w.Write([]byte(anthropicNonStreamingResponse))
 	}))
 	t.Cleanup(upstream.Close)
 
@@ -865,7 +865,7 @@ func TestErrorResponseCapture(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusTooManyRequests)
-		w.Write([]byte(`{"error":{"type":"rate_limit_error","message":"too many requests"}}`))
+		_, _ = w.Write([]byte(`{"error":{"type":"rate_limit_error","message":"too many requests"}}`))
 	}))
 	t.Cleanup(upstream.Close)
 
@@ -918,7 +918,7 @@ func TestLatencyTracking(t *testing.T) {
 		time.Sleep(5 * time.Millisecond)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(anthropicNonStreamingResponse))
+		_, _ = w.Write([]byte(anthropicNonStreamingResponse))
 	}))
 	t.Cleanup(upstream.Close)
 
@@ -953,7 +953,7 @@ func TestSequentialBurstRequests(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(anthropicNonStreamingResponse))
+		_, _ = w.Write([]byte(anthropicNonStreamingResponse))
 	}))
 	t.Cleanup(upstream.Close)
 

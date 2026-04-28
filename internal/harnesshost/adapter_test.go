@@ -25,15 +25,15 @@ type fakeRuntime struct {
 	hostCommandCalls       []HostCommand
 	summarizePasteCalls    []string
 
-	submitResult  SubmitAccepted
-	submitErr     error
-	interruptErr  error
-	resolveErr    error
-	loadPreview   harnessshell.PreviewPayload
-	loadErr       error
-	dispatchErr   error
-	summarizeRet  string
-	summarizeErr  error
+	submitResult SubmitAccepted
+	submitErr    error
+	interruptErr error
+	resolveErr   error
+	loadPreview  harnessshell.PreviewPayload
+	loadErr      error
+	dispatchErr  error
+	summarizeRet string
+	summarizeErr error
 }
 
 type resolvePermissionCall struct {

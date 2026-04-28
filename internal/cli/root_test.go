@@ -6,6 +6,17 @@ import (
 	"testing"
 )
 
+func setTestProviderKeys(t *testing.T) {
+	t.Helper()
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", "")
+	t.Setenv("XDG_DATA_HOME", "")
+	t.Setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
+	t.Setenv("OPENAI_API_KEY", "test-openai-key")
+	t.Setenv("MODELTAP_PROVIDERS_ANTHROPIC_API_KEY", "test-anthropic-key")
+	t.Setenv("MODELTAP_PROVIDERS_OPENAI_API_KEY", "test-openai-key")
+}
+
 func TestRootCommandExecutes(t *testing.T) {
 	// Bare `modeltap` invocation falls back to cobra's default help
 	// behavior since the legacy harness CLI was scrapped in v0.2.1.
@@ -102,6 +113,9 @@ func TestSubcommandsAcceptHelp(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.name == "config show" {
+				setTestProviderKeys(t)
+			}
 			cmd := NewRootCommand("test")
 			buf := new(bytes.Buffer)
 			cmd.SetOut(buf)
@@ -160,6 +174,9 @@ func TestStubCommandsOutput(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.name == "config show" {
+				setTestProviderKeys(t)
+			}
 			cmd := NewRootCommand("test")
 			buf := new(bytes.Buffer)
 			cmd.SetOut(buf)

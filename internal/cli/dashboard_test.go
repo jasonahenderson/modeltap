@@ -7,6 +7,8 @@ import (
 )
 
 func TestDashboardCommandExists(t *testing.T) {
+	setTestProviderKeys(t)
+
 	cmd := NewRootCommand("test")
 	buf := new(bytes.Buffer)
 	cmd.SetOut(buf)
@@ -26,6 +28,8 @@ func TestDashboardCommandExists(t *testing.T) {
 }
 
 func TestDashboardOutputContainsDefaultPort(t *testing.T) {
+	setTestProviderKeys(t)
+
 	cmd := NewRootCommand("test")
 	buf := new(bytes.Buffer)
 	cmd.SetOut(buf)

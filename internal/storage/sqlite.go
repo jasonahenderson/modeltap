@@ -179,7 +179,7 @@ func (s *SQLiteStore) migrateToV2() error {
 	if err != nil {
 		return fmt.Errorf("beginning v2 migration transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	const v2Schema = `
 CREATE TABLE sessions (
@@ -286,7 +286,7 @@ func (s *SQLiteStore) SaveRequest(ctx context.Context, req *Request) error {
 	if err != nil {
 		return fmt.Errorf("beginning transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	const insertRequest = `
 INSERT INTO requests (
@@ -600,7 +600,7 @@ func (s *SQLiteStore) RebuildMetrics(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("beginning rebuild transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if _, err := tx.ExecContext(ctx, "DELETE FROM hourly_usage"); err != nil {
 		return fmt.Errorf("clearing hourly_usage: %w", err)

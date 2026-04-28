@@ -157,9 +157,9 @@ func DefaultDataDir() string {
 	return filepath.Join(homeDir(), ".modeltap")
 }
 
-// legacyDBPath / legacySocketPath / legacyLogPath return the v0.1-era
-// defaults. Kept as package-private helpers because they are only
-// relevant when the config resolver detects a legacy install.
+// legacyDBPath / legacySocketPath return the v0.1-era defaults. Kept as
+// package-private helpers because they are only relevant when the config
+// resolver detects a legacy install.
 func legacyDBPath() string {
 	return filepath.Join(homeDir(), ".config", "modeltap", "modeltap.db")
 }
@@ -171,9 +171,6 @@ func legacySocketPath() string {
 		return filepath.Join(xdg, "modeltap", "server.sock")
 	}
 	return filepath.Join(homeDir(), ".local", "share", "modeltap", "server.sock")
-}
-func legacyLogPath() string {
-	return filepath.Join(homeDir(), ".config", "modeltap", "modeltap.log")
 }
 
 // DefaultBFFSocketPath returns the canonical Unix-domain socket path

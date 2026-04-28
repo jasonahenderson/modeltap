@@ -151,6 +151,7 @@ func runShell(cmd *cobra.Command, flags *shellFlags) error {
 	}
 
 	shell := harnessshell.New(
+		harnessshell.WithTitle("modeltap"),
 		harnessshell.WithLabel(label),
 		harnessshell.WithPlaceholder("Type a message and press Enter."),
 	)
