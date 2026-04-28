@@ -13,24 +13,6 @@ import (
 	"github.com/jasonahenderson/modeltap/internal/protocol"
 )
 
-// readAllFrames drains every NDJSON frame from r until EOF. Used in tests
-// that issue concurrent writes to verify each frame is intact.
-func readAllFrames(t *testing.T, r io.Reader) [][]byte {
-	t.Helper()
-	fr := protocol.NewFrameReader(r)
-	var out [][]byte
-	for {
-		b, err := fr.ReadFrame()
-		if errors.Is(err, io.EOF) {
-			return out
-		}
-		if err != nil {
-			t.Fatalf("ReadFrame: %v", err)
-		}
-		out = append(out, b)
-	}
-}
-
 // writeFrame writes a single NDJSON frame to w.
 func writeFrame(t *testing.T, w io.Writer, b []byte) {
 	t.Helper()

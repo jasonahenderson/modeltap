@@ -14,13 +14,6 @@ import (
 	"github.com/jasonahenderson/modeltap/internal/storage"
 )
 
-// inFlightTurn tracks the goroutine driving a streaming turn so it can
-// be cancelled by tool.cancel.
-type inFlightTurn struct {
-	turnID string
-	cancel context.CancelFunc
-}
-
 // turnTracker is owned by Server and lets handleTurnCancel find the
 // goroutine that owns a given turn id.
 type turnTracker struct {

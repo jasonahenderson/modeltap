@@ -1,6 +1,7 @@
 VERSION ?= dev
 GO ?= go
 GO_FMT ?= gofmt
+GOLANGCI_LINT ?= $(shell command -v golangci-lint 2>/dev/null || printf '%s/bin/golangci-lint' "$$($(GO) env GOPATH)")
 BINARY = bin/modeltap
 LDFLAGS = -X main.version=$(VERSION)
 
@@ -15,7 +16,7 @@ test:
 	$(GO) test -race ./...
 
 lint:
-	golangci-lint run ./...
+	$(GOLANGCI_LINT) run ./...
 
 fmt:
 	$(GO_FMT) -s -w .

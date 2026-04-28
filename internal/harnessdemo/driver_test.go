@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jasonahenderson/modeltap/internal/harnessshell"
 	"github.com/jasonahenderson/modeltap/internal/harnesshost"
+	"github.com/jasonahenderson/modeltap/internal/harnessshell"
 )
 
 func ctx() context.Context { return context.Background() }
@@ -142,7 +142,9 @@ func TestDriverDispatchesSubmitToFakeRuntime(t *testing.T) {
 		},
 	}
 	updated, cmd := d.Update(harnessshell.ActionMsg{Action: action})
-	d = updated.(Driver)
+	if _, ok := updated.(Driver); !ok {
+		t.Fatalf("updated model = %T, want Driver", updated)
+	}
 
 	if cmd == nil {
 		t.Fatalf("expected dispatch cmd from Driver.Update")

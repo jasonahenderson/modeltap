@@ -318,4 +318,3 @@ func (s *state) assistantRowIndexForRun(runID string) int {
 	}
 	return -1
 }
-

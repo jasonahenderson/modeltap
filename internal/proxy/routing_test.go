@@ -15,19 +15,19 @@ func TestRoutingAnthropicRequestsToAnthropicUpstream(t *testing.T) {
 	// Create per-provider mock upstreams.
 	anthropicUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"provider":"anthropic"}`))
+		_, _ = w.Write([]byte(`{"provider":"anthropic"}`))
 	}))
 	defer anthropicUpstream.Close()
 
 	openaiUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"provider":"openai"}`))
+		_, _ = w.Write([]byte(`{"provider":"openai"}`))
 	}))
 	defer openaiUpstream.Close()
 
 	defaultUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"provider":"default"}`))
+		_, _ = w.Write([]byte(`{"provider":"default"}`))
 	}))
 	defer defaultUpstream.Close()
 
@@ -72,19 +72,19 @@ func TestRoutingAnthropicRequestsToAnthropicUpstream(t *testing.T) {
 func TestRoutingOpenAIRequestsToOpenAIUpstream(t *testing.T) {
 	anthropicUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"provider":"anthropic"}`))
+		_, _ = w.Write([]byte(`{"provider":"anthropic"}`))
 	}))
 	defer anthropicUpstream.Close()
 
 	openaiUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"provider":"openai"}`))
+		_, _ = w.Write([]byte(`{"provider":"openai"}`))
 	}))
 	defer openaiUpstream.Close()
 
 	defaultUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"provider":"default"}`))
+		_, _ = w.Write([]byte(`{"provider":"default"}`))
 	}))
 	defer defaultUpstream.Close()
 
@@ -129,19 +129,19 @@ func TestRoutingOpenAIRequestsToOpenAIUpstream(t *testing.T) {
 func TestRoutingFallbackToDefaultUpstream(t *testing.T) {
 	anthropicUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"provider":"anthropic"}`))
+		_, _ = w.Write([]byte(`{"provider":"anthropic"}`))
 	}))
 	defer anthropicUpstream.Close()
 
 	openaiUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"provider":"openai"}`))
+		_, _ = w.Write([]byte(`{"provider":"openai"}`))
 	}))
 	defer openaiUpstream.Close()
 
 	defaultUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"provider":"default"}`))
+		_, _ = w.Write([]byte(`{"provider":"default"}`))
 	}))
 	defer defaultUpstream.Close()
 
@@ -185,7 +185,7 @@ func TestRoutingWithNoProviderUpstreams(t *testing.T) {
 	// When no provider upstreams are configured, all requests go to default.
 	defaultUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"provider":"default"}`))
+		_, _ = w.Write([]byte(`{"provider":"default"}`))
 	}))
 	defer defaultUpstream.Close()
 
@@ -227,7 +227,7 @@ func TestRoutingWithNilRegistry(t *testing.T) {
 	// When no registry is set, all requests go to default.
 	defaultUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"provider":"default"}`))
+		_, _ = w.Write([]byte(`{"provider":"default"}`))
 	}))
 	defer defaultUpstream.Close()
 

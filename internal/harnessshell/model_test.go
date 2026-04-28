@@ -62,6 +62,23 @@ func TestUpdateWindowSizePropagates(t *testing.T) {
 	}
 }
 
+func TestEmptyShellViewShowsWelcomeBlock(t *testing.T) {
+	m := New(WithTitle("modeltap"), WithLabel("test-model"), WithPlaceholder("Type here"))
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	mu := updated.(Model)
+
+	view := mu.View()
+	if !strings.Contains(view, "modeltap") {
+		t.Fatalf("empty shell view should include product title; view = %q", view)
+	}
+	if !strings.Contains(view, "Conversation shell") {
+		t.Fatalf("empty shell view should include welcome subtitle; view = %q", view)
+	}
+	if !strings.Contains(view, "test-model") {
+		t.Fatalf("empty shell view should include current label; view = %q", view)
+	}
+}
+
 func TestTabCyclesFocusSidebarClosed(t *testing.T) {
 	m := New()
 	if m.state.focus != FocusInput {

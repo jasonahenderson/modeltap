@@ -29,7 +29,9 @@ func TestNewDiagnosticError_BuildsStructuredError(t *testing.T) {
 
 func TestWithSuggestedCommand(t *testing.T) {
 	err := NewDiagnosticError(CodeSessionLocked, "locked", protocol.DiagSessionLocked, "session", "owner=other")
-	WithSuggestedCommand(err, "modeltap session unlock <id>")
+	if got := WithSuggestedCommand(err, "modeltap session unlock <id>"); got != err {
+		t.Fatalf("WithSuggestedCommand returned %p, want %p", got, err)
+	}
 	diag, _ := DiagnosticOf(err)
 	if diag.SuggestedCommand != "modeltap session unlock <id>" {
 		t.Errorf("suggested_command = %q", diag.SuggestedCommand)

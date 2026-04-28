@@ -142,10 +142,10 @@ func TestTranscriptEnterFileTokenEmitsLoadPreview(t *testing.T) {
 	m := newWithFixedClock()
 	m.state.transcriptItems = []TranscriptItem{
 		{
-			ID:    "msg-user-sub-1",
-			Kind:  TranscriptItemKindMessage,
-			Role:  RoleUser,
-			Text:  "look at this file",
+			ID:   "msg-user-sub-1",
+			Kind: TranscriptItemKindMessage,
+			Role: RoleUser,
+			Text: "look at this file",
 			Tokens: []InputToken{
 				{ID: "file-1", Kind: TokenKindFile, Label: "file-1 (foo.txt)", Payload: "/abs/foo.txt"},
 			},

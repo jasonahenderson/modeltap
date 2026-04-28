@@ -58,29 +58,6 @@ func (s *state) movePendingPermission(delta int) bool {
 	return true
 }
 
-// removeActivePendingPermission removes the active pending permission and
-// returns it. The returned bool is false when there were no pending
-// permissions.
-func (s *state) removeActivePendingPermission() (PendingPermission, bool) {
-	if len(s.pendingPermissions) == 0 {
-		return PendingPermission{}, false
-	}
-	if s.activePermissionIndex < 0 {
-		s.activePermissionIndex = 0
-	}
-	if s.activePermissionIndex >= len(s.pendingPermissions) {
-		s.activePermissionIndex = len(s.pendingPermissions) - 1
-	}
-	p := s.pendingPermissions[s.activePermissionIndex]
-	s.pendingPermissions = append(s.pendingPermissions[:s.activePermissionIndex], s.pendingPermissions[s.activePermissionIndex+1:]...)
-	if len(s.pendingPermissions) == 0 {
-		s.activePermissionIndex = 0
-	} else if s.activePermissionIndex >= len(s.pendingPermissions) {
-		s.activePermissionIndex = len(s.pendingPermissions) - 1
-	}
-	return p, true
-}
-
 // removePendingPermissionByID removes a pending permission whose request ID
 // matches the given id, regardless of its position. Returns true if a
 // permission was removed.

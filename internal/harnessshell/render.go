@@ -115,6 +115,10 @@ type RenderInput struct {
 	// Width is the transcript inner width (already padding-adjusted).
 	Width int
 
+	// Title is the host-fed product or shell name shown in the empty-state
+	// welcome block.
+	Title string
+
 	// ModelLabel is the host-fed assistant label (e.g. "fake-kimi-spike").
 	ModelLabel string
 
@@ -204,6 +208,9 @@ func Render(in RenderInput) RenderResult {
 	if contentWidth < 10 {
 		contentWidth = 10
 	}
+	if len(in.Messages) == 0 && len(in.Queued) == 0 {
+		b.WriteString(renderWelcomeBlock(in, contentWidth))
+	}
 	for i, msg := range in.Messages {
 		if i > 0 {
 			b.WriteString("\n\n")
@@ -233,6 +240,24 @@ func Render(in RenderInput) RenderResult {
 		Content:        b.String(),
 		TranscriptRefs: refs,
 	}
+}
+
+// renderWelcomeBlock renders the shell's compact empty-state identity mark.
+func renderWelcomeBlock(in RenderInput, width int) string {
+	title := in.Title
+	if title == "" {
+		title = "modeltap"
+	}
+	subtitle := "Conversation shell"
+	if in.ModelLabel != "" {
+		subtitle = "Conversation shell  |  " + in.ModelLabel
+	}
+	logomark := splashMarkStyle.Render("mt")
+	wordmark := lipgloss.JoinVertical(lipgloss.Left,
+		splashTitleStyle.Render(title),
+		splashSubtitleStyle.Render(subtitle),
+	)
+	return splashBoxStyle.Width(width).Render(lipgloss.JoinHorizontal(lipgloss.Top, logomark, "  ", wordmark))
 }
 
 // renderUserRow renders a user message, including any inline tokens. It

@@ -80,7 +80,9 @@ func TestTokenDelta_OmitEmpty(t *testing.T) {
 	v := TokenDelta{TurnID: "t1", Text: "hello"}
 	b, _ := json.Marshal(v)
 	var m map[string]interface{}
-	json.Unmarshal(b, &m)
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatal(err)
+	}
 	if _, ok := m["branch_id"]; ok {
 		t.Error("branch_id should be omitted when empty")
 	}
@@ -266,7 +268,9 @@ func TestCostUpdate_OmitEmpty(t *testing.T) {
 	v := CostUpdate{TurnID: "t1", InputTokens: 10, OutputTokens: 5, InputCost: 0.01, OutputCost: 0.02, TotalCost: 0.03}
 	b, _ := json.Marshal(v)
 	var m map[string]interface{}
-	json.Unmarshal(b, &m)
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatal(err)
+	}
 	if _, ok := m["branch_id"]; ok {
 		t.Error("branch_id should be omitted when empty")
 	}
@@ -469,7 +473,9 @@ func TestServerError_OmitEmpty(t *testing.T) {
 	}
 	b, _ := json.Marshal(v)
 	var m map[string]interface{}
-	json.Unmarshal(b, &m)
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatal(err)
+	}
 	if _, ok := m["turn_id"]; ok {
 		t.Error("turn_id should be omitted when empty")
 	}
@@ -504,7 +510,9 @@ func TestCapabilitiesRequestEvent_OmitEmpty(t *testing.T) {
 	v := CapabilitiesRequestEvent{}
 	b, _ := json.Marshal(v)
 	var m map[string]interface{}
-	json.Unmarshal(b, &m)
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatal(err)
+	}
 	if _, ok := m["reason"]; ok {
 		t.Error("reason should be omitted when empty")
 	}

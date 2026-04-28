@@ -27,6 +27,7 @@ request demo. /clear wipes the transcript. Esc once arms an interrupt
 during streaming; Esc twice emits the InterruptRunAction.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			shell := harnessshell.New(
+				harnessshell.WithTitle("modeltap"),
 				harnessshell.WithLabel("fake-kimi-demo"),
 				harnessshell.WithPlaceholder("Ask something. Enter sends. /perm shows the permission demo. /clear wipes the transcript."),
 			)

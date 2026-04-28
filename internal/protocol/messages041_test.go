@@ -59,7 +59,9 @@ func TestTurnSubmitResponse_OmitEmpty(t *testing.T) {
 	v := TurnSubmitResponse{TurnID: "t1", Status: "accepted"}
 	b, _ := json.Marshal(v)
 	var m map[string]interface{}
-	json.Unmarshal(b, &m)
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatal(err)
+	}
 	if _, ok := m["sync"]; ok {
 		t.Error("sync should be omitted when nil")
 	}
@@ -192,7 +194,9 @@ func TestCapabilitiesRegisterResponse_OmitEmpty(t *testing.T) {
 	}
 	b, _ := json.Marshal(v)
 	var m map[string]interface{}
-	json.Unmarshal(b, &m)
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatal(err)
+	}
 	if _, ok := m["rejected"]; ok {
 		t.Error("rejected should be omitted when nil/empty")
 	}
@@ -262,7 +266,9 @@ func TestSessionSummary_OmitEmpty(t *testing.T) {
 	}
 	b, _ := json.Marshal(v)
 	var m map[string]interface{}
-	json.Unmarshal(b, &m)
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatal(err)
+	}
 	if _, ok := m["model_override"]; ok {
 		t.Error("model_override should be omitted when empty")
 	}
@@ -320,7 +326,9 @@ func TestSessionDetail_OmitEmpty(t *testing.T) {
 	}
 	b, _ := json.Marshal(v)
 	var m map[string]interface{}
-	json.Unmarshal(b, &m)
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatal(err)
+	}
 	if _, ok := m["model_override"]; ok {
 		t.Error("model_override should be omitted when empty")
 	}
@@ -351,7 +359,9 @@ func TestTurnSummary_OmitEmpty(t *testing.T) {
 	v := TurnSummary{Sequence: 1, Summary: "s", Model: "m", Cost: 0}
 	b, _ := json.Marshal(v)
 	var m map[string]interface{}
-	json.Unmarshal(b, &m)
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatal(err)
+	}
 	if _, ok := m["original_turns"]; ok {
 		t.Error("original_turns should be omitted when empty")
 	}
@@ -376,7 +386,9 @@ func TestServerSessionEvent_OmitEmpty(t *testing.T) {
 	v := ServerSessionEvent{Type: "x", At: "t", Detail: "d"}
 	b, _ := json.Marshal(v)
 	var m map[string]interface{}
-	json.Unmarshal(b, &m)
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatal(err)
+	}
 	if _, ok := m["freed_tokens"]; ok {
 		t.Error("freed_tokens should be omitted when zero")
 	}
@@ -464,7 +476,9 @@ func TestActiveTurnState_OmitEmpty(t *testing.T) {
 	v := ActiveTurnState{TurnID: "t1", Status: "streaming", TokenReplayAvailable: false, Summary: "s"}
 	b, _ := json.Marshal(v)
 	var m map[string]interface{}
-	json.Unmarshal(b, &m)
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatal(err)
+	}
 	if _, ok := m["pending_tool_calls"]; ok {
 		t.Error("pending_tool_calls should be omitted when empty")
 	}
@@ -477,7 +491,9 @@ func TestReviewerState_OmitEmpty(t *testing.T) {
 	v := ReviewerState{Model: "claude", Status: "complete", Tokens: 100}
 	b, _ := json.Marshal(v)
 	var m map[string]interface{}
-	json.Unmarshal(b, &m)
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatal(err)
+	}
 	if _, ok := m["branch_id"]; ok {
 		t.Error("branch_id should be omitted when empty")
 	}
@@ -506,7 +522,9 @@ func TestSessionResumeResponse_OmitEmpty(t *testing.T) {
 	v := SessionResumeResponse{SessionID: "s1", Model: "m", Project: ProjectContext{Root: "/"}}
 	b, _ := json.Marshal(v)
 	var m map[string]interface{}
-	json.Unmarshal(b, &m)
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatal(err)
+	}
 	if _, ok := m["model_override"]; ok {
 		t.Error("model_override should be omitted when empty")
 	}
@@ -608,7 +626,9 @@ func TestModelInfo_OmitEmpty(t *testing.T) {
 	}
 	b, _ := json.Marshal(v)
 	var m map[string]interface{}
-	json.Unmarshal(b, &m)
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatal(err)
+	}
 	if _, ok := m["status"]; ok {
 		t.Error("status should be omitted when empty")
 	}
@@ -649,7 +669,9 @@ func TestModelListResponse_OmitEmpty(t *testing.T) {
 	}
 	b, _ := json.Marshal(v)
 	var m map[string]interface{}
-	json.Unmarshal(b, &m)
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatal(err)
+	}
 	if _, ok := m["current_override"]; ok {
 		t.Error("current_override should be omitted when empty")
 	}
@@ -674,7 +696,9 @@ func TestModelSwitchResponse_OmitEmpty(t *testing.T) {
 	v := ModelSwitchResponse{OverrideSet: false, Reason: "override_cleared"}
 	b, _ := json.Marshal(v)
 	var m map[string]interface{}
-	json.Unmarshal(b, &m)
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatal(err)
+	}
 	if _, ok := m["model"]; ok {
 		t.Error("model should be omitted when empty")
 	}
@@ -723,7 +747,9 @@ func TestHealthResponse_OmitEmpty(t *testing.T) {
 	}
 	b, _ := json.Marshal(v)
 	var m map[string]interface{}
-	json.Unmarshal(b, &m)
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatal(err)
+	}
 	if _, ok := m["active_session"]; ok {
 		t.Error("active_session should be omitted when nil")
 	}
@@ -763,7 +789,9 @@ func TestDependencyStatus_OmitEmpty(t *testing.T) {
 	v := DependencyStatus{Status: "ready"}
 	b, _ := json.Marshal(v)
 	var m map[string]interface{}
-	json.Unmarshal(b, &m)
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatal(err)
+	}
 	for _, key := range []string{"method", "path", "reason"} {
 		if _, ok := m[key]; ok {
 			t.Errorf("%s should be omitted when empty", key)
@@ -790,7 +818,9 @@ func TestProviderStatus_OmitEmpty(t *testing.T) {
 	v := ProviderStatus{Status: "ready"}
 	b, _ := json.Marshal(v)
 	var m map[string]interface{}
-	json.Unmarshal(b, &m)
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatal(err)
+	}
 	if _, ok := m["error"]; ok {
 		t.Error("error should be omitted when empty")
 	}
@@ -839,7 +869,9 @@ func TestServerCapabilities_OmitEmpty(t *testing.T) {
 	v := ServerCapabilities{ProtocolVersion: "1", MaxFrameSize: 10, MaxAttachmentSize: 5}
 	b, _ := json.Marshal(v)
 	var m map[string]interface{}
-	json.Unmarshal(b, &m)
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatal(err)
+	}
 	if _, ok := m["protocol_version_range"]; ok {
 		t.Error("protocol_version_range should be omitted when empty")
 	}
@@ -912,7 +944,9 @@ func TestDiagnostic_OmitEmpty(t *testing.T) {
 	}
 	b, _ := json.Marshal(v)
 	var m map[string]interface{}
-	json.Unmarshal(b, &m)
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatal(err)
+	}
 	for _, key := range []string{"repair_result", "suggested_command", "path_or_endpoint"} {
 		if _, ok := m[key]; ok {
 			t.Errorf("%s should be omitted when empty", key)
@@ -949,7 +983,9 @@ func TestCompactCategory_OmitEmpty(t *testing.T) {
 	v := CompactCategory{Name: "x", TokenCount: 0, ValueScore: 0, SuggestedAction: "keep"}
 	b, _ := json.Marshal(v)
 	var m map[string]interface{}
-	json.Unmarshal(b, &m)
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatal(err)
+	}
 	if _, ok := m["summary_preview"]; ok {
 		t.Error("summary_preview should be omitted when empty")
 	}
@@ -1010,7 +1046,9 @@ func TestCompactPlan_OmitEmpty(t *testing.T) {
 	}
 	b, _ := json.Marshal(v)
 	var m map[string]interface{}
-	json.Unmarshal(b, &m)
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatal(err)
+	}
 	if _, ok := m["files_breakdown"]; ok {
 		t.Error("files_breakdown should be omitted when empty")
 	}

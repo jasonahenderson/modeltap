@@ -455,10 +455,7 @@ func (s *state) refresh() {
 	s.transcript.SetContent(result.Content)
 	s.transcriptRefs = nil
 	for _, ref := range result.TranscriptRefs {
-		s.transcriptRefs = append(s.transcriptRefs, TranscriptRef{
-			MessageIndex: ref.MessageIndex,
-			TokenIndex:   ref.TokenIndex,
-		})
+		s.transcriptRefs = append(s.transcriptRefs, TranscriptRef(ref))
 	}
 
 	if followTail {
@@ -483,6 +480,7 @@ func stateToRenderInput(s *state) RenderInput {
 func (m Model) toRenderInput() RenderInput {
 	in := RenderInput{
 		Width:                 m.state.transcript.Width,
+		Title:                 m.state.title,
 		ModelLabel:            m.state.label,
 		InputView:             m.state.input.View(),
 		SelectedToken:         m.state.selectedToken,

@@ -384,7 +384,7 @@ func TestPermissionEnterEmitsResolveAction(t *testing.T) {
 	}})
 
 	// Default selectedAction is 0 → DecisionApproveOnce.
-	m, actions := drainActions(t, m, enterKey())
+	_, actions := drainActions(t, m, enterKey())
 	if len(actions) != 1 {
 		t.Fatalf("expected 1 ResolvePermissionAction, got %d", len(actions))
 	}

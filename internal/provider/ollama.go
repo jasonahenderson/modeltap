@@ -169,7 +169,7 @@ func (o *OllamaProvider) FormatMessages(opts FormatMessagesOpts) ([]byte, error)
 				if sb.Len() > 0 {
 					sb.WriteString("\n\n")
 				}
-				sb.WriteString(fmt.Sprintf("[tool result %s status=%s]\n%s", r.ToolCallID, r.Status, r.Output))
+				fmt.Fprintf(&sb, "[tool result %s status=%s]\n%s", r.ToolCallID, r.Status, r.Output)
 			}
 			content = sb.String()
 		}

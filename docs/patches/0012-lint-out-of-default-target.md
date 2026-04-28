@@ -1,6 +1,6 @@
 # PATCH-0012: Remove `lint` from the Makefile default target
 
-**Status:** proposed
+**Status:** done
 **Date:** 2026-04-22
 **Related:** PATCH-0010 (Makefile hygiene — left this as an open checklist item)
 **Branch:** exploration/integrated-harness
@@ -31,14 +31,14 @@ This hits anyone building from a fresh clone who hasn't separately installed `go
 
 ## Checklist
 
-- [ ] `all:` target becomes `fmt-check vet test build` (drop `lint`)
-- [ ] `lint:` target body unchanged
-- [ ] `.PHONY:` line unchanged (already lists `lint`)
-- [ ] `make` runs cleanly on a machine without `golangci-lint`
+- [x] `all:` target becomes `fmt-check vet test build` (drop `lint`)
+- [x] `lint:` target body unchanged
+- [x] `.PHONY:` line unchanged (already lists `lint`)
+- [x] `make` runs cleanly on a machine without `golangci-lint`
 - [ ] `make lint` still runs cleanly on a machine with `golangci-lint` installed
-- [ ] `make lint` still fails clearly on a machine without `golangci-lint`
-- [ ] `docs/patches/README.md` index updated
-- [ ] `docs/releases/v0.2.0/changelog.md` entry added
+- [x] `make lint` still fails clearly on a machine without `golangci-lint`
+- [x] `docs/patches/README.md` index updated
+- [x] `docs/releases/v0.2.0/changelog.md` entry added
 
 ## Fix Detail
 

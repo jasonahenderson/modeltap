@@ -153,8 +153,8 @@ func (pe *PromptEngine) toolUseInstructions(tools []protocol.ToolDefinition) str
 	var sb strings.Builder
 	sb.WriteString("You have access to the following tools:\n\n")
 	for _, t := range tools {
-		sb.WriteString(fmt.Sprintf("## %s\n%s\n\nInput schema:\n```json\n%s\n```\n\n",
-			t.Name, t.Description, string(t.InputSchema)))
+		fmt.Fprintf(&sb, "## %s\n%s\n\nInput schema:\n```json\n%s\n```\n\n",
+			t.Name, t.Description, string(t.InputSchema))
 	}
 	return sb.String()
 }

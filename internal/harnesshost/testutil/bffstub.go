@@ -155,8 +155,8 @@ func (s *BFFStub) handleConn(conn net.Conn) {
 		switch req.Method {
 		case "capabilities.register":
 			s.respond(w, req.ID, map[string]any{
-				"protocol_version":   "1",
-				"max_frame_size":     1 << 20,
+				"protocol_version":    "1",
+				"max_frame_size":      1 << 20,
 				"server_capabilities": map[string]any{},
 			}, nil)
 		case "turn.submit":

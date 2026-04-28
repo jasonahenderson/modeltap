@@ -494,12 +494,6 @@ func (c *Connection) setLastPingForTest(t time.Time) {
 	c.lastPing = t
 }
 
-func (c *Connection) recordPingForTest() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.lastPing = time.Now()
-}
-
 // dispatchForTest exposes the gating + dispatcher path for unit tests
 // without spinning up the full Run loop.
 func (c *Connection) dispatchForTest(ctx context.Context, req *protocol.Request) (any, error) {

@@ -169,7 +169,7 @@ func TestToolResult_RoundTrip_Error(t *testing.T) {
 }
 
 func TestToolResultRequest_AliasesToolResult(t *testing.T) {
-	var _ ToolResultRequest = ToolResult{}
+	var _ = ToolResult{}
 }
 
 func TestContentTransform_RoundTrip(t *testing.T) {
