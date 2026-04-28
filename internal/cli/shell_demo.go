@@ -23,8 +23,9 @@ streaming behavior, queue follow-ups, and the permission demo without a
 real BFF.
 
 Type a message and press Enter to submit. /perm triggers the permission
-request demo. /clear wipes the transcript. Esc once arms an interrupt
-during streaming; Esc twice emits the InterruptRunAction.`,
+request demo. /clear wipes the transcript. /quit and /exit leave the
+shell. Esc once arms an interrupt during streaming; Esc twice emits the
+InterruptRunAction.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			shell := harnessshell.New(
 				harnessshell.WithTitle("modeltap"),

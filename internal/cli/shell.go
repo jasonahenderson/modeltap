@@ -53,6 +53,7 @@ unix socket (auto-starting the BFF when the socket is absent) and
 drives sessions, tools, attachments, and routing commands.
 
 Slash commands:
+  /exit, /quit            exit the shell
   /clear                  clear the transcript (shell-local)
   /plan, /build, /auto    switch execution mode
   /model                  show current model
