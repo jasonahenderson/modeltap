@@ -14,6 +14,7 @@ Explorations are upstream product and design artifacts. They capture problem fra
 | [EXP-0009](0009-harness-prompt-architecture.md) | Harness Prompt Architecture — Lessons from the Claude Code Leak | exploring |
 | [EXP-0010](0010-harness-comparative-analysis.md) | Harness Comparative Analysis — modeltap, OpenCode, and OpenHarness | exploring |
 | [EXP-0011](0011-harness-excellence-gap-analysis.md) | Harness Excellence Gap Analysis | exploring |
+| [EXP-0012](0012-code-graphing-via-ast.md) | Code Graphing via AST for Repository-Aware Context | exploring |
 | [EXP-0013](0013-ultron-evaluation.md) | Ultron Evaluation — Tiered Memory and Skill Evolution from ModelScope | watching |
 
 ## Lifecycle
