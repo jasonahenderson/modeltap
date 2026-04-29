@@ -12,6 +12,8 @@ related:
   - FEAT-0013: Agent Teams
   - FEAT-0014: Harness Conversation Shell
   - ADR-0014: Harness Base Strategy
+promoted-to:
+  - FEAT-0015: Professional Harness Runtime
 ---
 
 # EXP-0011: Harness Excellence Gap Analysis

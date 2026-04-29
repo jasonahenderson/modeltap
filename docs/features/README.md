@@ -15,6 +15,7 @@ This directory holds **behavior-scoped** product definitions for modeltap that a
 | [FEAT-0012](0012-skills-and-agent-teams.md) | Skills | proposed |
 | [FEAT-0013](0013-agent-teams.md) | Agent Teams | proposed |
 | [FEAT-0014](0014-harness-conversation-shell.md) | Harness Conversation Shell | accepted |
+| [FEAT-0015](0015-professional-harness-runtime.md) | Professional Harness Runtime | draft |
 
 Other previously feature-shaped docs were reclassified when they proved to be upstream explorations or implementation-scoped patches rather than active behavior contracts. See `docs/explorations/` and `docs/patches/`.
 
