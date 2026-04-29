@@ -1,10 +1,16 @@
-# PATCH-0001: OpenAI Responses API Support
+---
+patch: "PATCH-0001"
+title: "OpenAI Responses API Support"
+status: "proposed"
+date: "2026-04-10"
+related:
+  - "ADR-0006 (Multi-Provider Support)"
+  - "`docs/usage-guide.md` (Codex caveat)"
+branch: "patch/0001-openai-responses-api"
+pr: "_(added when PR is created)_"
+---
 
-**Status:** proposed
-**Date:** 2026-04-10
-**Related:** ADR-0006 (Multi-Provider Support), `docs/usage-guide.md` (Codex caveat)
-**Branch:** patch/0001-openai-responses-api
-**PR:** _(added when PR is created)_
+# PATCH-0001: OpenAI Responses API Support
 
 ## Problem
 

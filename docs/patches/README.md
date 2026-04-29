@@ -52,14 +52,25 @@ Numbering is monotonic across the patches directory; do not reuse a number even 
 
 ## Format
 
-```markdown
-# PATCH-NNNN: Title
+Patches use YAML frontmatter, matching features, explorations, and ADRs.
 
-**Status:** proposed | approved | done
-**Date:** YYYY-MM-DD
-**Related:** FEAT-name, ADR-NNNN, PATCH-NNNN (optional — associated features, ADRs, or patches)
-**Branch:** patch/NNNN-short-name
-**PR:** (added when PR is created)
+```markdown
+---
+patch: PATCH-NNNN
+title: Human-readable title
+status: proposed | approved | done
+date: YYYY-MM-DD
+related:
+  - FEAT-NNNN: Associated feature, ADR, or patch
+branch: patch/NNNN-short-name
+pr: optional PR link or identifier
+parent: FEAT-NNNN
+series: Human-readable grouping name
+series-role: member
+series-order: 1
+---
+
+# PATCH-NNNN: Title
 
 ## Problem
 What's broken or missing, in 2-3 sentences. Include severity and how it was discovered if relevant.
@@ -79,7 +90,23 @@ What it explicitly does NOT do. Adjacent bugs, broader refactors, future work.
 Code snippets, design notes, or commentary that don't fit in the checklist but help a reviewer understand the change.
 ```
 
-The status, date, related, branch, and PR fields use inline bold-key formatting (not YAML frontmatter) to match this project's existing feature-doc style of light-touch metadata.
+Required fields:
+
+- `patch`
+- `title`
+- `status`
+- `date`
+
+Optional fields:
+
+- `related`
+- `branch`
+- `pr`
+- `release`
+- `parent`
+- `series`
+- `series-role`
+- `series-order`
 
 ## Lifecycle
 
@@ -106,6 +133,21 @@ The status, date, related, branch, and PR fields use inline bold-key formatting 
 | Work unit (`WU-NNN`) | Planned increments inside a feature, tracked in status.md | `docs/history/` |
 
 Work units (`WU-NNN`) are the existing planning unit for advancing accepted features through `tpm`. Patches are a separate axis for fixes and small implementation-scoped work that doesn't fit a feature's work-unit plan.
+
+## Grouping
+
+Use optional grouping metadata when a patch belongs to an umbrella feature,
+roadmap, or other cross-artifact work stream:
+
+```yaml
+parent: FEAT-0015
+series: Professional Harness Runtime
+series-role: member
+series-order: 9
+```
+
+Do not encode hierarchy in the patch identifier (`PATCH-0016a`, etc.). Keep the
+ID monotonic and put the relationship in metadata.
 
 ## Promotion
 

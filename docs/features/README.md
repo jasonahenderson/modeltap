@@ -51,11 +51,33 @@ feature: FEAT-NNNN
 title: Human-readable title
 status: draft | proposed | accepted | superseded
 date: YYYY-MM-DD
+parent: FEAT-NNNN
+series: Human-readable grouping name
+series-role: umbrella | member
+series-order: 1
 adr-constraints:
   - ADR-NNNN: Short reason this ADR constrains the feature
   - ADR-NNNN: ...
 ---
 ```
+
+Required fields:
+
+- `feature`
+- `title`
+- `status`
+- `date`
+
+Optional grouping fields:
+
+- `parent`: canonical parent artifact ID
+- `series`: human-readable grouping name
+- `series-role`: `umbrella` or `member`
+- `series-order`: optional integer for planned order within the series
+
+Use grouping metadata for umbrella features and related feature families rather
+than changing the ID format. For example, keep child features as `FEAT-0016`,
+`FEAT-0017`, etc., and point them at `parent: FEAT-0015`.
 
 The body follows this rough shape — sections may vary, but the load-bearing parts are the problem statement, the proposed solution, the key capabilities, and the success criteria:
 

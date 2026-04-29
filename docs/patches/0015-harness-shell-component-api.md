@@ -1,10 +1,16 @@
-# PATCH-0015: Harness Shell Component API
+---
+patch: "PATCH-0015"
+title: "Harness Shell Component API"
+status: "approved"
+date: "2026-04-24"
+related:
+  - "FEAT-0009"
+  - "FEAT-0014"
+branch: "patch/0015-harness-shell-component-api"
+release: "v0.2.1"
+---
 
-**Status:** approved
-**Date:** 2026-04-24
-**Related:** FEAT-0009, FEAT-0014
-**Branch:** patch/0015-harness-shell-component-api
-**Release:** v0.2.1
+# PATCH-0015: Harness Shell Component API
 
 ## Problem
 

@@ -1,9 +1,15 @@
-# PATCH-0013: Set SQLite `busy_timeout` on every pool connection
+---
+patch: "PATCH-0013"
+title: "Set SQLite `busy_timeout` on every pool connection"
+status: "proposed"
+date: "2026-04-22"
+related:
+  - "ADR-0002 (SQLite storage)"
+  - "PATCH-0012 (surfaced this failure in `make` default target)"
+branch: "exploration/integrated-harness"
+---
 
-**Status:** proposed
-**Date:** 2026-04-22
-**Related:** ADR-0002 (SQLite storage), PATCH-0012 (surfaced this failure in `make` default target)
-**Branch:** exploration/integrated-harness
+# PATCH-0013: Set SQLite `busy_timeout` on every pool connection
 
 ## Problem
 

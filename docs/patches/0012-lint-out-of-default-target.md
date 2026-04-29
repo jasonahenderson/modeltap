@@ -1,9 +1,14 @@
-# PATCH-0012: Remove `lint` from the Makefile default target
+---
+patch: "PATCH-0012"
+title: "Remove `lint` from the Makefile default target"
+status: "done"
+date: "2026-04-22"
+related:
+  - "PATCH-0010 (Makefile hygiene — left this as an open checklist item)"
+branch: "exploration/integrated-harness"
+---
 
-**Status:** done
-**Date:** 2026-04-22
-**Related:** PATCH-0010 (Makefile hygiene — left this as an open checklist item)
-**Branch:** exploration/integrated-harness
+# PATCH-0012: Remove `lint` from the Makefile default target
 
 ## Problem
 

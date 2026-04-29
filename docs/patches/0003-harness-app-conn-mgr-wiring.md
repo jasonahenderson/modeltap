@@ -1,9 +1,16 @@
-# PATCH-0003: Harness App ↔ ConnectionManager Wiring
+---
+patch: "PATCH-0003"
+title: "Harness App ↔ ConnectionManager Wiring"
+status: "approved"
+date: "2026-04-19"
+related:
+  - "v0.2.0 Bundle 6 (WU-073, WU-074)"
+  - "WU-083 (paste summarize)"
+  - "WU-086 (connection UX)"
+branch: "exploration/integrated-harness"
+---
 
-**Status:** approved
-**Date:** 2026-04-19
-**Related:** v0.2.0 Bundle 6 (WU-073, WU-074), WU-083 (paste summarize), WU-086 (connection UX)
-**Branch:** exploration/integrated-harness
+# PATCH-0003: Harness App ↔ ConnectionManager Wiring
 
 ## Problem
 

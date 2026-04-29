@@ -1,9 +1,17 @@
-# PATCH-0009: Root `README.md`
+---
+patch: "PATCH-0009"
+title: "Root `README.md`"
+status: "done"
+date: "2026-04-21"
+related:
+  - "`docs/usage-guide.md`"
+  - "`CONTRIBUTING.md`"
+  - "`GOVERNANCE.md`"
+  - "FEAT-0008–0013 (harness direction)"
+branch: "exploration/integrated-harness"
+---
 
-**Status:** done
-**Date:** 2026-04-21
-**Related:** `docs/usage-guide.md`, `CONTRIBUTING.md`, `GOVERNANCE.md`, FEAT-0008–0013 (harness direction)
-**Branch:** exploration/integrated-harness
+# PATCH-0009: Root `README.md`
 
 ## Problem
 

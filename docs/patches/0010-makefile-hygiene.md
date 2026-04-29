@@ -1,9 +1,14 @@
-# PATCH-0010: Makefile Hygiene — PATH-resolved Go + check-only default
+---
+patch: "PATCH-0010"
+title: "Makefile Hygiene — PATH-resolved Go + check-only default"
+status: "done"
+date: "2026-04-21"
+related:
+  - "PATCH-0009 (root README — flagged this as a follow-up)"
+branch: "exploration/integrated-harness"
+---
 
-**Status:** done
-**Date:** 2026-04-21
-**Related:** PATCH-0009 (root README — flagged this as a follow-up)
-**Branch:** exploration/integrated-harness
+# PATCH-0010: Makefile Hygiene — PATH-resolved Go + check-only default
 
 ## Problem
 

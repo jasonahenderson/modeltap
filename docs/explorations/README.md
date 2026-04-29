@@ -80,6 +80,23 @@ Optional fields:
 - `promoted-to`
 - `supersedes`
 - `superseded-by`
+- `parent`
+- `series`
+- `series-role`
+- `series-order`
+
+Use optional grouping metadata when an exploration belongs to an umbrella,
+roadmap, or other cross-artifact work stream:
+
+```yaml
+parent: EXP-0011
+series: Harness Excellence
+series-role: member
+series-order: 2
+```
+
+Do not encode hierarchy in the exploration identifier. Keep IDs monotonic and
+put grouping relationships in metadata.
 
 ## Status Values
 

@@ -1,9 +1,16 @@
-# PATCH-0008: Moonshot Provider Adapter
+---
+patch: "PATCH-0008"
+title: "Moonshot Provider Adapter"
+status: "proposed"
+date: "2026-04-20"
+related:
+  - "PATCH-0004 (secret prefix resolver)"
+  - "PATCH-0007 (dotenv loader)"
+  - "FEAT-0009 (terminal harness)"
+branch: "patch/0008-moonshot-provider-adapter"
+---
 
-**Status:** proposed
-**Date:** 2026-04-20
-**Related:** PATCH-0004 (secret prefix resolver), PATCH-0007 (dotenv loader), FEAT-0009 (terminal harness)
-**Branch:** patch/0008-moonshot-provider-adapter
+# PATCH-0008: Moonshot Provider Adapter
 
 ## Problem
 

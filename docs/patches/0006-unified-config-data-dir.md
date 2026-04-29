@@ -1,9 +1,16 @@
-# PATCH-0006: Unified `~/.modeltap/` Config & Data Directory
+---
+patch: "PATCH-0006"
+title: "Unified `~/.modeltap/` Config & Data Directory"
+status: "done"
+date: "2026-04-20"
+related:
+  - "PATCH-0004 (secret prefix resolver)"
+  - "PATCH-0005 (BFF→proxy routing)"
+  - "ADR-0004 (Viper configuration)"
+branch: "exploration/integrated-harness"
+---
 
-**Status:** done
-**Date:** 2026-04-20
-**Related:** PATCH-0004 (secret prefix resolver), PATCH-0005 (BFF→proxy routing), ADR-0004 (Viper configuration)
-**Branch:** exploration/integrated-harness
+# PATCH-0006: Unified `~/.modeltap/` Config & Data Directory
 
 ## Problem
 
