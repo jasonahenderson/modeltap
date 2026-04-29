@@ -17,6 +17,13 @@ related:
   - FEAT-0011: Knowledge Integration
   - FEAT-0012: Skills
   - FEAT-0013: Agent Teams
+  - FEAT-0016: Managed Codegen Run Pipeline
+  - FEAT-0017: Durable Runs and Background Agents
+  - FEAT-0018: Context Planner and Project Rules
+  - FEAT-0019: Validation and Repair Loop
+  - FEAT-0020: Patch Evidence and Run Artifacts
+  - FEAT-0021: Policy-Grade Tool Runtime
+  - FEAT-0022: Durable Memory, Quality Routing, and Workflow Extensions
 ---
 
 # FEAT-0015: Professional Harness Runtime
@@ -294,13 +301,13 @@ engineering tracks.
 | Rank | Artifact | Purpose |
 |---|---|---|
 | 1 | ADR: Run Runtime Ownership and Semantics | Decide BFF vs harness ownership, lifecycle states, attachment semantics, prompt/policy precedence, and workspace policy boundaries |
-| 2 | FEAT: Managed Codegen Run Pipeline | Make implementation turns durable run transactions with preflight, context/prompt planning, tool loop, artifact capture, and checkpoints |
-| 3 | FEAT: Durable Runs and Background Agents | Add attached/detached run semantics, background run queue, permission inbox, resume/attach/detach, and separate run transcripts |
-| 4 | FEAT: Context Planner and Project Rules | Add repo-aware context selection, project-rule discovery, prompt-layer inspection, and provenance |
-| 5 | FEAT: Validation and Repair Loop | Add validation planning, structured check evidence, failure summarization, and repair-attempt memory |
-| 6 | FEAT: Patch Evidence and Run Artifacts | Persist and inspect diffs, validation logs, approvals, prompt/context plans, cost, and outcomes |
-| 7 | FEAT: Policy-Grade Tool Runtime | Add command/path/domain policy, audit grouping, workspace profiles, and richer approval behavior |
-| 8 | FEAT: Durable Memory, Quality Routing, and Workflow Extensions | Promote successful work to memory, route by workflow/stage/risk, and align skills/hooks/teams with run contracts |
+| 2 | FEAT-0016: Managed Codegen Run Pipeline | Make implementation turns durable run transactions with preflight, context/prompt planning, tool loop, artifact capture, and checkpoints |
+| 3 | FEAT-0017: Durable Runs and Background Agents | Add attached/detached run semantics, background run queue, permission inbox, resume/attach/detach, and separate run transcripts |
+| 4 | FEAT-0018: Context Planner and Project Rules | Add repo-aware context selection, project-rule discovery, prompt-layer inspection, and provenance |
+| 5 | FEAT-0019: Validation and Repair Loop | Add validation planning, structured check evidence, failure summarization, and repair-attempt memory |
+| 6 | FEAT-0020: Patch Evidence and Run Artifacts | Persist and inspect diffs, validation logs, approvals, prompt/context plans, cost, and outcomes |
+| 7 | FEAT-0021: Policy-Grade Tool Runtime | Add command/path/domain policy, audit grouping, workspace profiles, and richer approval behavior |
+| 8 | FEAT-0022: Durable Memory, Quality Routing, and Workflow Extensions | Promote successful work to memory, route by workflow/stage/risk, and align skills/hooks/teams with run contracts |
 | 9 | PATCH: Codegen Evaluation Harness | Add benchmark scenarios, diff-quality scoring, validation-success metrics, and regression tests for the runtime |
 
 This order is stack-ranked by code-generation quality impact and foundation
