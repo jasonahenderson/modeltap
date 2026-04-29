@@ -1,9 +1,14 @@
-# PATCH-0004: Secret Prefix Resolver for Provider API Keys
+---
+patch: "PATCH-0004"
+title: "Secret Prefix Resolver for Provider API Keys"
+status: "approved"
+date: "2026-04-19"
+related:
+  - "WU-094 security review (storage-at-rest gap not covered by the Criticals/Highs)"
+branch: "exploration/integrated-harness"
+---
 
-**Status:** approved
-**Date:** 2026-04-19
-**Related:** WU-094 security review (storage-at-rest gap not covered by the Criticals/Highs)
-**Branch:** exploration/integrated-harness
+# PATCH-0004: Secret Prefix Resolver for Provider API Keys
 
 ## Problem
 

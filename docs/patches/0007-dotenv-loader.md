@@ -1,9 +1,16 @@
-# PATCH-0007: `.env` Loader for Provider Credentials
+---
+patch: "PATCH-0007"
+title: "`.env` Loader for Provider Credentials"
+status: "done"
+date: "2026-04-20"
+related:
+  - "PATCH-0004 (secret prefix resolver)"
+  - "PATCH-0006 (unified config/data dir)"
+  - "ADR-0010 (license compatibility)"
+branch: "exploration/integrated-harness"
+---
 
-**Status:** done
-**Date:** 2026-04-20
-**Related:** PATCH-0004 (secret prefix resolver), PATCH-0006 (unified config/data dir), ADR-0010 (license compatibility)
-**Branch:** exploration/integrated-harness
+# PATCH-0007: `.env` Loader for Provider Credentials
 
 ## Problem
 

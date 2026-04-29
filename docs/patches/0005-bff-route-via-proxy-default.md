@@ -1,9 +1,16 @@
-# PATCH-0005: BFF Routes Through Local Proxy by Default
+---
+patch: "PATCH-0005"
+title: "BFF Routes Through Local Proxy by Default"
+status: "approved"
+date: "2026-04-20"
+related:
+  - "FEAT-0008 (BFF server)"
+  - "v0.1 proxy (ADR pre-dates numbered ADRs)"
+  - "PATCH-0004 (secret prefix resolver)"
+branch: "exploration/integrated-harness"
+---
 
-**Status:** approved
-**Date:** 2026-04-20
-**Related:** FEAT-0008 (BFF server), v0.1 proxy (ADR pre-dates numbered ADRs), PATCH-0004 (secret prefix resolver)
-**Branch:** exploration/integrated-harness
+# PATCH-0005: BFF Routes Through Local Proxy by Default
 
 ## Problem
 

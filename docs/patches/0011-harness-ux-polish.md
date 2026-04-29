@@ -1,9 +1,17 @@
-# PATCH-0011: Harness UX Polish — OpenCode Theme Port, Borders, Sensible Keybindings
+---
+patch: "PATCH-0011"
+title: "Harness UX Polish — OpenCode Theme Port, Borders, Sensible Keybindings"
+status: "done"
+date: "2026-04-21"
+related:
+  - "FEAT-0009 (terminal harness)"
+  - "ADR-0013 (Bubbletea)"
+  - "ADR-0010 (Apache-2.0 license compatibility)"
+  - "PATCH-0003 (app ↔ conn-mgr wiring)"
+branch: "exploration/integrated-harness"
+---
 
-**Status:** done
-**Date:** 2026-04-21
-**Related:** FEAT-0009 (terminal harness), ADR-0013 (Bubbletea), ADR-0010 (Apache-2.0 license compatibility), PATCH-0003 (app ↔ conn-mgr wiring)
-**Branch:** exploration/integrated-harness
+# PATCH-0011: Harness UX Polish — OpenCode Theme Port, Borders, Sensible Keybindings
 
 ## Problem
 

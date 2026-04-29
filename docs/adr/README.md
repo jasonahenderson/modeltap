@@ -56,6 +56,10 @@ ADRs use YAML frontmatter for machine-readable metadata followed by a structured
 status: proposed | accepted | superseded by ADR-NNNN | deprecated
 date: YYYY-MM-DD
 decision-makers: Name, Name (optional)
+parent: FEAT-NNNN
+series: Human-readable grouping name
+series-role: member
+series-order: 0
 ---
 
 # ADR-NNNN: Title
@@ -77,6 +81,21 @@ One subsection per option, with a brief evaluation against the drivers.
 ```
 
 Existing ADRs in this directory follow this shape with minor variations. New ADRs should match.
+
+Required fields:
+
+- `status`
+- `date`
+
+Optional grouping fields:
+
+- `parent`: canonical parent artifact ID
+- `series`: human-readable grouping name
+- `series-role`: `umbrella` or `member`
+- `series-order`: optional integer for planned order within the series
+
+Use grouping metadata when an ADR supports an umbrella feature, exploration, or
+cross-artifact work stream. Do not encode hierarchy in the ADR identifier.
 
 ## Lifecycle
 

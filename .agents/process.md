@@ -41,6 +41,28 @@ Crystal-clear rules:
 - If a change mixes process work and product work, split it into separate
   commits or tracked artifacts.
 
+## Artifact Grouping Metadata
+
+Artifacts keep simple monotonic IDs (`FEAT-NNNN`, `PATCH-NNNN`, `ADR-NNNN`,
+`EXP-NNNN`). Do not encode hierarchy in the identifier with suffixes such as
+`FEAT-0015a`.
+
+When multiple artifacts belong to the same roadmap, umbrella, or work stream,
+use optional grouping metadata instead:
+
+- `parent`: canonical parent artifact ID, for example `FEAT-0015`
+- `series`: human-readable grouping name, for example `Professional Harness Runtime`
+- `series-role`: the artifact's role in the group, usually `umbrella` or `member`
+- `series-order`: optional integer used for planned ordering inside the group
+
+YAML-frontmatter artifacts (`EXP`, `FEAT`, `ADR`, `PATCH`) use these fields in
+frontmatter. Release plans can reference the same fields in normal markdown
+tables when useful.
+
+Grouping metadata is informational. It does not change artifact status,
+acceptance, or implementation authority. A child artifact can be draft,
+accepted, deferred, superseded, or implemented independently from its parent.
+
 ## Release-Level Workflow
 
 `modeltap` executes releases in three strict phases at the release level:

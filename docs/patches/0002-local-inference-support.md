@@ -1,9 +1,18 @@
-# PATCH-0002: Local Inference Support
+---
+patch: "PATCH-0002"
+title: "Local Inference Support"
+status: "proposed"
+date: "2026-04-09"
+related:
+  - "ADR-0006"
+  - "ADR-0007"
+  - "ADR-0008"
+  - "EXP-0001"
+  - "EXP-0007"
+branch: "patch/0002-local-inference-support"
+---
 
-**Status:** proposed
-**Date:** 2026-04-09
-**Related:** ADR-0006, ADR-0007, ADR-0008, EXP-0001, EXP-0007
-**Branch:** patch/0002-local-inference-support
+# PATCH-0002: Local Inference Support
 
 ## Problem
 

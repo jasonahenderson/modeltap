@@ -1,9 +1,14 @@
-# PATCH-0014: Fix BFF Server `sync.WaitGroup` race between accept and Shutdown
+---
+patch: "PATCH-0014"
+title: "Fix BFF Server `sync.WaitGroup` race between accept and Shutdown"
+status: "approved"
+date: "2026-04-22"
+related:
+  - "FEAT-0008 (BFF server)"
+branch: "exploration/integrated-harness"
+---
 
-**Status:** approved
-**Date:** 2026-04-22
-**Related:** FEAT-0008 (BFF server)
-**Branch:** exploration/integrated-harness
+# PATCH-0014: Fix BFF Server `sync.WaitGroup` race between accept and Shutdown
 
 ## Problem
 
