@@ -9,6 +9,12 @@ This directory organizes implementation plans and delivery artifacts by semver r
 | [v0.1.0](v0.1.0/) | shipped | Proxy core, CLI, dashboard, service management |
 | [v0.2.0](v0.2.0/) | planning | BFF server + terminal harness (FEAT-0008, FEAT-0009) |
 | [v0.2.1](v0.2.1/) | planning | Harness conversation-shell componentization (FEAT-0014, PATCH-0015) |
+| [v0.2.2](v0.2.2/) | released | Production conversation-shell wiring |
+| [v0.3.0](v0.3.0/) | planning draft | Run runtime foundation (FEAT-0016, FEAT-0017 slice) |
+| [v0.3.1](v0.3.1/) | planning draft | Context planner and project rules (FEAT-0018) |
+| [v0.3.2](v0.3.2/) | planning draft | Validation, repair, and run artifacts (FEAT-0019, FEAT-0020) |
+| [v0.3.3](v0.3.3/) | planning draft | Policy-grade tool runtime (FEAT-0021) |
+| [v0.3.4](v0.3.4/) | planning draft | Memory, routing, and workflow extensions (FEAT-0022) |
 
 ## Structure
 
@@ -77,10 +83,18 @@ Features are assigned to releases based on dependency chain and delivery priorit
 | FEAT-0004 (Service Management) | v0.1.0 | Shipped |
 | FEAT-0008 (BFF Server) | v0.2.0 | In planning |
 | FEAT-0009 (Terminal Harness) | v0.2.0 | In planning |
-| FEAT-0010 (Enterprise Auth) | v0.3.0 | Planned |
-| FEAT-0011 (Knowledge Integration) | v0.3.0 or v0.4.0 | Planned |
-| FEAT-0012 (Skills) | v0.3.0 or v0.4.0 | Planned |
-| FEAT-0013 (Agent Teams) | v0.4.0+ | Planned |
+| FEAT-0010 (Enterprise Auth) | v0.4.0+ or TBD | Deferred by v0.3.x Professional Harness Runtime planning |
+| FEAT-0011 (Knowledge Integration) | related to v0.3.4; implementation TBD | Proposed, coordinated with FEAT-0022 |
+| FEAT-0012 (Skills) | related to v0.3.4; implementation TBD | Proposed, needs coordination with FEAT-0022 |
+| FEAT-0013 (Agent Teams) | v0.4.0+ or TBD | Proposed, needs coordination with FEAT-0022 |
 | FEAT-0014 (Harness Conversation Shell) | v0.2.1 | Planned |
+| FEAT-0015 (Professional Harness Runtime) | v0.3.0–v0.3.4 | Umbrella series |
+| FEAT-0016 (Managed Codegen Run Pipeline) | v0.3.0 | Planning draft |
+| FEAT-0017 (Durable Runs and Background Agents) | v0.3.0 | Foundation slice |
+| FEAT-0018 (Context Planner and Project Rules) | v0.3.1 | Planning draft |
+| FEAT-0019 (Validation and Repair Loop) | v0.3.2 | Planning draft |
+| FEAT-0020 (Patch Evidence and Run Artifacts) | v0.3.2 | Planning draft |
+| FEAT-0021 (Policy-Grade Tool Runtime) | v0.3.3 | Planning draft |
+| FEAT-0022 (Durable Memory, Quality Routing, and Workflow Extensions) | v0.3.4 | Planning draft |
 
-Release assignments for FEAT-0010+ are tentative and will be confirmed during their planning phase.
+Release assignments for FEAT-0010+ are tentative and will be confirmed during their planning phase. The v0.3.x plans are draft roadmap artifacts until an explicit `ADMIN:` commit opens each release's Phase 1.
