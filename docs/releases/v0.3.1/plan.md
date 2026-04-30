@@ -63,12 +63,14 @@ Current phase: **Planning draft — Phase 1 not opened.**
 
 Decide rule precedence, how `MODELTAP.md` coexists with `AGENTS.md` and
 `CLAUDE.md`, which prompt layers are BFF-owned, and what prompt metadata can be
-shown safely.
+shown safely. Align the prompt metadata taxonomy with the v0.3.0 run prompt
+and `turn.submit` compatibility decisions.
 
 **WU-119: Context plan schema and protocol surface**
 
 Define run-correlated context plan payloads, provenance records, budget
-categories, and inspection methods.
+categories, and inspection methods. This WU activates the `context_plan`
+pipeline stage first defined by v0.3.0.
 
 ### Track B — Harness Context Discovery
 
@@ -80,7 +82,8 @@ to ADR policy and report conflicts or over-budget rule files.
 **WU-121: Lightweight repo map and recent-change scanner**
 
 Build a cheap repo map from file tree, package/module boundaries, imports where
-easy, git status/diff, and configured ignore/generated patterns.
+easy, git status/diff, and configured ignore/generated patterns. Define cost
+ceilings so repo-map generation remains bounded on large workspaces.
 
 **WU-122: Test and style-context discovery**
 
@@ -98,7 +101,8 @@ category.
 **WU-124: Prompt-plan metadata and context provenance capture**
 
 Store prompt/context metadata on the run without exposing protected prompt
-content by default.
+content by default. Real `context_plan` stage events must link to the stored
+context plan and provenance records.
 
 **WU-125: Harness `/context` inspection surfaces**
 

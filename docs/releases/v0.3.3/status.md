@@ -26,5 +26,8 @@
 
 ## Open Items
 
-- Decide whether workspace isolation implementation for `worktree` lands in
-  this release or only the policy/metadata shape.
+- During WU-138/WU-140 design, decide whether `worktree` or `temp_copy`
+  workspace creation lands in this release. Planning default is metadata and
+  policy shape only.
+- Confirm v0.3.0 has introduced `workflow_type` before Phase 3 so policy can
+  evaluate workflow-aware defaults.

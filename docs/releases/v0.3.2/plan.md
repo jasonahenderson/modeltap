@@ -29,6 +29,8 @@ This release does not cover:
 - durable memory promotion
 - quality-driven routing beyond recording evidence for future routing
 - background writers beyond v0.3.0 attach/detach behavior
+- autonomous-mode policy warnings beyond advisory artifact notes; policy-grade
+  enforcement belongs to v0.3.3
 
 ## Feature Scope
 
@@ -68,7 +70,8 @@ and when the system stops versus asks the user.
 **WU-128: Artifact storage, retention, and redaction ADR/design**
 
 Define artifact storage boundaries, large-log handling, redaction/encryption by
-deployment profile, and artifact references for isolated workspaces.
+deployment profile, artifact size limits, and artifact references for isolated
+workspaces.
 
 ### Track B — Validation and Repair
 
@@ -80,12 +83,14 @@ workflow type. Prefer targeted checks before broad checks.
 **WU-130: Structured command/check evidence envelopes**
 
 Capture command, workspace, timing, exit status, stdout/stderr references, and
-summary fields as run artifacts.
+summary fields as run artifacts. This WU activates the `validation` pipeline
+stage first defined by v0.3.0.
 
 **WU-131: Failure summarization and repair context injection**
 
 Summarize compiler/test/lint/runtime failures with file/line references and feed
-the summary into repair turns.
+the summary into repair turns. The design must use a validation outcome matrix
+that distinguishes passed, failed, skipped, and inconclusive checks.
 
 **WU-132: Repair-attempt memory and stop/ask behavior**
 
@@ -97,7 +102,9 @@ attempt limits.
 **WU-133: Run artifact bundle store and API**
 
 Persist artifact metadata and content/reference handles. Expose artifact list
-and detail APIs.
+and detail APIs. Include an approval-decision artifact schema stub so FEAT-0020
+SC#4 has a stable run-level home until v0.3.3 fills policy audit details. This
+WU activates the `artifact_capture` pipeline stage first defined by v0.3.0.
 
 **WU-134: Patch/diff evidence collector**
 
@@ -114,12 +121,17 @@ tokens and preview behavior.
 **WU-136: Codegen evaluation harness patch**
 
 Draft and implement the patch for benchmark scenarios, diff-quality scoring,
-validation success metrics, and regression fixtures.
+validation success metrics, and regression fixtures. WU-136 is gated on a
+separately drafted and accepted `PATCH-NNNN` before any implementation commit;
+the patch must decide whether the harness is a Go test package, standalone
+binary, CI script, or combination.
 
 **WU-137: Validation/artifact integration tests and docs**
 
 Add E2E tests for validation planning, repair summaries, artifact inspection,
-diff evidence, and final-answer evidence citation.
+diff evidence, and final-answer evidence citation. Tests must assert mutating
+run summaries reference validation artifact IDs or explain why validation was
+skipped, failed to run, or remained inconclusive.
 
 ## Phase 1 Design Checklist
 
@@ -147,4 +159,8 @@ diff evidence, and final-answer evidence citation.
 3. Failed validation can feed repair turns without raw-log dumping.
 4. Mutating runs produce patch evidence artifacts.
 5. The harness can inspect artifacts, diffs, and evidence.
-6. Codegen evaluation harness patch exists and runs against fixture scenarios.
+6. Approval decisions are represented by run artifact metadata, even before
+   v0.3.3 policy audit enrichment.
+7. Final run summaries cite validation evidence or explicit skip/inconclusive
+   reasons.
+8. Codegen evaluation harness patch exists and runs against fixture scenarios.
