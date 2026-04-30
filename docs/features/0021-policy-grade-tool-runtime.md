@@ -10,11 +10,10 @@ series-order: 6
 depends-on:
   - FEAT-0009: Terminal Harness
   - FEAT-0016: Managed Codegen Run Pipeline
+related:
   - FEAT-0017: Durable Runs and Background Agents
 adr-constraints:
   - ADR-0014: Harness Base Strategy
-promoted-from:
-  - FEAT-0015: Professional Harness Runtime
 ---
 
 # FEAT-0021: Policy-Grade Tool Runtime
@@ -74,11 +73,14 @@ The harness should explain why a decision happened.
 All local tools execute relative to the run workspace, not an implicit process
 cwd. Policy can differ between:
 
-- current workspace
-- read-only current workspace
-- Git worktree
-- temp copy
-- remote sandbox
+- `current`
+- `current_readonly`
+- `worktree`
+- `temp_copy`
+- `remote`
+
+These identifiers are defined by FEAT-0015's workspace policy and should remain
+stable across run metadata, policy config, and artifact records.
 
 ### Audit Trail
 
@@ -140,6 +142,9 @@ Configuration should support:
 5. The user can inspect why a tool request was allowed, denied, or blocked.
 6. Existing simple permission levels continue to work as presets over the richer
    policy model.
+7. A foreground-policy slice can ship before FEAT-0017; background-specific
+   behavior such as pre-approved detached execution and blocked-run inboxes
+   lands after durable background runs exist.
 
 ## Relationship to ADRs
 

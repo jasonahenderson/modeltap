@@ -8,16 +8,15 @@ series: Professional Harness Runtime
 series-role: member
 series-order: 7
 depends-on:
+  - FEAT-0016: Managed Codegen Run Pipeline
+  - FEAT-0020: Patch Evidence and Run Artifacts
+related:
   - FEAT-0011: Knowledge Integration
   - FEAT-0012: Skills
   - FEAT-0013: Agent Teams
-  - FEAT-0016: Managed Codegen Run Pipeline
-  - FEAT-0020: Patch Evidence and Run Artifacts
 adr-constraints:
   - ADR-0008: Knowledge Layer Architecture
   - ADR-0014: Harness Base Strategy
-promoted-from:
-  - FEAT-0015: Professional Harness Runtime
 ---
 
 # FEAT-0022: Durable Memory, Quality Routing, and Workflow Extensions
@@ -95,6 +94,25 @@ contracts:
 Extensions may narrow tools, set model preferences, define artifact
 requirements, or add validation behavior.
 
+Routing roles are orthogonal to workflow types. A workflow such as `debug` may
+use several roles (`context helper`, `repair`, `validation summarizer`,
+`reviewer`) during one run, while a role such as `reviewer` may appear in
+multiple workflows.
+
+### Cross-Feature Impact
+
+This feature re-anchors FEAT-0012 and FEAT-0013 rather than replacing them:
+
+- FEAT-0012 skills should become workflow/run specializations that can narrow
+  tools, alter prompt behavior, and optionally set model preferences for one run
+  or run stage.
+- FEAT-0013 agent teams should execute as durable runs with multiple coordinated
+  agents, shared artifacts, policy-aware tool calls, and run-level traceability.
+
+If FEAT-0012 or FEAT-0013 are accepted before this feature, their accepted
+language should be revised or constrained so skills and teams do not bypass the
+durable run contract.
+
 ## UI / CLI / API Integration
 
 Expected commands:
@@ -140,6 +158,10 @@ Configuration should support:
 6. Skills and teams can reference workflow profiles or run-stage behavior.
 7. Future routing improvements can be evaluated against stored run outcomes.
 
+Acceptance of the workflow-extension portions is gated on coordination with
+FEAT-0012 and FEAT-0013. The memory/routing portions may be accepted earlier if
+the feature is split or explicitly phased.
+
 ## Relationship to ADRs
 
 | ADR | Relationship |
@@ -156,3 +178,5 @@ Configuration should support:
    plugin/skill packaging format?
 4. When should the system compare multiple candidate patches instead of running
    one implementation plus review?
+5. Should this feature split into an earlier memory/routing slice and a later
+   workflow-extension slice that waits on FEAT-0012 and FEAT-0013?

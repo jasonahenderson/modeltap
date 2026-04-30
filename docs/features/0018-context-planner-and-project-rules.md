@@ -13,8 +13,6 @@ related:
   - EXP-0012: Code Graphing via AST for Repository-Aware Context
 adr-constraints:
   - ADR-0014: Harness Base Strategy
-promoted-from:
-  - FEAT-0015: Professional Harness Runtime
 ---
 
 # FEAT-0018: Context Planner and Project Rules

@@ -1,0 +1,28 @@
+[
+  {
+    "id": "F1",
+    "summary": "FEAT-0019 declares a hard dependency on FEAT-0018, but a minimum-viable validation slice may not need the full context planner.",
+    "reviewer": "Sequencing",
+    "severity": "advisory",
+    "affected_sections": [
+      "Relationship to other features (downstream \u2014 FEAT-0019)"
+    ],
+    "detail": "FEAT-0019 lists depends-on: FEAT-0018. FEAT-0019's validation logic primarily needs a changed-file list, language detection, and a way to surface failures back into a repair turn \u2014 none of which strictly require the full context planner. Provenance and repo-aware selection from FEAT-0018 strengthen FEAT-0019, but they are not required for a first slice.",
+    "recommendation": "Note in FEAT-0018 or FEAT-0019 that FEAT-0019 can be implemented with a minimal context plan that only carries changed-file metadata, and that full FEAT-0018 capability strengthens but does not gate FEAT-0019.",
+    "disposition": "accepted",
+    "disposition_rationale": "Added the sequencing clarification in FEAT-0019: basic validation can start with a minimal context plan while FEAT-0018 enriches repair quality."
+  },
+  {
+    "id": "F2",
+    "summary": "promoted-from: FEAT-0015 is redundant with parent: FEAT-0015.",
+    "reviewer": "Frontmatter Convention",
+    "severity": "advisory",
+    "affected_sections": [
+      "Frontmatter"
+    ],
+    "detail": "See FEAT-0015 review F4.",
+    "recommendation": "Drop promoted-from: FEAT-0015 from frontmatter.",
+    "disposition": "accepted",
+    "disposition_rationale": "Removed promoted-from: FEAT-0015 from the child feature frontmatter."
+  }
+]

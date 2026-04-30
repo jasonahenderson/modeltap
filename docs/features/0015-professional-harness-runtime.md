@@ -74,20 +74,44 @@ background, tool, and agent paths.
 
 Every meaningful task is represented as a run with a stable run ID.
 
-Run lifecycle:
+Run metadata has three related but distinct axes:
+
+- **status**: whether the run is queued, active, blocked, checkpointed, or
+  terminal
+- **pipeline stage**: what work the runtime is currently performing
+- **attachment state**: whether a harness is actively attached to the run
+
+Canonical run statuses:
 
 - `queued`
-- `preflight`
-- `context_planning`
-- `prompt_planning`
 - `running`
 - `waiting_permission`
 - `waiting_user`
-- `validating`
 - `checkpointed`
 - `completed`
 - `failed`
 - `cancelled`
+
+`waiting_permission` means the run is blocked on approval for a tool or policy
+decision. `waiting_user` means the run is blocked on non-permission user input,
+such as choosing a plan direction, answering a clarification, or deciding how to
+handle an ambiguous failure.
+
+Canonical pipeline stages:
+
+- `preflight`
+- `context_plan`
+- `prompt_plan`
+- `model_call`
+- `tool_loop`
+- `validation`
+- `artifact_capture`
+- `checkpoint`
+- `completion`
+
+A run can combine these axes. For example, an implementation run may be
+`status: waiting_permission`, `stage: tool_loop`, and
+`attachment: detached`.
 
 Runs record:
 
@@ -147,6 +171,13 @@ Initial workflow types:
 
 Workflow contracts are not full agent teams. They are the structured envelope
 that makes a run produce the right artifacts and ask for the right approvals.
+Artifact-oriented workflows such as `exploration`, `feature`, `adr`, and
+`release` produce or revise the existing repository artifact families
+(`docs/explorations/`, `docs/features/`, `docs/adr/`, and
+`docs/releases/<version>/`). They do not replace the canonical process rules for
+those directories. In particular, the `release` workflow must honor the
+existing release plan/status/track/changelog structure and the strict
+Phase 1 -> Phase 2 -> Phase 3 release process.
 
 ### Tool Runtime Integration
 
@@ -179,6 +210,8 @@ Supported workspace modes:
 - `worktree`: create or attach to a Git worktree for isolated edits
 - `temp_copy`: copy a workspace for risky or non-Git work
 - `remote`: execute in a remote or cloud sandbox
+
+These snake_case identifiers are canonical for run/workspace metadata.
 
 Default policy:
 
@@ -260,6 +293,7 @@ run. Background runs are visible through a compact jobs/runs surface.
 Expected commands:
 
 - `/jobs` or `/runs` lists active, blocked, failed, and completed runs
+- `/run` shows the currently attached run
 - `/attach <run-id>` attaches the foreground surface to a run
 - `/detach` returns the current run to the background
 - `/cancel <run-id>` cancels a run
@@ -308,10 +342,28 @@ engineering tracks.
 | 6 | FEAT-0020: Patch Evidence and Run Artifacts | Persist and inspect diffs, validation logs, approvals, prompt/context plans, cost, and outcomes |
 | 7 | FEAT-0021: Policy-Grade Tool Runtime | Add command/path/domain policy, audit grouping, workspace profiles, and richer approval behavior |
 | 8 | FEAT-0022: Durable Memory, Quality Routing, and Workflow Extensions | Promote successful work to memory, route by workflow/stage/risk, and align skills/hooks/teams with run contracts |
-| 9 | PATCH: Codegen Evaluation Harness | Add benchmark scenarios, diff-quality scoring, validation-success metrics, and regression tests for the runtime |
 
 This order is stack-ranked by code-generation quality impact and foundation
 value, not by implementation size.
+
+The codegen evaluation harness remains an expected implementation-scoped
+supporting patch, but it is not part of this behavior-contract map until a
+`PATCH-NNNN` artifact is drafted.
+
+## Future ADRs
+
+Before this series can move from draft/proposed into implementation planning,
+the following ADRs or ADR sections should be drafted and accepted where they
+have future constraint value:
+
+| ADR topic | Covers | Related features |
+|---|---|---|
+| Run runtime ownership and semantics | BFF vs harness ownership, run status/stage terminology, attachment state, checkpoint and reconnect semantics, local-executor availability | FEAT-0015, FEAT-0016, FEAT-0017 |
+| Project rules and prompt layering | Rule-file precedence, prompt-layer ownership, prompt metadata visibility, context budget authority | FEAT-0018 |
+| Validation and repair artifacts | Validation artifact schema, repair-loop limits, failure classification, retry boundaries | FEAT-0019 |
+| Artifact storage and redaction | Run artifact storage, blob references, redaction/encryption, retention by deployment profile | FEAT-0020 |
+| Policy and workspace boundaries | Policy inheritance, sandbox/workspace modes, non-overridable policy, local vs server enforcement | FEAT-0021 |
+| Memory, routing, and extension trust | Memory promotion defaults, routing role taxonomy, skill/hook/team trust boundaries | FEAT-0022 |
 
 ## Document Placement Guidance
 
@@ -396,3 +448,6 @@ runtime will likely need:
    deployments?
 6. Should workflow commands be implemented as skills, as first-class run
    profiles, or as a unified extension model that includes both?
+7. Can background runs continue local tool execution when no harness or local
+   executor is connected, or must they pause / use only server-safe tools until
+   a local executor reconnects?

@@ -65,6 +65,14 @@ series-order: 1
 adr-constraints:
   - ADR-NNNN: Short reason this ADR constrains the feature
   - ADR-NNNN: ...
+depends-on:
+  - FEAT-NNNN: Required predecessor feature
+related:
+  - EXP-NNNN: Related upstream exploration
+promoted-from:
+  - EXP-NNNN: Upstream exploration or PATCH-NNNN: Upstream patch
+decomposed-from:
+  - FEAT-NNNN: Umbrella feature, when parent/series metadata is insufficient
 ---
 ```
 
@@ -81,6 +89,16 @@ Optional grouping fields:
 - `series`: human-readable grouping name
 - `series-role`: `umbrella` or `member`
 - `series-order`: optional integer for planned order within the series
+
+Other optional relationship fields:
+
+- `depends-on`: features that must land before this feature can be implemented
+  or accepted as a complete behavior contract
+- `related`: non-blocking related features, explorations, ADRs, patches, or
+  release artifacts
+- `promoted-from`: upstream exploration or patch that became this feature
+- `decomposed-from`: umbrella feature that produced this child feature, if a
+  relationship beyond `parent` / `series` is needed
 
 Use grouping metadata for umbrella features and related feature families rather
 than changing the ID format. For example, keep child features as `FEAT-0016`,

@@ -11,8 +11,6 @@ depends-on:
   - FEAT-0016: Managed Codegen Run Pipeline
 adr-constraints:
   - ADR-0014: Harness Base Strategy
-promoted-from:
-  - FEAT-0015: Professional Harness Runtime
 ---
 
 # FEAT-0017: Durable Runs and Background Agents
@@ -52,6 +50,12 @@ Runs have attachment state:
 
 Users can attach, detach, cancel, continue, retry, or fork a run without losing
 its transcript or artifacts.
+
+Attachment state is orthogonal to run status and pipeline stage. A run can be
+`running` while `detached`, `waiting_permission` while `attached`, or
+`waiting_user` while `detached`. `blocked` is a UI grouping for runs whose
+status is `waiting_permission` or `waiting_user`; it is not a separate lifecycle
+status.
 
 ### Background Permission Behavior
 
