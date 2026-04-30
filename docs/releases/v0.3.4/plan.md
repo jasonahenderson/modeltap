@@ -45,6 +45,11 @@ If FEAT-0011, FEAT-0012, or FEAT-0013 are not accepted when this release is
 opened, Phase 1 must either split this release or mark workflow-extension WUs as
 deferred before design closes.
 
+If WU-153 is deferred, v0.3.4 becomes a memory/routing-only release. In that
+split path, WU-154 covers only WU-148 through WU-152 tests/docs, and WU-153
+moves to a future release or approved PATCH after FEAT-0011/0012/0013
+coordination completes.
+
 ## Work Units
 
 | WU | Title | Dependencies | Size | Feature |
@@ -56,7 +61,7 @@ deferred before design closes.
 | 151 | Routing role taxonomy and policy config | 147 | M | FEAT-0022 |
 | 152 | Routing decision/outcome capture | 151 | M | FEAT-0022 |
 | 153 | Workflow profile and extension alignment design | 147, FEAT-0012/0013 coordination | L | FEAT-0022 |
-| 154 | Memory/routing/workflow tests and docs | 148-153 | M | FEAT-0022 |
+| 154 | Memory/routing/workflow tests and docs | 148-153, or 148-152 if WU-153 is deferred | M | FEAT-0022 |
 
 ## Detailed WU Plan
 
@@ -113,7 +118,9 @@ constraint document before implementation.
 **WU-154: Memory/routing/workflow tests and docs**
 
 Add tests for candidate generation, memory provenance, routing explanation, and
-workflow profile behavior. Document user commands and configuration.
+workflow profile behavior. Document user commands and configuration. If WU-153
+is deferred, WU-154 excludes workflow-profile behavior and documents only the
+memory/routing slice plus the WU-153 deferral path.
 
 ## Phase 1 Design Checklist
 
@@ -121,7 +128,8 @@ workflow profile behavior. Document user commands and configuration.
 - [ ] WU-148 to WU-150 memory design bundle
 - [ ] WU-151 to WU-152 routing design bundle
 - [ ] WU-153 extension alignment design and FEAT-0012/0013 coordination plan
-- [ ] WU-154 verification/docs design
+- [ ] WU-154 verification/docs design, scoped to memory/routing only if WU-153
+      is deferred
 
 ## Risk Register
 
@@ -135,11 +143,12 @@ workflow profile behavior. Document user commands and configuration.
 
 ## Definition of Done
 
-1. Memory/routing/extension trust ADR is accepted or the release is split to
-   isolate memory/routing.
+1. Memory/routing/extension trust ADR is accepted, or the release is split to
+   isolate memory/routing and WU-153 is explicitly moved to a future release or
+   approved PATCH.
 2. Successful runs can produce source-linked memory candidates.
 3. Users can inspect and disposition memory candidates.
 4. Active memory provenance appears in run details.
 5. Routing roles and decisions are recorded with outcomes.
 6. Workflow extensions have a documented alignment path with FEAT-0012 and
-   FEAT-0013.
+   FEAT-0013, or the memory/routing-only split records WU-153's future owner.

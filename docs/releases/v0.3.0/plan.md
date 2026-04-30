@@ -13,6 +13,10 @@ implementation starts.
 
 ## Prerequisites
 
+Before Phase 1 opens, the release-open `ADMIN:` commit must reconcile the
+current v0.2.x release-status mismatch or name the exact committed BFF/harness
+contracts that v0.3.0 design may depend on.
+
 Before Phase 3 implementation starts, the v0.2.x harness foundation must be
 reachable from the implementation branch:
 
@@ -73,6 +77,18 @@ The release executes in the repo's strict three phases:
 Current phase: **Planning draft — Phase 1 not opened.** Opening Phase 1 requires
 an explicit `ADMIN:` commit.
 
+## Release Authority Gates
+
+Phase 1 may open only after one of these is true:
+
+- FEAT-0015, FEAT-0016, and the FEAT-0017 foundation slice are accepted.
+- An explicit `ADMIN:` exception authorizes v0.3.0 Phase 1 design against draft
+  feature specs.
+
+Phase 3 remains blocked until FEAT-0015, FEAT-0016, the FEAT-0017 foundation
+slice, and the run-runtime ADR are accepted. Later v0.3.x releases inherit the
+same rule for their feature scopes.
+
 ## Work Units
 
 | WU | Title | Dependencies | Size | Feature |
@@ -105,7 +121,10 @@ connected harness.
 
 Design tables or records for runs, run events, run checkpoints, attachment
 state, stage/status transitions, `workflow_type`, and summary metadata. Define
-retention and compatibility with existing sessions/turns.
+retention and compatibility with existing sessions/turns. Before this design
+closes, review the schema against downstream context, artifact, policy,
+workspace, memory, and routing ADR topics and reserve explicit extension points
+or compatibility rules.
 
 **WU-110: Run protocol methods and event taxonomy**
 
@@ -178,6 +197,7 @@ Phase 1 is complete only when all WUs have design docs under
 
 - [ ] WU-108 run runtime ADR design/ADR draft
 - [ ] WU-109 storage design
+- [ ] WU-109 cross-release schema compatibility check
 - [ ] WU-110 protocol design
 - [ ] WU-111 to WU-113 BFF runtime design bundle
 - [ ] WU-114 to WU-116 harness runtime design bundle
@@ -206,5 +226,7 @@ Phase 1 is complete only when all WUs have design docs under
    design.
 6. Run records include `workflow_type`, cost/token usage, and model-selection
    metadata required by downstream releases.
-7. Tests cover BFF run lifecycle, protocol events, harness projection, and
+7. The run schema records compatibility rules or extension points for context,
+   artifact, policy, workspace, memory, and routing metadata.
+8. Tests cover BFF run lifecycle, protocol events, harness projection, and
    reconnect behavior.

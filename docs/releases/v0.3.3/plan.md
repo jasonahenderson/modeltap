@@ -26,8 +26,9 @@ This release does not cover:
 - hook/plugin packaging
 - durable memory promotion
 - remote/cloud executor implementation beyond policy shape
-- actual `worktree` or `temp_copy` workspace creation/cleanup unless Phase 1
-  explicitly promotes those modes from metadata/policy shape to implementation
+- actual `worktree` or `temp_copy` workspace creation/cleanup; v0.3.3 records
+  metadata/policy shape only, while isolated writer workspaces require a future
+  release or approved PATCH
 
 ## Feature Scope
 
@@ -73,9 +74,10 @@ field from v0.3.0.
 **WU-140: Workspace mode resolver and run metadata integration**
 
 Resolve `current`, `current_readonly`, `worktree`, `temp_copy`, and `remote` for
-a run. Store workspace metadata on the run. Phase 1 must explicitly decide
-whether `worktree` and `temp_copy` are metadata-only/deferred or implemented in
-this release; the planning default is metadata-only/deferred.
+a run. Store workspace metadata on the run. `current` and `current_readonly`
+are executable modes in this release. `worktree`, `temp_copy`, and `remote` are
+metadata/policy modes only; they must not imply workspace creation or cleanup in
+v0.3.3.
 
 **WU-141: Foreground tool policy enforcement**
 
@@ -102,7 +104,9 @@ For detached runs, pause, auto-deny, or fail operations according to policy.
 Surface blocked requests in the run queue/inbox. The safe default is that
 background writes do not proceed silently; this WU is the implementation home
 for the FEAT-0017 background approval/blocked-operation criteria deferred from
-v0.3.0.
+v0.3.0. Because isolated writer workspaces are deferred, background write
+requests either pause/deny or require explicit policy/user approval to operate
+in the current workspace.
 
 **WU-145: Tool audit artifacts by run**
 
@@ -141,5 +145,5 @@ and user/developer docs.
 3. Background blocked operations pause or deny according to policy.
 4. `/policy` explains active policy and recent decisions.
 5. Tool decisions are recorded as run artifacts.
-6. Tests cover policy inheritance, classifiers, workspace modes, and
-   background behavior.
+6. Tests cover policy inheritance, classifiers, workspace metadata modes,
+   executable `current`/`current_readonly` behavior, and background behavior.

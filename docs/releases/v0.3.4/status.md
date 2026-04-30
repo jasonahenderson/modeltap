@@ -21,11 +21,19 @@
 
 - Depends on v0.3.2 run artifacts.
 - Workflow-extension acceptance is gated on FEAT-0011/0012/0013 coordination.
+- Phase 1 starts only after FEAT-0022 is accepted or the release-open `ADMIN:`
+  commit records an explicit design-against-draft exception.
+- If FEAT-0011/0012/0013 coordination is not ready, Phase 1 must split out or
+  defer WU-153 and rescope WU-154 before design closes.
+- Phase 3 is blocked until FEAT-0022 and any in-scope workflow-extension
+  dependency revisions are accepted.
 
 ## Open Items
 
 - Decide during Phase 1 whether to split memory/routing from workflow-extension
   alignment.
+- If WU-153 is deferred, name the future release or approved PATCH that owns it
+  and rescope WU-154 to memory/routing tests/docs.
 - Confirm v0.3.0 has introduced `workflow_type` before Phase 1 opens.
 - Track FEAT-0011, FEAT-0012, and FEAT-0013 acceptance or revision status
   before WU-153 design closes.

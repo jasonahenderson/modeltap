@@ -22,6 +22,8 @@
 
 - Depends on v0.3.0 run infrastructure.
 - Phase 1 starts only after explicit release-open `ADMIN:` commit.
+- Phase 3 is blocked until FEAT-0018 is accepted and v0.3.0 Phase 3 has
+  produced accepted run schema/protocol contracts.
 
 ## Open Items
 
