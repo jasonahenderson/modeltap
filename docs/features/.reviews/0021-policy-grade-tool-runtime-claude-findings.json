@@ -1,0 +1,42 @@
+[
+  {
+    "id": "F1",
+    "summary": "Hard depends-on: FEAT-0017 may force a later landing than necessary.",
+    "reviewer": "Sequencing",
+    "severity": "significant",
+    "affected_sections": [
+      "Frontmatter (depends-on)",
+      "Workspace-Aware Execution"
+    ],
+    "detail": "FEAT-0021 lists depends-on: FEAT-0009, FEAT-0016, FEAT-0017. Path/command/Git/domain policy and the audit-trail capability are useful for foreground runs alone. Background-specific policy does need FEAT-0017, but it is a subset. Forcing the whole feature behind FEAT-0017 means policy-grade tools cannot land for foreground use until durable runs ship.",
+    "recommendation": "Either split FEAT-0021 into a foreground-policy slice (no FEAT-0017 dependency) and a background-policy slice (depends on FEAT-0017), or keep one feature but document explicit phasing in \u00a7Success Criteria so the foreground slice can start earlier.",
+    "disposition": "accepted",
+    "disposition_rationale": "Relaxed FEAT-0021 by moving FEAT-0017 from depends-on to related and adding an explicit foreground-policy-first success criterion."
+  },
+  {
+    "id": "F2",
+    "summary": "Workspace mode names diverge from FEAT-0015's canonical identifiers.",
+    "reviewer": "Vocabulary Consistency",
+    "severity": "advisory",
+    "affected_sections": [
+      "Workspace-Aware Execution"
+    ],
+    "detail": "FEAT-0015 defines snake_case identifiers (current, current_readonly, worktree, temp_copy, remote). FEAT-0021 uses prose forms (current workspace, read-only current workspace, Git worktree, temp copy, remote sandbox). Same set, different surface form.",
+    "recommendation": "Use the snake_case identifiers from FEAT-0015 verbatim in FEAT-0021 \u00a7Workspace-Aware Execution.",
+    "disposition": "accepted",
+    "disposition_rationale": "Changed FEAT-0021 workspace names to the canonical FEAT-0015 snake_case identifiers."
+  },
+  {
+    "id": "F3",
+    "summary": "promoted-from: FEAT-0015 is redundant with parent: FEAT-0015.",
+    "reviewer": "Frontmatter Convention",
+    "severity": "advisory",
+    "affected_sections": [
+      "Frontmatter"
+    ],
+    "detail": "See FEAT-0015 review F4.",
+    "recommendation": "Drop promoted-from: FEAT-0015 from frontmatter.",
+    "disposition": "accepted",
+    "disposition_rationale": "Removed promoted-from: FEAT-0015 from the child feature frontmatter."
+  }
+]

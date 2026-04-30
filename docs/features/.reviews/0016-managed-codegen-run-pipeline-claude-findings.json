@@ -1,0 +1,29 @@
+[
+  {
+    "id": "F1",
+    "summary": "Pipeline stage names diverge from FEAT-0015's run lifecycle states.",
+    "reviewer": "Vocabulary Consistency",
+    "severity": "significant",
+    "affected_sections": [
+      "Run Lifecycle",
+      "Pipeline Events"
+    ],
+    "detail": "FEAT-0016 defines stages preflight \u2192 context_plan \u2192 prompt_plan \u2192 model_call \u2192 tool_loop \u2192 artifact_capture \u2192 checkpoint \u2192 completion. FEAT-0015 lists lifecycle states queued, preflight, context_planning, prompt_planning, running, waiting_permission, waiting_user, validating, checkpointed, completed, failed, cancelled. There is no explicit mapping; noun/verb forms differ. Both specs flag the future Run Runtime ADR as the harmonization point.",
+    "recommendation": "Either note explicitly in \u00a7Run Lifecycle that vocabulary is provisional pending the lifecycle ADR and that FEAT-0015 uses a parallel state set, or collapse to a single canonical vocabulary in FEAT-0015 and have this spec reference it.",
+    "disposition": "accepted",
+    "disposition_rationale": "Updated FEAT-0016 to use FEAT-0015 stage vocabulary and include the validation stage."
+  },
+  {
+    "id": "F2",
+    "summary": "promoted-from: FEAT-0015 is redundant with parent: FEAT-0015.",
+    "reviewer": "Frontmatter Convention",
+    "severity": "advisory",
+    "affected_sections": [
+      "Frontmatter"
+    ],
+    "detail": "The README's promoted-from semantic is reserved for an exploration or patch that firms up into a feature spec. FEAT-0016 is a member of FEAT-0015's umbrella, already encoded by parent and series. See FEAT-0015 review F4 for the full cross-cutting note.",
+    "recommendation": "Drop promoted-from: FEAT-0015 from frontmatter.",
+    "disposition": "accepted",
+    "disposition_rationale": "Removed promoted-from: FEAT-0015 from the child feature frontmatter."
+  }
+]

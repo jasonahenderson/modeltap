@@ -12,8 +12,6 @@ depends-on:
   - FEAT-0019: Validation and Repair Loop
 adr-constraints:
   - ADR-0014: Harness Base Strategy
-promoted-from:
-  - FEAT-0015: Professional Harness Runtime
 ---
 
 # FEAT-0020: Patch Evidence and Run Artifacts

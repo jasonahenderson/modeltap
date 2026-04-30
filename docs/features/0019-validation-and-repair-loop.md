@@ -9,11 +9,10 @@ series-role: member
 series-order: 4
 depends-on:
   - FEAT-0016: Managed Codegen Run Pipeline
+related:
   - FEAT-0018: Context Planner and Project Rules
 adr-constraints:
   - ADR-0014: Harness Base Strategy
-promoted-from:
-  - FEAT-0015: Professional Harness Runtime
 ---
 
 # FEAT-0019: Validation and Repair Loop
@@ -91,6 +90,11 @@ Expected commands:
 
 The harness displays validation results compactly in the transcript and exposes
 full logs through run artifacts.
+
+The first validation slice may run with a minimal context plan containing
+changed-file metadata and language/toolchain detection. FEAT-0018 strengthens
+repair quality with richer repository context and provenance, but the full
+context planner is not a hard prerequisite for basic validation execution.
 
 ## Configuration
 

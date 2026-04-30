@@ -13,8 +13,6 @@ depends-on:
   - FEAT-0014: Harness Conversation Shell
 adr-constraints:
   - ADR-0014: Harness Base Strategy
-promoted-from:
-  - FEAT-0015: Professional Harness Runtime
 ---
 
 # FEAT-0016: Managed Codegen Run Pipeline
@@ -37,7 +35,7 @@ Define code generation as a durable run pipeline owned primarily by the BFF and
 surfaced by the harness. Each implementation or debug run moves through explicit
 stages:
 
-`preflight -> context_plan -> prompt_plan -> model_call -> tool_loop -> artifact_capture -> checkpoint -> completion`
+`preflight -> context_plan -> prompt_plan -> model_call -> tool_loop -> validation -> artifact_capture -> checkpoint -> completion`
 
 The BFF stores lifecycle metadata and emits progress events. The harness renders
 the active stage compactly, enforces local side-effect policy, executes local
@@ -58,6 +56,7 @@ The pipeline must support these stage states:
 - `model_call`: dispatch to the selected model or agent.
 - `tool_loop`: process tool calls and tool results until the model stops or
   policy blocks.
+- `validation`: run or record checks when the workflow requires validation.
 - `artifact_capture`: collect patch, command, validation, approval, and cost
   evidence.
 - `checkpoint`: persist enough state to continue, retry, fork, or inspect.
@@ -110,6 +109,9 @@ demand:
 The BFF protocol needs run-aware submit and inspection surfaces, either by
 extending `turn.submit` or adding run-specific methods.
 
+`/run` is singular and always refers to the currently attached run. `/runs` or
+`/jobs` is the plural queue/list surface defined by FEAT-0017.
+
 ## Configuration
 
 Configuration should allow:
@@ -150,6 +152,7 @@ Configuration should allow:
 1. Should `turn.submit` become run-aware or should new `run.*` methods wrap
    turn submission?
 2. What minimum checkpoint data is required to safely continue a failed run?
-3. Should every chat turn be a run, or only workflow/codegen turns?
+3. How should simple attached chat use a lightweight run representation without
+   forcing the full codegen pipeline onto low-risk conversation turns?
 4. How much prompt metadata can be exposed without leaking protected prompt
    content?
