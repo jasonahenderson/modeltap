@@ -26,6 +26,8 @@ This release does not cover:
 - hook/plugin packaging
 - durable memory promotion
 - remote/cloud executor implementation beyond policy shape
+- actual `worktree` or `temp_copy` workspace creation/cleanup unless Phase 1
+  explicitly promotes those modes from metadata/policy shape to implementation
 
 ## Feature Scope
 
@@ -57,19 +59,23 @@ Current phase: **Planning draft — Phase 1 not opened.**
 **WU-138: Policy and workspace boundary ADR**
 
 Decide policy inheritance, non-overridable policy sources, workspace mode
-semantics, and local vs BFF enforcement boundaries.
+semantics, and local vs BFF enforcement boundaries. Avoid introducing a
+general-purpose policy DSL; keep the release to structured policy shapes.
 
 **WU-139: Policy schema and inheritance model**
 
 Define config shapes and merge behavior for user, project, team/server, and
-workflow policy layers.
+workflow policy layers. The schema must consume the upstream `workflow_type`
+field from v0.3.0.
 
 ### Track B — Enforcement
 
 **WU-140: Workspace mode resolver and run metadata integration**
 
 Resolve `current`, `current_readonly`, `worktree`, `temp_copy`, and `remote` for
-a run. Store workspace metadata on the run.
+a run. Store workspace metadata on the run. Phase 1 must explicitly decide
+whether `worktree` and `temp_copy` are metadata-only/deferred or implemented in
+this release; the planning default is metadata-only/deferred.
 
 **WU-141: Foreground tool policy enforcement**
 
@@ -79,24 +85,30 @@ simple permission levels as presets.
 **WU-142: Command/path/Git/domain classifiers**
 
 Add dynamic classifiers for shell commands, Git mutations, file paths, and
-network domains.
+network domains. Include a solo-mode fast path so safe defaults do not create
+unnecessary prompts for local single-user workflows.
 
 ### Track C — Harness and Artifacts
 
 **WU-143: Permission explanation and `/policy` harness surface**
 
 Show why a tool request was allowed, denied, paused, or blocked. Add `/policy`
-inspection for the active run.
+inspection for the active run. Include a solo-mode fast path explanation when
+policy permits an operation without prompting.
 
 **WU-144: Background blocked-operation behavior**
 
 For detached runs, pause, auto-deny, or fail operations according to policy.
-Surface blocked requests in the run queue/inbox.
+Surface blocked requests in the run queue/inbox. The safe default is that
+background writes do not proceed silently; this WU is the implementation home
+for the FEAT-0017 background approval/blocked-operation criteria deferred from
+v0.3.0.
 
 **WU-145: Tool audit artifacts by run**
 
 Record tool decisions, policy source, approver, input summary, workspace, and
-result reference as run artifacts.
+result reference as run artifacts. This enriches the FEAT-0020 SC#4
+approval-decision artifact schema stub introduced in v0.3.2.
 
 ### Track D — Verification
 

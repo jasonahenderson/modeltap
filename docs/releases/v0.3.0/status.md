@@ -31,5 +31,8 @@ FEAT-0017
 ## Open Items
 
 - Draft and accept the run-runtime ADR.
-- Decide the implementation branch and whether v0.3.0 starts before or after
-  any v0.2.x follow-up releases.
+- Decide the implementation branch.
+- Confirm v0.2.0, v0.2.1, and v0.2.2 prerequisite surfaces are reachable from
+  the v0.3.0 implementation branch before Phase 3.
+- During WU-108/WU-109 design, lock the `workflow_type` enum and persistence
+  shape used by v0.3.1 through v0.3.4.

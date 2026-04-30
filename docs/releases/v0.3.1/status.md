@@ -27,3 +27,5 @@
 
 - Decide whether deeper EXP-0012 AST graphing lands here or later. Current plan
   keeps it later.
+- Confirm v0.3.0 has introduced `workflow_type` before Phase 3 if context
+  planning uses workflow-aware defaults.

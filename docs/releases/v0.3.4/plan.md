@@ -78,7 +78,9 @@ confidence, and user disposition states.
 **WU-149: Candidate generation and disposition UI**
 
 Generate memory candidates from successful run artifacts and expose accept,
-edit, reject, and defer controls in the harness.
+edit, reject, and defer controls in the harness. The default promotion policy
+is no silent durable promotion: candidates require explicit user disposition
+unless the WU-147 ADR accepts a narrower automatic mode.
 
 **WU-150: Active memory provenance in run details**
 
@@ -95,15 +97,18 @@ review, documentation, and synthesis.
 **WU-152: Routing decision/outcome capture**
 
 Record model, role, reason, cost, validation/artifact outcome, and later tuning
-signals per run stage.
+signals per run stage. The routing-decision record must be concrete enough to
+audit why a model or helper role was selected for each routed stage.
 
 ### Track D — Workflow Extensions
 
 **WU-153: Workflow profile and extension alignment design**
 
 Align skills, hooks, slash commands, and agent teams with durable run contracts.
-This WU may produce revisions to FEAT-0012 and FEAT-0013 or split those
-features further before implementation.
+This includes assigning a home for workflow slash commands such as `/explore`,
+`/feature`, `/adr`, `/release`, `/implement`, `/debug`, `/docs`, and `/devops`;
+it may defer command implementation, revise FEAT-0012/FEAT-0013, or produce a
+constraint document before implementation.
 
 **WU-154: Memory/routing/workflow tests and docs**
 

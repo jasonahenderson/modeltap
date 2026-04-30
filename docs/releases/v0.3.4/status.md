@@ -26,3 +26,6 @@
 
 - Decide during Phase 1 whether to split memory/routing from workflow-extension
   alignment.
+- Confirm v0.3.0 has introduced `workflow_type` before Phase 1 opens.
+- Track FEAT-0011, FEAT-0012, and FEAT-0013 acceptance or revision status
+  before WU-153 design closes.

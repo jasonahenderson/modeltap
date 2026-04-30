@@ -28,4 +28,7 @@
 
 ## Open Items
 
-- Draft the supporting PATCH for WU-136 when this release enters Phase 1.
+- Draft and accept the supporting PATCH for WU-136 before any WU-136
+  implementation commit.
+- Confirm v0.3.0 has introduced `workflow_type` before Phase 3 so WU-129 can
+  use workflow-aware validation defaults.
