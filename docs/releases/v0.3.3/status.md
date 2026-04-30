@@ -23,11 +23,14 @@
 - Depends on v0.3.0 run infrastructure.
 - Background-specific behavior depends on v0.3.0 attach/detach and queue
   semantics.
+- Phase 1 starts only after FEAT-0021 is accepted or the release-open `ADMIN:`
+  commit records an explicit design-against-draft exception.
+- Phase 3 is blocked until FEAT-0021 and the policy/workspace ADR are accepted.
 
 ## Open Items
 
-- During WU-138/WU-140 design, decide whether `worktree` or `temp_copy`
-  workspace creation lands in this release. Planning default is metadata and
-  policy shape only.
+- Identify a future release or PATCH owner for actual `worktree` and
+  `temp_copy` workspace creation/cleanup. v0.3.3 scope is metadata/policy shape
+  only.
 - Confirm v0.3.0 has introduced `workflow_type` before Phase 3 so policy can
   evaluate workflow-aware defaults.

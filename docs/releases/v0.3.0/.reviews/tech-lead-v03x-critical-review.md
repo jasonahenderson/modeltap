@@ -173,3 +173,16 @@ release home for WU-153.
    release.
 5. Allocate the WU-136 evaluation PATCH before v0.3.2 Phase 1.
 6. Predefine the v0.3.4 split mechanics for WU-153/WU-154.
+
+## Disposition
+
+Processed in `ADMIN: process v0.3.x tech lead review findings`.
+
+| Finding | Disposition |
+|---|---|
+| WU authority is not gated on accepted feature contracts | Accepted. v0.3.0 now requires accepted feature scope or an explicit design-against-draft ADMIN exception before Phase 1, and Phase 3 remains blocked on accepted feature scope. Later release status files inherit the same gate pattern for their scopes. |
+| v0.2.x prerequisite state is internally inconsistent | Accepted. v0.3.0 now requires the Phase 1 opening commit to reconcile the status mismatch or name exact committed BFF/harness contracts available for design. Phase 3 remains blocked on reachable prerequisite surfaces. |
+| Workspace isolation has no committed 0.3.x implementation owner | Accepted by narrowing v0.3.3. Actual `worktree`/`temp_copy` creation is out of v0.3.3; WU-140 records metadata/policy shape only, and status requires a future owner. |
+| Codegen evaluation harness is in v0.3.2 DoD without an artifact | Accepted. v0.3.2 now requires a numbered PATCH before Phase 1 includes WU-136; otherwise WU-136 must be removed or deferred before Phase 1 closes. |
+| Cross-release ADR sequencing is too distributed for schema risk | Accepted. v0.3.0 WU-109 now includes a cross-release schema compatibility check covering context, artifact, policy, workspace, memory, and routing metadata. |
+| v0.3.4 split path is mechanically incomplete | Accepted. v0.3.4 now defines the memory/routing-only split path, WU-154 rescoping, and future-owner requirement for deferred WU-153. |

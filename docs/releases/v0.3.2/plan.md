@@ -124,7 +124,9 @@ Draft and implement the patch for benchmark scenarios, diff-quality scoring,
 validation success metrics, and regression fixtures. WU-136 is gated on a
 separately drafted and accepted `PATCH-NNNN` before any implementation commit;
 the patch must decide whether the harness is a Go test package, standalone
-binary, CI script, or combination.
+binary, CI script, or combination. If that patch is not allocated before Phase
+1 opens, WU-136 must be removed from the active release plan or deferred before
+Phase 1 closes.
 
 **WU-137: Validation/artifact integration tests and docs**
 
@@ -163,4 +165,5 @@ skipped, failed to run, or remained inconclusive.
    v0.3.3 policy audit enrichment.
 7. Final run summaries cite validation evidence or explicit skip/inconclusive
    reasons.
-8. Codegen evaluation harness patch exists and runs against fixture scenarios.
+8. If WU-136 remains in scope, the allocated codegen evaluation harness PATCH
+   is accepted and runs against fixture scenarios.
