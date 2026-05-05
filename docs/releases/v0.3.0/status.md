@@ -8,8 +8,14 @@ FEAT-0017
 
 Phase 1 opened on 2026-05-05 by explicit `ADMIN:` commit and completed after all
 WU-108 through WU-117 designs were drafted. Phase 2 opened on 2026-05-05 by
-explicit `ADMIN:` commit. Phase 2 design findings were recorded and processed in
-`docs/releases/v0.3.0/.reviews/codex-design-review.md`.
+explicit `ADMIN:` commit. Phase 2 design findings recorded so far:
+
+- `docs/releases/v0.3.0/.reviews/codex-design-review.md` — 5 findings (F1–F5)
+  accepted and applied to the designs.
+- `docs/releases/v0.3.0/.reviews/claude-design-review.md` — 10 net-new findings
+  (F6–F15), pending disposition. The largest is the FEAT-0015 observability axis
+  (trace IDs, heartbeats, stage deadlines, fsync) which the v0.3.0 designs do
+  not cover and the plan does not explicitly defer.
 
 The complete release design index for user review is
 `docs/releases/v0.3.0/designs/README.md`.
@@ -50,6 +56,10 @@ are accepted.
 
 ## Open Items
 
+- Disposition the 10 findings from `claude-design-review.md` (F6–F15). The four
+  significant ones are F6 (observability axis), F7 (`run.create` /
+  `queued` reachability), F8 (`run.blocked` event naming), and F9 (fsync /
+  N-1 checkpoint compatibility).
 - Accept the run-runtime ADR before Phase 3.
 - Accept FEAT-0015, FEAT-0016, and the FEAT-0017 foundation slice before Phase
   3.
