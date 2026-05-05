@@ -24,8 +24,11 @@ prerequisite BFF/harness surfaces were confirmed reachable on `release/v0.3.0`
 before the phase transition.
 
 Phase 3 implementation completed on 2026-05-05. Release readiness is recorded
-in `.reviews/v0.3.0-release-readiness.md`; release close/tagging remains a
-separate user decision.
+in `.reviews/v0.3.0-release-readiness.md`. The implementation review at
+`.reviews/v0.3.0-implementation-review.md` has been dispositioned and the
+pre-tag fixes for relay errors, foreground-run persistence, heartbeat/stuck
+projection, registry bounds, and focused regressions have been applied.
+Release close/tagging remains a separate user decision.
 
 ## Work Units
 
@@ -81,6 +84,11 @@ separate user decision.
 - Added adapter-level detached transcript buffers and replay-row creation when
   a detached run is attached.
 - Added summary-fidelity replay gap detection and checkpoint fallback metadata.
+- Processed the implementation review by making foreground `turn.submit`
+  persistence transactional, logging relay failures with run/turn context,
+  making `run.heartbeat` advance run liveness, bounding in-memory run/turn
+  registries, documenting the v0.3.0 database rollback path, and adding
+  focused regression coverage.
 - Updated user and embedding docs for run commands and run projection.
 
 Validation: `go test ./...` passes.

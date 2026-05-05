@@ -399,6 +399,7 @@ type Store interface {
 
 	// Durable runs
 	CreateRun(ctx context.Context, run *Run, initial RunEvent, cp RunCheckpoint) error
+	CreateRunWithTurn(ctx context.Context, run *Run, initial RunEvent, cp RunCheckpoint, turn *Turn, linkRole string, linkSeq int, history *CommandHistoryEntry) error
 	GetRun(ctx context.Context, id string) (*Run, error)
 	GetRunByIdempotency(ctx context.Context, userID, project, idempotencyKey string) (*Run, error)
 	ListRuns(ctx context.Context, filter RunFilter) ([]Run, error)

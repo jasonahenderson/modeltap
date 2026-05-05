@@ -194,3 +194,102 @@ func TestRunEventsReportsSummaryFidelityOnReplayGap(t *testing.T) {
 		t.Fatalf("checkpoint = %+v", got.Checkpoint)
 	}
 }
+
+func TestRunHeartbeatAppendsProgressAndClearsStuck(t *testing.T) {
+	srv := newServerWithRealStore(t)
+	run := seedRunForControls(t, srv, "")
+	c, _ := newRelayConnection(t, srv)
+
+	old := time.Now().UTC().Add(-runStuckThreshold - time.Minute)
+	if _, err := srv.store.AppendRunEvent(context.Background(), run.ID, storage.RunEvent{
+		Type:      protocol.EventRunProgress,
+		Stage:     storage.RunStageModelCall,
+		Status:    storage.RunStatusRunning,
+		CreatedAt: old,
+	}, storage.RunStateUpdate{}); err != nil {
+		t.Fatalf("AppendRunEvent old progress: %v", err)
+	}
+
+	detailsParams, _ := json.Marshal(protocol.RunDetails{RunID: run.ID})
+	before, err := handleRunDetails(context.Background(), c, detailsParams)
+	if err != nil {
+		t.Fatalf("handleRunDetails before: %v", err)
+	}
+	if !before.(protocol.RunDetailsResponse).Run.Stuck {
+		t.Fatalf("run should be stuck before heartbeat")
+	}
+
+	hbParams, _ := json.Marshal(protocol.RunHeartbeat{RunID: run.ID, HostFingerprint: "host-1", LastObservedSeq: 2})
+	resp, err := handleRunHeartbeat(context.Background(), c, hbParams)
+	if err != nil {
+		t.Fatalf("handleRunHeartbeat: %v", err)
+	}
+	heartbeat := resp.(protocol.RunHeartbeatResponse)
+	if heartbeat.LatestSeq != 3 {
+		t.Fatalf("heartbeat latest seq = %d, want 3", heartbeat.LatestSeq)
+	}
+
+	after, err := handleRunDetails(context.Background(), c, detailsParams)
+	if err != nil {
+		t.Fatalf("handleRunDetails after: %v", err)
+	}
+	if after.(protocol.RunDetailsResponse).Run.Stuck {
+		t.Fatalf("run should not be stuck after heartbeat")
+	}
+}
+
+func TestRunHeartbeatDoesNotAppendTerminalRun(t *testing.T) {
+	srv := newServerWithRealStore(t)
+	run := seedRunForControls(t, srv, "")
+	c, _ := newRelayConnection(t, srv)
+
+	status := storage.RunStatusCompleted
+	stage := storage.RunStageCompletion
+	terminal := time.Now().UTC()
+	if _, err := srv.store.AppendRunEvent(context.Background(), run.ID, storage.RunEvent{
+		Type:      protocol.EventRunCompleted,
+		Stage:     stage,
+		Status:    status,
+		CreatedAt: terminal,
+	}, storage.RunStateUpdate{Status: &status, Stage: &stage, TerminalAt: &terminal}); err != nil {
+		t.Fatalf("AppendRunEvent terminal: %v", err)
+	}
+
+	params, _ := json.Marshal(protocol.RunHeartbeat{RunID: run.ID})
+	resp, err := handleRunHeartbeat(context.Background(), c, params)
+	if err != nil {
+		t.Fatalf("handleRunHeartbeat: %v", err)
+	}
+	heartbeat := resp.(protocol.RunHeartbeatResponse)
+	if heartbeat.LatestSeq != 2 {
+		t.Fatalf("heartbeat latest seq = %d, want unchanged 2", heartbeat.LatestSeq)
+	}
+}
+
+func TestRunResolvePermissionRejectsTerminalRun(t *testing.T) {
+	srv := newServerWithRealStore(t)
+	run := seedRunForControls(t, srv, "")
+	c, _ := newRelayConnection(t, srv)
+
+	status := storage.RunStatusCompleted
+	stage := storage.RunStageCompletion
+	terminal := time.Now().UTC()
+	if _, err := srv.store.AppendRunEvent(context.Background(), run.ID, storage.RunEvent{
+		Type:      protocol.EventRunCompleted,
+		Stage:     stage,
+		Status:    status,
+		CreatedAt: terminal,
+	}, storage.RunStateUpdate{Status: &status, Stage: &stage, TerminalAt: &terminal}); err != nil {
+		t.Fatalf("AppendRunEvent terminal: %v", err)
+	}
+
+	params, _ := json.Marshal(protocol.RunResolvePermission{RunID: run.ID, RequestID: "req-1", Decision: "allow"})
+	resp, err := handleRunResolvePermission(context.Background(), c, params)
+	if err != nil {
+		t.Fatalf("handleRunResolvePermission: %v", err)
+	}
+	got := resp.(protocol.RunControlResponse)
+	if got.Accepted || got.Status != storage.RunStatusCompleted {
+		t.Fatalf("resolve terminal response = %+v, want rejected completed", got)
+	}
+}

@@ -282,6 +282,18 @@ Every config key can be overridden with an environment variable using the `MODEL
 
 Precedence order (highest to lowest): CLI flags > environment variables > config file > defaults.
 
+### Database rollback note
+
+modeltap v0.3.0 upgrades the SQLite schema to version 3 for durable run
+runtime tables. Older v0.2.x binaries intentionally refuse to open a database
+whose schema version is newer than they understand.
+
+Before testing or deploying v0.3.0, stop modeltap and copy the database file
+configured by `db_path`. To roll back to v0.2.x, stop modeltap again, restore
+that pre-upgrade database copy, then start the older binary. Do not manually
+reset SQLite `user_version`; the v0.3.0 run tables are not part of the v0.2.x
+schema contract.
+
 ## CLI Commands Reference
 
 ### `modeltap start`

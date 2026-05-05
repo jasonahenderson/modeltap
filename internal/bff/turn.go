@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -21,6 +22,8 @@ type turnTracker struct {
 	byTurnID map[string]context.CancelFunc
 }
 
+const maxTrackedTurns = 4096
+
 func newTurnTracker() *turnTracker {
 	return &turnTracker{byTurnID: make(map[string]context.CancelFunc)}
 }
@@ -28,6 +31,12 @@ func newTurnTracker() *turnTracker {
 func (tt *turnTracker) register(turnID string, cancel context.CancelFunc) {
 	tt.mu.Lock()
 	defer tt.mu.Unlock()
+	if _, exists := tt.byTurnID[turnID]; !exists && len(tt.byTurnID) >= maxTrackedTurns {
+		for oldTurnID := range tt.byTurnID {
+			delete(tt.byTurnID, oldTurnID)
+			break
+		}
+	}
 	tt.byTurnID[turnID] = cancel
 }
 
@@ -106,6 +115,9 @@ func handleTurnSubmit(ctx context.Context, conn *Connection, params json.RawMess
 		if err := verifySessionAccess(conn, sess); err != nil {
 			return nil, err
 		}
+		if sess.UserID == "" {
+			sess.UserID = conn.UserID()
+		}
 	}
 	if sess == nil {
 		sess = &storage.Session{
@@ -141,37 +153,42 @@ func handleTurnSubmit(ctx context.Context, conn *Connection, params json.RawMess
 	if idempotencyKey == "" {
 		idempotencyKey = "turn:" + submit.SessionID + ":" + submit.TurnID
 	}
-	run, err := createRunRecord(ctx, srv, conn, sess, createRunOptions{
+	if existing, err := srv.store.GetRunByIdempotency(ctx, sess.UserID, sess.Project, idempotencyKey); err == nil {
+		return &protocol.TurnSubmitResponse{
+			TurnID:    submit.TurnID,
+			SessionID: submit.SessionID,
+			Status:    "accepted",
+			RunID:     existing.ID,
+		}, nil
+	} else if !errors.Is(err, storage.ErrRunNotFound) {
+		return nil, &TransportError{Code: CodeInternalError, Message: "lookup run idempotency: " + err.Error()}
+	}
+
+	// Append the user turn to the in-memory conversation and persist the
+	// foreground run, initial event/checkpoint, turn, run link, and command
+	// history in one durable transaction before provider dispatch.
+	userTurn, err := active.Conversation.AppendUserTurn(submit)
+	if err != nil {
+		return nil, err
+	}
+	history := &storage.CommandHistoryEntry{
+		UserID:    active.UserID,
+		Project:   active.Project,
+		SessionID: stringPtr(active.ID),
+		Content:   submit.Content,
+		CreatedAt: time.Now().UTC(),
+	}
+	run, err := createForegroundRunWithTurn(ctx, srv, conn, sess, createRunOptions{
 		IdempotencyKey:       idempotencyKey,
 		WorkflowType:         storage.RunWorkflowImplementation,
 		Title:                submit.Content,
 		Status:               storage.RunStatusRunning,
 		AttachmentState:      storage.RunAttachmentAttached,
 		AttachedConnectionID: conn.ID(),
-	})
+	}, userTurn, history)
 	if err != nil {
-		return nil, &TransportError{Code: CodeInternalError, Message: "create run: " + err.Error()}
+		return nil, &TransportError{Code: CodeInternalError, Message: "create foreground run: " + err.Error()}
 	}
-
-	// Append the user turn to the in-memory conversation and persist.
-	userTurn, err := active.Conversation.AppendUserTurn(submit)
-	if err != nil {
-		return nil, err
-	}
-	if err := srv.store.CreateTurn(ctx, userTurn); err != nil {
-		return nil, &TransportError{Code: CodeInternalError, Message: "persist user turn: " + err.Error()}
-	}
-	if err := srv.store.LinkTurnToRun(ctx, run.ID, userTurn.ID, userTurn.Role, userTurn.Sequence); err != nil {
-		return nil, &TransportError{Code: CodeInternalError, Message: "link turn to run: " + err.Error()}
-	}
-	// Append to command history (best-effort; auto-append per WU-091).
-	_ = srv.store.AppendCommandHistory(ctx, &storage.CommandHistoryEntry{
-		UserID:    active.UserID,
-		Project:   active.Project,
-		SessionID: stringPtr(active.ID),
-		Content:   submit.Content,
-		CreatedAt: time.Now().UTC(),
-	})
 
 	// Resolve the model via routing.
 	models, isMulti := srv.routing.ResolveForTurn(active, submit.Mode)
@@ -246,7 +263,13 @@ func handleTurnSubmit(ctx context.Context, conn *Connection, params json.RawMess
 	go func() {
 		defer srv.turns.deregister(submit.TurnID)
 		defer srv.runs.deregister(run.ID, submit.TurnID)
-		turn, _ := relay.Relay(relayCtx, resp.Body, srv.adapterFor(entry.Provider))
+		turn, relayErr := relay.Relay(relayCtx, resp.Body, srv.adapterFor(entry.Provider))
+		if relayErr != nil {
+			slog.Error("run relay failed", "run_id", run.ID, "turn_id", submit.TurnID, "error", relayErr)
+			if got, err := srv.store.GetRun(context.Background(), run.ID); err == nil && !isTerminalRunStatus(got.Status) {
+				_, _ = appendRunLifecycle(context.Background(), conn, got, protocol.EventRunFailed, got.Stage, storage.RunStatusFailed, "relay_failed", map[string]string{"error": relayErr.Error()})
+			}
+		}
 		if turn != nil && srv.cost != nil {
 			srv.cost.UpdateAfterTurn(ctx, conn, active, turn)
 		}

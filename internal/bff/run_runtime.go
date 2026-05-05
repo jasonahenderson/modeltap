@@ -88,6 +88,60 @@ func createRunRecord(ctx context.Context, srv *Server, conn *Connection, sess *s
 	return run, nil
 }
 
+func createForegroundRunWithTurn(ctx context.Context, srv *Server, conn *Connection, sess *storage.Session, opts createRunOptions, turn *storage.Turn, history *storage.CommandHistoryEntry) (*storage.Run, error) {
+	key := opts.IdempotencyKey
+	if key == "" {
+		key = "turn:" + sess.ID + ":" + turn.ID
+	}
+
+	now := time.Now().UTC()
+	run := &storage.Run{
+		ID:                   "run-" + uuid.NewString(),
+		TraceID:              "trace-" + uuid.NewString(),
+		IdempotencyKey:       key,
+		UserID:               sess.UserID,
+		Project:              sess.Project,
+		SessionID:            sess.ID,
+		ParentRunID:          stringPtrOrNil(opts.ParentRunID),
+		InitiatorType:        "user",
+		Title:                opts.Title,
+		WorkflowType:         opts.WorkflowType,
+		Status:               opts.Status,
+		Stage:                storage.RunStagePreflight,
+		AttachmentState:      opts.AttachmentState,
+		AttachedConnectionID: opts.AttachedConnectionID,
+		LastAdvancedAt:       now,
+		CreatedAt:            now,
+		UpdatedAt:            now,
+	}
+	payload, _ := json.Marshal(map[string]any{
+		"trace_id":      run.TraceID,
+		"workflow_type": run.WorkflowType,
+	})
+	initial := storage.RunEvent{
+		Type:        protocol.EventRunStarted,
+		Stage:       run.Stage,
+		Status:      run.Status,
+		PayloadJSON: payload,
+		CreatedAt:   now,
+	}
+	cp := storage.RunCheckpoint{
+		Stage:       run.Stage,
+		Status:      run.Status,
+		Summary:     run.Summary,
+		TurnIDs:     []string{turn.ID},
+		PayloadJSON: defaultCheckpointPayload(),
+		CreatedAt:   now,
+	}
+	if err := srv.store.CreateRunWithTurn(ctx, run, initial, cp, turn, turn.Role, turn.Sequence, history); err != nil {
+		return nil, err
+	}
+	if conn != nil {
+		emitStoredRunEvent(conn, run, storage.RunEvent{RunID: run.ID, Seq: 1, Type: initial.Type, Stage: initial.Stage, Status: initial.Status, PayloadJSON: initial.PayloadJSON, CreatedAt: initial.CreatedAt}, turn.ID)
+	}
+	return run, nil
+}
+
 type createRunOptions struct {
 	IdempotencyKey       string
 	WorkflowType         string

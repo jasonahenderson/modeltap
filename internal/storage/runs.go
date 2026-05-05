@@ -117,6 +117,101 @@ VALUES (?, ?, ?, ?, ?)`,
 	return nil
 }
 
+// CreateRunWithTurn inserts a foreground run, initial event/checkpoint, user
+// turn, run-turn link, and optional command history in one transaction.
+func (s *SQLiteStore) CreateRunWithTurn(ctx context.Context, run *Run, initial RunEvent, cp RunCheckpoint, turn *Turn, linkRole string, linkSeq int, history *CommandHistoryEntry) error {
+	if turn == nil {
+		return fmt.Errorf("storage: turn is required")
+	}
+	if err := normalizeRunForCreate(run); err != nil {
+		return err
+	}
+	if initial.Type == "" {
+		initial.Type = "run.started"
+	}
+	if initial.Stage == "" {
+		initial.Stage = run.Stage
+	}
+	if initial.Status == "" {
+		initial.Status = run.Status
+	}
+	if initial.PayloadJSON == nil {
+		initial.PayloadJSON = json.RawMessage(`{}`)
+	}
+	if initial.PayloadSchemaVersion == 0 {
+		initial.PayloadSchemaVersion = 1
+	}
+	if initial.CreatedAt.IsZero() {
+		initial.CreatedAt = run.CreatedAt
+	}
+	initial.RunID = run.ID
+	initial.Seq = 1
+	normalizeCheckpointForCreate(&cp, run, initial.Seq)
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("beginning create foreground run transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := insertRun(ctx, tx, run); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `
+INSERT INTO run_attachments (run_id, state, attached_connection_id, grace_deadline, updated_at)
+VALUES (?, ?, ?, ?, ?)`,
+		run.ID,
+		run.AttachmentState,
+		run.AttachedConnectionID,
+		formatOptionalTime(run.AttachmentGraceDeadline),
+		run.UpdatedAt.UTC().Format(time.RFC3339Nano),
+	); err != nil {
+		return fmt.Errorf("inserting run attachment: %w", err)
+	}
+	if err := insertRunEvent(ctx, tx, initial); err != nil {
+		return err
+	}
+	if err := insertRunCheckpoint(ctx, tx, cp); err != nil {
+		return err
+	}
+	if err := insertTurn(ctx, tx, turn); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `
+INSERT INTO run_turns (run_id, turn_id, sequence, role, created_at)
+VALUES (?, ?, ?, ?, ?)`, run.ID, turn.ID, linkSeq, linkRole, time.Now().UTC().Format(time.RFC3339Nano)); err != nil {
+		return fmt.Errorf("linking turn to run: %w", err)
+	}
+	if history != nil && history.Content != "" {
+		sessionID := history.SessionID
+		_, err := tx.ExecContext(ctx, `
+INSERT INTO command_history (user_id, project, session_id, content, created_at)
+VALUES (?, ?, ?, ?, ?)`,
+			history.UserID,
+			history.Project,
+			sessionID,
+			history.Content,
+			history.CreatedAt.UTC().Format(time.RFC3339Nano),
+		)
+		if err != nil {
+			return fmt.Errorf("inserting command history: %w", err)
+		}
+	}
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE runs SET last_event_seq = ?, last_checkpoint_id = ?, updated_at = ? WHERE id = ?`,
+		initial.Seq, cp.ID, run.UpdatedAt.UTC().Format(time.RFC3339Nano), run.ID,
+	); err != nil {
+		return fmt.Errorf("updating created run sequence: %w", err)
+	}
+	run.LastEventSeq = initial.Seq
+	run.LastCheckpointID = cp.ID
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("committing create foreground run: %w", err)
+	}
+	return nil
+}
+
 // GetRun retrieves one run by ID.
 func (s *SQLiteStore) GetRun(ctx context.Context, id string) (*Run, error) {
 	row := s.db.QueryRowContext(ctx, selectRunSQL()+` WHERE id = ?`, id)

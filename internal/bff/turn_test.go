@@ -133,9 +133,62 @@ func TestHandleTurnSubmit_HappyPath(t *testing.T) {
 	}
 }
 
+func TestHandleTurnSubmit_DuplicateIdempotencyReturnsExistingRun(t *testing.T) {
+	srv, _ := setupTurnSubmitServer(t)
+
+	c, frames := newRelayConnection(t, srv)
+	c.SetSessionID("sess-idem")
+	srv.sessions.EnsureActive("sess-idem", c)
+
+	submit := &protocol.TurnSubmit{
+		TurnID:         "turn-idem-1",
+		SessionID:      "sess-idem",
+		Sequence:       1,
+		Mode:           protocol.ModeBuild,
+		Content:        "say hi once",
+		IdempotencyKey: "idem-key-1",
+	}
+	params, _ := json.Marshal(submit)
+	resp, err := handleTurnSubmit(context.Background(), c, params)
+	if err != nil {
+		t.Fatalf("first handleTurnSubmit: %v", err)
+	}
+	first := resp.(*protocol.TurnSubmitResponse)
+	_ = frames.waitForFrame(t, protocol.EventRunCompleted)
+	if _, err := srv.store.GetRunByIdempotency(context.Background(), SoloUserID, "", "idem-key-1"); err != nil {
+		t.Fatalf("GetRunByIdempotency after first submit: %v", err)
+	}
+
+	submit.TurnID = "turn-idem-duplicate"
+	submit.Sequence = 2
+	params, _ = json.Marshal(submit)
+	resp, err = handleTurnSubmit(context.Background(), c, params)
+	if err != nil {
+		t.Fatalf("duplicate handleTurnSubmit: %v", err)
+	}
+	second := resp.(*protocol.TurnSubmitResponse)
+	if second.RunID != first.RunID {
+		t.Fatalf("duplicate RunID = %q, want %q", second.RunID, first.RunID)
+	}
+
+	turns, err := srv.store.ListTurns(context.Background(), "sess-idem")
+	if err != nil {
+		t.Fatalf("ListTurns: %v", err)
+	}
+	userTurns := 0
+	for _, turn := range turns {
+		if turn.Role == "user" {
+			userTurns++
+		}
+	}
+	if userTurns != 1 {
+		t.Fatalf("user turns = %d, want 1", userTurns)
+	}
+}
+
 func TestHandleTurnSubmit_MissingSession(t *testing.T) {
 	srv, _ := setupTurnSubmitServer(t)
-	c, _ := newRelayConnection(t, srv)
+	c, frames := newRelayConnection(t, srv)
 	submit := &protocol.TurnSubmit{
 		TurnID: "x", Sequence: 1, Mode: protocol.ModeBuild, Content: "hi",
 	}
@@ -151,6 +204,7 @@ func TestHandleTurnSubmit_MissingSession(t *testing.T) {
 	if ack.TurnID == "" {
 		t.Errorf("TurnID not set")
 	}
+	_ = frames.waitForFrame(t, protocol.EventRunCompleted)
 }
 
 func TestHandleTurnSubmit_UnknownModelInRouting(t *testing.T) {

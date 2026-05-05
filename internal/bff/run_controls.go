@@ -294,6 +294,9 @@ func handleRunResolvePermission(ctx context.Context, conn *Connection, params js
 	if err != nil {
 		return nil, err
 	}
+	if isTerminalRunStatus(run.Status) {
+		return protocol.RunControlResponse{RunID: run.ID, Accepted: false, Status: run.Status, Message: "run is already terminal"}, nil
+	}
 	if req.RequestID == "" || req.Decision == "" {
 		return nil, transportInvalidParams("request_id and decision are required")
 	}
@@ -320,7 +323,24 @@ func handleRunHeartbeat(ctx context.Context, conn *Connection, params json.RawMe
 	if err != nil {
 		return nil, err
 	}
-	return protocol.RunHeartbeatResponse{RunID: run.ID, Status: run.Status, Stage: run.Stage, LatestSeq: run.LastEventSeq}, nil
+	if isTerminalRunStatus(run.Status) {
+		return protocol.RunHeartbeatResponse{RunID: run.ID, Status: run.Status, Stage: run.Stage, LatestSeq: run.LastEventSeq}, nil
+	}
+	stage := run.Stage
+	if req.Stage != "" {
+		stage = req.Stage
+	}
+	raw, _ := json.Marshal(map[string]any{
+		"host_fingerprint":  req.HostFingerprint,
+		"last_observed_seq": req.LastObservedSeq,
+		"stage":             stage,
+	})
+	ev := storage.RunEvent{Type: protocol.EventRunProgress, Stage: stage, Status: run.Status, PayloadJSON: raw, CreatedAt: time.Now().UTC()}
+	seq, err := conn.server.store.AppendRunEvent(ctx, run.ID, ev, storage.RunStateUpdate{})
+	if err != nil {
+		return nil, transportInternal("heartbeat run", err)
+	}
+	return protocol.RunHeartbeatResponse{RunID: run.ID, Status: run.Status, Stage: stage, LatestSeq: seq}, nil
 }
 
 func maxInt64(a, b int64) int64 {

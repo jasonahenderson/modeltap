@@ -11,8 +11,11 @@ type runRegistry struct {
 	byTurnID map[string]string
 }
 
+const maxTrackedRuns = 4096
+
 type activeRun struct {
 	id                   string
+	turnID               string
 	sessionID            string
 	attachedConnectionID string
 	cancel               context.CancelFunc
@@ -29,7 +32,19 @@ func newRunRegistry() *runRegistry {
 func (rr *runRegistry) register(runID, turnID, sessionID, connectionID string, cancel context.CancelFunc) {
 	rr.mu.Lock()
 	defer rr.mu.Unlock()
-	rr.byRunID[runID] = &activeRun{id: runID, sessionID: sessionID, attachedConnectionID: connectionID, cancel: cancel}
+	if existing := rr.byRunID[runID]; existing != nil && existing.turnID != "" && existing.turnID != turnID {
+		delete(rr.byTurnID, existing.turnID)
+	}
+	if _, exists := rr.byRunID[runID]; !exists && len(rr.byRunID) >= maxTrackedRuns {
+		for oldRunID, oldRun := range rr.byRunID {
+			delete(rr.byRunID, oldRunID)
+			if oldRun.turnID != "" {
+				delete(rr.byTurnID, oldRun.turnID)
+			}
+			break
+		}
+	}
+	rr.byRunID[runID] = &activeRun{id: runID, turnID: turnID, sessionID: sessionID, attachedConnectionID: connectionID, cancel: cancel}
 	if turnID != "" {
 		rr.byTurnID[turnID] = runID
 	}
@@ -44,6 +59,9 @@ func (rr *runRegistry) cancel(runID string) bool {
 	}
 	r.cancel()
 	delete(rr.byRunID, runID)
+	if r.turnID != "" {
+		delete(rr.byTurnID, r.turnID)
+	}
 	return true
 }
 

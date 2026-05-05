@@ -40,6 +40,10 @@ Implemented so far:
   into an explicit attached-run row when the user attaches the run.
 - Replay gaps report summary fidelity with checkpoint fallback metadata instead
   of failing the request.
+- Implementation-review hardening adds transactional foreground run/turn
+  persistence, relay-error failure signaling, stateful `run.heartbeat`
+  liveness, bounded in-memory run/turn registries, and focused regression
+  coverage for idempotency and durable run-turn ownership.
 
 Release readiness is recorded in `.reviews/v0.3.0-release-readiness.md`.
 Publishing and tagging remain a separate release-close decision.
