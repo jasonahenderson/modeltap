@@ -200,7 +200,7 @@ readLoop:
 		switch ev.Type {
 		case provider.StreamEventText:
 			acc.Content += ev.Content
-			delta := protocol.TokenDelta{TurnID: sr.turnID, BranchID: sr.branchID, Text: ev.Content}
+			delta := protocol.TokenDelta{TurnID: sr.turnID, RunID: sr.runID, BranchID: sr.branchID, Text: ev.Content}
 			sr.sendNotification(protocol.EventTokenDelta, delta)
 
 		case provider.StreamEventToolCallStart:
@@ -270,6 +270,7 @@ readLoop:
 
 	cancelled := streamErr == "cancelled"
 	complete := protocol.TurnComplete{
+		RunID:             sr.runID,
 		TurnID:            sr.turnID,
 		FinalInputTokens:  int(acc.InputTokens),
 		FinalOutputTokens: int(acc.OutputTokens),

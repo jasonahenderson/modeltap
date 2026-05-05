@@ -57,11 +57,15 @@ type ProductionRuntimeConfig struct {
 // snippet) ensures no events fire before the program is attached.
 type deferredSender struct {
 	program atomic.Pointer[tea.Program]
+	onSend  func(tea.Msg)
 }
 
 // Send satisfies harness.ProgramSender. Drops messages silently when
 // no program is attached.
 func (d *deferredSender) Send(msg tea.Msg) {
+	if d.onSend != nil {
+		d.onSend(msg)
+	}
 	if p := d.program.Load(); p != nil {
 		p.Send(msg)
 	}
@@ -191,6 +195,7 @@ func NewProductionRuntime(cfg ProductionRuntimeConfig) (*ProductionRuntime, erro
 		sender: &deferredSender{},
 		mode:   newRuntimeState(),
 	}
+	r.sender.onSend = r.observeRuntimeMessage
 
 	// Construction order per WU-104 design (Kimi #10):
 	// 1. PlanAccumulator (passed into ToolDispatcher).
@@ -242,7 +247,11 @@ func (r *ProductionRuntime) AttachProgram(p *tea.Program) {
 // goroutine so the tea.Program's main loop can begin handling messages
 // while the connection is still being set up.
 func (r *ProductionRuntime) Start(ctx context.Context) error {
-	return r.cm.ConnectSync(ctx)
+	if err := r.cm.ConnectSync(ctx); err != nil {
+		return err
+	}
+	r.resumeKnownRuns(ctx)
+	return nil
 }
 
 // Close shuts down the connection.
@@ -541,11 +550,52 @@ func (r *ProductionRuntime) handleSessionResume(ctx context.Context, id string) 
 		return r.statusError("session.resume", err)
 	}
 	r.mode.SetSessionID(resp.SessionID)
+	r.resumeKnownRuns(ctx)
 	r.sender.Send(harnessshell.HostStatusEvent{
 		Status: "Resumed session: " + resp.SessionID,
 		Kind:   harnessshell.StatusReady,
 	})
 	return nil
+}
+
+func (r *ProductionRuntime) observeRuntimeMessage(msg tea.Msg) {
+	m, ok := msg.(harness.ConnStateMsg)
+	if !ok || m.Info.State != harness.ConnStateReady {
+		return
+	}
+	go r.resumeKnownRuns(context.Background())
+}
+
+func (r *ProductionRuntime) resumeKnownRuns(ctx context.Context) {
+	client := r.cm.Client()
+	if client == nil {
+		return
+	}
+	sessionID := r.mode.SessionID()
+	if sessionID == "" {
+		return
+	}
+	var list protocol.RunListResponse
+	if err := client.CallInto(ctx, protocol.MethodRunList, &protocol.RunList{SessionID: sessionID, Limit: 20}, &list); err != nil {
+		return
+	}
+	activeRunID := r.mode.ActiveRunID()
+	if activeRunID != "" {
+		var events protocol.RunEventsResponse
+		if err := client.CallInto(ctx, protocol.MethodRunEvents, &protocol.RunEvents{RunID: activeRunID, AfterSeq: 0, Limit: 100}, &events); err == nil {
+			r.sender.Send(harnessshell.HostStatusEvent{
+				Status: "Run replay: " + activeRunID + " (" + events.Fidelity + ")",
+				Kind:   harnessshell.StatusReady,
+			})
+			return
+		}
+	}
+	if len(list.Runs) > 0 {
+		r.sender.Send(harnessshell.HostStatusEvent{
+			Status: fmt.Sprintf("Recovered %d recent run(s)", len(list.Runs)),
+			Kind:   harnessshell.StatusReady,
+		})
+	}
 }
 
 func (r *ProductionRuntime) handleSessionMutation(ctx context.Context, method string) error {

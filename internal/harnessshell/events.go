@@ -309,6 +309,13 @@ func (s *state) assistantRowIndexForRun(runID string) int {
 				return i
 			}
 		}
+		for i := len(s.transcriptItems) - 1; i >= 0; i-- {
+			item := &s.transcriptItems[i]
+			if item.Role == RoleAssistant && item.Streaming && item.RunID == "" {
+				return i
+			}
+		}
+		return -1
 	}
 	for i := len(s.transcriptItems) - 1; i >= 0; i-- {
 		item := &s.transcriptItems[i]

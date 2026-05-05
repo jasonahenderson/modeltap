@@ -107,6 +107,9 @@ func handleRunAttach(ctx context.Context, conn *Connection, params json.RawMessa
 	if isTerminalRunStatus(run.Status) {
 		return nil, transportInvalidParams("cannot attach terminal run")
 	}
+	if run.AttachmentState == storage.RunAttachmentAttached && run.AttachedConnectionID != "" && run.AttachedConnectionID != conn.ID() {
+		return nil, transportInvalidParams("attachment conflict: run is attached elsewhere")
+	}
 	state := storage.RunAttachmentAttached
 	connID := conn.ID()
 	ev := storage.RunEvent{Type: protocol.EventRunAttached, Stage: run.Stage, Status: run.Status, CreatedAt: time.Now().UTC()}
@@ -137,6 +140,12 @@ func handleRunDetach(ctx context.Context, conn *Connection, params json.RawMessa
 	var req protocol.RunDetach
 	if err := json.Unmarshal(params, &req); err != nil {
 		return nil, transportInvalidParams("decode run.detach: " + err.Error())
+	}
+	if req.RunID == "" {
+		var ctrl protocol.RunControl
+		if err := json.Unmarshal(params, &ctrl); err == nil {
+			req.RunID = ctrl.RunID
+		}
 	}
 	run, err := getAuthorizedRun(ctx, conn, req.RunID)
 	if err != nil {

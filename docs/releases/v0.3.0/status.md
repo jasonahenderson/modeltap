@@ -33,9 +33,9 @@ before the phase transition.
 | 111 | BFF run registry and lifecycle store | L | implemented, hardening pending | [designs/2026-05-05-design-bff-run-runtime-111-113.md](designs/2026-05-05-design-bff-run-runtime-111-113.md) |
 | 112 | `turn.submit` to foreground-run integration | L | implemented | [designs/2026-05-05-design-bff-run-runtime-111-113.md](designs/2026-05-05-design-bff-run-runtime-111-113.md) |
 | 113 | Pipeline stage/status emission and checkpoint metadata | M | implemented, coverage expanding | [designs/2026-05-05-design-bff-run-runtime-111-113.md](designs/2026-05-05-design-bff-run-runtime-111-113.md) |
-| 114 | Harness run projection and active `/run` surface | M | partially implemented | [designs/2026-05-05-design-harness-run-surface-114-116.md](designs/2026-05-05-design-harness-run-surface-114-116.md) |
-| 115 | Run list, attach/detach/cancel/retry/continue/fork commands | L | partially implemented | [designs/2026-05-05-design-harness-run-surface-114-116.md](designs/2026-05-05-design-harness-run-surface-114-116.md) |
-| 116 | Reconnect/resume behavior for active and detached runs | M | pending | [designs/2026-05-05-design-harness-run-surface-114-116.md](designs/2026-05-05-design-harness-run-surface-114-116.md) |
+| 114 | Harness run projection and active `/run` surface | M | implemented, coverage expanding | [designs/2026-05-05-design-harness-run-surface-114-116.md](designs/2026-05-05-design-harness-run-surface-114-116.md) |
+| 115 | Run list, attach/detach/cancel/retry/continue/fork commands | L | implemented, hardening pending | [designs/2026-05-05-design-harness-run-surface-114-116.md](designs/2026-05-05-design-harness-run-surface-114-116.md) |
+| 116 | Reconnect/resume behavior for active and detached runs | M | partially implemented | [designs/2026-05-05-design-harness-run-surface-114-116.md](designs/2026-05-05-design-harness-run-surface-114-116.md) |
 | 117 | Runtime foundation tests and docs | M | in progress | [designs/2026-05-05-design-runtime-foundation-verification-117.md](designs/2026-05-05-design-runtime-foundation-verification-117.md) |
 
 ## Gates
@@ -67,14 +67,18 @@ before the phase transition.
   and heartbeat with conservative v0.3.0 retry/continue behavior.
 - Added production harness command routing for `/run`, `/runs`/`/jobs`,
   `/attach`, `/detach`, `/cancel`, `/retry`, `/continue`, and `/fork`.
+- Added optional `run_id` correlation on legacy turn stream events so durable
+  run IDs do not break foreground transcript projection.
+- Added attach-conflict handling, exact detach lease clearing, startup/session
+  run recovery summaries, and detached-run delta regression coverage.
 - Updated user and embedding docs for run commands and run projection.
 
 Validation: `go test ./...` passes.
 
 ## Open Items
 
-- Harden BFF attach conflict semantics and permission-blocker persistence.
-- Complete reconnect/resume replay behavior and detached transcript-buffer
-  tests for WU-116.
-- Expand harness projection tests for detached transcript invariants.
+- Persist and expose richer permission-blocker details.
+- Complete full reconnect/resume replay projection and detached transcript
+  buffer behavior for WU-116.
+- Expand harness projection tests for attach replay and summary-only fidelity.
 - Finalize release changelog and readiness review after all WUs close.

@@ -26,8 +26,14 @@ Implemented so far:
   attach/detach/cancel/retry/continue/fork surfaces.
 - Provider stream completion updates run lifecycle state and token/cost/model
   metadata.
+- Legacy turn stream events now carry optional `run_id` correlation so the
+  existing foreground transcript can consume durable BFF run IDs without
+  losing token deltas.
 - The production harness routes `/run`, `/runs`/`/jobs`, `/attach`, `/detach`,
   `/cancel`, `/retry`, `/continue`, and `/fork` to run-native RPC methods.
+- Attach conflicts are rejected when another connection owns the run, and
+  detach clears the attachment lease.
 
-Remaining before ship: reconnect/resume behavior, detached transcript invariant
-coverage, attach conflict hardening, and final release-readiness review.
+Remaining before ship: full reconnect/replay projection, permission-blocker
+detail persistence, detached transcript buffer behavior, and final
+release-readiness review.

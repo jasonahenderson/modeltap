@@ -588,15 +588,23 @@ func (cm *ConnectionManager) HandleEvent(method string, params json.RawMessage) 
 	case protocol.EventTokenDelta:
 		var ev protocol.TokenDelta
 		if err := json.Unmarshal(params, &ev); err == nil {
+			runID := ev.TurnID
+			if ev.RunID != "" {
+				runID = ev.RunID
+			}
 			cm.sender.Send(StreamTokenMsg{
-				TurnID: ev.TurnID, BranchID: ev.BranchID, Delta: ev.Text,
+				TurnID: runID, BranchID: ev.BranchID, Delta: ev.Text,
 			})
 		}
 	case protocol.EventTurnComplete:
 		var ev protocol.TurnComplete
 		if err := json.Unmarshal(params, &ev); err == nil {
+			runID := ev.TurnID
+			if ev.RunID != "" {
+				runID = ev.RunID
+			}
 			cm.sender.Send(StreamCompleteMsg{
-				TurnID:   ev.TurnID,
+				TurnID:   runID,
 				Tokens:   TokenInfo{Input: ev.FinalInputTokens, Output: ev.FinalOutputTokens},
 				Cost:     ev.TotalCost,
 				Model:    ev.Model,

@@ -97,9 +97,23 @@ func TestHandleTurnSubmit_HappyPath(t *testing.T) {
 	if len(deltas) == 0 {
 		t.Errorf("no token.delta")
 	}
+	var delta protocol.TokenDelta
+	if err := json.Unmarshal(deltas[0], &delta); err != nil {
+		t.Fatalf("decode token.delta: %v", err)
+	}
+	if delta.TurnID != "turn-1" || delta.RunID != tr.RunID {
+		t.Fatalf("token.delta ids = turn:%q run:%q, want turn-1/%s", delta.TurnID, delta.RunID, tr.RunID)
+	}
 	complete := frames.waitForFrame(t, protocol.EventTurnComplete)
 	if len(complete) != 1 {
 		t.Errorf("turn.complete count = %d", len(complete))
+	}
+	var turnComplete protocol.TurnComplete
+	if err := json.Unmarshal(complete[0], &turnComplete); err != nil {
+		t.Fatalf("decode turn.complete: %v", err)
+	}
+	if turnComplete.RunID != tr.RunID {
+		t.Fatalf("turn.complete run_id = %q, want %q", turnComplete.RunID, tr.RunID)
 	}
 	if runComplete := frames.waitForFrame(t, protocol.EventRunCompleted); len(runComplete) != 1 {
 		t.Errorf("run.completed count = %d", len(runComplete))

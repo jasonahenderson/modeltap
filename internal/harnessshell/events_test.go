@@ -232,6 +232,24 @@ func TestRunLifecycleHappyPath(t *testing.T) {
 	}
 }
 
+func TestDetachedRunDeltaDoesNotMutateForegroundTranscript(t *testing.T) {
+	m := newWithFixedClock()
+	m.state.input.SetValue("ping")
+	m, actions := drainActions(t, m, enterKey())
+	subID := actions[0].(SubmitTurnAction).Submission.ID
+
+	m, _ = drainActions(t, m, SubmissionAcceptedEvent{SubmissionID: subID, RunID: "run-attached"})
+	m, _ = drainActions(t, m, RunDeltaEvent{RunID: "run-detached", Delta: "background chatter"})
+
+	if got := m.state.transcriptItems[1].Text; got != "" {
+		t.Fatalf("foreground assistant text = %q, want empty", got)
+	}
+	m, _ = drainActions(t, m, RunDeltaEvent{RunID: "run-attached", Delta: "foreground"})
+	if got := m.state.transcriptItems[1].Text; got != "foreground" {
+		t.Fatalf("foreground assistant text = %q, want foreground", got)
+	}
+}
+
 func TestRunCompletedAutoReleasesQueue(t *testing.T) {
 	m := newWithFixedClock()
 	m.state.input.SetValue("first")

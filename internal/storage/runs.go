@@ -697,25 +697,22 @@ func applyRunStateUpdate(ctx context.Context, tx *sql.Tx, runID string, seq int6
 		return ErrRunNotFound
 	}
 	if update.AttachmentState != nil || update.AttachedConnectionID != nil || update.AttachmentGraceDeadline != nil {
-		state := ""
-		connID := ""
-		var grace any
+		attachmentSets := []string{"updated_at = ?"}
+		attachmentArgs := []any{at.UTC().Format(time.RFC3339Nano)}
 		if update.AttachmentState != nil {
-			state = *update.AttachmentState
+			attachmentSets = append(attachmentSets, "state = ?")
+			attachmentArgs = append(attachmentArgs, *update.AttachmentState)
 		}
 		if update.AttachedConnectionID != nil {
-			connID = *update.AttachedConnectionID
+			attachmentSets = append(attachmentSets, "attached_connection_id = ?")
+			attachmentArgs = append(attachmentArgs, *update.AttachedConnectionID)
 		}
 		if update.AttachmentGraceDeadline != nil {
-			grace = update.AttachmentGraceDeadline.UTC().Format(time.RFC3339Nano)
+			attachmentSets = append(attachmentSets, "grace_deadline = ?")
+			attachmentArgs = append(attachmentArgs, update.AttachmentGraceDeadline.UTC().Format(time.RFC3339Nano))
 		}
-		_, err := tx.ExecContext(ctx, `
-UPDATE run_attachments SET
-	state = CASE WHEN ? != '' THEN ? ELSE state END,
-	attached_connection_id = CASE WHEN ? != '' THEN ? ELSE attached_connection_id END,
-	grace_deadline = COALESCE(?, grace_deadline),
-	updated_at = ?
-WHERE run_id = ?`, state, state, connID, connID, grace, at.UTC().Format(time.RFC3339Nano), runID)
+		attachmentArgs = append(attachmentArgs, runID)
+		_, err := tx.ExecContext(ctx, `UPDATE run_attachments SET `+strings.Join(attachmentSets, ", ")+` WHERE run_id = ?`, attachmentArgs...)
 		if err != nil {
 			return fmt.Errorf("updating run attachment state: %w", err)
 		}
