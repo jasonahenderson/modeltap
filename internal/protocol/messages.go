@@ -38,6 +38,19 @@ const (
 	MethodConnectionReady      = "connection.ready"
 	MethodHistoryAppend        = "history.append"
 	MethodHistoryList          = "history.list"
+	MethodRunList              = "run.list"
+	MethodRunCreate            = "run.create"
+	MethodRunDetails           = "run.details"
+	MethodRunAttach            = "run.attach"
+	MethodRunDetach            = "run.detach"
+	MethodRunCancel            = "run.cancel"
+	MethodRunRetry             = "run.retry"
+	MethodRunContinue          = "run.continue"
+	MethodRunFork              = "run.fork"
+	MethodRunEvents            = "run.events"
+	MethodRunPermissions       = "run.permissions"
+	MethodRunResolvePermission = "run.resolve_permission"
+	MethodRunHeartbeat         = "run.heartbeat"
 )
 
 // -----------------------------------------------------------------------
@@ -121,14 +134,15 @@ type ProjectContext struct {
 // ToolResults must be set; this package does not enforce that constraint
 // (see FEAT-0008 dispatch requirements for WU-046 / WU-051).
 type TurnSubmit struct {
-	TurnID      string       `json:"turn_id"`
-	SessionID   string       `json:"session_id"`
-	Sequence    int          `json:"sequence"`
-	Mode        Mode         `json:"mode"`
-	Content     string       `json:"content,omitempty"`
-	Attachments []Attachment `json:"attachments,omitempty"`
-	Paste       *Paste       `json:"paste,omitempty"`
-	ToolResults []ToolResult `json:"tool_results,omitempty"`
+	TurnID         string       `json:"turn_id"`
+	SessionID      string       `json:"session_id"`
+	Sequence       int          `json:"sequence"`
+	Mode           Mode         `json:"mode"`
+	Content        string       `json:"content,omitempty"`
+	IdempotencyKey string       `json:"idempotency_key,omitempty"`
+	Attachments    []Attachment `json:"attachments,omitempty"`
+	Paste          *Paste       `json:"paste,omitempty"`
+	ToolResults    []ToolResult `json:"tool_results,omitempty"`
 }
 
 // TurnCancel cancels an in-flight turn.
@@ -261,6 +275,7 @@ type TurnSubmitResponse struct {
 	TurnID    string               `json:"turn_id"`
 	SessionID string               `json:"session_id,omitempty"`
 	Status    string               `json:"status"`
+	RunID     string               `json:"run_id,omitempty"`
 	Sync      *SessionSyncResponse `json:"sync,omitempty"`
 }
 
