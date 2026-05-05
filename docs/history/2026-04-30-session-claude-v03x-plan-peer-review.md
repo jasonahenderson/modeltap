@@ -51,6 +51,47 @@ identified, all tractable as pre-Phase-1 edits rather than restructuring:
 - `docs/releases/v0.3.2/.reviews/claude-plan-review.md`
 - `docs/releases/v0.3.3/.reviews/claude-plan-review.md`
 - `docs/releases/v0.3.4/.reviews/claude-plan-review.md`
+- `docs/features/.reviews/syntheses/0015-0022-id-hygiene-claude.md`
+- `docs/features/.reviews/syntheses/0015-0022-id-hygiene-claude.json`
+
+## Follow-up review: identifier hygiene across FEAT-0015 – FEAT-0022
+
+After dispositions on the per-release plan reviews, the user requested a
+focused identifier-hygiene review across the eight FEAT specs. Saved to
+`docs/features/.reviews/syntheses/` per the README's cross-feature
+synthesis convention.
+
+Verdict: 9 findings — 0 blocking, 5 significant, 4 advisory. `run_id`
+discipline is strong; `session_id ↔ run_id` and `turn_id ↔ run_id`
+relationships, `tool_call_id`, the FEAT-0021 "request ID"/`decision_id`
+split, and the `branch_id` non-existence choice need explicit naming
+before Phase 1 opens.
+
+## Follow-up review: ownership and authority across FEAT-0015 – FEAT-0022
+
+After the identifier review was processed, the user requested an
+ownership/authority review with six guiding questions covering run
+state, attachment, permission decisions, workspace lifecycle,
+disconnected-executor behavior, and artifact ownership for local
+outputs. Saved to `docs/features/.reviews/syntheses/`.
+
+Files added:
+
+- `docs/features/.reviews/syntheses/0015-0022-ownership-claude.md`
+
+Note: paired `.json` findings files were initially created for both
+syntheses then removed at user request — the project no longer uses the
+JSON findings format described in `docs/features/.reviews/README.md`.
+The earlier `0015-0022-id-hygiene-claude.json` was also removed.
+
+Verdict: 8 findings — 0 blocking, 5 significant, 3 advisory. The
+BFF/harness split is right in spirit but is stated as responsibilities
+rather than authority. Five boundaries need an exclusive-authority
+contract: run status/stage advancement (BFF-authoritative), attachment
+state under multi-client and reconnect, permission decision record
+authoring and revocation, workspace lifecycle (cleanup/orphan recovery/
+remote ownership), and disconnected-executor behavior (currently OQ-only,
+should be a stated principle even before the ADR completes).
 
 ## Files modified
 
