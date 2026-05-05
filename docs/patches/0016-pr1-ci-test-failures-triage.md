@@ -121,17 +121,17 @@ One fix per failure, one commit per fix. All commits prefixed `PATCH-0016:` and 
 
 ## Checklist
 
-- [ ] `internal/storage/sqlite.go`: `NewSQLiteStore` calls `db.SetMaxOpenConns(1)` when `dbPath == ":memory:"`, with a one-line comment explaining why
-- [ ] `internal/harness/connection_test.go`: drop `s.ln = nil` from `mockBFF.close()`
-- [ ] `internal/harness/tools/bash.go`: `cmd.WaitDelay = 100 * time.Millisecond` (or named constant) before `cmd.CombinedOutput()`
-- [ ] `internal/harness/tools/bash_test.go:117`: replace bash brace expansion with portable equivalent
-- [ ] `internal/protocol/protocol_test.go:691,694`: `reflect.Ptr` → `reflect.Pointer`
-- [ ] `go test -race ./...` passes locally on macOS
-- [ ] `golangci-lint run ./...` passes locally (with `latest` matching CI)
+- [x] `internal/storage/sqlite.go`: `NewSQLiteStore` calls `db.SetMaxOpenConns(1)` when `dbPath == ":memory:"`, with a one-line comment explaining why
+- [x] `internal/harness/connection_test.go`: drop `s.ln = nil` from `mockBFF.close()`
+- [x] `internal/harness/tools/bash.go`: `cmd.WaitDelay = 100 * time.Millisecond` (or named constant) before `cmd.CombinedOutput()`
+- [x] `internal/harness/tools/bash_test.go:117`: replace bash brace expansion with portable equivalent
+- [x] `internal/protocol/protocol_test.go:691,694`: `reflect.Ptr` → `reflect.Pointer`
+- [x] `go test -race ./...` passes locally on macOS
+- [ ] `golangci-lint run ./...` passes locally (with `latest` matching CI) — golangci-lint not installed locally; deferred to CI
 - [ ] CI passes on the patch branch (Linux + race + golangci-lint)
-- [ ] One commit per fix, all prefixed `PATCH-0016:`, all DCO-signed
-- [ ] `docs/patches/README.md` index updated
-- [ ] `docs/releases/v0.2.0/changelog.md` (or appropriate release) entry added
+- [x] One commit per fix, all prefixed `PATCH-0016:`, all DCO-signed
+- [x] `docs/patches/README.md` index updated
+- [x] `docs/releases/v0.2.0/changelog.md` entry added
 
 ## Fix Detail
 
