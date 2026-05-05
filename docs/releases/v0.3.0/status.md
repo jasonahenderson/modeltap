@@ -28,15 +28,15 @@ before the phase transition.
 | WU | Title | Size | State | Design |
 |---|---|---|---|---|
 | 108 | Run runtime ADR | M | accepted | [designs/2026-05-05-design-run-runtime-adr-108.md](designs/2026-05-05-design-run-runtime-adr-108.md), [ADR-0015](../../adr/0015-run-runtime.md) |
-| 109 | Run schema, storage, and migration design | M | ready for implementation | [designs/2026-05-05-design-run-storage-109.md](designs/2026-05-05-design-run-storage-109.md) |
-| 110 | Run protocol methods and event taxonomy | M | ready for implementation | [designs/2026-05-05-design-run-protocol-110.md](designs/2026-05-05-design-run-protocol-110.md) |
-| 111 | BFF run registry and lifecycle store | L | ready for implementation | [designs/2026-05-05-design-bff-run-runtime-111-113.md](designs/2026-05-05-design-bff-run-runtime-111-113.md) |
-| 112 | `turn.submit` to foreground-run integration | L | ready for implementation | [designs/2026-05-05-design-bff-run-runtime-111-113.md](designs/2026-05-05-design-bff-run-runtime-111-113.md) |
-| 113 | Pipeline stage/status emission and checkpoint metadata | M | ready for implementation | [designs/2026-05-05-design-bff-run-runtime-111-113.md](designs/2026-05-05-design-bff-run-runtime-111-113.md) |
-| 114 | Harness run projection and active `/run` surface | M | ready for implementation | [designs/2026-05-05-design-harness-run-surface-114-116.md](designs/2026-05-05-design-harness-run-surface-114-116.md) |
-| 115 | Run list, attach/detach/cancel/retry/continue/fork commands | L | ready for implementation | [designs/2026-05-05-design-harness-run-surface-114-116.md](designs/2026-05-05-design-harness-run-surface-114-116.md) |
-| 116 | Reconnect/resume behavior for active and detached runs | M | ready for implementation | [designs/2026-05-05-design-harness-run-surface-114-116.md](designs/2026-05-05-design-harness-run-surface-114-116.md) |
-| 117 | Runtime foundation tests and docs | M | ready for implementation | [designs/2026-05-05-design-runtime-foundation-verification-117.md](designs/2026-05-05-design-runtime-foundation-verification-117.md) |
+| 109 | Run schema, storage, and migration design | M | implemented | [designs/2026-05-05-design-run-storage-109.md](designs/2026-05-05-design-run-storage-109.md) |
+| 110 | Run protocol methods and event taxonomy | M | implemented | [designs/2026-05-05-design-run-protocol-110.md](designs/2026-05-05-design-run-protocol-110.md) |
+| 111 | BFF run registry and lifecycle store | L | implemented, hardening pending | [designs/2026-05-05-design-bff-run-runtime-111-113.md](designs/2026-05-05-design-bff-run-runtime-111-113.md) |
+| 112 | `turn.submit` to foreground-run integration | L | implemented | [designs/2026-05-05-design-bff-run-runtime-111-113.md](designs/2026-05-05-design-bff-run-runtime-111-113.md) |
+| 113 | Pipeline stage/status emission and checkpoint metadata | M | implemented, coverage expanding | [designs/2026-05-05-design-bff-run-runtime-111-113.md](designs/2026-05-05-design-bff-run-runtime-111-113.md) |
+| 114 | Harness run projection and active `/run` surface | M | partially implemented | [designs/2026-05-05-design-harness-run-surface-114-116.md](designs/2026-05-05-design-harness-run-surface-114-116.md) |
+| 115 | Run list, attach/detach/cancel/retry/continue/fork commands | L | partially implemented | [designs/2026-05-05-design-harness-run-surface-114-116.md](designs/2026-05-05-design-harness-run-surface-114-116.md) |
+| 116 | Reconnect/resume behavior for active and detached runs | M | pending | [designs/2026-05-05-design-harness-run-surface-114-116.md](designs/2026-05-05-design-harness-run-surface-114-116.md) |
+| 117 | Runtime foundation tests and docs | M | in progress | [designs/2026-05-05-design-runtime-foundation-verification-117.md](designs/2026-05-05-design-runtime-foundation-verification-117.md) |
 
 ## Gates
 
@@ -52,7 +52,29 @@ before the phase transition.
   FEAT-0015/0016/0017 foundation scope, accepted ADR-0015, and reachable
   v0.2.x prerequisite surfaces.
 
+## Implementation Progress
+
+- Added SQLite schema version 3 with durable run, event, checkpoint,
+  attachment, model-call, tool-result, and run-turn link tables.
+- Added run storage APIs and tests for workflow validation, event sequencing,
+  replay, and idempotent model-call accounting.
+- Added `run.*` protocol request/response types, run event payloads, and
+  optional `run_id` on `turn.submit` responses.
+- Wired BFF foreground `turn.submit` into durable runs with lifecycle events,
+  checkpoints, run IDs, model-call accounting, and run cancellation.
+- Added BFF `run.*` handlers for create, list, details, attach, detach,
+  cancel, retry, continue, fork, events, permissions, permission resolution,
+  and heartbeat with conservative v0.3.0 retry/continue behavior.
+- Added production harness command routing for `/run`, `/runs`/`/jobs`,
+  `/attach`, `/detach`, `/cancel`, `/retry`, `/continue`, and `/fork`.
+- Updated user and embedding docs for run commands and run projection.
+
+Validation: `go test ./...` passes.
+
 ## Open Items
 
-- Begin implementation in dependency order, starting with WU-109/WU-110 runtime
-  foundation tests and implementation.
+- Harden BFF attach conflict semantics and permission-blocker persistence.
+- Complete reconnect/resume replay behavior and detached transcript-buffer
+  tests for WU-116.
+- Expand harness projection tests for detached transcript invariants.
+- Finalize release changelog and readiness review after all WUs close.

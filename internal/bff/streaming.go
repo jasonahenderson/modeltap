@@ -112,6 +112,7 @@ type StreamRelay struct {
 	branchID string
 	model    string
 	provider string
+	runID    string
 }
 
 // NewStreamRelay constructs a relay bound to the given connection and
@@ -126,6 +127,12 @@ func NewStreamRelay(conn *Connection, session *ActiveSession, turnID, branchID, 
 		model:    model,
 		provider: providerName,
 	}
+}
+
+// WithRun binds the relay to the durable BFF run that owns this turn.
+func (sr *StreamRelay) WithRun(runID string) *StreamRelay {
+	sr.runID = runID
+	return sr
 }
 
 // relayResult is the in-memory accumulation of a streaming response.
@@ -224,6 +231,11 @@ readLoop:
 				Input:      tc.Input,
 			}
 			sr.sendNotification(protocol.EventToolCall, tcEv)
+			sr.appendRunEvent(ctx, protocol.EventRunToolCallRequested, storage.RunStageToolLoop, storage.RunStatusRunning, "", map[string]any{
+				"turn_id":      sr.turnID,
+				"tool_call_id": tb.id,
+				"tool":         tb.name,
+			})
 
 		case provider.StreamEventUsage:
 			if ev.Usage == nil {
@@ -272,8 +284,23 @@ readLoop:
 		complete.TotalCost = sr.session.TotalCost
 	}
 	sr.sendNotification(protocol.EventTurnComplete, complete)
+	if sr.conn != nil && sr.conn.server != nil && sr.runID != "" {
+		_, _ = sr.conn.server.store.RecordRunModelCall(ctx, storage.RunModelCall{
+			ModelCallID:  sr.runID + ":" + sr.turnID,
+			RunID:        sr.runID,
+			Provider:     sr.provider,
+			Model:        sr.model,
+			Status:       "completed",
+			InputTokens:  acc.InputTokens,
+			OutputTokens: acc.OutputTokens,
+			TotalCost:    complete.TotalCost,
+			LatencyMs:    int64(complete.LatencyMs),
+			PayloadJSON:  json.RawMessage(`{}`),
+		})
+	}
 
 	if streamErr != "" && !cancelled {
+		sr.appendTerminalRunEvent(ctx, protocol.EventRunFailed, storage.RunStatusFailed, "provider_stream_failed", map[string]string{"error": streamErr})
 		errEv := protocol.ServerError{
 			TurnID:  sr.turnID,
 			Code:    "provider_error",
@@ -286,6 +313,17 @@ readLoop:
 		}
 		sr.sendNotification(protocol.EventError, errEv)
 		return turnPersisted, fmt.Errorf("relay: %s", streamErr)
+	}
+	if cancelled {
+		sr.appendTerminalRunEvent(ctx, protocol.EventRunCancelled, storage.RunStatusCancelled, "cancelled", nil)
+	} else {
+		sr.appendTerminalRunEvent(ctx, protocol.EventRunCompleted, storage.RunStatusCompleted, "", map[string]any{
+			"turn_id":       sr.turnID,
+			"input_tokens":  acc.InputTokens,
+			"output_tokens": acc.OutputTokens,
+			"model":         sr.model,
+			"provider":      sr.provider,
+		})
 	}
 	return turnPersisted, nil
 }
@@ -312,8 +350,26 @@ func (sr *StreamRelay) persistAssistant(ctx context.Context, acc *relayResult) (
 		if err := sr.conn.server.store.CreateTurn(ctx, turn); err != nil {
 			return turn, fmt.Errorf("persist turn: %w", err)
 		}
+		if sr.runID != "" {
+			_ = sr.conn.server.store.LinkTurnToRun(ctx, sr.runID, turn.ID, turn.Role, turn.Sequence)
+		}
 	}
 	return turn, nil
+}
+
+func (sr *StreamRelay) appendTerminalRunEvent(ctx context.Context, typ, status, reason string, payload any) {
+	sr.appendRunEvent(ctx, typ, storage.RunStageCompletion, status, reason, payload)
+}
+
+func (sr *StreamRelay) appendRunEvent(ctx context.Context, typ, stage, status, reason string, payload any) {
+	if sr.conn == nil || sr.conn.server == nil || sr.runID == "" {
+		return
+	}
+	run, err := sr.conn.server.store.GetRun(ctx, sr.runID)
+	if err != nil {
+		return
+	}
+	_, _ = appendRunLifecycle(ctx, sr.conn, run, typ, stage, status, reason, payload)
 }
 
 // sendNotification marshals payload and writes it to the connection

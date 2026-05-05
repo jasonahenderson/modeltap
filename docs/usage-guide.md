@@ -170,6 +170,37 @@ You should see a row for the tool's request with the correct provider label, mod
 
 If the row is present but the model and tokens are empty, the request is reaching modeltap but using an endpoint the v1 adapters don't yet parse (for example, OpenAI's Responses API). The raw request and response are still captured in full and can be inspected with `modeltap show <id>`.
 
+## Harness Run Commands
+
+In the production harness shell, every foreground `turn.submit` is also stored
+as a durable run. Existing chat behavior still works, and newer harness builds
+can inspect and control the BFF-owned run record.
+
+Available commands:
+
+- `/run` shows the active attached run.
+- `/run <run-id>` shows a specific run without attaching it.
+- `/runs` lists recent runs for the active session. `/jobs` is an alias.
+- `/attach <run-id>` attaches the shell to a non-terminal run and replays
+  retained run events.
+- `/detach [run-id]` detaches from the named run, or the active run when no ID
+  is supplied.
+- `/cancel <run-id>` cooperatively cancels a run. Interrupting the active run
+  uses the same run cancellation path when the BFF supports it.
+- `/retry <run-id>`, `/continue <run-id>`, and `/fork <run-id>` are present as
+  checkpoint-aware controls. In v0.3.0 retry and continue return conservative
+  "not enabled yet" responses for unsupported stages; fork creates a queued
+  sibling run record without cloning workspace or artifact state.
+
+Run rows distinguish `waiting_permission` from `waiting_user`. The list output
+also shows BFF-computed input-required and stuck markers so clients do not need
+to make independent wall-clock decisions.
+
+Planning subcommands are reserved for later v0.3.x releases:
+
+- `/run context` and `/run prompt` are planned for v0.3.1.
+- `/run policy` is planned for v0.3.3.
+
 ## Configuration
 
 ### Config file location

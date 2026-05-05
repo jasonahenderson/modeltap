@@ -72,11 +72,12 @@ func (d *deferredSender) Send(msg tea.Msg) {
 // harness.ModeReader so harness.ToolDispatcher can read the current
 // execution mode.
 type runtimeState struct {
-	mu        sync.Mutex
-	mode      protocol.Mode
-	sessionID string
-	sequence  int
-	label     string // current model label
+	mu          sync.Mutex
+	mode        protocol.Mode
+	sessionID   string
+	activeRunID string
+	sequence    int
+	label       string // current model label
 }
 
 func newRuntimeState() *runtimeState {
@@ -111,6 +112,18 @@ func (s *runtimeState) SetSessionID(id string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.sessionID = id
+}
+
+func (s *runtimeState) ActiveRunID() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.activeRunID
+}
+
+func (s *runtimeState) SetActiveRunID(id string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.activeRunID = id
 }
 
 // NextSequence returns the next sequence counter for this session.
@@ -274,12 +287,16 @@ func (r *ProductionRuntime) SubmitTurn(ctx context.Context, req SubmitRequest) (
 	}
 
 	finalID := ack.TurnID
+	if ack.RunID != "" {
+		finalID = ack.RunID
+	}
 	if finalID == "" {
 		finalID = turnID
 	}
 	if ack.SessionID != "" {
 		r.mode.SetSessionID(ack.SessionID)
 	}
+	r.mode.SetActiveRunID(finalID)
 
 	return SubmitAccepted{
 		RunID: finalID,
@@ -307,13 +324,15 @@ func (r *ProductionRuntime) InterruptRun(ctx context.Context, runID string) erro
 		})
 		return nil
 	}
-	if err := client.CancelTurn(ctx, runID); err != nil {
-		r.sender.Send(harnessshell.RunStoppedEvent{
-			RunID:   runID,
-			Reason:  harnessshell.StopReasonInterrupt,
-			Message: "stopped — backend reported: " + err.Error(),
-		})
-		return nil
+	if err := client.CancelRun(ctx, runID); err != nil {
+		if turnErr := client.CancelTurn(ctx, runID); turnErr != nil {
+			r.sender.Send(harnessshell.RunStoppedEvent{
+				RunID:   runID,
+				Reason:  harnessshell.StopReasonInterrupt,
+				Message: "stopped — backend reported: " + err.Error(),
+			})
+			return nil
+		}
 	}
 	// Success: the BFF accepted the cancel. Synthesize the stop
 	// event ourselves; the existing harness streaming layer doesn't
@@ -367,6 +386,22 @@ func (r *ProductionRuntime) DispatchCommand(ctx context.Context, cmd HostCommand
 		return r.handleHistoryCommand(ctx, cmd.Args)
 	case "mcp":
 		return r.handleMCPCommand(ctx, cmd.Args)
+	case "run":
+		return r.handleRunCommand(ctx, cmd.Args)
+	case "runs", "jobs":
+		return r.handleRunsCommand(ctx)
+	case "attach":
+		return r.handleRunAttachCommand(ctx, cmd.Args)
+	case "detach":
+		return r.handleRunDetachCommand(ctx, cmd.Args)
+	case "cancel":
+		return r.handleRunControlCommand(ctx, protocol.MethodRunCancel, cmd.Args)
+	case "retry":
+		return r.handleRunControlCommand(ctx, protocol.MethodRunRetry, cmd.Args)
+	case "continue":
+		return r.handleRunControlCommand(ctx, protocol.MethodRunContinue, cmd.Args)
+	case "fork":
+		return r.handleRunControlCommand(ctx, protocol.MethodRunFork, cmd.Args)
 	default:
 		r.sender.Send(harnessshell.HostStatusEvent{
 			Status: "Unknown command: /" + cmd.Name,
@@ -568,6 +603,157 @@ func (r *ProductionRuntime) handleHistoryCommand(ctx context.Context, args strin
 	return nil
 }
 
+func (r *ProductionRuntime) handleRunCommand(ctx context.Context, args string) error {
+	args = strings.TrimSpace(args)
+	switch args {
+	case "context", "prompt":
+		r.sender.Send(harnessshell.HostStatusEvent{
+			Status: "/run " + args + ": not enabled in v0.3.0 (planned for v0.3.1)",
+			Kind:   harnessshell.StatusReady,
+		})
+		return nil
+	case "policy":
+		r.sender.Send(harnessshell.HostStatusEvent{
+			Status: "/run policy: not enabled in v0.3.0 (planned for v0.3.3)",
+			Kind:   harnessshell.StatusReady,
+		})
+		return nil
+	}
+	runID := args
+	if runID == "" {
+		runID = r.mode.ActiveRunID()
+	}
+	if runID == "" {
+		return r.statusError("run.details", errors.New("no active run"))
+	}
+	client := r.cm.Client()
+	if client == nil {
+		return r.statusError("run.details", errNoLiveClient)
+	}
+	var resp protocol.RunDetailsResponse
+	if err := client.CallInto(ctx, protocol.MethodRunDetails, &protocol.RunDetails{RunID: runID}, &resp); err != nil {
+		return r.statusError("run.details", err)
+	}
+	r.sender.Send(harnessshell.HostStatusEvent{
+		Status: formatRunDetails(resp.Run),
+		Kind:   harnessshell.StatusReady,
+	})
+	return nil
+}
+
+func (r *ProductionRuntime) handleRunsCommand(ctx context.Context) error {
+	client := r.cm.Client()
+	if client == nil {
+		return r.statusError("run.list", errNoLiveClient)
+	}
+	var resp protocol.RunListResponse
+	if err := client.CallInto(ctx, protocol.MethodRunList, &protocol.RunList{SessionID: r.mode.SessionID(), Limit: 20}, &resp); err != nil {
+		return r.statusError("run.list", err)
+	}
+	if len(resp.Runs) == 0 {
+		r.sender.Send(harnessshell.HostStatusEvent{Status: "No runs", Kind: harnessshell.StatusReady})
+		return nil
+	}
+	var b strings.Builder
+	b.WriteString("Runs:")
+	for _, run := range resp.Runs {
+		b.WriteString("\n  ")
+		b.WriteString(run.RunID)
+		b.WriteString(" ")
+		b.WriteString(run.Status)
+		b.WriteString("/")
+		b.WriteString(run.Stage)
+		if run.InputRequired {
+			b.WriteString(" input-required")
+		}
+		if run.Stuck {
+			b.WriteString(" stuck")
+		}
+		if run.Title != "" {
+			b.WriteString(" — ")
+			b.WriteString(truncate(run.Title, 60))
+		}
+	}
+	r.sender.Send(harnessshell.HostStatusEvent{Status: b.String(), Kind: harnessshell.StatusReady})
+	return nil
+}
+
+func (r *ProductionRuntime) handleRunAttachCommand(ctx context.Context, args string) error {
+	runID := strings.TrimSpace(args)
+	if runID == "" {
+		return r.statusError("run.attach", errors.New("attach requires <run-id>"))
+	}
+	client := r.cm.Client()
+	if client == nil {
+		return r.statusError("run.attach", errNoLiveClient)
+	}
+	var resp protocol.RunAttachResponse
+	if err := client.CallInto(ctx, protocol.MethodRunAttach, &protocol.RunAttach{RunID: runID}, &resp); err != nil {
+		return r.statusError("run.attach", err)
+	}
+	r.mode.SetActiveRunID(resp.Run.RunID)
+	r.sender.Send(harnessshell.HostStatusEvent{
+		Status: "Attached run: " + resp.Run.RunID + " (" + resp.Fidelity + " replay)",
+		Kind:   harnessshell.StatusReady,
+	})
+	return nil
+}
+
+func (r *ProductionRuntime) handleRunDetachCommand(ctx context.Context, args string) error {
+	runID := strings.TrimSpace(args)
+	if runID == "" {
+		runID = r.mode.ActiveRunID()
+	}
+	if runID == "" {
+		return r.statusError("run.detach", errors.New("no active run"))
+	}
+	client := r.cm.Client()
+	if client == nil {
+		return r.statusError("run.detach", errNoLiveClient)
+	}
+	var resp protocol.RunDetachResponse
+	if err := client.CallInto(ctx, protocol.MethodRunDetach, &protocol.RunDetach{RunID: runID}, &resp); err != nil {
+		return r.statusError("run.detach", err)
+	}
+	if r.mode.ActiveRunID() == runID {
+		r.mode.SetActiveRunID("")
+	}
+	r.sender.Send(harnessshell.HostStatusEvent{
+		Status: "Detached run: " + resp.RunID,
+		Kind:   harnessshell.StatusReady,
+	})
+	return nil
+}
+
+func (r *ProductionRuntime) handleRunControlCommand(ctx context.Context, method, args string) error {
+	runID := strings.TrimSpace(args)
+	if runID == "" && method == protocol.MethodRunCancel {
+		runID = r.mode.ActiveRunID()
+	}
+	if runID == "" {
+		return r.statusError(method, errors.New("requires <run-id>"))
+	}
+	client := r.cm.Client()
+	if client == nil {
+		return r.statusError(method, errNoLiveClient)
+	}
+	var resp protocol.RunControlResponse
+	if err := client.CallInto(ctx, method, &protocol.RunControl{RunID: runID}, &resp); err != nil {
+		return r.statusError(method, err)
+	}
+	status := method + " "
+	if resp.Accepted {
+		status += "accepted"
+	} else {
+		status += "not accepted"
+	}
+	if resp.Message != "" {
+		status += ": " + resp.Message
+	}
+	r.sender.Send(harnessshell.HostStatusEvent{Status: status, Kind: harnessshell.StatusReady})
+	return nil
+}
+
 // handleMCPCommand is the MCP lazy-start integration point. v0.2.2
 // ships with MCP wiring deferred to a follow-up release; the command
 // returns a clear "not yet configured" status rather than crashing.
@@ -577,6 +763,32 @@ func (r *ProductionRuntime) handleMCPCommand(ctx context.Context, args string) e
 		Kind:   harnessshell.StatusReady,
 	})
 	return nil
+}
+
+func formatRunDetails(run protocol.RunSummary) string {
+	var b strings.Builder
+	b.WriteString("Run ")
+	b.WriteString(run.RunID)
+	b.WriteString(": ")
+	b.WriteString(run.Status)
+	b.WriteString("/")
+	b.WriteString(run.Stage)
+	if run.AttachmentState != "" {
+		b.WriteString(" ")
+		b.WriteString(run.AttachmentState)
+	}
+	if run.Model != "" {
+		b.WriteString(" ")
+		b.WriteString(run.Model)
+	}
+	if run.TotalCost > 0 {
+		b.WriteString(fmt.Sprintf(" $%.4f", run.TotalCost))
+	}
+	if run.Summary != "" {
+		b.WriteString("\n")
+		b.WriteString(run.Summary)
+	}
+	return b.String()
 }
 
 // statusError emits a HostStatusEvent{Kind: StatusError} with the

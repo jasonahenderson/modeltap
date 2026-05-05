@@ -85,8 +85,14 @@ func TestHandleTurnSubmit_HappyPath(t *testing.T) {
 	if tr.Status != "accepted" || tr.TurnID != "turn-1" {
 		t.Errorf("response = %+v", tr)
 	}
+	if tr.RunID == "" {
+		t.Fatalf("RunID not set in turn.submit response")
+	}
 
 	// Wait for streaming to fire token.delta and turn.complete frames.
+	if started := frames.waitForFrame(t, protocol.EventRunStarted); len(started) == 0 {
+		t.Errorf("no run.started")
+	}
 	deltas := frames.waitForFrame(t, protocol.EventTokenDelta)
 	if len(deltas) == 0 {
 		t.Errorf("no token.delta")
@@ -95,11 +101,21 @@ func TestHandleTurnSubmit_HappyPath(t *testing.T) {
 	if len(complete) != 1 {
 		t.Errorf("turn.complete count = %d", len(complete))
 	}
+	if runComplete := frames.waitForFrame(t, protocol.EventRunCompleted); len(runComplete) != 1 {
+		t.Errorf("run.completed count = %d", len(runComplete))
+	}
 
 	// User turn should be persisted in storage.
 	turns, _ := srv.store.ListTurns(context.Background(), "sess-1")
 	if len(turns) < 1 {
 		t.Errorf("expected at least 1 persisted turn, got %d", len(turns))
+	}
+	run, err := srv.store.GetRun(context.Background(), tr.RunID)
+	if err != nil {
+		t.Fatalf("GetRun(%s): %v", tr.RunID, err)
+	}
+	if run.WorkflowType != "implementation" || run.Status != "completed" {
+		t.Errorf("run = %+v", run)
 	}
 }
 
@@ -202,6 +218,11 @@ func TestHandleTurnSubmit_RegistersStandardHandlers(t *testing.T) {
 		protocol.MethodTurnSubmit,
 		protocol.MethodTurnCancel,
 		protocol.MethodToolResult,
+		protocol.MethodRunList,
+		protocol.MethodRunDetails,
+		protocol.MethodRunAttach,
+		protocol.MethodRunDetach,
+		protocol.MethodRunCancel,
 	} {
 		if _, ok := srv.dispatcher.handlers[m]; !ok {
 			t.Errorf("handler %q not registered", m)

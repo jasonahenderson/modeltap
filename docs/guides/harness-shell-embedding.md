@@ -183,6 +183,12 @@ func (m model) View() string { return m.shell.View() }
 
 A submit followed by a streaming response runs as follows.
 
+Starting in v0.3.0, the `RunID` that crosses the host/shell boundary is the
+BFF-owned durable run ID when the server returns one. Older BFFs may still echo
+the turn ID; production runtime code keeps that fallback for compatibility.
+Host integrations should treat `RunID` as opaque and should call `run.*`
+methods for run-native inspection and control.
+
 ### Sequence
 
 1. The user presses `Enter` with a non-empty composer buffer.
@@ -290,6 +296,26 @@ before forwarding to the inner shell.
   `InterruptRunAction`. If the host cannot interrupt, it must still
   answer with a terminal lifecycle event so the shell leaves the armed
   state.
+
+## Run Projection
+
+The production host consumes both legacy turn notifications and v0.3.0 run
+notifications. Turn token events still populate the active foreground
+transcript. Run lifecycle events update durable status, attachment, replay, and
+control surfaces.
+
+Embedding hosts should preserve these rules:
+
+- Do not append detached-run deltas to the active foreground transcript.
+- Keep per-run replay state keyed by run ID, including the last observed run
+  sequence.
+- Prefer `run.cancel` for BFF-owned run IDs and fall back to `turn.cancel` only
+  when speaking to older BFFs.
+- Render BFF-provided `input_required`, `stuck`, and replay-fidelity fields
+  directly instead of recomputing them in the shell.
+
+The shell package itself remains protocol-free. Protocol payloads are converted
+inside `internal/harnesshost` before the shell receives typed host events.
 
 ## Permission Flow Integration
 

@@ -47,6 +47,7 @@ type Server struct {
 	dispatch   *TurnDispatcher
 	cost       *CostTracker
 	turns      *turnTracker
+	runs       *runRegistry
 
 	mu    sync.Mutex
 	conns map[*Connection]struct{}
@@ -127,6 +128,7 @@ func NewServer(store storage.Store, config ServerConfig) *Server {
 	s.dispatch = NewTurnDispatcher(s.providers, s.adapters)
 	s.cost = NewCostTracker(s.models, s.store)
 	s.turns = newTurnTracker()
+	s.runs = newRunRegistry()
 	s.registerCoreHandlers()
 	s.sessions.Register(s.dispatcher)
 	s.dispatcher.Register(protocol.MethodModelList, handleModelList)
@@ -140,6 +142,7 @@ func NewServer(store storage.Store, config ServerConfig) *Server {
 	s.dispatcher.Register(protocol.MethodContentTransform, handleContentTransform)
 	s.dispatcher.Register(protocol.MethodSessionCompact, handleSessionCompact)
 	s.dispatcher.Register(protocol.MethodCompactApply, handleCompactApply)
+	s.registerRunHandlers()
 	return s
 }
 

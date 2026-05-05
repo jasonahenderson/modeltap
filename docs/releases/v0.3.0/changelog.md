@@ -15,4 +15,19 @@ Anticipated scope:
 - `/runs` or `/jobs` run list
 - attach/detach/cancel/reconnect semantics for BFF-known runs
 
-This changelog remains a Phase 3 placeholder until implementation completes.
+Implemented so far:
+
+- SQLite schema version 3 stores durable runs, run events, checkpoints,
+  attachment state, run-turn links, model-call accounting, and tool-result
+  accounting.
+- `turn.submit` now returns an optional `run_id` and creates a foreground run
+  before provider dispatch.
+- BFF run handlers expose run create/list/details/events and basic
+  attach/detach/cancel/retry/continue/fork surfaces.
+- Provider stream completion updates run lifecycle state and token/cost/model
+  metadata.
+- The production harness routes `/run`, `/runs`/`/jobs`, `/attach`, `/detach`,
+  `/cancel`, `/retry`, `/continue`, and `/fork` to run-native RPC methods.
+
+Remaining before ship: reconnect/resume behavior, detached transcript invariant
+coverage, attach conflict hardening, and final release-readiness review.

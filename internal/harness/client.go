@@ -349,6 +349,7 @@ type TurnSubmitAck struct {
 	TurnID    string          `json:"turn_id"`
 	SessionID string          `json:"session_id,omitempty"`
 	Status    string          `json:"status"`
+	RunID     string          `json:"run_id,omitempty"`
 	Sync      json.RawMessage `json:"sync,omitempty"`
 }
 
@@ -365,6 +366,12 @@ func (c *ProtocolClient) SubmitTurn(ctx context.Context, submit *protocol.TurnSu
 // CancelTurn sends turn.cancel.
 func (c *ProtocolClient) CancelTurn(ctx context.Context, turnID string) error {
 	_, err := c.Call(ctx, protocol.MethodTurnCancel, &protocol.TurnCancel{TurnID: turnID})
+	return err
+}
+
+// CancelRun sends run.cancel.
+func (c *ProtocolClient) CancelRun(ctx context.Context, runID string) error {
+	_, err := c.Call(ctx, protocol.MethodRunCancel, &protocol.RunControl{RunID: runID})
 	return err
 }
 
