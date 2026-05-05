@@ -1,15 +1,16 @@
 # v0.3.0 — Status
 
-**Current phase:** Phase 1 — Design  
+**Current phase:** Phase 2 — Review  
 **Branch:** `release/v0.3.0`  
 **Scope:** Run runtime foundation for FEAT-0016 and the first slice of
 FEAT-0017
 
-Phase 1 opened on 2026-05-05 by explicit `ADMIN:` commit. Because FEAT-0015,
-FEAT-0016, and FEAT-0017 remain draft specs, the release is authorized for
-design-against-draft work only. Phase 3 remains blocked until those feature
-contracts, the FEAT-0017 foundation slice, and WU-108 run-runtime ADR are
-accepted.
+Phase 1 opened on 2026-05-05 by explicit `ADMIN:` commit and completed after all
+WU-108 through WU-117 designs were drafted. Phase 2 opened on 2026-05-05 by
+explicit `ADMIN:` commit. Because FEAT-0015, FEAT-0016, and FEAT-0017 remain
+draft specs, the release remains design-against-draft work only. Phase 3 remains
+blocked until those feature contracts, the FEAT-0017 foundation slice, and
+WU-108 run-runtime ADR are accepted.
 
 ## Work Units
 
@@ -43,7 +44,7 @@ accepted.
 
 ## Open Items
 
-- Process Phase 2 design review after the user confirms Phase 1 complete.
+- Process Phase 2 design review findings.
 - Accept the run-runtime ADR before Phase 3.
 - Confirm v0.2.0, v0.2.1, and v0.2.2 prerequisite surfaces remain reachable
   from the v0.3.0 implementation branch before Phase 3.
