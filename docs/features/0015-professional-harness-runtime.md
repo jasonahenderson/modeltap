@@ -74,9 +74,27 @@ background, tool, and agent paths.
 
 Every meaningful task is represented as a run with a stable run ID.
 
+Run identity is distinct from session identity. A `session_id` identifies the
+conversation container: persisted chat state, turn order, model override, and
+session-level operations such as resume, fork, clear, and compact. A run ID
+identifies a durable execution of a workflow or task, usually initiated from a
+turn within a session. A session can contain many runs, and runtime controls
+such as inspect, attach, detach, cancel, continue, retry, and fork address the
+run ID rather than the session ID.
+
+Run creation accepts a client-supplied idempotency key so retries after network
+loss do not create duplicate runs. Tool-result delivery is idempotent per
+`tool_call_id`, and model-call accounting is idempotent per `model_call_id`.
+
+Run events are append-only and monotonically sequenced per `run_id`. Event
+streams are resumable from a last-observed sequence number, and reattach must
+detect gaps rather than silently skipping events. Persisted run-related records,
+including run records, events, workflow contracts, context plans, and artifact
+bundles, carry schema version metadata.
+
 Run metadata has three related but distinct axes:
 
-- **status**: whether the run is queued, active, blocked, checkpointed, or
+- **status**: whether the run is queued, active, waiting, checkpointed, or
   terminal
 - **pipeline stage**: what work the runtime is currently performing
 - **attachment state**: whether a harness is actively attached to the run
@@ -113,6 +131,51 @@ A run can combine these axes. For example, an implementation run may be
 `status: waiting_permission`, `stage: tool_loop`, and
 `attachment: detached`.
 
+Canonical attachment states:
+
+- `attached`
+- `detached`
+
+Observers are per-client subscriptions, not a run attachment state. A blocked
+run is a queue/UI grouping for runs in `waiting_permission` or `waiting_user`;
+`blocked` is not a lifecycle status or attachment state.
+
+Canonical run control verbs:
+
+- `attach`
+- `detach`
+- `cancel`
+- `continue`
+- `retry`
+- `fork`
+
+`pause` is not a canonical user command in this series. A run that cannot
+advance transitions to an explicit waiting, checkpointed, failed, or cancelled
+status with a structured reason.
+
+Run-related identifiers use a shared identity discipline:
+
+| Identifier | Scope |
+|---|---|
+| `session_id` | conversation container |
+| `run_id` | durable workflow execution |
+| `turn_id` | one turn within a session; may be owned by at most one run |
+| `model_call_id` | one provider/model dispatch within a run |
+| `tool_call_id` | one requested tool invocation within a run |
+| `check_id` | one validation check within a run |
+| `artifact_id` | one run artifact |
+| `decision_id` | one policy or approval decision |
+| `result_id` | one tool or check execution result |
+| `memory_id` | one durable or candidate memory item |
+| `workflow_profile_id` | one workflow contract/profile |
+| `host_fingerprint` | one local harness/executor host identity |
+| `policy_version` | one effective policy version for a run/project context |
+| `schema_version` | version marker on persisted run-related records |
+
+Each persisted run-related record carries schema-version metadata. Identifier
+formats are implementation details, but uniqueness scope and foreign-key
+relationships are part of the runtime contract.
+
 Runs record:
 
 - initiating user request
@@ -127,6 +190,15 @@ Runs record:
 - cost, latency, and token usage
 - checkpoints and final outcome
 
+Cancellation is cooperative by default and bounded by a runtime deadline. The
+BFF records the cancellation request, asks active model calls and tool calls to
+stop, and transitions the run to `cancelled` when active work has stopped or the
+deadline expires. In-flight tool calls may either return a final result or an
+interrupted result; the runtime must not assume local filesystem writes can be
+rolled back automatically. Artifacts, logs, approvals, and partial diffs
+captured before cancellation are retained. Cancelling a parent run cascades to
+active children unless run policy explicitly opts out.
+
 ### Foreground and Background Agents
 
 Foreground and background agents use the same run runtime.
@@ -139,6 +211,23 @@ pauses for permission, or auto-denies operations outside policy.
 
 Background agents are not a separate execution architecture. They are durable
 runs with different attachment and interactivity semantics.
+
+Parallel candidate work uses sibling runs, not branches within a run. A fork or
+parallel candidate creates a new `run_id` that may reference a parent `run_id`;
+an optional synthesis run may aggregate the sibling results. The runtime does
+not introduce a `branch_id` concept for professional runtime work unless a
+future ADR explicitly adds intra-run branching.
+
+Only one harness or local executor may hold the foreground attachment lease for
+a run at a time. Additional clients may observe run events, but they do not own
+the composer or answer permission prompts unless the foreground lease is
+transferred.
+
+Run-family budgets and deadlines compose downward by default. Parent run cost,
+token, wall-clock, and deadline limits bound child and sibling runs unless
+policy explicitly grants a separate budget. Synthesis runs have explicit
+timeouts, and parent cancellation or budget exhaustion cascades to active
+children unless run policy says otherwise.
 
 Required behavior:
 
@@ -183,6 +272,10 @@ Phase 1 -> Phase 2 -> Phase 3 release process.
 
 Tool calls are first-class run events, not transient stream messages.
 
+Every tool call has a stable `tool_call_id` issued at request time. Tool
+requests, tool results, permission decisions, and audit records all reference
+this `tool_call_id`. The `tool_call_id` is unique within a run.
+
 For every tool call, the runtime records:
 
 - tool name, namespace, and schema version
@@ -197,6 +290,20 @@ For every tool call, the runtime records:
 The BFF may request tools, but local side effects remain harness/executor-owned.
 The harness enforces local permission policy and returns structured tool
 results to the BFF.
+
+Permission flow is sequenced as:
+
+1. The harness or local executor detects that a tool request needs approval.
+2. The harness reports the pending decision to the BFF with `run_id` and
+   `tool_call_id`.
+3. The BFF records the pending decision, emits `waiting_permission`, and surfaces
+   an inbox event for the appropriate attached or authorized user.
+4. The user resolves the decision through the harness inbox or attached run.
+5. The harness records the decision and policy context; the BFF persists the
+   decision and emits the resulting run transition.
+
+The BFF is authoritative for run status and permission-inbox state. The harness
+is authoritative for local side-effect enforcement.
 
 ### Workspace Policy
 
@@ -225,6 +332,31 @@ Default policy:
 
 The BFF stores workspace metadata on the run. The local harness/executor
 creates and manages local workspaces because it owns the filesystem.
+
+Workspace lifecycle follows the same authority split:
+
+1. Workspace mode and metadata are selected during `preflight`.
+2. The local harness/executor owns creation, mutation, and cleanup of `current`,
+   `current_readonly`, `worktree`, and `temp_copy` workspaces.
+3. `worktree` and `temp_copy` workspaces are cleaned up when the owning run
+   reaches a terminal state unless artifacts are explicitly pinned to that
+   workspace.
+4. Cancellation retains captured artifacts, then triggers workspace cleanup
+   according to the same terminal-state rule.
+5. On reconnect, the harness scans for orphaned local workspaces whose runs are
+   no longer active according to the BFF and cleans them with user-visible
+   notice.
+6. If a workspace becomes unexpectedly missing during an active run, the harness
+   reports a `workspace_lost` fact and the BFF transitions the run to `failed`
+   with that reason.
+
+`remote` workspaces are owned by the BFF or remote sandbox provider; the harness
+acts as policy and permission relay for those workspaces.
+
+When no harness or local executor is connected, the BFF never simulates local
+side effects. Runs that require local filesystem, process, or workspace effects
+pause with an executor-disconnected reason until an executor reconnects or a
+server-safe alternative exists under an accepted ADR.
 
 ### Context and Prompt Planning
 
@@ -283,6 +415,44 @@ Routing should become quality-driven:
 
 Routing decisions and outcomes are captured so future policy can improve.
 
+Every `model_call` runs under an explicit retry and backoff policy. Provider
+5xx errors, rate limits, quota failures, and fallback-model choices are recorded
+as run events. Fallback routing must not corrupt run state, double-count model
+usage, or bypass the run queue and budget policy.
+
+### Observability, Liveness, and Durability
+
+Runs expose operator-facing metrics and structured logs, not only transcript UI.
+At minimum, the runtime reports queue depth, time in stage, stuck-stage counts,
+validation outcomes, permission-inbox age, and per-stage failure rates. Each run
+has a trace ID that propagates across BFF, harness/executor, and model-provider
+calls.
+
+Harnesses and local executors send heartbeats while attached or executing run
+work. Runtime stages have deadlines; `model_call` and `tool_loop` deadlines are
+configurable. Runs that exceed heartbeat, stage, or permission-input deadlines
+transition according to policy, with stuck stages defaulting to `failed` with a
+structured reason.
+
+Run durability is BFF-owned. Stage transitions, tool results, permission
+decisions, checkpoints, and artifact metadata are durable before they are used
+to advance the run. The run-runtime ADR should define exact fsync boundaries
+and checkpoint-format compatibility across at least the previous minor version.
+
+Budget exhaustion transitions the run to `waiting_user` by default so the user
+can grant more budget, narrow scope, continue in a cheaper mode, or cancel.
+Per-run memory, process, file descriptor, disk, token, and cost caps are policy
+inputs, and run-family limits compose with the parent budget/deadline rules.
+Repair-loop cost is capped by default at three times the initial implementation
+attempt cost, and routing must check remaining run budget before upgrading model
+class. Policy may override these defaults explicitly.
+
+Retention follows one envelope across the series: memory can outlive artifacts,
+artifacts can outlive the active run transcript, and the run record is the last
+non-promoted runtime record to age out. Member-feature retention knobs may tune
+durations within this envelope, but must not produce artifact metadata without a
+run record or promoted memory without provenance.
+
 ## UI / CLI / API Integration
 
 ### Terminal UI
@@ -312,6 +482,22 @@ Workflow commands may map to skills, teams, or workflow contracts:
 - `/debug`
 - `/docs`
 - `/devops`
+
+Command ownership is registered at the umbrella level:
+
+| Command | Owner |
+|---|---|
+| `/jobs`, `/runs`, `/attach`, `/detach`, `/cancel`, `/continue`, `/retry`, `/fork`, `/permissions` | FEAT-0017 |
+| `/run`, `/run context`, `/run prompt`, `/run policy` | FEAT-0016 |
+| `/context`, `/context rules`, `/context why`, `/context drop` | FEAT-0018 |
+| `/validate`, `/validate plan`, `/validate retry`, `/repair` | FEAT-0019 |
+| `/artifacts`, `/diff`, `/evidence` | FEAT-0020 |
+| `/policy` | FEAT-0021 |
+| `/memory`, `/routing`, `/workflows` | FEAT-0022 |
+| `/explore`, `/feature`, `/adr`, `/release`, `/implement`, `/debug`, `/docs`, `/devops` | workflow profiles under FEAT-0015/0022 |
+
+Subcommands use the `/x subcommand` shape consistently. Adding a command in this
+series requires updating this registry.
 
 ### Protocol / API
 
@@ -346,6 +532,27 @@ engineering tracks.
 This order is stack-ranked by code-generation quality impact and foundation
 value, not by implementation size.
 
+Series sequencing rules:
+
+- FEAT-0016 owns the pipeline graph, stage taxonomy, checkpoints, and run-level
+  event categories.
+- FEAT-0017 owns attached/detached behavior, observer attach claims, background
+  queue behavior, and reconnect UX.
+- FEAT-0018 owns context-plan snapshots, project-rule precedence, and context
+  provenance categories.
+- FEAT-0019 owns validation plans, check outcomes, repair limits, and validation
+  evidence.
+- FEAT-0020 owns artifact envelopes, retention coordination details, and patch
+  evidence timing.
+- FEAT-0021 owns tool-policy evaluation, server-safe tool classification slots,
+  permission decisions, and audit records.
+- FEAT-0022 owns memory candidates, routing decisions, extension trust, and
+  workflow extension behavior.
+
+The Run Runtime ADR must lock event delivery, transition policy, identity
+semantics, server-safe tool enumeration, and durability boundaries before Phase 3
+implementation begins for this series.
+
 The codegen evaluation harness remains an expected implementation-scoped
 supporting patch, but it is not part of this behavior-contract map until a
 `PATCH-NNNN` artifact is drafted.
@@ -358,12 +565,14 @@ have future constraint value:
 
 | ADR topic | Covers | Related features |
 |---|---|---|
-| Run runtime ownership and semantics | BFF vs harness ownership, run status/stage terminology, attachment state, checkpoint and reconnect semantics, local-executor availability | FEAT-0015, FEAT-0016, FEAT-0017 |
+| Run runtime ownership and semantics | BFF vs harness ownership, run status/stage terminology, attachment leases, cancellation, checkpoint and reconnect semantics, local-executor availability | FEAT-0015, FEAT-0016, FEAT-0017 |
+| Run event stream, idempotency, and schema semantics | Event ordering, sequence checkpoints, gap detection, idempotency keys, duplicate result handling, `model_call_id`, and run/artifact/workflow schema versioning | FEAT-0015, FEAT-0016, FEAT-0017, FEAT-0020 |
 | Project rules and prompt layering | Rule-file precedence, prompt-layer ownership, prompt metadata visibility, context budget authority | FEAT-0018 |
 | Validation and repair artifacts | Validation artifact schema, repair-loop limits, failure classification, retry boundaries | FEAT-0019 |
-| Artifact storage and redaction | Run artifact storage, blob references, redaction/encryption, retention by deployment profile | FEAT-0020 |
-| Policy and workspace boundaries | Policy inheritance, sandbox/workspace modes, non-overridable policy, local vs server enforcement | FEAT-0021 |
-| Memory, routing, and extension trust | Memory promotion defaults, routing role taxonomy, skill/hook/team trust boundaries | FEAT-0022 |
+| Artifact storage, redaction, retention, and GC | Run artifact storage, blob references, redaction/encryption, retention windows, garbage collection, and blob lifecycle by deployment profile | FEAT-0020 |
+| Policy, workspace, and resource boundaries | Policy inheritance, sandbox/workspace modes, non-overridable policy, local vs server enforcement, resource caps, and budget exhaustion behavior | FEAT-0021 |
+| Memory, routing, extension trust, and provider resilience | Memory promotion defaults, routing role taxonomy, retry/backoff, fallback model policy, per-provider quotas, skill/hook/team trust boundaries | FEAT-0022 |
+| Runtime operability and upgrade safety | Run metrics, trace propagation, heartbeat/stuck-stage detection, fsync boundaries, rolling restart behavior, and checkpoint compatibility | FEAT-0015, FEAT-0017 |
 
 ## Document Placement Guidance
 
@@ -391,8 +600,10 @@ runtime will likely need:
 - default workspace policy per workflow
 - background run concurrency limits
 - maximum run cost and token budgets
+- per-run memory, process, file descriptor, and disk caps
 - allowed background tools
 - permission timeout and blocked-run retention
+- run record and artifact blob retention windows
 - memory promotion policy
 
 ## Non-Goals
@@ -448,6 +659,5 @@ runtime will likely need:
    deployments?
 6. Should workflow commands be implemented as skills, as first-class run
    profiles, or as a unified extension model that includes both?
-7. Can background runs continue local tool execution when no harness or local
-   executor is connected, or must they pause / use only server-safe tools until
-   a local executor reconnects?
+7. Which server-safe tool surfaces, if any, may continue without a connected
+   harness/local executor under the disconnected-executor rule?

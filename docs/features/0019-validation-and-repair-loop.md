@@ -36,7 +36,8 @@ back into repair turns.
 
 ### Validation Plan
 
-For mutating runs, the system proposes a validation plan based on:
+For mutating runs, the BFF composes a validation plan from facts reported by the
+harness or local executor. Inputs include:
 
 - changed files
 - package/module structure
@@ -45,13 +46,21 @@ For mutating runs, the system proposes a validation plan based on:
 - prior failures
 - user-requested checks
 
-The plan should prefer targeted checks before broad checks.
+The plan is recorded as an artifact before checks run and should prefer targeted
+checks before broad checks. The harness executes the recorded plan and reports
+per-check results.
+
+For mutating workflows, a configurable baseline pass runs during `preflight`
+using the cheapest relevant subset of the validation plan. Failures present in
+the baseline are marked `pre_existing` and do not drive repair attempts unless
+the user explicitly opts in.
 
 ### Check Execution
 
 The harness executes checks through the normal tool/runtime policy. Checks are
 structured as validation artifacts:
 
+- stable `check_id`
 - command
 - workspace
 - start/end time
@@ -60,7 +69,21 @@ structured as validation artifacts:
 - summarized failures
 - implicated files/lines when detectable
 
+Check outcomes are classified as `pass`, `fail`, `error`, `timeout`, or
+`skipped`. Only `fail` feeds the repair loop by default. `error` transitions the
+run to `waiting_user` with environment or execution context.
+
+Validation checks reuse FEAT-0021 risk classification. Known project toolchain
+commands may auto-run under policy; novel shell commands require approval.
 Expensive or risky checks may require approval.
+
+Checks default to serial execution within a class and parallel execution across
+independent classes. The default dependency model is lint/format/typecheck
+first, then build, then tests. Projects may override dependencies and
+concurrency.
+
+stdout/stderr capture keeps the tail by default, bounded by the FEAT-0020
+artifact cap, and stores a checksum plus truncation metadata for the full output.
 
 ### Failure Summarization
 
@@ -76,8 +99,16 @@ The BFF turns validation output into concise repair context:
 ### Repair Attempts
 
 Repair turns record what was attempted and why. The model receives enough
-history to avoid repeating failed fixes. The run stops or asks the user when it
-hits configured repair limits.
+history to avoid repeating failed fixes. Repair attempts reference the failing
+`check_id` and record an edit-set fingerprint, such as files and line ranges
+changed. Repeated fixes are flagged when fingerprints overlap above a configured
+threshold, and failed-fingerprint history is fed into the next repair turn.
+
+Default repair limits are three attempts for `implementation`, five for `debug`,
+and one for `docs` and `release`. On limit, or when the repair-loop wall-clock or
+cost envelope is exhausted, the run transitions to `waiting_user` with a
+structured reason and failed-fingerprint history attached. The default
+repair-loop cost ceiling is three times the initial attempt cost.
 
 ## UI / CLI / API Integration
 
@@ -87,6 +118,10 @@ Expected commands:
 - `/validate plan` shows planned checks
 - `/validate retry` reruns failed checks
 - `/repair` continues from validation failure context
+
+`/validate plan` previews are tied to the context-plan snapshot fingerprint from
+FEAT-0018. If the working tree changes before execution, the preview is
+invalidated and the run re-plans with a visible reason.
 
 The harness displays validation results compactly in the transcript and exposes
 full logs through run artifacts.
@@ -104,7 +139,13 @@ Configuration should support:
 - maximum repair attempts
 - broad-check approval policy
 - ignored known-failing checks
-- validation timeout
+- validation timeouts by check and class
+- total validation wall-clock cap
+- repair-loop cost and wall-clock caps
+
+Default validation timeouts are 30 seconds per check, 60 seconds for lint, 5
+minutes for unit tests, 15 minutes for integration tests, and 30 minutes for e2e
+checks. All are configurable.
 
 ## Non-Goals
 
@@ -134,5 +175,4 @@ Configuration should support:
 
 1. How should modeltap infer validation commands for unknown projects?
 2. Should the user approve the validation plan before any commands run?
-3. How should known pre-existing failures be marked?
-4. What is the default repair-attempt limit?
+3. How should modeltap infer check dependencies for unknown projects?

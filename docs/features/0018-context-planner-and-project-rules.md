@@ -50,7 +50,13 @@ or metadata to the BFF. Sources may include:
 - user/global config
 - team/server policy metadata
 
-The planner must define deterministic precedence and conflict behavior.
+Default precedence is:
+
+`server policy > team policy > project config (.modeltap.yaml) > modeltap project rules (MODELTAP.md/.modeltap/) > compatible project rules (CLAUDE.md/AGENTS.md) > user config > global defaults`
+
+Higher-precedence rules may mark settings as non-overridable. Conflicts are
+recorded as warnings on the context-plan artifact with the winning source.
+Richer policy-language behavior belongs in the future prompt/policy ADR.
 
 ### Repository-Aware Selection
 
@@ -65,6 +71,18 @@ For implementation and debug workflows, the planner should consider:
 - local style examples
 - accepted ADRs, features, patches, or release docs when relevant
 
+The context plan snapshots the working tree at `context_plan` time, including
+dirty changes. The plan records a fingerprint containing the current commit and
+dirty-file digests. A context plan is frozen for one `model_call`; every
+subsequent `model_call` in the same run requires either an explicit re-plan event
+or reuse of the frozen plan with a recorded reason.
+
+Context planning has a default deadline of 10 seconds. If planning exceeds the
+deadline, the BFF proceeds with the partial plan when policy allows, marks the
+artifact `partial_plan`, and records omitted selectors. The harness may maintain
+a repo-map cache invalidated by file mtimes; richer incremental indexing is
+deferred to EXP-0012 follow-up work.
+
 ### Context Provenance
 
 Every selected context item records why it was selected:
@@ -77,8 +95,11 @@ Every selected context item records why it was selected:
 - project rule
 - memory retrieval
 - workflow requirement
+- extension
+- parent run or synthesis input
 
-The harness exposes this through `/context` and run artifact inspection.
+The provenance vocabulary is extensible through a structured source field. The
+harness exposes this through `/context` and run artifact inspection.
 
 ### Budgeting
 
@@ -92,7 +113,37 @@ The BFF tracks token budgets by category:
 - tool definitions
 
 The planner may summarize, trim, or reject oversized context before model
-dispatch.
+dispatch. Default overflow behavior is:
+
+- project rules and user attachments are pinned; overflow rejects dispatch with
+  a budget-exceeded reason
+- transcript/history is summarized
+- selected files/snippets are trimmed least-recently-touched first
+- memory is trimmed lowest-relevance first
+- validation evidence is summarized, then trimmed by age
+
+These defaults are configurable and recorded in the context-plan artifact.
+Per-rule-source content is capped by a configurable byte budget, defaulting to
+32 KiB; over-cap rule sources are summarized with a warning, but pinned-category
+overflow still rejects the run.
+
+Token estimates use the selected model's tokenizer when available. Otherwise the
+planner uses a conservative provider-class estimator. Any routing-driven model
+change requires re-budgeting, and the tokenizer or estimator used is recorded on
+the plan artifact.
+
+If memory retrieval is unavailable or degraded, the default behavior is skip with
+warning and mark the plan `memory_unavailable`. Implementation and devops
+workflows may escalate to `waiting_user` so the user can proceed without memory
+or wait for recovery.
+
+Full prompt content is BFF-owned and is not transmitted to the harness by
+default. The harness sees prompt-layer metadata such as layer name, byte budget,
+source category, and provenance, but not raw prompt text. A user-controlled
+debug flag may permit prompt content disclosure to the harness for inspection;
+that disclosure is scoped per run, requested at run start, off by default,
+recorded on the run and disclosure artifact, and may be forbidden by team/server
+policy.
 
 ## UI / CLI / API Integration
 
@@ -102,6 +153,9 @@ Expected commands:
 - `/context rules` shows rule sources and precedence
 - `/context why <item>` explains why an item was selected
 - `/context drop <item>` excludes an item from the next run when policy allows
+
+`<item>` refers to the context-item ID shown by `/context` for the active
+context plan.
 
 The protocol needs a context-plan structure correlated with a run ID and exposed
 through run details.
@@ -115,6 +169,8 @@ Configuration should support:
 - maximum file/snippet count
 - whether to ingest `AGENTS.md` and `CLAUDE.md`
 - ignored paths and generated-file patterns
+- context-plan deadline and repo-map cache behavior
+- project-rule source byte caps
 
 ## Non-Goals
 
@@ -142,8 +198,5 @@ Configuration should support:
 
 ## Open Questions
 
-1. Should `MODELTAP.md` take precedence over `AGENTS.md`, or should modeltap
-   ingest all compatible rule files with explicit source labels?
-2. How much repo-map construction belongs in the harness versus the BFF?
-3. Should AST/symbol indexing from EXP-0012 be required for the first version?
-4. What context categories are pinned and what categories may be trimmed?
+1. How much repo-map construction belongs in the harness versus the BFF?
+2. Should AST/symbol indexing from EXP-0012 be required for the first version?

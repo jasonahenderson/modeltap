@@ -53,8 +53,15 @@ Runs may produce memory candidates from:
 - release/process constraints
 - user-approved summaries
 
-The BFF separates durable knowledge from ephemeral traces. The harness lets the
-user inspect, accept, edit, or reject candidates when policy requires it.
+The BFF separates durable knowledge from ephemeral traces by rule. Candidate
+generation is triggered by accepted ADR/feature/release artifacts, validation
+commands the user explicitly approved, and user-marked moments such as
+`/remember`. Heuristic candidate generation is a future opt-in capability.
+
+Candidate generation has a default soft cap of 10 candidates per run. Duplicate
+candidates are coalesced; over-cap candidates are summarized into a deferred
+bucket the user can expand on demand. The harness lets the user inspect, accept,
+edit, or reject candidates when policy requires it.
 
 ### Active Memory Inspection
 
@@ -65,6 +72,21 @@ When memory influences a run, the user can inspect:
 - relevance reason
 - scope: global, project, package, file, workflow
 - age and confidence when available
+
+Memory conflict resolution uses specificity:
+
+`file > package > project > workflow > global`
+
+Conflicts within a scope are recorded as warnings and presented together.
+Retrieval ranking defaults to scope match, then vector similarity, then recency.
+The active-memory artifact records the ranking method. Age is always available
+from the memory creation timestamp. Confidence is present when the source has a
+quantitative score, such as validation pass count or vector similarity; otherwise
+the harness renders the field as absent rather than hiding the item.
+
+Durable memory has no automatic expiry but is checked for staleness when
+referenced files or symbols disappear. Ephemeral memory ages out after 30 days by
+default. Users may pin memories against expiry.
 
 ### Quality-Driven Routing
 
@@ -78,8 +100,21 @@ Routing should select models or roles by workflow stage:
 - documentation
 - synthesizer
 
+Routing roles are model selections within FEAT-0016 pipeline stages, not new
+stages. For example, `context helper` selects a model for `context_plan`,
+`validation summarizer` selects a model for summarization within `validation`,
+and `repair` selects a model for repair turns that reenter `model_call`.
+
 Routing decisions should record reason, cost, model capability, and outcome so
-future tuning can improve quality/cost trade-offs.
+future tuning can improve quality/cost trade-offs. Routing decisions are stored
+as `routing_decision` artifacts under the FEAT-0020 artifact envelope.
+
+Default routing is a fast deterministic policy using workflow, stage, run
+history, and configured model preferences. Inference-driven routing is opt-in.
+Routing failures fall back to the configured default model and record
+`routing_fallback`. Dataset learning is per deployment by default; cross-tenant
+aggregation is opt-in with explicit consent and dataset provenance recorded on
+each routing decision.
 
 ### Workflow Extensions
 
@@ -93,6 +128,22 @@ contracts:
 
 Extensions may narrow tools, set model preferences, define artifact
 requirements, or add validation behavior.
+
+Extension trust tiers are:
+
+- built-in extensions: full trust within normal policy
+- workspace-local extensions: may narrow tools and add requirements, but cannot
+  widen the tool surface
+- third-party extensions: must declare capabilities and execute inside FEAT-0021
+  policy
+
+Untrusted extensions cannot widen tools, override policy decisions, or bypass
+workflow validation requirements.
+
+Hooks have a default 5 second deadline and 256 MiB memory bound. Over-limit hooks
+are reported as hook errors and the tool call proceeds or blocks according to
+FEAT-0021 hook policy. Workspace-local hooks may raise limits through config;
+third-party hooks cannot.
 
 Routing roles are orthogonal to workflow types. A workflow such as `debug` may
 use several roles (`context helper`, `repair`, `validation summarizer`,
@@ -124,6 +175,8 @@ Expected commands:
 - existing `/skills` and `/team` surfaces should eventually reference workflow
   contracts
 
+`<id>` refers to a memory candidate ID listed by `/memory`.
+
 The BFF protocol should expose memory candidates, active memory provenance, and
 routing explanations through run details.
 
@@ -137,6 +190,9 @@ Configuration should support:
 - model preferences per workflow/stage
 - extension manifests
 - hook enablement and trust policy
+- hook resource limits
+- memory candidate caps
+- routing fallback policy
 
 ## Non-Goals
 
@@ -157,6 +213,8 @@ Configuration should support:
    bypassing it.
 6. Skills and teams can reference workflow profiles or run-stage behavior.
 7. Future routing improvements can be evaluated against stored run outcomes.
+8. Routing outcome datasets remain deployment-scoped unless explicit opt-in
+   enables broader aggregation.
 
 Acceptance of the workflow-extension portions is gated on coordination with
 FEAT-0012 and FEAT-0013. The memory/routing portions may be accepted earlier if
@@ -172,11 +230,10 @@ the feature is split or explicitly phased.
 
 ## Open Questions
 
-1. Which memory candidates should require user approval in solo mode?
-2. How should quality outcomes be scored without overfitting to tests?
-3. Should workflow extensions live in `.modeltap.yaml`, `.modeltap/`, or a
+1. How should quality outcomes be scored without overfitting to tests?
+2. Should workflow extensions live in `.modeltap.yaml`, `.modeltap/`, or a
    plugin/skill packaging format?
-4. When should the system compare multiple candidate patches instead of running
+3. When should the system compare multiple candidate patches instead of running
    one implementation plus review?
-5. Should this feature split into an earlier memory/routing slice and a later
+4. Should this feature split into an earlier memory/routing slice and a later
    workflow-extension slice that waits on FEAT-0012 and FEAT-0013?
