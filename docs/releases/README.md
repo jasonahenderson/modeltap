@@ -100,9 +100,9 @@ Features are assigned to releases based on dependency chain and delivery priorit
 | FEAT-0012 (Skills) | related to v0.3.4; implementation TBD | Proposed, needs coordination with FEAT-0022 |
 | FEAT-0013 (Agent Teams) | v0.4.0+ or TBD | Proposed, needs coordination with FEAT-0022 |
 | FEAT-0014 (Harness Conversation Shell) | v0.2.1 | Planned |
-| FEAT-0015 (Professional Harness Runtime) | v0.3.0–v0.3.4 | Umbrella series |
-| FEAT-0016 (Managed Codegen Run Pipeline) | v0.3.0 | Planning draft |
-| FEAT-0017 (Durable Runs and Background Agents) | v0.3.0 | Foundation slice |
+| FEAT-0015 (Professional Harness Runtime) | v0.3.0–v0.3.4 | Umbrella series, v0.3.0 Phase 1 open |
+| FEAT-0016 (Managed Codegen Run Pipeline) | v0.3.0 | Phase 1 design |
+| FEAT-0017 (Durable Runs and Background Agents) | v0.3.0 | Foundation slice, Phase 1 design |
 | FEAT-0018 (Context Planner and Project Rules) | v0.3.1 | Planning draft |
 | FEAT-0019 (Validation and Repair Loop) | v0.3.2 | Planning draft |
 | FEAT-0020 (Patch Evidence and Run Artifacts) | v0.3.2 | Planning draft |

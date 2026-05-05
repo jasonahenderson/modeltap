@@ -212,13 +212,17 @@ invariant and `workflow_type` persistence.
 Phase 1 is complete only when all WUs have design docs under
 `docs/releases/v0.3.0/designs/`:
 
-- [ ] WU-108 run runtime ADR design/ADR draft
-- [ ] WU-109 storage design
-- [ ] WU-109 cross-release schema compatibility check
-- [ ] WU-110 protocol design
-- [ ] WU-111 to WU-113 BFF runtime design bundle
-- [ ] WU-114 to WU-116 harness runtime design bundle
-- [ ] WU-117 verification/docs design
+- [x] WU-108 run runtime ADR design/ADR draft
+- [x] WU-109 storage design
+- [x] WU-109 cross-release schema compatibility check
+- [x] WU-110 protocol design
+- [x] WU-111 to WU-113 BFF runtime design bundle
+- [x] WU-114 to WU-116 harness runtime design bundle
+- [x] WU-117 verification/docs design
+
+Phase 1 design artifacts were drafted on 2026-05-05. The release remains in
+Phase 1 until the user confirms Phase 1 complete and an explicit `ADMIN:`
+commit transitions to Phase 2.
 
 ## Risk Register
 

@@ -15,16 +15,16 @@ accepted.
 
 | WU | Title | Size | State | Design |
 |---|---|---|---|---|
-| 108 | Run runtime ADR | M | planned | pending |
-| 109 | Run schema, storage, and migration design | M | planned | pending |
-| 110 | Run protocol methods and event taxonomy | M | planned | pending |
-| 111 | BFF run registry and lifecycle store | L | planned | pending |
-| 112 | `turn.submit` to foreground-run integration | L | planned | pending |
-| 113 | Pipeline stage/status emission and checkpoint metadata | M | planned | pending |
-| 114 | Harness run projection and active `/run` surface | M | planned | pending |
-| 115 | Run list, attach/detach/cancel/retry/continue/fork commands | L | planned | pending |
-| 116 | Reconnect/resume behavior for active and detached runs | M | planned | pending |
-| 117 | Runtime foundation tests and docs | M | planned | pending |
+| 108 | Run runtime ADR | M | designed | [designs/2026-05-05-design-run-runtime-adr-108.md](designs/2026-05-05-design-run-runtime-adr-108.md), [ADR-0015](../../adr/0015-run-runtime.md) |
+| 109 | Run schema, storage, and migration design | M | designed | [designs/2026-05-05-design-run-storage-109.md](designs/2026-05-05-design-run-storage-109.md) |
+| 110 | Run protocol methods and event taxonomy | M | designed | [designs/2026-05-05-design-run-protocol-110.md](designs/2026-05-05-design-run-protocol-110.md) |
+| 111 | BFF run registry and lifecycle store | L | designed | [designs/2026-05-05-design-bff-run-runtime-111-113.md](designs/2026-05-05-design-bff-run-runtime-111-113.md) |
+| 112 | `turn.submit` to foreground-run integration | L | designed | [designs/2026-05-05-design-bff-run-runtime-111-113.md](designs/2026-05-05-design-bff-run-runtime-111-113.md) |
+| 113 | Pipeline stage/status emission and checkpoint metadata | M | designed | [designs/2026-05-05-design-bff-run-runtime-111-113.md](designs/2026-05-05-design-bff-run-runtime-111-113.md) |
+| 114 | Harness run projection and active `/run` surface | M | designed | [designs/2026-05-05-design-harness-run-surface-114-116.md](designs/2026-05-05-design-harness-run-surface-114-116.md) |
+| 115 | Run list, attach/detach/cancel/retry/continue/fork commands | L | designed | [designs/2026-05-05-design-harness-run-surface-114-116.md](designs/2026-05-05-design-harness-run-surface-114-116.md) |
+| 116 | Reconnect/resume behavior for active and detached runs | M | designed | [designs/2026-05-05-design-harness-run-surface-114-116.md](designs/2026-05-05-design-harness-run-surface-114-116.md) |
+| 117 | Runtime foundation tests and docs | M | designed | [designs/2026-05-05-design-runtime-foundation-verification-117.md](designs/2026-05-05-design-runtime-foundation-verification-117.md) |
 
 ## Gates
 
@@ -43,10 +43,7 @@ accepted.
 
 ## Open Items
 
-- Draft and accept the run-runtime ADR.
+- Process Phase 2 design review after the user confirms Phase 1 complete.
+- Accept the run-runtime ADR before Phase 3.
 - Confirm v0.2.0, v0.2.1, and v0.2.2 prerequisite surfaces remain reachable
   from the v0.3.0 implementation branch before Phase 3.
-- During WU-108/WU-109 design, lock the `workflow_type` enum and persistence
-  shape used by v0.3.1 through v0.3.4.
-- During WU-109 design, complete the cross-release schema compatibility check
-  for context, artifact, policy, workspace, memory, and routing metadata.
