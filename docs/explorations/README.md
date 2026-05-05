@@ -16,6 +16,7 @@ Explorations are upstream product and design artifacts. They capture problem fra
 | [EXP-0011](0011-harness-excellence-gap-analysis.md) | Harness Excellence Gap Analysis | exploring |
 | [EXP-0012](0012-code-graphing-via-ast.md) | Code Graphing via AST for Repository-Aware Context | exploring |
 | [EXP-0013](0013-ultron-evaluation.md) | Ultron Evaluation — Tiered Memory and Skill Evolution from ModelScope | watching |
+| [EXP-0014](0014-project-wide-structural-indexes.md) | Project-Wide Structural Indexes Beyond Code | exploring |
 
 ## Lifecycle
 
