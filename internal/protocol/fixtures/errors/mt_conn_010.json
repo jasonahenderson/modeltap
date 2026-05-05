@@ -1,0 +1,7 @@
+{
+  "code": "MT-CONN-010",
+  "category": "capabilities",
+  "cause": "Tool schema validation failed for 'DangerousTool'",
+  "auto_repair_attempted": false,
+  "suggested_command": "modeltap tools validate"
+}

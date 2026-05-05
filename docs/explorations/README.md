@@ -10,6 +10,13 @@ Explorations are upstream product and design artifacts. They capture problem fra
 | [EXP-0002](0002-multi-user-support.md) | Multi-User Support | exploring |
 | [EXP-0005](0005-apprenticeship.md) | Apprenticeship Program | exploring |
 | [EXP-0007](0007-multi-model-orchestration.md) | Multi-Model Orchestration | exploring |
+| [EXP-0008](0008-integrated-harness.md) | Integrated Harness — Modeltap as Professional AI Environment | exploring |
+| [EXP-0009](0009-harness-prompt-architecture.md) | Harness Prompt Architecture — Lessons from the Claude Code Leak | exploring |
+| [EXP-0010](0010-harness-comparative-analysis.md) | Harness Comparative Analysis — modeltap, OpenCode, and OpenHarness | exploring |
+| [EXP-0011](0011-harness-excellence-gap-analysis.md) | Harness Excellence Gap Analysis | exploring |
+| [EXP-0012](0012-code-graphing-via-ast.md) | Code Graphing via AST for Repository-Aware Context | exploring |
+| [EXP-0013](0013-ultron-evaluation.md) | Ultron Evaluation — Tiered Memory and Skill Evolution from ModelScope | watching |
+| [EXP-0014](0014-project-wide-structural-indexes.md) | Project-Wide Structural Indexes Beyond Code | exploring |
 
 ## Lifecycle
 
@@ -74,12 +81,31 @@ Optional fields:
 - `promoted-to`
 - `supersedes`
 - `superseded-by`
+- `parent`
+- `series`
+- `series-role`
+- `series-order`
+
+Use optional grouping metadata when an exploration belongs to an umbrella,
+roadmap, or other cross-artifact work stream:
+
+```yaml
+parent: EXP-0011
+series: Harness Excellence
+series-role: member
+series-order: 2
+```
+
+Do not encode hierarchy in the exploration identifier. Keep IDs monotonic and
+put grouping relationships in metadata.
 
 ## Status Values
 
 Use one of:
 
 - `exploring` — active problem-space exploration
+- `watching` — not actively pursuing, but tracking an external project or
+  development for changes that might shift our decision
 - `deferred` — intentionally parked for later
 - `promoted` — exploration produced downstream canonical artifact(s)
 - `superseded` — replaced by another exploration or a more canonical document

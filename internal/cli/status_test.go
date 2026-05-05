@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jasonahenderson/modeltap/internal/config"
+	"github.com/jasonahenderson/modeltap/internal/protocol"
 	"github.com/jasonahenderson/modeltap/internal/provider"
 	"github.com/jasonahenderson/modeltap/internal/storage"
 )
@@ -29,6 +30,15 @@ func (m *statusMockProvider) ParseResponse(_ []byte, _ http.Header, _ int) (*pro
 }
 func (m *statusMockProvider) ReassembleStream(_ []provider.StreamChunk) (*provider.ResponseMetadata, string, error) {
 	return &provider.ResponseMetadata{}, "", nil
+}
+func (m *statusMockProvider) FormatMessages(_ provider.FormatMessagesOpts) ([]byte, error) {
+	return nil, nil
+}
+func (m *statusMockProvider) FormatToolDefinitions(_ []protocol.ToolDefinition) ([]byte, error) {
+	return nil, nil
+}
+func (m *statusMockProvider) ParseStreamEvent(_ []byte) (*provider.StreamEvent, error) {
+	return nil, nil
 }
 
 // seedStatusTestStore creates an in-memory SQLite store populated with test data.
@@ -66,7 +76,7 @@ func testStatusConfig() *config.Config {
 	return &config.Config{
 		Port:          8080,
 		Upstream:      "https://api.anthropic.com",
-		DBPath:        "~/.config/modeltap/modeltap.db",
+		DBPath:        "~/.modeltap/modeltap.db",
 		RetentionDays: 30,
 	}
 }

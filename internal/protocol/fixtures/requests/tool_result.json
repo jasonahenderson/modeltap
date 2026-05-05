@@ -1,0 +1,6 @@
+{
+  "tool_call_id": "tc-001",
+  "status": "success",
+  "output": "file contents here",
+  "output_type": "text"
+}

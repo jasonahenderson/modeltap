@@ -8,6 +8,21 @@ This directory holds **behavior-scoped** product definitions for modeltap that a
 |---------|-------|--------|
 | [FEAT-0003](0003-web-dashboard.md) | Web Dashboard | accepted |
 | [FEAT-0004](0004-service-management.md) | Service Management | accepted |
+| [FEAT-0008](0008-bff-server.md) | BFF Server | proposed |
+| [FEAT-0009](0009-terminal-harness.md) | Terminal Harness | proposed |
+| [FEAT-0010](0010-enterprise-auth.md) | Enterprise Auth and Multi-User | proposed |
+| [FEAT-0011](0011-knowledge-integration.md) | Knowledge Integration | proposed |
+| [FEAT-0012](0012-skills-and-agent-teams.md) | Skills | proposed |
+| [FEAT-0013](0013-agent-teams.md) | Agent Teams | proposed |
+| [FEAT-0014](0014-harness-conversation-shell.md) | Harness Conversation Shell | accepted |
+| [FEAT-0015](0015-professional-harness-runtime.md) | Professional Harness Runtime | draft |
+| [FEAT-0016](0016-managed-codegen-run-pipeline.md) | Managed Codegen Run Pipeline | draft |
+| [FEAT-0017](0017-durable-runs-and-background-agents.md) | Durable Runs and Background Agents | draft |
+| [FEAT-0018](0018-context-planner-and-project-rules.md) | Context Planner and Project Rules | draft |
+| [FEAT-0019](0019-validation-and-repair-loop.md) | Validation and Repair Loop | draft |
+| [FEAT-0020](0020-patch-evidence-and-run-artifacts.md) | Patch Evidence and Run Artifacts | draft |
+| [FEAT-0021](0021-policy-grade-tool-runtime.md) | Policy-Grade Tool Runtime | draft |
+| [FEAT-0022](0022-memory-routing-and-workflow-extensions.md) | Durable Memory, Quality Routing, and Workflow Extensions | draft |
 
 Other previously feature-shaped docs were reclassified when they proved to be upstream explorations or implementation-scoped patches rather than active behavior contracts. See `docs/explorations/` and `docs/patches/`.
 
@@ -43,11 +58,51 @@ feature: FEAT-NNNN
 title: Human-readable title
 status: draft | proposed | accepted | superseded
 date: YYYY-MM-DD
+parent: FEAT-NNNN
+series: Human-readable grouping name
+series-role: umbrella | member
+series-order: 1
 adr-constraints:
   - ADR-NNNN: Short reason this ADR constrains the feature
   - ADR-NNNN: ...
+depends-on:
+  - FEAT-NNNN: Required predecessor feature
+related:
+  - EXP-NNNN: Related upstream exploration
+promoted-from:
+  - EXP-NNNN: Upstream exploration or PATCH-NNNN: Upstream patch
+decomposed-from:
+  - FEAT-NNNN: Umbrella feature, when parent/series metadata is insufficient
 ---
 ```
+
+Required fields:
+
+- `feature`
+- `title`
+- `status`
+- `date`
+
+Optional grouping fields:
+
+- `parent`: canonical parent artifact ID
+- `series`: human-readable grouping name
+- `series-role`: `umbrella` or `member`
+- `series-order`: optional integer for planned order within the series
+
+Other optional relationship fields:
+
+- `depends-on`: features that must land before this feature can be implemented
+  or accepted as a complete behavior contract
+- `related`: non-blocking related features, explorations, ADRs, patches, or
+  release artifacts
+- `promoted-from`: upstream exploration or patch that became this feature
+- `decomposed-from`: umbrella feature that produced this child feature, if a
+  relationship beyond `parent` / `series` is needed
+
+Use grouping metadata for umbrella features and related feature families rather
+than changing the ID format. For example, keep child features as `FEAT-0016`,
+`FEAT-0017`, etc., and point them at `parent: FEAT-0015`.
 
 The body follows this rough shape — sections may vary, but the load-bearing parts are the problem statement, the proposed solution, the key capabilities, and the success criteria:
 
@@ -88,7 +143,7 @@ Existing features in this directory follow this shape. New features should match
 
 1. **Draft** — Status `draft`. Spec is a sketch; problem and solution are still being shaped.
 2. **Propose** — Status `proposed`. Spec is complete enough to review. Open questions are explicit. Decision-makers can evaluate trade-offs.
-3. **Accept** — Status `accepted`. The feature is selected for implementation. Work units are planned in `docs/history/status.md` and tracked through completion. Only `accepted` features drive work per `CLAUDE.md`.
+3. **Accept** — Status `accepted`. The feature is selected for implementation. Work units are planned in `docs/releases/<version>/` and tracked through completion. Only `accepted` features drive work per `CLAUDE.md`.
 4. **Supersede** — If a later feature replaces this one, set status to `superseded` and add a forward reference. Do not delete the original.
 
 ## Commit Convention

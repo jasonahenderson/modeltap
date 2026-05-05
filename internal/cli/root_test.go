@@ -6,15 +6,27 @@ import (
 	"testing"
 )
 
+func setTestProviderKeys(t *testing.T) {
+	t.Helper()
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", "")
+	t.Setenv("XDG_DATA_HOME", "")
+	t.Setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
+	t.Setenv("OPENAI_API_KEY", "test-openai-key")
+	t.Setenv("MODELTAP_PROVIDERS_ANTHROPIC_API_KEY", "test-anthropic-key")
+	t.Setenv("MODELTAP_PROVIDERS_OPENAI_API_KEY", "test-openai-key")
+}
+
 func TestRootCommandExecutes(t *testing.T) {
+	// Bare `modeltap` invocation falls back to cobra's default help
+	// behavior since the legacy harness CLI was scrapped in v0.2.1.
 	cmd := NewRootCommand("test")
 	buf := new(bytes.Buffer)
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
-	cmd.SetArgs([]string{})
-	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("root command returned error: %v", err)
+	cmd.SetArgs([]string{"--help"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("root --help returned error: %v", err)
 	}
 }
 
@@ -36,14 +48,16 @@ func TestVersionFlag(t *testing.T) {
 
 func TestSubcommandsRegistered(t *testing.T) {
 	tests := []struct {
-		name    string
-		subcmd  string
+		name   string
+		subcmd string
 	}{
 		{"start", "start"},
 		{"logs", "logs"},
 		{"show", "show"},
 		{"export", "export"},
 		{"config", "config"},
+		{"shell", "shell"},
+		{"shell-demo", "shell-demo"},
 		{"status", "status"},
 		{"metrics", "metrics"},
 		{"dashboard", "dashboard"},
@@ -74,6 +88,8 @@ func TestSubcommandsAcceptHelp(t *testing.T) {
 		args []string
 	}{
 		{"start --help", []string{"start", "--help"}},
+		{"shell --help", []string{"shell", "--help"}},
+		{"shell-demo --help", []string{"shell-demo", "--help"}},
 		{"logs --help", []string{"logs", "--help"}},
 		{"show --help", []string{"show", "--help"}},
 		{"export --help", []string{"export", "--help"}},
@@ -97,6 +113,9 @@ func TestSubcommandsAcceptHelp(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.name == "config show" {
+				setTestProviderKeys(t)
+			}
 			cmd := NewRootCommand("test")
 			buf := new(bytes.Buffer)
 			cmd.SetOut(buf)
@@ -124,6 +143,7 @@ func TestHelpListsAllSubcommands(t *testing.T) {
 	output := buf.String()
 	expected := []string{
 		"start", "logs", "show", "export", "config",
+		"shell", "shell-demo",
 		"status", "metrics", "dashboard", "completion", "service",
 	}
 	for _, sub := range expected {
@@ -154,6 +174,9 @@ func TestStubCommandsOutput(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.name == "config show" {
+				setTestProviderKeys(t)
+			}
 			cmd := NewRootCommand("test")
 			buf := new(bytes.Buffer)
 			cmd.SetOut(buf)

@@ -1,0 +1,37 @@
+{
+  "id": "sess-001",
+  "summary": "Protocol types implementation session",
+  "created_at": "2026-04-16T08:00:00Z",
+  "last_active": "2026-04-16T10:30:00Z",
+  "model": "claude-opus-4-6",
+  "context_pct": 45.2,
+  "total_cost": 1.25,
+  "turns": [
+    {
+      "sequence": 1,
+      "summary": "Initial turn discussing architecture",
+      "compacted": false,
+      "model": "claude-opus-4-6",
+      "cost": 0.05
+    },
+    {
+      "sequence": 2,
+      "summary": "Compacted debugging turns",
+      "compacted": true,
+      "original_turns": [2, 3, 4],
+      "model": "claude-opus-4-6",
+      "cost": 0.15
+    }
+  ],
+  "pinned_items": ["CLAUDE.md"],
+  "files_touched": ["internal/protocol/messages.go"],
+  "files_modified": ["internal/protocol/events.go"],
+  "server_events": [
+    {
+      "type": "compaction",
+      "at": "2026-04-16T09:30:00Z",
+      "freed_tokens": 3000,
+      "detail": "Auto-compacted debugging turns"
+    }
+  ]
+}

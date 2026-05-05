@@ -1,0 +1,7 @@
+{
+  "code": "MT-CONN-011",
+  "category": "model",
+  "cause": "Requested model 'gpt-5-turbo' is not available in any configured provider",
+  "auto_repair_attempted": false,
+  "suggested_command": "modeltap model list"
+}

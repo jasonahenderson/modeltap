@@ -21,10 +21,10 @@ func TestOpenAIDetect(t *testing.T) {
 	p := newOpenAI()
 
 	tests := []struct {
-		name   string
-		url    string
+		name    string
+		url     string
 		headers map[string]string
-		want   bool
+		want    bool
 	}{
 		{
 			name: "host api.openai.com",
@@ -249,10 +249,10 @@ func TestOpenAIParseResponse(t *testing.T) {
 			wantStopReason:   "length",
 		},
 		{
-			name:    "invalid JSON",
-			body:    `{not valid json`,
+			name:       "invalid JSON",
+			body:       `{not valid json`,
 			statusCode: 200,
-			wantErr: true,
+			wantErr:    true,
 		},
 	}
 

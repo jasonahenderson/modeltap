@@ -78,14 +78,13 @@ func (env *captureTestEnv) waitForSave(t *testing.T, timeout time.Duration) {
 	}
 }
 
-
 func TestCaptureMiddleware_SavesRequestAndResponse(t *testing.T) {
 	respBody := `{"id":"msg_123","type":"message","model":"claude-3-5-sonnet-20241022","content":[{"type":"text","text":"Hello!"}],"usage":{"input_tokens":10,"output_tokens":5},"stop_reason":"end_turn"}`
 
 	env := newCaptureTestEnv(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(respBody))
+		_, _ = w.Write([]byte(respBody))
 	})
 
 	reqBody := `{"model":"claude-3-5-sonnet-20241022","max_tokens":100,"messages":[{"role":"user","content":"Hi"}]}`
@@ -99,7 +98,7 @@ func TestCaptureMiddleware_SavesRequestAndResponse(t *testing.T) {
 		t.Fatalf("request failed: %v", err)
 	}
 	defer resp.Body.Close()
-	io.ReadAll(resp.Body)
+	_, _ = io.ReadAll(resp.Body)
 
 	env.waitForSave(t, 2*time.Second)
 
@@ -132,7 +131,7 @@ func TestCaptureMiddleware_DetectsProviderAndExtractsMetadata(t *testing.T) {
 	env := newCaptureTestEnv(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(respBody))
+		_, _ = w.Write([]byte(respBody))
 	})
 
 	reqBody := `{"model":"claude-3-5-sonnet-20241022","max_tokens":100,"messages":[{"role":"user","content":"Hello"}]}`
@@ -146,7 +145,7 @@ func TestCaptureMiddleware_DetectsProviderAndExtractsMetadata(t *testing.T) {
 		t.Fatalf("request failed: %v", err)
 	}
 	defer resp.Body.Close()
-	io.ReadAll(resp.Body)
+	_, _ = io.ReadAll(resp.Body)
 
 	env.waitForSave(t, 2*time.Second)
 
@@ -188,7 +187,7 @@ func TestCaptureMiddleware_ResponseUnchanged(t *testing.T) {
 			w.Header().Set(k, v)
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(expectedBody))
+		_, _ = w.Write([]byte(expectedBody))
 	})
 
 	reqBody := `{"model":"claude-3","messages":[{"role":"user","content":"Hi"}]}`
@@ -223,7 +222,7 @@ func TestCaptureMiddleware_UnknownProvider(t *testing.T) {
 	env := newCaptureTestEnv(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(respBody))
+		_, _ = w.Write([]byte(respBody))
 	})
 
 	// Send a request that doesn't match any known provider.
@@ -236,7 +235,7 @@ func TestCaptureMiddleware_UnknownProvider(t *testing.T) {
 		t.Fatalf("request failed: %v", err)
 	}
 	defer resp.Body.Close()
-	io.ReadAll(resp.Body)
+	_, _ = io.ReadAll(resp.Body)
 
 	env.waitForSave(t, 2*time.Second)
 
@@ -272,7 +271,7 @@ func TestCaptureMiddleware_PreservesRequestBody(t *testing.T) {
 		receivedBody = string(body)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"ok":true}`))
+		_, _ = w.Write([]byte(`{"ok":true}`))
 	})
 
 	reqBody := `{"model":"gpt-4","messages":[{"role":"user","content":"Test"}]}`
@@ -285,7 +284,7 @@ func TestCaptureMiddleware_PreservesRequestBody(t *testing.T) {
 		t.Fatalf("request failed: %v", err)
 	}
 	defer resp.Body.Close()
-	io.ReadAll(resp.Body)
+	_, _ = io.ReadAll(resp.Body)
 
 	// Verify upstream received the full body (middleware didn't consume it).
 	if receivedBody != reqBody {
@@ -314,7 +313,7 @@ func TestCaptureMiddleware_OpenAIProvider(t *testing.T) {
 	env := newCaptureTestEnv(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(respBody))
+		_, _ = w.Write([]byte(respBody))
 	})
 
 	reqBody := `{"model":"gpt-4","messages":[{"role":"user","content":"Hello"}]}`
@@ -327,7 +326,7 @@ func TestCaptureMiddleware_OpenAIProvider(t *testing.T) {
 		t.Fatalf("request failed: %v", err)
 	}
 	defer resp.Body.Close()
-	io.ReadAll(resp.Body)
+	_, _ = io.ReadAll(resp.Body)
 
 	env.waitForSave(t, 2*time.Second)
 
@@ -359,7 +358,7 @@ func TestCaptureMiddleware_HeadersCaptured(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("X-Request-Id", "req-789")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{}`))
+		_, _ = w.Write([]byte(`{}`))
 	})
 
 	req, _ := http.NewRequest("GET", env.proxyServer.URL+"/health", nil)
@@ -370,7 +369,7 @@ func TestCaptureMiddleware_HeadersCaptured(t *testing.T) {
 		t.Fatalf("request failed: %v", err)
 	}
 	defer resp.Body.Close()
-	io.ReadAll(resp.Body)
+	_, _ = io.ReadAll(resp.Body)
 
 	env.waitForSave(t, 2*time.Second)
 
@@ -406,7 +405,7 @@ func TestCaptureMiddleware_NonSuccessStatusCode(t *testing.T) {
 	env := newCaptureTestEnv(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusTooManyRequests)
-		w.Write([]byte(`{"error":{"type":"rate_limit_error","message":"too many requests"}}`))
+		_, _ = w.Write([]byte(`{"error":{"type":"rate_limit_error","message":"too many requests"}}`))
 	})
 
 	req, _ := http.NewRequest("POST", env.proxyServer.URL+"/v1/messages", strings.NewReader(`{}`))
@@ -418,7 +417,7 @@ func TestCaptureMiddleware_NonSuccessStatusCode(t *testing.T) {
 		t.Fatalf("request failed: %v", err)
 	}
 	defer resp.Body.Close()
-	io.ReadAll(resp.Body)
+	_, _ = io.ReadAll(resp.Body)
 
 	if resp.StatusCode != http.StatusTooManyRequests {
 		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusTooManyRequests)

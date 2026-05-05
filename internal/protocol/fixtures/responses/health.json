@@ -1,0 +1,33 @@
+{
+  "server_version": "0.2.0",
+  "protocol_version": "1",
+  "uptime_seconds": 3600,
+  "auth": {
+    "status": "ready",
+    "method": "api_key"
+  },
+  "storage": {
+    "status": "ready",
+    "path": "/Users/dev/.modeltap/modeltap.db"
+  },
+  "capabilities": {
+    "status": "ready"
+  },
+  "providers": {
+    "anthropic": {
+      "status": "ready",
+      "models": 3
+    },
+    "ollama": {
+      "status": "unavailable",
+      "error": "connection refused"
+    }
+  },
+  "routing": {
+    "status": "ready"
+  },
+  "active_session": {
+    "id": "sess-001",
+    "owner": "user-abc"
+  }
+}

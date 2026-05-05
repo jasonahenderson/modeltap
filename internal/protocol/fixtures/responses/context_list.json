@@ -1,0 +1,23 @@
+{
+  "files": [
+    {
+      "path": "internal/protocol/messages.go",
+      "size_bytes": 8500,
+      "attached_turn": 1,
+      "stale": false
+    }
+  ],
+  "knowledge_injections": [
+    {
+      "summary": "ADR-0002: SQLite WAL mode for storage",
+      "source_date": "2026-01-15",
+      "relevance": 0.88
+    }
+  ],
+  "pinned_items": ["CLAUDE.md"],
+  "context_tokens": 15000,
+  "context_window": 200000,
+  "context_pct": 7.5,
+  "system_prompt_tokens": 2000,
+  "knowledge_injection_tokens": 500
+}

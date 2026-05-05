@@ -59,7 +59,7 @@ func (h *APIHandler) RegisterRoutes(mux *http.ServeMux) {
 		}
 		securityHeaders(w)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Write(data)
+		_, _ = w.Write(data)
 	})
 }
 
@@ -76,7 +76,7 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	securityHeaders(w)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
+	_ = json.NewEncoder(w).Encode(v)
 }
 
 // writeError writes a JSON error response.
@@ -314,8 +314,8 @@ func (h *APIHandler) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var metrics []storage.UsageMetrics
 
-	switch {
-	case groupBy == "hour":
+	switch groupBy {
+	case "hour":
 		metrics, err = h.store.QueryHourlyMetrics(ctx, filter)
 	default:
 		// day, provider, model all use daily metrics
@@ -343,7 +343,7 @@ func (h *APIHandler) handleMetrics(w http.ResponseWriter, r *http.Request) {
 
 // aggregateMetrics groups metrics by provider or model, summing across periods.
 func aggregateMetrics(metrics []storage.UsageMetrics, groupBy string) []storage.UsageMetrics {
-	type key struct{ a, b string }
+	type key struct{ a string }
 	agg := make(map[key]*storage.UsageMetrics)
 	var order []key
 
@@ -445,7 +445,7 @@ func (h *APIHandler) ListenAndServe(ctx context.Context) error {
 		<-ctx.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		server.Shutdown(shutdownCtx)
+		_ = server.Shutdown(shutdownCtx)
 	}()
 
 	err := server.ListenAndServe()
@@ -454,4 +454,3 @@ func (h *APIHandler) ListenAndServe(ctx context.Context) error {
 	}
 	return err
 }
-

@@ -1,0 +1,6 @@
+{
+  "turn_id": "turn-abc-123",
+  "model": ["claude-opus-4-6", "llama-3.1-70b"],
+  "provider": ["anthropic", "ollama"],
+  "reason": "multi-model comparison requested"
+}

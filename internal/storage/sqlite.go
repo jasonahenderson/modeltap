@@ -19,8 +19,9 @@ type SQLiteStore struct {
 }
 
 // NewSQLiteStore opens (or creates) a SQLite database at dbPath, enables WAL
-// mode, and runs schema migrations. The dbPath may use "~" for the user's
-// home directory. Use ":memory:" for an in-memory database.
+// mode and foreign keys via DSN pragmas, and runs schema migrations.
+// The dbPath may use "~" for the user's home directory.
+// Use ":memory:" for an in-memory database.
 func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 	dbPath = expandHome(dbPath)
 
@@ -32,7 +33,12 @@ func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 		}
 	}
 
-	db, err := sql.Open("sqlite", dbPath)
+	// Use DSN pragmas so every pool connection gets foreign_keys=ON, WAL mode,
+	// and a non-zero busy_timeout. Without busy_timeout, concurrent writers get
+	// SQLITE_BUSY immediately on contention; with it, writers briefly block
+	// instead of losing the write.
+	dsn := dbPath + "?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("opening database: %w", err)
 	}
@@ -44,11 +50,6 @@ func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 	}
 
 	s := &SQLiteStore{db: db}
-
-	if err := s.enableWAL(); err != nil {
-		db.Close()
-		return nil, err
-	}
 
 	if err := s.migrate(); err != nil {
 		db.Close()
@@ -70,17 +71,49 @@ func expandHome(path string) string {
 	return filepath.Join(home, path[1:])
 }
 
-// enableWAL sets the journal mode to WAL for better concurrent read performance.
-func (s *SQLiteStore) enableWAL() error {
-	_, err := s.db.Exec("PRAGMA journal_mode=WAL")
+// currentSchemaVersion reads the database's user_version pragma.
+func (s *SQLiteStore) currentSchemaVersion() (int, error) {
+	var version int
+	if err := s.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
+		return 0, fmt.Errorf("reading schema version: %w", err)
+	}
+	return version, nil
+}
+
+// migrate runs stepwise schema migrations from the current version to
+// MaxKnownSchemaVersion. A downgrade guard rejects databases newer than
+// this binary supports.
+func (s *SQLiteStore) migrate() error {
+	version, err := s.currentSchemaVersion()
 	if err != nil {
-		return fmt.Errorf("enabling WAL mode: %w", err)
+		return err
+	}
+
+	// Downgrade guard: reject databases from a newer binary.
+	if version > MaxKnownSchemaVersion {
+		return fmt.Errorf("storage: database schema version %d is newer than this binary supports (max %d); upgrade modeltap",
+			version, MaxKnownSchemaVersion)
+	}
+
+	// v0 (implicit) with existing tables is treated as v1 (retrofit).
+	// v0 with no tables is a fresh database.
+	if version < 1 {
+		if err := s.migrateToV1(); err != nil {
+			return err
+		}
+	}
+	if version < 2 {
+		if err := s.migrateToV2(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-// migrate creates the schema if it does not already exist.
-func (s *SQLiteStore) migrate() error {
+// migrateToV1 creates the v1 schema (requests, hourly_usage, daily_usage).
+// Uses CREATE TABLE IF NOT EXISTS for idempotence — existing v0.1.x DBs
+// with user_version=0 but v1 tables already present are handled safely.
+func (s *SQLiteStore) migrateToV1() error {
 	const schema = `
 CREATE TABLE IF NOT EXISTS requests (
 	id               TEXT PRIMARY KEY,
@@ -129,10 +162,112 @@ CREATE TABLE IF NOT EXISTS daily_usage (
 	error_count INTEGER NOT NULL DEFAULT 0,
 	PRIMARY KEY (day, provider, model)
 );
+
+PRAGMA user_version = 1;
 `
 	_, err := s.db.Exec(schema)
 	if err != nil {
-		return fmt.Errorf("running schema migration: %w", err)
+		return fmt.Errorf("running v1 schema migration: %w", err)
+	}
+	return nil
+}
+
+// migrateToV2 adds session, turn, event, and command history tables.
+// Wrapped in a transaction so crash mid-migration rolls back atomically.
+func (s *SQLiteStore) migrateToV2() error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("beginning v2 migration transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	const v2Schema = `
+CREATE TABLE sessions (
+	id                   TEXT PRIMARY KEY,
+	user_id              TEXT NOT NULL DEFAULT '',
+	project              TEXT NOT NULL DEFAULT '',
+	summary              TEXT NOT NULL DEFAULT '',
+	active_model         TEXT NOT NULL DEFAULT '',
+	model_override       TEXT,
+	routing_overrides    TEXT NOT NULL DEFAULT '{}',
+	pinned_items         TEXT NOT NULL DEFAULT '[]',
+	compaction_state     TEXT NOT NULL DEFAULT '{}',
+	total_cost           REAL NOT NULL DEFAULT 0.0,
+	total_input_tokens   INTEGER NOT NULL DEFAULT 0,
+	total_output_tokens  INTEGER NOT NULL DEFAULT 0,
+	context_pct          REAL NOT NULL DEFAULT 0.0,
+	status               TEXT NOT NULL DEFAULT 'active',
+	lock_owner           TEXT,
+	lock_expires_at      TEXT,
+	created_at           TEXT NOT NULL,
+	updated_at           TEXT NOT NULL
+);
+
+CREATE INDEX idx_sessions_user_id     ON sessions(user_id);
+CREATE INDEX idx_sessions_user_active ON sessions(user_id, updated_at DESC);
+CREATE INDEX idx_sessions_project     ON sessions(user_id, project);
+CREATE INDEX idx_sessions_status      ON sessions(status);
+
+CREATE TABLE turns (
+	id                  TEXT PRIMARY KEY,
+	session_id          TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+	sequence            INTEGER NOT NULL,
+	role                TEXT NOT NULL,
+	content             TEXT NOT NULL DEFAULT '',
+	model               TEXT NOT NULL DEFAULT '',
+	provider            TEXT NOT NULL DEFAULT '',
+	input_tokens        INTEGER NOT NULL DEFAULT 0,
+	output_tokens       INTEGER NOT NULL DEFAULT 0,
+	cost                REAL NOT NULL DEFAULT 0.0,
+	latency_ms          INTEGER NOT NULL DEFAULT 0,
+	tool_calls          TEXT NOT NULL DEFAULT '[]',
+	files_touched       TEXT NOT NULL DEFAULT '[]',
+	files_modified      TEXT NOT NULL DEFAULT '[]',
+	compacted           INTEGER NOT NULL DEFAULT 0,
+	compacted_summary   TEXT NOT NULL DEFAULT '',
+	original_turns      TEXT NOT NULL DEFAULT '[]',
+	created_at          TEXT NOT NULL
+);
+
+CREATE INDEX idx_turns_session_id  ON turns(session_id);
+CREATE INDEX idx_turns_session_seq ON turns(session_id, sequence);
+
+CREATE TABLE session_events (
+	id         INTEGER PRIMARY KEY AUTOINCREMENT,
+	session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+	type       TEXT NOT NULL,
+	detail     TEXT NOT NULL DEFAULT '',
+	payload    TEXT NOT NULL DEFAULT '{}',
+	at         TEXT NOT NULL
+);
+
+CREATE INDEX idx_session_events_session_id ON session_events(session_id, at);
+
+CREATE TABLE command_history (
+	id         INTEGER PRIMARY KEY AUTOINCREMENT,
+	user_id    TEXT NOT NULL DEFAULT '',
+	project    TEXT NOT NULL DEFAULT '',
+	session_id TEXT,
+	content    TEXT NOT NULL,
+	created_at TEXT NOT NULL
+);
+
+CREATE INDEX idx_command_history_user_recent   ON command_history(user_id, created_at DESC);
+CREATE INDEX idx_command_history_project       ON command_history(user_id, project, created_at DESC);
+CREATE INDEX idx_command_history_session       ON command_history(user_id, session_id, created_at DESC);
+`
+
+	if _, err := tx.Exec(v2Schema); err != nil {
+		return fmt.Errorf("running v2 schema migration: %w", err)
+	}
+
+	// Bump version inside the transaction so it's atomic.
+	if _, err := tx.Exec("PRAGMA user_version = 2"); err != nil {
+		return fmt.Errorf("setting user_version to 2: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("committing v2 migration: %w", err)
 	}
 	return nil
 }
@@ -151,7 +286,7 @@ func (s *SQLiteStore) SaveRequest(ctx context.Context, req *Request) error {
 	if err != nil {
 		return fmt.Errorf("beginning transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	const insertRequest = `
 INSERT INTO requests (
@@ -465,7 +600,7 @@ func (s *SQLiteStore) RebuildMetrics(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("beginning rebuild transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if _, err := tx.ExecContext(ctx, "DELETE FROM hourly_usage"); err != nil {
 		return fmt.Errorf("clearing hourly_usage: %w", err)
@@ -516,6 +651,12 @@ GROUP BY strftime('%%Y-%%m-%%d', timestamp), provider, model`
 		return fmt.Errorf("committing rebuild transaction: %w", err)
 	}
 	return nil
+}
+
+// Ping verifies the database connection is alive. Used by the BFF
+// connection.health handler to report storage readiness.
+func (s *SQLiteStore) Ping(ctx context.Context) error {
+	return s.db.PingContext(ctx)
 }
 
 // Close closes the underlying database connection.

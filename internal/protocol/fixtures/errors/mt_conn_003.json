@@ -1,0 +1,8 @@
+{
+  "code": "MT-CONN-003",
+  "category": "connection",
+  "cause": "Permission denied on socket file",
+  "auto_repair_attempted": false,
+  "suggested_command": "chmod 600 /tmp/modeltap.sock",
+  "path_or_endpoint": "/tmp/modeltap.sock"
+}

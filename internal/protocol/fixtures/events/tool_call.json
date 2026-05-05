@@ -1,0 +1,7 @@
+{
+  "turn_id": "turn-abc-123",
+  "tool_call_id": "tc-001",
+  "tool": "read_file",
+  "namespace": "fs",
+  "input": {"path": "/tmp/example.go", "encoding": "utf-8"}
+}

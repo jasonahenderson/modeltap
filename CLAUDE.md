@@ -4,37 +4,27 @@ Reverse proxy for AI/ML clients that captures requests/responses, tracks usage m
 
 ## Key References
 
+- Canonical process rules: `.agents/process.md`
+- Agent-team contract: `.agents/contracts/agent-team.md`
+- Base agent contract: `.agents/contracts/base.md`
 - Architecture decisions: `docs/adr/` (only `status: accepted` ADRs drive work) — see `docs/adr/README.md` for the index, format, and lifecycle
 - Explorations: `docs/explorations/` (upstream problem framing; does not by itself authorize implementation) — see `docs/explorations/README.md`
 - Feature specs: `docs/features/` (only `status: accepted` features drive work) — see `docs/features/README.md` for the index, format, and lifecycle
 - Patches: `docs/patches/` (implementation-scoped fixes, missing-endpoint coverage, internal plumbing) — see `docs/patches/README.md` for when to use vs. ADR or feature spec
 - Agent team definition: `docs/agents.md`
 - OpenCode / generic agent instructions: `AGENTS.md`
-- Project status: `docs/history/status.md`
-- Work logs: `docs/history/`
+- Release plans and status: `docs/releases/` — each release (vX.Y.Z) has `plan.md`, `status.md`, `track-*.md`, and `changelog.md`
+- Current active release: `docs/releases/v0.2.0/`
+- Work logs (session history): `docs/history/`
 
-## Doc Type Taxonomy
+## Precedence
 
-| Doc Type | Scope | Lives In | Identifier |
-|----------|-------|----------|------------|
-| Exploration | Upstream problem framing and design-space exploration | `docs/explorations/` | `EXP-NNNN` |
-| ADR | Architectural decisions with future constraint value | `docs/adr/` | `ADR-NNNN` |
-| Feature spec | Behavior — user-visible capabilities | `docs/features/` | `FEAT-NNNN` |
-| Patch | Implementation — fixes, missing endpoints, internal work | `docs/patches/` | `PATCH-NNNN` |
-| Work unit | Planned increments inside an accepted feature | tracked in `docs/history/status.md` | `WU-NNN` |
-| Admin task | Repo workflow / instruction / process changes | no numbered doc required by default | `ADMIN` |
+When process guidance overlaps:
 
-`PATCH` does not mean semver patch — it means implementation-scoped work. `ADMIN:` commits cover repo workflow / instruction-file changes and don't need a numbered doc.
-
-### Which Artifact to Use
-
-- Use an **exploration** when the problem is still being framed, multiple solution shapes are plausible, or the topic may later promote into a feature, ADR, or patch.
-- Use a **feature spec** when the work is behavior-scoped and needs user-visible scope, capabilities, and success criteria.
-- Use a **patch** when the work is implementation-scoped and a checklist is enough to define "done."
-- Use an **ADR** when the work requires a hard architectural choice with future constraint value.
-- Use **ADMIN** for repo workflow / instruction / prompt / process changes such as `CLAUDE.md`, `AGENTS.md`, review structure, status-process rules, or similar meta work.
-
-If a change mixes product work and repo-process work, split it into separate artifacts or commits rather than forcing a single classification.
+1. `.agents/process.md` is canonical for process rules.
+2. `.agents/contracts/*.md` define role-specific expectations.
+3. `AGENTS.md` is the concise cross-tool entrypoint.
+4. `CLAUDE.md` is Claude-specific guidance layered on top.
 
 ## Technology Stack (from accepted ADRs)
 
@@ -52,7 +42,7 @@ If a change mixes product work and repo-process work, split it into separate art
 
 ## Agent Team
 
-When working as part of the agent team, follow the workflow defined in `docs/agents.md`. `AGENTS.md` is the concise cross-agent version of the same expectations. Every significant action must be logged to `docs/history/`.
+When working as part of the agent team, follow `.agents/contracts/agent-team.md` and `docs/agents.md`. Every significant action must be logged to `docs/history/`.
 
 ### Agent Roles
 
@@ -80,11 +70,22 @@ This ensures continuity across sessions even for planning, review, or ad-hoc con
 
 ### Resumption Protocol
 
-1. Read `docs/history/status.md`
-2. Check if any "In Progress" items are actually complete (files exist, tests pass)
-3. Update status accordingly
-4. Pick next task from "Up Next"
-5. Log plan before starting, summary after completion
+1. Read `docs/releases/<current-version>/status.md` (check `docs/releases/README.md` for the current release)
+2. Check what release phase is active (Phase 1 design / Phase 2 peer review / Phase 3 implementation — see `plan.md` and `docs/agents.md` §"Workflow")
+3. Check if any "In Progress" items are actually complete (files exist, tests pass)
+4. Update status accordingly
+5. Pick next task from "Up Next" within the current phase
+6. Log plan before starting, summary after completion
+
+### Release Execution
+
+Releases execute in three sequential phases at the **release level, not the WU level**. Do not interleave. Canonical rules live in `.agents/process.md`.
+
+1. **Phase 1 — Design ALL WUs across ALL tracks.** Produce design docs. Optional: run pre-review lint (Claude subagent, fresh context) to catch mechanical drift. No coding. No reviews. Phase 1 is not complete until every track has designs for every WU.
+2. **Phase 2 — Review.** User decides what to review and how (read directly, send to external model, both, or skip). No new designs. No coding. Begins only when user confirms Phase 1 complete.
+3. **Phase 3 — Implement ALL WUs.** Red → green → security → docs per WU, any dependency-legal order. No new designs; revise explicitly if implementation reveals a flaw. Begins only after Phase 2 findings are processed.
+
+Current phase lives in `docs/releases/<version>/plan.md`. Phase transitions are explicit `ADMIN:` commits — never implicit.
 
 ### Commit Policy
 

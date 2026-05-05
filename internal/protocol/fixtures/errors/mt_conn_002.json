@@ -1,0 +1,9 @@
+{
+  "code": "MT-CONN-002",
+  "category": "connection",
+  "cause": "Socket file exists but no process is listening",
+  "auto_repair_attempted": true,
+  "repair_result": "socket_cleaned",
+  "suggested_command": "modeltap server restart",
+  "path_or_endpoint": "/tmp/modeltap.sock"
+}

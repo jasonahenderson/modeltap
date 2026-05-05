@@ -17,6 +17,15 @@ This document defines the agent team responsible for designing, building, testin
 - `docs/adr/` holds architectural decisions with future constraint value.
 - `ADMIN:` work covers repo process and instruction changes such as `CLAUDE.md`, `AGENTS.md`, prompts, hooks, or documentation structure.
 
+## Review Artifact Naming
+
+- Canonical per-doc findings keep the single filename `{stem}-findings.md`. Dispositions live in a table at the bottom of that file; no sidecar JSON.
+- Non-canonical work-plan reviews should include the reviewing model or harness name in the filename when known.
+- Prefer reviewer-first names for those plan-review artifacts, for example:
+  - `codex-plan-review.md`
+  - `codex-0008-bff-server-connectivity-review.md`
+  - `gpt5-0001-openai-responses-api-support-plan-review.md`
+
 ## Agents
 
 ### TPM (Technical Program Manager)
@@ -26,8 +35,8 @@ This document defines the agent team responsible for designing, building, testin
 **Responsibilities:**
 - Read accepted ADRs (`docs/adr/`) and features (`docs/features/`) to determine project scope
 - Break scope into ordered, independently completable work units
-- Write and maintain the plan (`docs/history/plan.md`)
-- Update the status file (`docs/history/status.md`) after each unit completes
+- Write and maintain the plan in the current release directory (`docs/releases/<version>/plan.md` and per-track files)
+- Update the status file (`docs/releases/<version>/status.md`) after each unit completes
 - Determine what to do next when resuming from a prior session
 - Ensure agents work in the right order (design before implementation, tests before code, security review after code, docs after all)
 
@@ -46,7 +55,7 @@ This document defines the agent team responsible for designing, building, testin
 - Write design docs that are specific enough for the Implementation Engineer to code from
 
 **Inputs:** Accepted ADRs, feature docs, TPM task assignment
-**Outputs:** Design document in `docs/history/<timestamp>-design-<component>.md`
+**Outputs:** Design document in `docs/releases/<version>/designs/<date>-design-<component>.md`
 
 ### Test Engineer
 
@@ -155,41 +164,168 @@ This document defines the agent team responsible for designing, building, testin
 
 ## Workflow
 
-Each work unit follows this pipeline:
+### Prime directives — DO NOT VIOLATE
+
+1. **Phases are release-level, not WU-level.** Phase 1 → Phase 2 → Phase 3, strict order, no interleaving.
+2. **Phase 1 = design ALL WUs across ALL tracks.** No coding. No reviews. Just design docs (with optional pre-review lint). Phase 1 is not complete until every track (0, A, B, Integration) has design docs for every WU. Completing one track's designs does not authorize advancing to Phase 2 or 3.
+3. **Phase 2 = review.** User decides what to review and how. No new designs. No coding. Phase 2 begins only after the user confirms Phase 1 is complete.
+4. **Phase 3 = implement ALL WUs.** No new designs. If implementation reveals a design flaw, revise the design doc explicitly — don't silently improvise. Phase 3 begins only after Phase 2 findings are processed.
+5. **Current phase lives in `docs/releases/<version>/plan.md`.** Any action outside the current phase is wrong. Phase transitions are explicit ADMIN commits — never implicit.
+
+If any instruction elsewhere contradicts these, the prime directives win.
+
+### Why release-level phases
+
+Phase boundaries are at the release level, not the WU level — all designs complete before any coding begins. This is a deliberate change from the per-WU end-to-end flow: contract-heavy releases benefit from seeing the complete design surface before fossilizing it in implementation. Catching cross-WU drift costs minutes at the design-doc layer and hours-per-WU once code is written.
 
 ```
-TPM assigns task
-    |
-    v
-Design Engineer -> design doc
-    |
-    v
-Test Engineer -> failing unit tests
-    |                                  COMMIT: tests (red phase)
-    +--------------------------+
-    |                          |
-    v                          v
-Backend Implementer      UI Implementer
-    |                          |
-    +--------------------------+
-    |                                  COMMIT: implementation (green phase)
-    v
-Integration Tester -> end-to-end tests
-    |
-    v
-Security Reviewer -> review (pass/fail)
-    |                    |
-    | (pass)             | (fail -> Implementer fixes -> re-review)
-    |                                  COMMIT: security fixes (if any)
-    v
-Documentation Specialist -> docs
-    |
-    v
-Infrastructure Engineer -> CI/build updates (if needed)
-    |                                  COMMIT: work unit complete
-    v
-TPM logs completion, updates status
+===============================================================
+PHASE 1 — Design (all WUs in the release)
+===============================================================
+
+For each WU (or bundle of related WUs):
+    TPM assigns task
+        |
+        v
+    Designer produces design doc
+    (Bundle related WUs into one design doc where they share a
+     contract surface — see "Bundled designs" below.)
+        |
+        v
+    Subagent pre-review lint (recommended for B and C)
+    Claude subagent with fresh context reviews the design against
+    source specs; Designer triages findings, resolves cheap ones.
+        |
+        v
+    COMMIT: design doc + lint artifact
+
+After ALL designs are complete, Phase 1 ends.
+
+===============================================================
+PHASE 2 — Peer review (opt-in, batched)
+===============================================================
+
+User identifies which WUs (or bundles) warrant external peer-model
+review beyond the subagent lint. Typically a minority: ADR-level
+decisions, externally-facing contracts, security-critical surfaces.
+
+Designer announces the flagged items in chat — WU or bundle
+identifier, plus paths to the design doc, pre-review artifact, and
+relevant source specs. No prompt file is produced: the external
+reviewer is trusted to decide their own framing, and over-prescribing
+the review biases the outcome.
+
+User runs the reviews through their chosen external model in one
+session. Results committed at
+`.reviews/<wu-or-bundle>/<reviewer>-design-review.md` using the
+reviewer-first naming convention.
+
+Designer processes findings across the batch; design docs revised
+as needed.
+
+    COMMIT: peer-review artifacts + design revisions
+
+Phase 2 may be skipped entirely for a release if the user decides
+the subagent lint is sufficient coverage.
+
+===============================================================
+PHASE 3 — Implementation (all WUs)
+===============================================================
+
+With all designs stable, implementation proceeds in any
+dependency-legal order. Per WU:
+
+    Test Engineer -> failing unit tests
+        |                              COMMIT: tests (red phase)
+        +--------------------------+
+        |                          |
+        v                          v
+    Backend Implementer      UI Implementer
+        |                          |
+        +--------------------------+
+        |                              COMMIT: implementation (green)
+        v
+    Integration Tester -> end-to-end tests
+        |
+        v
+    Security Reviewer -> review (pass/fail)
+        |                    |
+        | (pass)             | (fail -> Implementer fixes -> re-review)
+        |                              COMMIT: security fixes (if any)
+        v
+    Documentation Specialist -> docs
+        |
+        v
+    Infrastructure Engineer -> CI/build updates (if needed)
+        |                              COMMIT: work unit complete
+        v
+    TPM logs completion, updates status
+
+WUs may parallelize within Phase 3 subject to their dependency
+graph.
 ```
+
+### Bundled designs
+
+Where multiple WUs share a contract surface, produce ONE design doc covering them all. The bundle's title lists the WU range (e.g., `design-protocol-types-040-041-093.md`). Each constituent WU's status line references the bundle doc.
+
+Bundle when WUs:
+- Share a Go package or file set
+- Share a protocol surface (message catalog, interface signature)
+- Are implementations of one conceptual subsystem where separating designs would force duplication
+
+Do NOT bundle when WUs have independent blast radius or when a design flaw in one wouldn't invalidate the others.
+
+### Phase selection per release
+
+A release's `plan.md` records which phase the release is in. Status updates move WUs within the current phase, and phase transitions are ADMIN commits that mark the boundary.
+
+### Release tags
+
+Every shipped release gets one annotated Git tag named `vX.Y.Z`. The tag points
+at the final release commit after status, changelog, release-readiness review,
+and final notes are committed.
+
+Before publication, the tag may move when final commits are added. Recreate it
+with `git tag -f -a vX.Y.Z -m "modeltap vX.Y.Z" <new-release-commit>` and, if it
+was already pushed, update it with
+`git push --force-with-lease origin refs/tags/vX.Y.Z`. Log the old SHA, new SHA,
+and reason in `docs/history/`.
+
+After publication, tags are immutable by default. New commits ship as a new
+version, usually the next patch release, unless a maintainer explicitly approves
+a correction and documents it.
+
+### Design Review
+
+Design errors are cheapest to fix before code cements them. Phase 1 produces the designs; Phase 2 reviews them.
+
+#### Phase 2 review — user's call
+
+The user decides what to review, how to review it, and when it's sufficient:
+
+- Read and approve designs directly
+- Send designs to an external model (Codex, Kimi, GPT-5, Gemini, etc.)
+- Both
+- Skip Phase 2 entirely
+
+There is no tiering system. There are no mandatory review gates. The user owns the risk judgment.
+
+Review artifacts committed at `docs/releases/<version>/.reviews/<wu-or-bundle>/<reviewer>-review.md` using the reviewer-first naming convention.
+
+#### Pre-review lint (optional designer tool)
+
+A **pre-review lint** is a Claude subagent with fresh context that reads a design doc against source specs, checking for mechanical drift, scope gaps, missing fields, and undocumented assumptions. The Designer decides when it's worth running — it is not mandatory.
+
+The lint catches spec-drift and mechanical issues. It does **not** catch reasoning blind spots specific to the Designer's model family — only a different model or human reviewer can do that.
+
+Artifact: `docs/releases/<version>/.reviews/<wu-or-bundle>/claude-subagent-pre-review.md`.
+
+#### Finding severity (for any review)
+
+- **Blocking** — must resolve before Phase 3 implementation.
+- **Attention** — should address unless documented reason not to.
+- **Nit** — optional.
 
 ### Commit Points
 
@@ -241,11 +377,11 @@ Examples of bad work units (too large):
 
 ## History & Status Files
 
-### `docs/history/plan.md`
-The master plan. Created by TPM at the start of the project. Updated as work progresses. Contains the ordered list of work units with their status.
+### `docs/releases/<version>/plan.md`
+The release plan. Created by TPM at the start of each release cycle. Contains the ordered list of work units with their tracks and dependencies. Per-track detail files (`track-*.md`) accompany the plan.
 
-### `docs/history/status.md`
-Living status file. Updated after every work unit completes. Structure:
+### `docs/releases/<version>/status.md`
+Living status file for the active release. Updated after every work unit completes. Structure:
 
 ```markdown
 # Project Status
@@ -280,7 +416,7 @@ Individual work logs. Each agent writes one per task with:
 ### Session Resumption
 
 When starting a new session:
-1. TPM reads `docs/history/status.md`
+1. TPM reads `docs/releases/<current-version>/status.md`
 2. If a task is marked "In Progress", TPM checks if the work was actually completed (files exist, tests pass) and updates accordingly
 3. TPM picks the next task from "Up Next" and assigns it
 4. Work continues normally

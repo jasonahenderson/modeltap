@@ -1,0 +1,9 @@
+{
+  "turn_id": "turn-abc-123",
+  "branch_id": "branch-001",
+  "input_tokens": 1500,
+  "output_tokens": 400,
+  "input_cost": 0.0225,
+  "output_cost": 0.06,
+  "total_cost": 0.0825
+}

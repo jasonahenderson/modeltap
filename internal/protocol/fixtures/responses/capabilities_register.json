@@ -1,0 +1,25 @@
+{
+  "registered": [
+    {
+      "name": "Read",
+      "namespace": "builtin",
+      "description": "Read a file from disk",
+      "input_schema": {"type": "object", "properties": {"path": {"type": "string"}}},
+      "output_envelope": "text",
+      "risk_level": "read_only",
+      "capabilities_required": ["fs"]
+    }
+  ],
+  "server_capabilities": {
+    "protocol_version": "1",
+    "supported_transforms": ["summarize", "extract"],
+    "max_frame_size": 10485760,
+    "max_attachment_size": 5242880
+  },
+  "rejected": [
+    {
+      "name": "DangerousTool",
+      "reason": "risk_level exceeds session policy"
+    }
+  ]
+}

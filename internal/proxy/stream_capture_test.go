@@ -327,7 +327,7 @@ func TestStreamCapture_NonSSEStillHandled(t *testing.T) {
 	env := newStreamTestEnv(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(respBody))
+		_, _ = w.Write([]byte(respBody))
 	})
 
 	reqBody := `{"model":"claude-sonnet-4-20250514","max_tokens":100,"messages":[{"role":"user","content":"Hi"}]}`
@@ -341,7 +341,7 @@ func TestStreamCapture_NonSSEStillHandled(t *testing.T) {
 		t.Fatalf("request failed: %v", err)
 	}
 	defer resp.Body.Close()
-	io.ReadAll(resp.Body)
+	_, _ = io.ReadAll(resp.Body)
 
 	env.waitForSave(t, 2*time.Second)
 
@@ -385,7 +385,7 @@ func TestStreamCapture_ReassembledResponseSavedWithMetadata(t *testing.T) {
 		t.Fatalf("request failed: %v", err)
 	}
 	defer resp.Body.Close()
-	io.ReadAll(resp.Body)
+	_, _ = io.ReadAll(resp.Body)
 
 	env.waitForSave(t, 2*time.Second)
 
@@ -456,7 +456,7 @@ func TestStreamCapture_UnknownProviderSSE(t *testing.T) {
 		t.Fatalf("request failed: %v", err)
 	}
 	defer resp.Body.Close()
-	io.ReadAll(resp.Body)
+	_, _ = io.ReadAll(resp.Body)
 
 	env.waitForSave(t, 2*time.Second)
 

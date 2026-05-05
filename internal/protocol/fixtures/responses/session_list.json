@@ -1,0 +1,18 @@
+{
+  "sessions": [
+    {
+      "id": "sess-001",
+      "project": "modeltap",
+      "status": "active",
+      "summary": "Working on protocol types",
+      "last_active": "2026-04-16T10:30:00Z",
+      "context_pct": 45.2,
+      "total_cost": 1.25,
+      "turn_count": 12,
+      "model": "claude-opus-4-6",
+      "last_turn_summary": "Implemented conformance tests",
+      "files_touched": ["internal/protocol/messages.go", "internal/protocol/events.go"],
+      "pinned_count": 2
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "turn_id": "turn-abc-123",
+  "code": "provider_error",
+  "message": "Upstream provider returned 503",
+  "diagnostic": {
+    "code": "MT-CONN-009",
+    "category": "provider",
+    "cause": "Provider returned HTTP 503 Service Unavailable",
+    "auto_repair_attempted": true,
+    "repair_result": "retry_failed",
+    "suggested_command": "modeltap provider status"
+  }
+}

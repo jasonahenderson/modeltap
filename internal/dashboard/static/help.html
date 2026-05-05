@@ -219,7 +219,7 @@ modeltap completion fish > ~/.config/fish/completions/modeltap.fish</code></pre>
             <section class="help-section" data-help-section>
                 <h2 class="help-section-title">Configuration Options</h2>
                 <div class="help-section-body">
-                    <p>The config file is stored at <code>~/.config/modeltap/config.yaml</code>. If the file does not exist, modeltap uses built-in defaults.</p>
+                    <p>The config file is stored at <code>~/.modeltap/config.yaml</code> (or <code>$XDG_CONFIG_HOME/modeltap/config.yaml</code> when that env var is set). Installs predating PATCH-0006 still load from <code>~/.config/modeltap/config.yaml</code> with a deprecation warning. If no config file exists, modeltap uses built-in defaults.</p>
 
                     <h3>Available Settings</h3>
                     <table class="help-table">
@@ -227,7 +227,7 @@ modeltap completion fish > ~/.config/fish/completions/modeltap.fish</code></pre>
                         <tbody>
                             <tr><td><code>port</code></td><td>8080</td><td>Port the proxy listens on</td></tr>
                             <tr><td><code>upstream</code></td><td>https://api.anthropic.com</td><td>Default upstream API URL</td></tr>
-                            <tr><td><code>db_path</code></td><td>~/.config/modeltap/modeltap.db</td><td>Path to the SQLite database</td></tr>
+                            <tr><td><code>db_path</code></td><td>~/.modeltap/modeltap.db</td><td>Path to the SQLite database</td></tr>
                             <tr><td><code>retention_days</code></td><td>30</td><td>Days to retain captured data</td></tr>
                             <tr><td><code>max_body_size</code></td><td>10MB</td><td>Maximum body size to store</td></tr>
                             <tr><td><code>dashboard.enabled</code></td><td>false</td><td>Whether dashboard starts with proxy</td></tr>
@@ -239,7 +239,7 @@ modeltap completion fish > ~/.config/fish/completions/modeltap.fish</code></pre>
                     <h3>Example Config File</h3>
                     <pre><code>port: 8080
 upstream: https://api.anthropic.com
-db_path: ~/.config/modeltap/modeltap.db
+db_path: ~/.modeltap/modeltap.db
 retention_days: 30
 max_body_size: 10MB
 
@@ -333,7 +333,7 @@ modeltap service logs
 # Show the last 200 lines
 modeltap service logs --lines 200
 modeltap service logs -n 200</code></pre>
-                    <p>On macOS, logs are read from <code>~/.config/modeltap/modeltap.log</code>. On Linux, logs are read from journalctl.</p>
+                    <p>On macOS, logs are read from <code>~/.modeltap/modeltap.log</code> (or the legacy <code>~/.config/modeltap/modeltap.log</code> on older installs). On Linux, logs are read from journalctl.</p>
 
                     <h3>Removing the Service</h3>
                     <pre><code>modeltap service uninstall</code></pre>

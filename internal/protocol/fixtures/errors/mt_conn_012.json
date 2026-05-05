@@ -1,0 +1,7 @@
+{
+  "code": "MT-CONN-012",
+  "category": "connection",
+  "cause": "No heartbeat response within 45 seconds",
+  "auto_repair_attempted": true,
+  "repair_result": "reconnect_succeeded"
+}
