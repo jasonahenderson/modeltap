@@ -76,11 +76,12 @@ before the phase transition.
   extraction for `run.permissions`.
 - Added adapter-level detached transcript buffers and replay-row creation when
   a detached run is attached.
+- Added summary-fidelity replay gap detection and checkpoint fallback metadata.
 - Updated user and embedding docs for run commands and run projection.
 
 Validation: `go test ./...` passes.
 
 ## Open Items
 
-- Expand harness projection tests for summary-only fidelity.
+- Finalize release readiness review and closeout artifacts.
 - Finalize release changelog and readiness review after all WUs close.

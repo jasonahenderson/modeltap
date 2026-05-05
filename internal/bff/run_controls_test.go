@@ -12,6 +12,33 @@ import (
 	"github.com/jasonahenderson/modeltap/internal/storage"
 )
 
+type gapReplayStore struct {
+	storage.Store
+	run    storage.Run
+	events []storage.RunEvent
+}
+
+func (s *gapReplayStore) GetRun(_ context.Context, id string) (*storage.Run, error) {
+	if id != s.run.ID {
+		return nil, storage.ErrRunNotFound
+	}
+	return &s.run, nil
+}
+
+func (s *gapReplayStore) ListRunEvents(_ context.Context, runID string, afterSeq int64, limit int) ([]storage.RunEvent, error) {
+	var out []storage.RunEvent
+	for _, ev := range s.events {
+		if ev.RunID == runID && ev.Seq > afterSeq {
+			out = append(out, ev)
+		}
+	}
+	return out, nil
+}
+
+func (s *gapReplayStore) GetLatestRunCheckpoint(_ context.Context, runID string) (*storage.RunCheckpoint, error) {
+	return &storage.RunCheckpoint{ID: "cp-gap", RunID: runID, Seq: s.run.LastEventSeq, Stage: s.run.Stage, Status: s.run.Status}, nil
+}
+
 func seedRunForControls(t *testing.T, srv *Server, attachedConnectionID string) *storage.Run {
 	t.Helper()
 	now := time.Now().UTC()
@@ -129,5 +156,41 @@ func TestRunPermissionsReturnsStoredBlockerDetails(t *testing.T) {
 	}
 	if perms[0].RequestID != "perm-1" || perms[0].Reason != "write_file" || perms[0].Type != storage.RunStatusWaitingPermission {
 		t.Fatalf("permission = %+v", perms[0])
+	}
+}
+
+func TestRunEventsReportsSummaryFidelityOnReplayGap(t *testing.T) {
+	store := &gapReplayStore{
+		run: storage.Run{
+			ID:              "run-gap",
+			UserID:          SoloUserID,
+			SessionID:       "sess-gap",
+			Status:          storage.RunStatusRunning,
+			Stage:           storage.RunStageModelCall,
+			AttachmentState: storage.RunAttachmentAttached,
+			LastEventSeq:    5,
+			CreatedAt:       time.Now().UTC(),
+			UpdatedAt:       time.Now().UTC(),
+			LastAdvancedAt:  time.Now().UTC(),
+		},
+		events: []storage.RunEvent{{RunID: "run-gap", Seq: 5, Type: protocol.EventRunCompleted}},
+	}
+	srv := NewServer(store, shortServerConfig(""))
+	c, _ := newRelayConnection(t, srv)
+
+	params, _ := json.Marshal(protocol.RunEvents{RunID: "run-gap", AfterSeq: 1, Limit: 10})
+	resp, err := handleRunEvents(context.Background(), c, params)
+	if err != nil {
+		t.Fatalf("handleRunEvents: %v", err)
+	}
+	got := resp.(protocol.RunEventsResponse)
+	if got.ReplayAvailable {
+		t.Fatalf("ReplayAvailable = true, want false")
+	}
+	if got.Fidelity != protocol.RunReplaySummary {
+		t.Fatalf("Fidelity = %q, want summary", got.Fidelity)
+	}
+	if got.Checkpoint == nil || got.Checkpoint.CheckpointID != "cp-gap" {
+		t.Fatalf("checkpoint = %+v", got.Checkpoint)
 	}
 }

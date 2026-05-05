@@ -126,8 +126,8 @@ func handleRunAttach(ctx context.Context, conn *Connection, params json.RawMessa
 	resp := protocol.RunAttachResponse{
 		Run:             runSummary(*run),
 		AttachmentState: state,
-		ReplayAvailable: true,
-		Fidelity:        protocol.RunReplayFull,
+		ReplayAvailable: replayAvailable(events, req.LastObservedSeq),
+		Fidelity:        replayFidelity(events, req.LastObservedSeq, run.LastEventSeq),
 		Checkpoint:      checkpointSummary(cp),
 	}
 	for _, ev := range events {
@@ -255,8 +255,8 @@ func handleRunEvents(ctx context.Context, conn *Connection, params json.RawMessa
 		Events:          make([]protocol.RunEventPayload, 0, len(events)),
 		LatestSeq:       run.LastEventSeq,
 		HasMore:         len(events) > 0 && int64(len(events))+req.AfterSeq < run.LastEventSeq,
-		ReplayAvailable: true,
-		Fidelity:        protocol.RunReplayFull,
+		ReplayAvailable: replayAvailable(events, req.AfterSeq),
+		Fidelity:        replayFidelity(events, req.AfterSeq, run.LastEventSeq),
 		Checkpoint:      checkpointSummary(cp),
 	}
 	for _, ev := range events {
@@ -335,6 +335,20 @@ func boolMessage(ok bool, ifTrue, ifFalse string) string {
 		return ifTrue
 	}
 	return ifFalse
+}
+
+func replayAvailable(events []storage.RunEvent, afterSeq int64) bool {
+	return len(events) == 0 || events[0].Seq <= afterSeq+1
+}
+
+func replayFidelity(events []storage.RunEvent, afterSeq, latestSeq int64) string {
+	if !replayAvailable(events, afterSeq) {
+		return protocol.RunReplaySummary
+	}
+	if len(events) == 0 && afterSeq < latestSeq {
+		return protocol.RunReplaySummary
+	}
+	return protocol.RunReplayFull
 }
 
 func latestRunBlocker(ctx context.Context, store storage.Store, run storage.Run) protocol.RunPermission {

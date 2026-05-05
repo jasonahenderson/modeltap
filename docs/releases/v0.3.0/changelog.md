@@ -38,6 +38,7 @@ Implemented so far:
   `run.blocked` event is available.
 - Detached run deltas are buffered outside the foreground transcript and replay
   into an explicit attached-run row when the user attaches the run.
+- Replay gaps report summary fidelity with checkpoint fallback metadata instead
+  of failing the request.
 
-Remaining before ship: summary-only fidelity tests and final release-readiness
-review.
+Remaining before ship: final release-readiness review.
