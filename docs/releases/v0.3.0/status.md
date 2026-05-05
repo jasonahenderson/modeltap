@@ -1,9 +1,15 @@
 # v0.3.0 — Status
 
-**Current phase:** Planning draft — Phase 1 not opened  
-**Branch:** TBD  
+**Current phase:** Phase 1 — Design  
+**Branch:** `release/v0.3.0`  
 **Scope:** Run runtime foundation for FEAT-0016 and the first slice of
 FEAT-0017
+
+Phase 1 opened on 2026-05-05 by explicit `ADMIN:` commit. Because FEAT-0015,
+FEAT-0016, and FEAT-0017 remain draft specs, the release is authorized for
+design-against-draft work only. Phase 3 remains blocked until those feature
+contracts, the FEAT-0017 foundation slice, and WU-108 run-runtime ADR are
+accepted.
 
 ## Work Units
 
@@ -22,11 +28,12 @@ FEAT-0017
 
 ## Gates
 
-- Phase 1 starts only after an explicit `ADMIN:` commit opens the release and
-  either FEAT-0015, FEAT-0016, and the FEAT-0017 foundation slice are accepted
-  or the commit records an explicit design-against-draft exception.
-- The Phase 1 opening commit must reconcile the v0.2.x release-status mismatch
-  or name the committed BFF/harness contracts that v0.3.0 design may depend on.
+- Phase 1 started by explicit `ADMIN:` release-open commit on 2026-05-05 with a
+  design-against-draft exception for FEAT-0015/0016/0017 foundation scope.
+- v0.3.0 Phase 1 design may depend on the committed BFF/harness contracts in
+  `internal/protocol`, `internal/bff`, `internal/harness`,
+  `internal/harnesshost`, `internal/harnessshell`, `internal/cli`, and
+  `internal/storage` at the `release/v0.3.0` branch point.
 - Phase 1 closes only after every WU has a design artifact.
 - Phase 2 closes only after design reviews are recorded and findings
   dispositioned.
@@ -37,9 +44,8 @@ FEAT-0017
 ## Open Items
 
 - Draft and accept the run-runtime ADR.
-- Decide the implementation branch.
-- Confirm v0.2.0, v0.2.1, and v0.2.2 prerequisite surfaces are reachable from
-  the v0.3.0 implementation branch before Phase 3.
+- Confirm v0.2.0, v0.2.1, and v0.2.2 prerequisite surfaces remain reachable
+  from the v0.3.0 implementation branch before Phase 3.
 - During WU-108/WU-109 design, lock the `workflow_type` enum and persistence
   shape used by v0.3.1 through v0.3.4.
 - During WU-109 design, complete the cross-release schema compatibility check

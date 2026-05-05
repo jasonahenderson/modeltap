@@ -13,9 +13,25 @@ implementation starts.
 
 ## Prerequisites
 
-Before Phase 1 opens, the release-open `ADMIN:` commit must reconcile the
-current v0.2.x release-status mismatch or name the exact committed BFF/harness
-contracts that v0.3.0 design may depend on.
+Phase 1 opened on 2026-05-05 with an explicit `ADMIN:` release-open commit on
+`release/v0.3.0`. Because FEAT-0015, FEAT-0016, and FEAT-0017 remain in draft
+status, Phase 1 is authorized as design-against-draft work only. Phase 3 remains
+blocked until the feature scope and WU-108 run-runtime ADR are accepted.
+
+The release-open commit names the exact committed BFF/harness contracts that
+v0.3.0 Phase 1 design may depend on rather than changing historical v0.2.x
+release-status metadata:
+
+- `internal/protocol`: JSON-RPC envelope, session, event, tool, compact, health,
+  and model protocol types and conformance tests
+- `internal/bff`: server, connection registry, session/conversation store,
+  `turn.submit` dispatch, provider routing, prompt/compact/sync surfaces, cost
+  accounting, and diagnostics
+- `internal/harness`, `internal/harnesshost`, and `internal/harnessshell`:
+  production shell adapter/runtime, host projection boundary, permission queue,
+  shell event/state/rendering model, and local tool dispatcher
+- `internal/cli`: BFF wiring and shell command entrypoints
+- `internal/storage`: existing session/history storage and migrations
 
 Before Phase 3 implementation starts, the v0.2.x harness foundation must be
 reachable from the implementation branch:
@@ -74,8 +90,8 @@ The release executes in the repo's strict three phases:
 2. **Phase 2 — Review:** process design findings.
 3. **Phase 3 — Implementation:** implement WUs in dependency-legal order.
 
-Current phase: **Planning draft — Phase 1 not opened.** Opening Phase 1 requires
-an explicit `ADMIN:` commit.
+Current phase: **Phase 1 — Design.** Phase 1 opened on 2026-05-05 by explicit
+`ADMIN:` commit on `release/v0.3.0`.
 
 ## Release Authority Gates
 
@@ -83,7 +99,8 @@ Phase 1 may open only after one of these is true:
 
 - FEAT-0015, FEAT-0016, and the FEAT-0017 foundation slice are accepted.
 - An explicit `ADMIN:` exception authorizes v0.3.0 Phase 1 design against draft
-  feature specs.
+  feature specs. This exception was recorded in the 2026-05-05 release-open
+  commit.
 
 Phase 3 remains blocked until FEAT-0015, FEAT-0016, the FEAT-0017 foundation
 slice, and the run-runtime ADR are accepted. Later v0.3.x releases inherit the
