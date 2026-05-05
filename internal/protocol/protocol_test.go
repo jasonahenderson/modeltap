@@ -688,10 +688,10 @@ func assertRoundTrip(t *testing.T, in interface{}, out interface{}) {
 	// pointers-to-same-concrete-type or same-concrete-type.
 	inVal := reflect.ValueOf(in)
 	outVal := reflect.ValueOf(out)
-	if inVal.Kind() == reflect.Ptr {
+	if inVal.Kind() == reflect.Pointer {
 		inVal = inVal.Elem()
 	}
-	if outVal.Kind() == reflect.Ptr {
+	if outVal.Kind() == reflect.Pointer {
 		outVal = outVal.Elem()
 	}
 	if !reflect.DeepEqual(inVal.Interface(), outVal.Interface()) {
