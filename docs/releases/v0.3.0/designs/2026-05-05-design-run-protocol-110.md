@@ -30,6 +30,8 @@ New method constants:
 - `run.continue`
 - `run.fork`
 - `run.events`
+- `run.permissions`
+- `run.resolve_permission`
 
 `turn.cancel` remains supported and maps to the active run containing the turn.
 New harnesses should call `run.cancel`.
@@ -57,7 +59,16 @@ type RunListResponse struct {
 
 `RunSummary` includes run ID, session ID, title, workflow type, status, stage,
 attachment state, model/provider, elapsed timestamps, cost, token totals, and
-whether input is required.
+whether input is required. It also includes:
+
+- `last_advanced_at`
+- `stuck`
+- `stuck_seconds`
+
+`input_required` is true when status is `waiting_permission` or `waiting_user`.
+`stuck` is true when the run is non-terminal and has not advanced event
+sequence or stage since the configured stuck threshold, defaulting to 300
+seconds in v0.3.0.
 
 ### `run.details`
 
@@ -96,6 +107,30 @@ type RunEvents struct {
 
 Response returns ordered events, `latest_seq`, `has_more`, `replay_available`,
 and `fidelity` (`full` or `summary`).
+
+### `run.permissions`
+
+Lists pending permission or user-input blockers for one run, or for active runs
+in the current session when `run_id` is omitted. v0.3.0 uses this for foreground
+and attached-run permission resolution; the full blocked-run inbox remains in
+v0.3.3 WU-144.
+
+### `run.resolve_permission`
+
+Applies a permission decision to a pending run-correlated request:
+
+```go
+type RunResolvePermission struct {
+    RunID     string `json:"run_id"`
+    RequestID string `json:"request_id"`
+    Decision  string `json:"decision"`
+}
+```
+
+The BFF records the decision, appends a run event, and transitions out of
+`waiting_permission` when all pending permission blockers for the run are
+resolved. Non-permission `waiting_user` resolution remains command-specific in
+v0.3.0.
 
 ## Events
 
@@ -163,3 +198,5 @@ includes latest checkpoint metadata.
 - unknown fields do not break existing `turn.submit`
 - event sequence fixtures reject missing `run_id` or non-monotonic sequences
 - attach replay returns full event list when retained and summary when gapped
+- permission resolution transitions a run out of `waiting_permission`
+- run summaries expose `input_required` and `stuck`

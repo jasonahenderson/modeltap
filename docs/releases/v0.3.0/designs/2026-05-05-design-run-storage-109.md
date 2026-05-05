@@ -6,6 +6,7 @@ This design covers WU-109:
 
 - SQLite schema for durable runs, events, checkpoints, attachments, and
   run/turn links
+- idempotency boundaries for model calls and tool results
 - Go storage types and methods
 - schema-version and migration plan
 - cross-release extension points for v0.3.1 through v0.3.4
@@ -49,6 +50,7 @@ Required columns:
 - `attached_connection_id TEXT NOT NULL DEFAULT ''`
 - `attachment_grace_deadline TEXT NULL`
 - `summary TEXT NOT NULL DEFAULT ''`
+- `last_advanced_at TEXT NOT NULL`
 - `model TEXT NOT NULL DEFAULT ''`
 - `provider TEXT NOT NULL DEFAULT ''`
 - `input_tokens INTEGER NOT NULL DEFAULT 0`
@@ -143,6 +145,56 @@ Columns:
 Observers are intentionally not represented here. They are transient connection
 subscriptions until a later multi-client feature requires persistence.
 
+`run_attachments` is the authoritative lease-detail row.
+`runs.attachment_state`, `runs.attached_connection_id`, and
+`runs.attachment_grace_deadline` are denormalized list/detail summary fields.
+They must be updated in the same transaction through one storage method. Code
+outside storage must not update only one side of the attachment state.
+
+### `run_model_calls`
+
+Idempotent model-call accounting.
+
+Columns:
+
+- `model_call_id TEXT PRIMARY KEY`
+- `run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE`
+- `provider TEXT NOT NULL`
+- `model TEXT NOT NULL`
+- `stage TEXT NOT NULL DEFAULT 'model_call'`
+- `status TEXT NOT NULL`
+- `input_tokens INTEGER NOT NULL DEFAULT 0`
+- `output_tokens INTEGER NOT NULL DEFAULT 0`
+- `total_cost REAL NOT NULL DEFAULT 0`
+- `latency_ms INTEGER NOT NULL DEFAULT 0`
+- `payload_json TEXT NOT NULL DEFAULT '{}'`
+- `created_at TEXT NOT NULL`
+- `updated_at TEXT NOT NULL`
+
+The primary key is the idempotency boundary. Re-reporting the same
+`model_call_id` updates only missing terminal fields and must not double-count
+usage in `runs`.
+
+### `run_tool_results`
+
+Idempotent tool-result delivery.
+
+Columns:
+
+- `tool_call_id TEXT PRIMARY KEY`
+- `run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE`
+- `tool TEXT NOT NULL`
+- `namespace TEXT NOT NULL DEFAULT ''`
+- `status TEXT NOT NULL`
+- `result_id TEXT NOT NULL DEFAULT ''`
+- `payload_json TEXT NOT NULL DEFAULT '{}'`
+- `created_at TEXT NOT NULL`
+- `updated_at TEXT NOT NULL`
+
+The primary key is the idempotency boundary for tool result delivery. Duplicate
+`tool_call_id` reports return the stored result summary and do not re-enter the
+model loop.
+
 ## Storage API
 
 Add `internal/storage/runs.go` with:
@@ -160,6 +212,8 @@ func (s *SQLiteStore) AppendRunEvent(ctx context.Context, runID string, ev RunEv
 func (s *SQLiteStore) CreateRunCheckpoint(ctx context.Context, cp RunCheckpoint) error
 func (s *SQLiteStore) ListRunEvents(ctx context.Context, runID string, afterSeq int64, limit int) ([]RunEvent, error)
 func (s *SQLiteStore) LinkTurnToRun(ctx context.Context, runID, turnID, role string, seq int) error
+func (s *SQLiteStore) RecordRunModelCall(ctx context.Context, call RunModelCall) (created bool, err error)
+func (s *SQLiteStore) RecordRunToolResult(ctx context.Context, result RunToolResult) (created bool, err error)
 ```
 
 `CreateRun` and `AppendRunEvent` are transaction boundaries. Code outside
@@ -190,3 +244,5 @@ cost, and token totals.
 - event append returns contiguous per-run sequence numbers
 - `run_turns` rejects linking one turn to two runs
 - checkpoint creation and latest checkpoint pointer are transactional
+- duplicate `model_call_id` does not double-count run usage
+- duplicate `tool_call_id` does not re-deliver a tool result

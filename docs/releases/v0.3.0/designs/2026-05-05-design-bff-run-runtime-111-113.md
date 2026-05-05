@@ -58,18 +58,21 @@ the BFF reconstructs summaries from storage.
 3. derive idempotency key:
    - new optional request field if present
    - else `turn:<session_id>:<turn_id>` for compatibility
-4. create a run row if none exists for that key
-5. append `run.started` and initial checkpoint in one storage transaction
-6. link the user turn to the run
-7. append user turn and command history as today
-8. emit `run.stage_changed` for `preflight`
-9. resolve model and emit `run.stage_changed` for `prompt_plan`
-10. emit `run.stage_changed` for `model_call`
-11. dispatch provider stream
-12. register run cancellation
-13. return accepted response with optional `run_id`
+4. open one durable pre-dispatch transaction
+5. create a run row if none exists for that key
+6. append the user turn and command history
+7. link the user turn to the run
+8. append `run.started` and initial checkpoint
+9. commit the transaction
+10. emit `run.stage_changed` for `preflight`
+11. resolve model and emit `run.stage_changed` for `prompt_plan`
+12. emit `run.stage_changed` for `model_call`
+13. dispatch provider stream
+14. register run cancellation
+15. return accepted response with optional `run_id`
 
-If run creation fails, no provider call starts.
+If any part of the pre-dispatch transaction fails, no provider call starts and
+no partial run/turn/link state is committed.
 
 ## Stream Relay Integration
 
@@ -86,6 +89,11 @@ provider stream facts also append run events:
 - cancellation: `run.cancelled`
 
 Existing turn events remain emitted for compatibility.
+
+Model-call accounting is recorded through `run_model_calls` by
+`model_call_id`. Tool-result delivery is recorded through `run_tool_results` by
+`tool_call_id`. Duplicate reports return the stored state and do not double-count
+usage or re-enter the model loop.
 
 ## Status and Stage Transitions
 
@@ -147,6 +155,8 @@ Handlers:
 - `handleRunContinue`
 - `handleRunFork`
 - `handleRunEvents`
+- `handleRunPermissions`
+- `handleRunResolvePermission`
 
 `run.cancel` uses the same cancellation function as `turn.cancel`. `turn.cancel`
 becomes a compatibility wrapper that locates the owning run for the turn and
@@ -186,3 +196,5 @@ reason.
   run
 - provider completion updates run totals and terminal checkpoint
 - disconnected executor transitions to `waiting_user`
+- duplicate model-call accounting and tool-result delivery are idempotent
+- permission resolution transitions `waiting_permission` runs correctly

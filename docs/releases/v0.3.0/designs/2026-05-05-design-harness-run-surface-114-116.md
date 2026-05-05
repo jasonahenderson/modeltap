@@ -79,6 +79,11 @@ Command output is surfaced as compact transcript event rows plus status chrome.
 Long event lists are summarized; users can request more through repeated
 commands once pagination exists in a later release.
 
+`/runs` rows include an input-required marker for `waiting_permission` and
+`waiting_user`, and a stuck marker when the BFF summary reports `stuck=true`.
+The shell does not compute stuck state from wall-clock time independently; it
+renders the BFF summary so all clients use the same threshold.
+
 ## Runtime Interface Changes
 
 Add optional methods to `harnesshost.Runtime` or extend `DispatchCommand`
@@ -138,6 +143,7 @@ converts protocol payloads into shell-local view structs.
 - `/run` calls runtime command path and renders active run summary
 - `/runs` distinguishes running, waiting permission, waiting user, completed,
   failed, and cancelled rows
+- `/runs` renders input-required and stuck markers from BFF summaries
 - `/attach` handles success, conflict, terminal run, and partial replay
 - `/detach` preserves detached transcript buffer
 - reconnect replays from last sequence and reports summary fidelity on gap

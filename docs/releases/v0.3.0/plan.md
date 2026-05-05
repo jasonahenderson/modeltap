@@ -90,9 +90,10 @@ The release executes in the repo's strict three phases:
 2. **Phase 2 — Review:** process design findings.
 3. **Phase 3 — Implementation:** implement WUs in dependency-legal order.
 
-Current phase: **Phase 2 — Review.** Phase 1 completed after all WU-108 through
-WU-117 design artifacts were drafted, and Phase 2 opened on 2026-05-05 by
-explicit `ADMIN:` commit on `release/v0.3.0`.
+Current phase: **Phase 2 — Review processed; Phase 3 blocked.** Phase 1
+completed after all WU-108 through WU-117 design artifacts were drafted, Phase 2
+opened on 2026-05-05 by explicit `ADMIN:` commit on `release/v0.3.0`, and Phase
+2 findings were processed on 2026-05-05.
 
 ## Release Authority Gates
 
@@ -221,8 +222,8 @@ Phase 1 is complete only when all WUs have design docs under
 - [x] WU-114 to WU-116 harness runtime design bundle
 - [x] WU-117 verification/docs design
 
-Phase 1 design artifacts were drafted on 2026-05-05. Phase 2 review processing
-is open as of 2026-05-05.
+Phase 1 design artifacts were drafted on 2026-05-05. Phase 2 review findings
+were recorded and processed on 2026-05-05.
 
 ## Risk Register
 

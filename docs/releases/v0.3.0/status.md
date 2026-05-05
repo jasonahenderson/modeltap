@@ -1,16 +1,20 @@
 # v0.3.0 — Status
 
-**Current phase:** Phase 2 — Review  
+**Current phase:** Phase 2 — Review processed; Phase 3 blocked
+
 **Branch:** `release/v0.3.0`  
 **Scope:** Run runtime foundation for FEAT-0016 and the first slice of
 FEAT-0017
 
 Phase 1 opened on 2026-05-05 by explicit `ADMIN:` commit and completed after all
 WU-108 through WU-117 designs were drafted. Phase 2 opened on 2026-05-05 by
-explicit `ADMIN:` commit. Because FEAT-0015, FEAT-0016, and FEAT-0017 remain
-draft specs, the release remains design-against-draft work only. Phase 3 remains
-blocked until those feature contracts, the FEAT-0017 foundation slice, and
-WU-108 run-runtime ADR are accepted.
+explicit `ADMIN:` commit. Phase 2 design findings were recorded and processed in
+`docs/releases/v0.3.0/.reviews/codex-design-review.md`.
+
+Because FEAT-0015, FEAT-0016, and FEAT-0017 remain draft specs, the release
+remains design-against-draft work only. Phase 3 remains blocked until those
+feature contracts, the FEAT-0017 foundation slice, and WU-108 run-runtime ADR
+are accepted.
 
 ## Work Units
 
@@ -36,15 +40,15 @@ WU-108 run-runtime ADR are accepted.
   `internal/harnesshost`, `internal/harnessshell`, `internal/cli`, and
   `internal/storage` at the `release/v0.3.0` branch point.
 - Phase 1 closes only after every WU has a design artifact.
-- Phase 2 closes only after design reviews are recorded and findings
-  dispositioned.
+- Phase 2 design review is recorded and findings are dispositioned.
 - Phase 3 begins only after the explicit Phase 2 -> Phase 3 `ADMIN:` commit,
   accepted FEAT-0015/0016/0017 foundation scope, accepted run-runtime ADR, and
   reachable v0.2.x prerequisite surfaces.
 
 ## Open Items
 
-- Process Phase 2 design review findings.
 - Accept the run-runtime ADR before Phase 3.
+- Accept FEAT-0015, FEAT-0016, and the FEAT-0017 foundation slice before Phase
+  3.
 - Confirm v0.2.0, v0.2.1, and v0.2.2 prerequisite surfaces remain reachable
   from the v0.3.0 implementation branch before Phase 3.

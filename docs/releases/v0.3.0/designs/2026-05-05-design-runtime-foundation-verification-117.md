@@ -22,6 +22,8 @@ Tests:
 - idempotent run creation returns or rejects duplicate keys deterministically
 - event append is contiguous per run
 - checkpoint and lifecycle state update are transactional
+- duplicate model-call IDs do not double-count usage
+- duplicate tool-call IDs do not re-deliver tool results
 
 ### Protocol
 
@@ -33,6 +35,7 @@ Tests:
 - event payloads require `run_id` and `seq`
 - `turn.submit` fixture remains backward-compatible
 - optional `run_id` in `TurnSubmitResponse` omits cleanly for old clients
+- `run.permissions` and `run.resolve_permission` fixtures round-trip
 
 ### BFF
 
@@ -47,6 +50,7 @@ Tests:
 - `run.list` scopes by user/project/session
 - `run.attach` serializes competing attach requests
 - `run.events` returns full replay or summary fidelity
+- `run.resolve_permission` transitions a run out of `waiting_permission`
 - executor disconnect produces `waiting_user`
 - permission request produces `waiting_permission`
 
@@ -59,6 +63,7 @@ Tests:
 - run protocol events project into existing shell host events
 - active `/run` renders summary without changing shell-native commands
 - `/runs` and `/jobs` render compact run rows
+- `/runs` renders input-required and stuck markers from BFF summaries
 - detached run deltas do not mutate foreground transcript
 - attach replay projects selected run transcript
 - reconnect resumes from last observed sequence
