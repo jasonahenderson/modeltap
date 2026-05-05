@@ -1,6 +1,6 @@
 # v0.3.0 Changelog
 
-**Status:** Phase 2 processed; Phase 3 blocked
+**Status:** Phase 2 review processed; Phase 3 blocked
 
 v0.3.0 is planned to ship the run runtime foundation for the Professional
 Harness Runtime series.

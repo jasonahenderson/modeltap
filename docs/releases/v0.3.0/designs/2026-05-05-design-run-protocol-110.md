@@ -22,6 +22,7 @@ Add `internal/protocol/runs.go` for request/response payloads and
 New method constants:
 
 - `run.list`
+- `run.create`
 - `run.details`
 - `run.attach`
 - `run.detach`
@@ -32,9 +33,33 @@ New method constants:
 - `run.events`
 - `run.permissions`
 - `run.resolve_permission`
+- `run.heartbeat`
 
 `turn.cancel` remains supported and maps to the active run containing the turn.
 New harnesses should call `run.cancel`.
+
+### `run.create`
+
+Creates a queued run without starting provider work. This is the run-native
+creation surface for future background scheduling and for v0.3.0 fork-created
+runs that need a durable queued record before work starts.
+
+Request:
+
+```go
+type RunCreate struct {
+    SessionID      string `json:"session_id"`
+    IdempotencyKey string `json:"idempotency_key"`
+    WorkflowType   string `json:"workflow_type,omitempty"`
+    Title          string `json:"title,omitempty"`
+    ParentRunID    string `json:"parent_run_id,omitempty"`
+}
+```
+
+Response returns the created or existing run summary. Initial status is
+`queued`, initial stage is `preflight`, and no provider dispatch begins until a
+future start/continue path advances the run. `turn.submit` is still the
+compatibility path for create-and-start foreground work in v0.3.0.
 
 ### `run.list`
 
@@ -132,6 +157,23 @@ The BFF records the decision, appends a run event, and transitions out of
 resolved. Non-permission `waiting_user` resolution remains command-specific in
 v0.3.0.
 
+### `run.heartbeat`
+
+Reports liveness for an attached harness or local executor working on a run.
+
+```go
+type RunHeartbeat struct {
+    RunID           string `json:"run_id"`
+    HostFingerprint string `json:"host_fingerprint,omitempty"`
+    LastObservedSeq int64  `json:"last_observed_seq,omitempty"`
+    Stage           string `json:"stage,omitempty"`
+}
+```
+
+The BFF updates liveness metadata and may return the latest run status. Missing
+heartbeats feed the executor-disconnect and `stage_timeout` policies in
+ADR-0015.
+
 ## Events
 
 New notification method constants:
@@ -139,6 +181,9 @@ New notification method constants:
 - `run.started`
 - `run.stage_changed`
 - `run.status_changed`
+- `run.blocked`
+- `run.unblocked`
+- `run.stage_timeout`
 - `run.progress`
 - `run.tool_call_requested`
 - `run.tool_result_recorded`
@@ -162,6 +207,11 @@ Every run event payload includes:
 
 `run.progress` may be coalesced. All other events are essential and must not be
 silently dropped.
+
+`run.blocked` is emitted when a run enters `waiting_permission` or
+`waiting_user`. `run.unblocked` is emitted when the run leaves those states.
+Consumers may use these events directly instead of parsing every
+`run.status_changed` payload.
 
 ## `turn.submit` Compatibility
 
@@ -200,3 +250,6 @@ includes latest checkpoint metadata.
 - attach replay returns full event list when retained and summary when gapped
 - permission resolution transitions a run out of `waiting_permission`
 - run summaries expose `input_required` and `stuck`
+- `run.create` creates a queued run without provider dispatch
+- `run.heartbeat` updates run liveness metadata
+- blocked/unblocked and stage-timeout events round-trip through JSON fixtures

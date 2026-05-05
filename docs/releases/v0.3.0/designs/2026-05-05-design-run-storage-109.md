@@ -36,6 +36,7 @@ One row per durable workflow execution.
 Required columns:
 
 - `id TEXT PRIMARY KEY`
+- `trace_id TEXT NOT NULL`
 - `idempotency_key TEXT NOT NULL`
 - `user_id TEXT NOT NULL`
 - `project TEXT NOT NULL`
@@ -59,6 +60,8 @@ Required columns:
 - `last_event_seq INTEGER NOT NULL DEFAULT 0`
 - `last_checkpoint_id TEXT NOT NULL DEFAULT ''`
 - `extension_json TEXT NOT NULL DEFAULT '{}'`
+- `retention_class TEXT NOT NULL DEFAULT 'standard'`
+- `expires_at TEXT NULL`
 - `schema_version INTEGER NOT NULL DEFAULT 1`
 - `created_at TEXT NOT NULL`
 - `updated_at TEXT NOT NULL`
@@ -100,11 +103,15 @@ Columns:
 - `status TEXT NOT NULL DEFAULT ''`
 - `reason TEXT NOT NULL DEFAULT ''`
 - `payload_json TEXT NOT NULL DEFAULT '{}'`
+- `payload_schema_version INTEGER NOT NULL DEFAULT 1`
 - `created_at TEXT NOT NULL`
 - primary key `(run_id, seq)`
 
 The store assigns `seq = runs.last_event_seq + 1` inside the same transaction
-that updates `runs.last_event_seq`.
+that updates `runs.last_event_seq`. `session_id` for protocol event payloads is
+projected from `runs` at read/emit time. `turn_id` is either copied into
+`payload_json.turn_id` for turn-correlated events or projected from `run_turns`
+when the event references a known run-turn link.
 
 ### `run_checkpoints`
 
@@ -185,8 +192,11 @@ Columns:
 - `run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE`
 - `tool TEXT NOT NULL`
 - `namespace TEXT NOT NULL DEFAULT ''`
+- `stage TEXT NOT NULL DEFAULT 'tool_loop'`
 - `status TEXT NOT NULL`
 - `result_id TEXT NOT NULL DEFAULT ''`
+- `duration_ms INTEGER NOT NULL DEFAULT 0`
+- `estimated_cost REAL NOT NULL DEFAULT 0`
 - `payload_json TEXT NOT NULL DEFAULT '{}'`
 - `created_at TEXT NOT NULL`
 - `updated_at TEXT NOT NULL`
@@ -194,6 +204,10 @@ Columns:
 The primary key is the idempotency boundary for tool result delivery. Duplicate
 `tool_call_id` reports return the stored result summary and do not re-enter the
 model loop.
+
+Run totals are derived from `run_model_calls` and `run_tool_results`. Per-stage
+aggregation is a query over the `stage` columns in those tables and
+`run_events`; no separate stage aggregate table is introduced in v0.3.0.
 
 ## Storage API
 
@@ -236,6 +250,10 @@ v0.3.4 memory/routing stores source links to run ID, artifact ID, and outcome.
 v0.3.0 only needs durable `workflow_type`, terminal outcome, model/provider,
 cost, and token totals.
 
+Retention metadata is intentionally minimal in v0.3.0: `retention_class` and
+`expires_at` reserve the run-record side of the FEAT-0015 retention envelope.
+Artifact/blob-specific retention remains deferred to FEAT-0020.
+
 ## Tests
 
 - migration v2 to v3 creates all run tables and preserves v2 data
@@ -246,3 +264,6 @@ cost, and token totals.
 - checkpoint creation and latest checkpoint pointer are transactional
 - duplicate `model_call_id` does not double-count run usage
 - duplicate `tool_call_id` does not re-deliver a tool result
+- unknown `workflow_type` is rejected at run creation
+- v0.3.0 readers accept `run_checkpoints.schema_version = 1`
+- run totals equal the sum of model-call/tool-result accounting fields

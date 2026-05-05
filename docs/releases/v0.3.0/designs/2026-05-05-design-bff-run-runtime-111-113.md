@@ -74,6 +74,10 @@ the BFF reconstructs summaries from storage.
 If any part of the pre-dispatch transaction fails, no provider call starts and
 no partial run/turn/link state is committed.
 
+`run.create` uses the same run creation and idempotency path but stops after the
+queued run, initial event, and initial checkpoint are durable. It does not append
+a user turn and does not dispatch a provider call.
+
 ## Stream Relay Integration
 
 `NewStreamRelay` currently emits turn events. WU-113 wraps or extends it so
@@ -95,6 +99,11 @@ Model-call accounting is recorded through `run_model_calls` by
 `tool_call_id`. Duplicate reports return the stored state and do not double-count
 usage or re-enter the model loop.
 
+The v0.3.0 tool loop is sequential. Tool calls are processed in provider
+emission order, and mutating operations are serialized. Parallel read-only tool
+resolution is deferred until policy and validation work can classify operations
+reliably.
+
 ## Status and Stage Transitions
 
 Required v0.3.0 transitions:
@@ -105,6 +114,8 @@ Required v0.3.0 transitions:
 - provider dispatch: `running` + `model_call`
 - tool call pending: `waiting_permission` or `running` + `tool_loop`
 - local executor disconnected: `waiting_user` + current stage
+- stage deadline exceeded: `failed` + current stage with reason
+  `stage_timeout`
 - provider complete: `completed` + `completion`
 - cancel requested: `cancelled` + current stage or `completion`
 - provider/tool fatal error: `failed` + current stage
@@ -120,6 +131,16 @@ Inactive downstream stages:
 - `validation`: same.
 - `artifact_capture`: same, except minimal usage/checkpoint metadata may be
   recorded as run events, not FEAT-0020 artifacts.
+
+Legal reentry edges:
+
+| Edge | v0.3.0 status |
+|---|---|
+| `tool_loop -> prompt_plan` | active; tool results can trigger prompt assembly before the next provider call |
+| `model_call -> preflight` | active for retryable provider dispatch failures or policy changes before retry |
+| `validation -> model_call` | no-op/inactive until v0.3.2 |
+| `validation -> prompt_plan` | no-op/inactive until v0.3.2 |
+| any active stage -> terminal | active |
 
 ## Checkpoints
 
@@ -157,6 +178,8 @@ Handlers:
 - `handleRunEvents`
 - `handleRunPermissions`
 - `handleRunResolvePermission`
+- `handleRunCreate`
+- `handleRunHeartbeat`
 
 `run.cancel` uses the same cancellation function as `turn.cancel`. `turn.cancel`
 becomes a compatibility wrapper that locates the owning run for the turn and
@@ -198,3 +221,9 @@ reason.
 - disconnected executor transitions to `waiting_user`
 - duplicate model-call accounting and tool-result delivery are idempotent
 - permission resolution transitions `waiting_permission` runs correctly
+- `run.create` persists a queued run without provider dispatch
+- `run.heartbeat` updates liveness and missing heartbeat can drive executor
+  disconnect behavior
+- `model_call` or `tool_loop` hard deadline transitions to `failed` with
+  reason `stage_timeout`
+- `tool_loop -> prompt_plan` reentry is recorded as a legal transition

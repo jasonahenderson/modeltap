@@ -1,6 +1,6 @@
 # v0.3.0 — Status
 
-**Current phase:** Phase 2 — Ready for user review; Phase 3 blocked
+**Current phase:** Phase 2 — Remaining review processed; Phase 3 blocked
 
 **Branch:** `release/v0.3.0`  
 **Scope:** Run runtime foundation for FEAT-0016 and the first slice of
@@ -13,9 +13,7 @@ explicit `ADMIN:` commit. Phase 2 design findings recorded so far:
 - `docs/releases/v0.3.0/.reviews/codex-design-review.md` — 5 findings (F1–F5)
   accepted and applied to the designs.
 - `docs/releases/v0.3.0/.reviews/claude-design-review.md` — 10 net-new findings
-  (F6–F15), pending disposition. The largest is the FEAT-0015 observability axis
-  (trace IDs, heartbeats, stage deadlines, fsync) which the v0.3.0 designs do
-  not cover and the plan does not explicitly defer.
+  (F6–F15), accepted and applied or explicitly deferred.
 
 The complete release design index for user review is
 `docs/releases/v0.3.0/designs/README.md`.
@@ -49,17 +47,13 @@ are accepted.
   `internal/harnesshost`, `internal/harnessshell`, `internal/cli`, and
   `internal/storage` at the `release/v0.3.0` branch point.
 - Phase 1 closes only after every WU has a design artifact.
-- Phase 2 design review is recorded and findings are dispositioned.
+- Phase 2 design reviews are recorded and findings are dispositioned.
 - Phase 3 begins only after the explicit Phase 2 -> Phase 3 `ADMIN:` commit,
   accepted FEAT-0015/0016/0017 foundation scope, accepted run-runtime ADR, and
   reachable v0.2.x prerequisite surfaces.
 
 ## Open Items
 
-- Disposition the 10 findings from `claude-design-review.md` (F6–F15). The four
-  significant ones are F6 (observability axis), F7 (`run.create` /
-  `queued` reachability), F8 (`run.blocked` event naming), and F9 (fsync /
-  N-1 checkpoint compatibility).
 - Accept the run-runtime ADR before Phase 3.
 - Accept FEAT-0015, FEAT-0016, and the FEAT-0017 foundation slice before Phase
   3.

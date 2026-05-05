@@ -63,6 +63,9 @@ Tests must prove:
 `ProductionRuntime.DispatchCommand` routes these commands:
 
 - `/run [run-id]`
+- `/run context`
+- `/run prompt`
+- `/run policy`
 - `/runs`
 - `/jobs` alias for `/runs`
 - `/attach <run-id>`
@@ -73,7 +76,10 @@ Tests must prove:
 - `/fork <run-id>`
 
 `/run` with no ID shows the active attached run. `/run <run-id>` fetches details
-without taking attachment. `/attach` claims attachment through `run.attach`.
+without taking attachment. `/run context`, `/run prompt`, and `/run policy` are
+discoverable v0.3.0 stubs that return a clear "not enabled in v0.3.0" message
+and point to the owning future release (`v0.3.1` for context/prompt planning
+and `v0.3.3` for policy). `/attach` claims attachment through `run.attach`.
 
 Command output is surfaced as compact transcript event rows plus status chrome.
 Long event lists are summarized; users can request more through repeated
@@ -141,6 +147,8 @@ converts protocol payloads into shell-local view structs.
 ## Tests
 
 - `/run` calls runtime command path and renders active run summary
+- `/run context`, `/run prompt`, and `/run policy` render explicit not-enabled
+  messages
 - `/runs` distinguishes running, waiting permission, waiting user, completed,
   failed, and cancelled rows
 - `/runs` renders input-required and stuck markers from BFF summaries

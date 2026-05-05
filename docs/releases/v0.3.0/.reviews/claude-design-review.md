@@ -260,22 +260,20 @@ Severity: trivial
 
 ## Disposition
 
-To be processed in a Phase 2 disposition pass parallel to the Codex
-disposition (WU-110: process v0.3.0 design review). Suggested
-prioritization:
+Processed in `WU-110: process remaining v0.3.0 design review`.
 
-| Finding | Suggested disposition |
+| Finding | Disposition |
 |---|---|
-| F6 (observability) | Accept-with-scoping decision: declare ADR-0015 scope and add minimum trace_id / heartbeat / stage_timeout coverage to v0.3.0, OR explicitly defer in the plan |
-| F7 (`run.create`) | Accept: add the method or remove `queued` from v0.3.0 status enum |
-| F8 (`run.blocked` events) | Pick one: add events to WU-110, or revise FEAT-0016 |
-| F9 (fsync / N-1) | Accept: declare in ADR-0015 |
-| F10 (run-family budgets) | Accept-and-defer: note in plan "does not cover" |
-| F11 (cost granularity) | Accept: extend `run_model_calls` / `run_tool_results` |
-| F12 (reentry edges) | Accept: enumerate in WU-111-113 |
-| F13 (`/run` subcommands) | Accept: stub in WU-114-116 |
-| F14 (parallel tool calls) | Accept: state v0.3.0 policy in WU-111-113 |
-| F15 (consistency) | Accept: mechanical fixes |
+| F6 (observability) | Accepted with v0.3.0 minimum scope. ADR-0015 now defines trace IDs, heartbeats, default `model_call`/`tool_loop` deadlines, and `stage_timeout`; WU-109/WU-110/WU-111-113/WU-117 reserve schema/protocol/runtime/tests. |
+| F7 (`run.create`) | Accepted. WU-110 now defines `run.create`, and WU-111-113 defines queued run creation without provider dispatch. |
+| F8 (`run.blocked` events) | Accepted. WU-110 now adds `run.blocked` and `run.unblocked` events while retaining `run.status_changed`. |
+| F9 (fsync / N-1) | Accepted. ADR-0015 now declares SQLite transaction commit as the fsync boundary and requires v0.3.0 checkpoint schema-version compatibility. |
+| F10 (run-family budgets) | Accepted and deferred. ADR-0015 and the v0.3.0 plan now defer budget inheritance, inherited deadlines, and cancellation cascade until child/sub-agent execution lands. |
+| F11 (cost granularity) | Accepted. WU-109 now extends model-call/tool-result accounting and states per-stage aggregation is derived by query; WU-117 adds tests. |
+| F12 (reentry edges) | Accepted. WU-111-113 now enumerates legal reentry edges and marks v0.3.0-active versus inactive edges. |
+| F13 (`/run` subcommands) | Accepted. WU-114-116 now adds discoverable `/run context`, `/run prompt`, and `/run policy` stubs. |
+| F14 (parallel tool calls) | Accepted. WU-111-113 now states v0.3.0 uses sequential provider-emission-order tool-loop processing. |
+| F15 (consistency) | Accepted. WU-109, ADR-0015, and WU-117 now clarify protocol event projection, checkpoint/run field ownership, non-turn idempotency, workflow-type rejection tests, and event payload schema versions. |
 
 ## Forward-compatibility check (FEAT-0018/0019/0020/0021/0022)
 

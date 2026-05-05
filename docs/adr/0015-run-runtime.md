@@ -27,16 +27,19 @@ client and makes the BFF authoritative for runtime state.
 
 ## Decision
 
-The BFF owns run identity, lifecycle status, pipeline stage, attachment state,
-event sequencing, and checkpoint records. The harness owns local execution facts:
-tool results, local permission decisions, file previews, executor connection
-state, and user commands. The harness reports those facts to the BFF; the BFF
-integrates them and emits canonical `run.*` events.
+The BFF owns run identity, trace identity, lifecycle status, pipeline stage,
+attachment state, event sequencing, checkpoint records, stage deadlines, and
+run liveness state. The harness owns local execution facts: tool results, local
+permission decisions, file previews, executor connection state, heartbeats, and
+user commands. The harness reports those facts to the BFF; the BFF integrates
+them and emits canonical `run.*` events.
 
 Every `turn.submit` creates or continues a foreground run in v0.3.0. The
 existing `turn.submit` method remains supported for compatibility, but the BFF
 wraps it in a durable run before provider dispatch. New run-native control and
-inspection methods use the `run.*` namespace.
+inspection methods use the `run.*` namespace. `run.create` creates a queued run
+without starting provider work; `turn.submit` remains the compatibility path for
+creating and immediately starting an attached foreground run.
 
 Canonical run statuses are:
 
@@ -122,19 +125,56 @@ Minimum checkpoint fields:
 - extension JSON for context, artifacts, policy, workspace, memory, and routing
 
 Checkpoint writes are part of the same SQLite transaction as the lifecycle event
-that advances the run state.
+that advances the run state. Fsync follows the repository's existing SQLite WAL
+storage contract: the durability boundary is SQLite transaction commit. v0.3.0
+does not add manual fsync calls outside SQLite.
+
+v0.3.0 checkpoint records use `schema_version = 1`. v0.3.0 readers must accept
+version 1 records. Subsequent minor releases that change checkpoint payloads
+must read at minimum v0.3.0 version 1 records or provide an explicit migration.
+
+Checkpoint payloads may reference the current `runs` row for fields that are
+also stored on the run, including `workflow_type` and attachment state. They do
+not need to duplicate those fields as checkpoint table columns.
 
 ## Event Ordering
 
 Run events are append-only and monotonically sequenced per `run_id`. Essential
-events must not be silently dropped: lifecycle, stage transition, tool request,
-tool result, checkpoint, artifact, and terminal events. Progress events may be
-coalesced when buffers overflow, but the BFF must either preserve essential
-events or pause/fail the run according to liveness policy.
+events must not be silently dropped: lifecycle, stage transition, blocked,
+unblocked, tool request, tool result, checkpoint, artifact, and terminal events.
+Progress events may be coalesced when buffers overflow, but the BFF must either
+preserve essential events or pause/fail the run according to liveness policy.
 
 Reattach requests include the last observed sequence. If replay has a gap, the
 BFF returns a summary plus the latest checkpoint and marks replay fidelity as
 partial.
+
+## Liveness and Observability
+
+Every run has a BFF-generated opaque `trace_id`. The trace ID is recorded on the
+run row and propagated through BFF logs, harness/executor requests, and
+model-provider dispatch metadata where the provider adapter can carry it safely.
+
+Attached harnesses and local executors send run-scoped heartbeats. v0.3.0 uses
+heartbeats for attached foreground runs and detached runs that still have local
+tool execution in progress. Missing heartbeats do not fail a completed or idle
+detached run, but they can move active local-executor work to `waiting_user` or
+`failed` according to the executor-disconnect rules above.
+
+v0.3.0 defines stage warning thresholds and hard deadlines as runtime policy
+values. Defaults are implementation constants unless later config work moves
+them to user config:
+
+| Stage | Warning threshold | Hard deadline |
+|---|---:|---:|
+| `model_call` | 120 seconds | 600 seconds |
+| `tool_loop` | 120 seconds without tool-result progress | 900 seconds |
+
+When an active stage exceeds its hard deadline, the BFF appends a
+`run.stage_timeout` event and transitions the run to `failed` with reason
+`stage_timeout`. Waiting states (`waiting_permission` and `waiting_user`) use
+their own timeout policies and are not failed by active-stage deadlines in
+v0.3.0.
 
 ## Workflow Type
 
@@ -154,6 +194,14 @@ churn:
 Unknown workflow types are rejected at run creation in v0.3.0. Future workflow
 profiles may add aliases, but persisted run rows use this canonical enum until
 a later ADR revises it.
+
+## Run Families
+
+`parent_run_id` is reserved in v0.3.0 for future forks, sibling runs, and
+synthesis runs. Run-family budgets, inherited deadlines, and cancellation
+cascade behavior are explicitly deferred until a later release introduces
+child/sub-agent execution. v0.3.0 cancellation affects only the addressed run
+unless a later accepted design revises the family policy.
 
 ## Consequences
 
@@ -180,3 +228,5 @@ This ADR is accepted when v0.3.0 designs show:
    active foreground transcript.
 5. Tests cover executor disconnect, event replay gaps, and
    `waiting_permission` versus `waiting_user`.
+6. Tests cover trace ID persistence, heartbeat liveness, stage timeout, and
+   checkpoint schema-version compatibility.

@@ -65,6 +65,9 @@ This release does not cover:
 - policy-grade command/path/domain rules
 - durable memory promotion or quality-driven routing
 - full background local-tool execution while no harness/executor is connected
+- run-family budget inheritance, inherited deadlines, and cancellation cascade;
+  those behaviors are deferred until a later release introduces child/sub-agent
+  execution
 - workflow slash commands such as `/explore`, `/feature`, `/adr`, `/release`,
   `/implement`, `/debug`, `/docs`, and `/devops`; their alignment home is
   v0.3.4 WU-153 unless later split into a dedicated feature or patch
@@ -90,11 +93,11 @@ The release executes in the repo's strict three phases:
 2. **Phase 2 — Review:** process design findings.
 3. **Phase 3 — Implementation:** implement WUs in dependency-legal order.
 
-Current phase: **Phase 2 — Ready for user review; Phase 3 blocked.** Phase 1
-completed after all WU-108 through WU-117 design artifacts were drafted, Phase 2
-opened on 2026-05-05 by explicit `ADMIN:` commit on `release/v0.3.0`, Phase 2
-findings were processed on 2026-05-05, and the full design-review index is
-available at `docs/releases/v0.3.0/designs/README.md`.
+Current phase: **Phase 2 — Remaining review processed; Phase 3 blocked.** Phase
+1 completed after all WU-108 through WU-117 design artifacts were drafted,
+Phase 2 opened on 2026-05-05 by explicit `ADMIN:` commit on `release/v0.3.0`,
+Phase 2 findings were processed on 2026-05-05, and the full design-review index
+is available at `docs/releases/v0.3.0/designs/README.md`.
 
 ## Release Authority Gates
 

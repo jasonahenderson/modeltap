@@ -24,6 +24,9 @@ Tests:
 - checkpoint and lifecycle state update are transactional
 - duplicate model-call IDs do not double-count usage
 - duplicate tool-call IDs do not re-deliver tool results
+- unknown workflow types are rejected at run creation
+- v1 checkpoint records load under v0.3.0 readers
+- run totals match the sum of model-call/tool-result accounting
 
 ### Protocol
 
@@ -36,6 +39,8 @@ Tests:
 - `turn.submit` fixture remains backward-compatible
 - optional `run_id` in `TurnSubmitResponse` omits cleanly for old clients
 - `run.permissions` and `run.resolve_permission` fixtures round-trip
+- `run.create`, `run.heartbeat`, `run.blocked`, `run.unblocked`, and
+  `run.stage_timeout` fixtures round-trip
 
 ### BFF
 
@@ -51,8 +56,11 @@ Tests:
 - `run.attach` serializes competing attach requests
 - `run.events` returns full replay or summary fidelity
 - `run.resolve_permission` transitions a run out of `waiting_permission`
+- `run.create` creates a queued run without dispatching a provider
+- stage hard deadline transitions to `failed` with reason `stage_timeout`
 - executor disconnect produces `waiting_user`
 - permission request produces `waiting_permission`
+- heartbeat liveness updates attached-run state
 
 ### Harness Host and Shell
 
@@ -62,6 +70,8 @@ Tests:
 
 - run protocol events project into existing shell host events
 - active `/run` renders summary without changing shell-native commands
+- `/run context`, `/run prompt`, and `/run policy` render explicit not-enabled
+  stubs
 - `/runs` and `/jobs` render compact run rows
 - `/runs` renders input-required and stuck markers from BFF summaries
 - detached run deltas do not mutate foreground transcript
@@ -90,6 +100,8 @@ Scenarios:
 - Detached transcripts do not merge into foreground transcript.
 - Cost/token/model metadata is present on terminal run summaries.
 - Checkpoint records include reserved extension keys for downstream releases.
+- Trace IDs persist and are available to BFF/harness/model dispatch paths.
+- Heartbeat and stage-timeout behavior is covered for active runs.
 
 ## Documentation
 

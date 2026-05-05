@@ -48,8 +48,10 @@ Primary questions:
 
 ## Phase 2 Findings Already Processed
 
-The Codex Phase 2 design review is recorded at
-[`../.reviews/codex-design-review.md`](../.reviews/codex-design-review.md).
+The Phase 2 design reviews are recorded at:
+
+- [`../.reviews/codex-design-review.md`](../.reviews/codex-design-review.md)
+- [`../.reviews/claude-design-review.md`](../.reviews/claude-design-review.md)
 
 Processed findings tightened:
 
@@ -58,6 +60,10 @@ Processed findings tightened:
 - model-call and tool-result idempotency
 - attachment summary/lease authority
 - run-list input-required and stuck semantics
+- observability/liveness scope, including trace IDs, heartbeats, stage timeout,
+  and checkpoint compatibility
+- `run.create`, blocked/unblocked event naming, run-accounting granularity,
+  reentry edges, `/run` subcommand stubs, and sequential v0.3.0 tool-loop policy
 
 ## Phase 3 Blocks
 
