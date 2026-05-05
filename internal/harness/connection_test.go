@@ -590,8 +590,12 @@ func startMockBFF(t *testing.T, sock string) *mockBFF {
 
 func (s *mockBFF) close() {
 	if s.ln != nil {
+		// Don't nil s.ln — acceptLoop reads it from another goroutine.
+		// Closing the listener is sufficient to unblock Accept with
+		// net.ErrClosed; the field is set once at construction and
+		// never reassigned, so leaving it pointing at the closed
+		// listener is race-free.
 		_ = s.ln.Close()
-		s.ln = nil
 	}
 }
 

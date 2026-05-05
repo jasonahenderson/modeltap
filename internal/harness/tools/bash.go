@@ -85,6 +85,13 @@ func (b *BashTool) Execute(ctx context.Context, input json.RawMessage) (*ToolExe
 
 	cmd := exec.CommandContext(execCtx, "sh", "-c", *in.Command)
 	cmd.Dir = b.projectRoot
+	// On Linux, /bin/sh (dash) may fork the trailing simple command
+	// rather than exec'ing into it. CommandContext SIGKILLs sh, but the
+	// forked child inherits the stdout/stderr pipes and gets reparented
+	// to PID 1 — CombinedOutput's I/O reader goroutines then block on
+	// EOF until the child exits naturally. WaitDelay (Go 1.20+) bounds
+	// that wait so timeouts return promptly.
+	cmd.WaitDelay = 100 * time.Millisecond
 	output, runErr := cmd.CombinedOutput()
 
 	truncated := truncateOutput(output, b.maxOutput)

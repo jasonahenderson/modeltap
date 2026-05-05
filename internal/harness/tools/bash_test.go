@@ -113,8 +113,11 @@ func TestBash_OutputTruncation(t *testing.T) {
 	b := NewBashTool(t.TempDir())
 	b.SetMaxOutput(50)
 
+	// Brace expansion ({1..500}) is bash/zsh, not POSIX. On Ubuntu where
+	// /bin/sh is dash, the literal '{1..500}' becomes one argument and
+	// printf prints 'x' once. Use awk for a portable byte-stream emitter.
 	res, err := b.Execute(context.Background(),
-		bashInput(t, `printf 'x%.0s' {1..500}`, 0))
+		bashInput(t, `awk 'BEGIN{for(i=0;i<500;i++)printf "x"}'`, 0))
 	if err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
