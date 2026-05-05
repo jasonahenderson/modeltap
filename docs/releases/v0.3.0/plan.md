@@ -93,11 +93,11 @@ The release executes in the repo's strict three phases:
 2. **Phase 2 — Review:** process design findings.
 3. **Phase 3 — Implementation:** implement WUs in dependency-legal order.
 
-Current phase: **Phase 2 — Remaining review processed; Phase 3 blocked.** Phase
-1 completed after all WU-108 through WU-117 design artifacts were drafted,
-Phase 2 opened on 2026-05-05 by explicit `ADMIN:` commit on `release/v0.3.0`,
-Phase 2 findings were processed on 2026-05-05, and the full design-review index
-is available at `docs/releases/v0.3.0/designs/README.md`.
+Current phase: **Phase 3 — Implementation.** Phase 1 completed after all
+WU-108 through WU-117 design artifacts were drafted, Phase 2 opened on
+2026-05-05 by explicit `ADMIN:` commit on `release/v0.3.0`, Phase 2 findings
+were processed on 2026-05-05, and Phase 3 opened on 2026-05-05 after accepting
+the feature/ADR gates and confirming prerequisite surfaces.
 
 ## Release Authority Gates
 
@@ -108,9 +108,9 @@ Phase 1 may open only after one of these is true:
   feature specs. This exception was recorded in the 2026-05-05 release-open
   commit.
 
-Phase 3 remains blocked until FEAT-0015, FEAT-0016, the FEAT-0017 foundation
-slice, and the run-runtime ADR are accepted. Later v0.3.x releases inherit the
-same rule for their feature scopes.
+Phase 3 opened after FEAT-0015, FEAT-0016, the FEAT-0017 foundation slice, and
+ADR-0015 were accepted. Later v0.3.x releases inherit the same gate pattern for
+their feature scopes.
 
 ## Work Units
 
