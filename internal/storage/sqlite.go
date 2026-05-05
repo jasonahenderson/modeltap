@@ -43,6 +43,15 @@ func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 		return nil, fmt.Errorf("opening database: %w", err)
 	}
 
+	// :memory: gives each pool connection its own independent SQLite
+	// database, so a schema or row written via one connection is invisible
+	// to the next. Production never uses :memory: (file paths only); pin
+	// the pool to a single connection for tests so concurrent writers and
+	// readers see the same DB.
+	if dbPath == ":memory:" {
+		db.SetMaxOpenConns(1)
+	}
+
 	// Verify the connection works.
 	if err := db.Ping(); err != nil {
 		db.Close()
