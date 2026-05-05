@@ -1,6 +1,6 @@
 # v0.3.0 — Status
 
-**Current phase:** Phase 2 — Review processed; Phase 3 blocked
+**Current phase:** Phase 2 — Ready for user review; Phase 3 blocked
 
 **Branch:** `release/v0.3.0`  
 **Scope:** Run runtime foundation for FEAT-0016 and the first slice of
@@ -10,6 +10,9 @@ Phase 1 opened on 2026-05-05 by explicit `ADMIN:` commit and completed after all
 WU-108 through WU-117 designs were drafted. Phase 2 opened on 2026-05-05 by
 explicit `ADMIN:` commit. Phase 2 design findings were recorded and processed in
 `docs/releases/v0.3.0/.reviews/codex-design-review.md`.
+
+The complete release design index for user review is
+`docs/releases/v0.3.0/designs/README.md`.
 
 Because FEAT-0015, FEAT-0016, and FEAT-0017 remain draft specs, the release
 remains design-against-draft work only. Phase 3 remains blocked until those

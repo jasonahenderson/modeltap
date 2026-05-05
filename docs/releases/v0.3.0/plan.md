@@ -90,10 +90,11 @@ The release executes in the repo's strict three phases:
 2. **Phase 2 — Review:** process design findings.
 3. **Phase 3 — Implementation:** implement WUs in dependency-legal order.
 
-Current phase: **Phase 2 — Review processed; Phase 3 blocked.** Phase 1
+Current phase: **Phase 2 — Ready for user review; Phase 3 blocked.** Phase 1
 completed after all WU-108 through WU-117 design artifacts were drafted, Phase 2
-opened on 2026-05-05 by explicit `ADMIN:` commit on `release/v0.3.0`, and Phase
-2 findings were processed on 2026-05-05.
+opened on 2026-05-05 by explicit `ADMIN:` commit on `release/v0.3.0`, Phase 2
+findings were processed on 2026-05-05, and the full design-review index is
+available at `docs/releases/v0.3.0/designs/README.md`.
 
 ## Release Authority Gates
 
