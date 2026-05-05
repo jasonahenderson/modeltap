@@ -26,6 +26,7 @@ const (
 type RunEventPayload struct {
 	RunID     string          `json:"run_id"`
 	Seq       int64           `json:"seq"`
+	Type      string          `json:"type,omitempty"`
 	SessionID string          `json:"session_id"`
 	TurnID    string          `json:"turn_id,omitempty"`
 	Stage     string          `json:"stage,omitempty"`

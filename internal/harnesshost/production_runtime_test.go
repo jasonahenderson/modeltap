@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jasonahenderson/modeltap/internal/harness"
 	"github.com/jasonahenderson/modeltap/internal/harnesshost/testutil"
 	"github.com/jasonahenderson/modeltap/internal/harnessshell"
@@ -289,5 +290,39 @@ func TestProductionRuntimeResolvePermissionUnblocksCallback(t *testing.T) {
 		}
 	case <-time.After(50 * time.Millisecond):
 		t.Fatalf("ResolvePermission did not unblock the channel")
+	}
+}
+
+func TestProductionRuntimeProjectRunReplay(t *testing.T) {
+	r, err := NewProductionRuntime(ProductionRuntimeConfig{
+		ConnConfig: harness.ConnectionConfig{SocketPath: "/nonexistent.sock"},
+	})
+	if err != nil {
+		t.Fatalf("NewProductionRuntime: %v", err)
+	}
+	defer r.Close()
+
+	var msgs []any
+	r.sender.onSend = func(msg tea.Msg) {
+		msgs = append(msgs, msg)
+	}
+	r.projectRunReplay([]protocol.RunEventPayload{
+		{
+			RunID:   "run-1",
+			Type:    protocol.EventRunProgress,
+			Payload: json.RawMessage(`{"type":"token_delta","text":"hello"}`),
+		},
+		{RunID: "run-1", Type: protocol.EventRunCompleted},
+	})
+
+	if len(msgs) != 2 {
+		t.Fatalf("msgs = %d, want 2", len(msgs))
+	}
+	delta, ok := msgs[0].(harnessshell.RunDeltaEvent)
+	if !ok || delta.RunID != "run-1" || delta.Delta != "hello" {
+		t.Fatalf("delta msg = %#v", msgs[0])
+	}
+	if _, ok := msgs[1].(harnessshell.RunCompletedEvent); !ok {
+		t.Fatalf("complete msg = %T, want RunCompletedEvent", msgs[1])
 	}
 }

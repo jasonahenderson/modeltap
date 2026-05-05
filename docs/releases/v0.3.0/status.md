@@ -71,14 +71,15 @@ before the phase transition.
   run IDs do not break foreground transcript projection.
 - Added attach-conflict handling, exact detach lease clearing, startup/session
   run recovery summaries, and detached-run delta regression coverage.
+- Added replay event type metadata, checkpoint-backed run progress replay for
+  token deltas, attach/reconnect replay projection, and blocker detail
+  extraction for `run.permissions`.
 - Updated user and embedding docs for run commands and run projection.
 
 Validation: `go test ./...` passes.
 
 ## Open Items
 
-- Persist and expose richer permission-blocker details.
-- Complete full reconnect/resume replay projection and detached transcript
-  buffer behavior for WU-116.
+- Complete detached transcript buffer behavior for WU-116.
 - Expand harness projection tests for attach replay and summary-only fidelity.
 - Finalize release changelog and readiness review after all WUs close.

@@ -33,7 +33,9 @@ Implemented so far:
   `/cancel`, `/retry`, `/continue`, and `/fork` to run-native RPC methods.
 - Attach conflicts are rejected when another connection owns the run, and
   detach clears the attachment lease.
+- Run event replay includes event type metadata, token-delta progress events,
+  terminal projection, and `run.permissions` blocker details when a stored
+  `run.blocked` event is available.
 
-Remaining before ship: full reconnect/replay projection, permission-blocker
-detail persistence, detached transcript buffer behavior, and final
-release-readiness review.
+Remaining before ship: detached transcript buffer behavior, attach replay and
+summary-only fidelity tests, and final release-readiness review.

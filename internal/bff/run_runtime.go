@@ -155,6 +155,7 @@ func emitStoredRunEvent(conn *Connection, run *storage.Run, ev storage.RunEvent,
 	payload := protocol.RunEventPayload{
 		RunID:     run.ID,
 		Seq:       ev.Seq,
+		Type:      ev.Type,
 		SessionID: run.SessionID,
 		TurnID:    turnID,
 		Stage:     ev.Stage,
@@ -226,6 +227,7 @@ func protocolRunEvent(run storage.Run, ev storage.RunEvent) protocol.RunEventPay
 	return protocol.RunEventPayload{
 		RunID:     ev.RunID,
 		Seq:       ev.Seq,
+		Type:      ev.Type,
 		SessionID: run.SessionID,
 		Stage:     ev.Stage,
 		Status:    ev.Status,

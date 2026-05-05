@@ -81,3 +81,53 @@ func TestRunDetachClearsAttachedConnectionID(t *testing.T) {
 		t.Fatalf("attachment = %q/%q, want detached/empty", got.AttachmentState, got.AttachedConnectionID)
 	}
 }
+
+func TestRunEventsReplayIncludesEventType(t *testing.T) {
+	srv := newServerWithRealStore(t)
+	run := seedRunForControls(t, srv, "")
+	c, _ := newRelayConnection(t, srv)
+
+	params, _ := json.Marshal(protocol.RunEvents{RunID: run.ID, AfterSeq: 0, Limit: 10})
+	resp, err := handleRunEvents(context.Background(), c, params)
+	if err != nil {
+		t.Fatalf("handleRunEvents: %v", err)
+	}
+	events := resp.(protocol.RunEventsResponse).Events
+	if len(events) == 0 {
+		t.Fatalf("no replay events")
+	}
+	if events[0].Type != protocol.EventRunStarted {
+		t.Fatalf("event type = %q, want %q", events[0].Type, protocol.EventRunStarted)
+	}
+}
+
+func TestRunPermissionsReturnsStoredBlockerDetails(t *testing.T) {
+	srv := newServerWithRealStore(t)
+	run := seedRunForControls(t, srv, "")
+	c, _ := newRelayConnection(t, srv)
+
+	status := storage.RunStatusWaitingPermission
+	stage := storage.RunStageToolLoop
+	payload := json.RawMessage(`{"request_id":"perm-1","type":"waiting_permission","reason":"write_file"}`)
+	if _, err := srv.store.AppendRunEvent(context.Background(), run.ID, storage.RunEvent{
+		Type:        protocol.EventRunBlocked,
+		Stage:       stage,
+		Status:      status,
+		PayloadJSON: payload,
+	}, storage.RunStateUpdate{Status: &status, Stage: &stage}); err != nil {
+		t.Fatalf("AppendRunEvent: %v", err)
+	}
+
+	params, _ := json.Marshal(protocol.RunPermissions{RunID: run.ID})
+	resp, err := handleRunPermissions(context.Background(), c, params)
+	if err != nil {
+		t.Fatalf("handleRunPermissions: %v", err)
+	}
+	perms := resp.(protocol.RunPermissionsResponse).Permissions
+	if len(perms) != 1 {
+		t.Fatalf("permissions = %d, want 1", len(perms))
+	}
+	if perms[0].RequestID != "perm-1" || perms[0].Reason != "write_file" || perms[0].Type != storage.RunStatusWaitingPermission {
+		t.Fatalf("permission = %+v", perms[0])
+	}
+}

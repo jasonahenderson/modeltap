@@ -583,6 +583,7 @@ func (r *ProductionRuntime) resumeKnownRuns(ctx context.Context) {
 	if activeRunID != "" {
 		var events protocol.RunEventsResponse
 		if err := client.CallInto(ctx, protocol.MethodRunEvents, &protocol.RunEvents{RunID: activeRunID, AfterSeq: 0, Limit: 100}, &events); err == nil {
+			r.projectRunReplay(events.Events)
 			r.sender.Send(harnessshell.HostStatusEvent{
 				Status: "Run replay: " + activeRunID + " (" + events.Fidelity + ")",
 				Kind:   harnessshell.StatusReady,
@@ -595,6 +596,33 @@ func (r *ProductionRuntime) resumeKnownRuns(ctx context.Context) {
 			Status: fmt.Sprintf("Recovered %d recent run(s)", len(list.Runs)),
 			Kind:   harnessshell.StatusReady,
 		})
+	}
+}
+
+func (r *ProductionRuntime) projectRunReplay(events []protocol.RunEventPayload) {
+	for _, ev := range events {
+		switch ev.Type {
+		case protocol.EventRunProgress:
+			var payload struct {
+				Type string `json:"type"`
+				Text string `json:"text"`
+			}
+			if err := json.Unmarshal(ev.Payload, &payload); err == nil && payload.Type == "token_delta" && payload.Text != "" {
+				r.sender.Send(harnessshell.RunDeltaEvent{RunID: ev.RunID, Delta: payload.Text})
+			}
+		case protocol.EventRunCompleted:
+			r.sender.Send(harnessshell.RunCompletedEvent{RunID: ev.RunID})
+		case protocol.EventRunFailed:
+			r.sender.Send(harnessshell.RunFailedEvent{RunID: ev.RunID, Message: ev.Reason})
+		case protocol.EventRunCancelled:
+			r.sender.Send(harnessshell.RunStoppedEvent{RunID: ev.RunID, Reason: harnessshell.StopReasonHost, Message: ev.Reason})
+		case protocol.EventRunBlocked:
+			status := "Run blocked"
+			if ev.Reason != "" {
+				status += ": " + ev.Reason
+			}
+			r.sender.Send(harnessshell.HostStatusEvent{Status: status, Kind: harnessshell.StatusPermissionPending})
+		}
 	}
 }
 
@@ -742,6 +770,7 @@ func (r *ProductionRuntime) handleRunAttachCommand(ctx context.Context, args str
 		return r.statusError("run.attach", err)
 	}
 	r.mode.SetActiveRunID(resp.Run.RunID)
+	r.projectRunReplay(resp.Events)
 	r.sender.Send(harnessshell.HostStatusEvent{
 		Status: "Attached run: " + resp.Run.RunID + " (" + resp.Fidelity + " replay)",
 		Kind:   harnessshell.StatusReady,

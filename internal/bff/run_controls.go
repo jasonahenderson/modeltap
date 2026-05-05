@@ -279,7 +279,7 @@ func handleRunPermissions(ctx context.Context, conn *Connection, params json.Raw
 			return nil, err
 		}
 		if run.Status == storage.RunStatusWaitingPermission || run.Status == storage.RunStatusWaitingUser {
-			resp.Permissions = append(resp.Permissions, protocol.RunPermission{RunID: run.ID, Type: run.Status})
+			resp.Permissions = append(resp.Permissions, latestRunBlocker(ctx, conn.server.store, *run))
 		}
 	}
 	return resp, nil
@@ -335,4 +335,37 @@ func boolMessage(ok bool, ifTrue, ifFalse string) string {
 		return ifTrue
 	}
 	return ifFalse
+}
+
+func latestRunBlocker(ctx context.Context, store storage.Store, run storage.Run) protocol.RunPermission {
+	perm := protocol.RunPermission{RunID: run.ID, Type: run.Status}
+	events, err := store.ListRunEvents(ctx, run.ID, 0, 500)
+	if err != nil {
+		return perm
+	}
+	for i := len(events) - 1; i >= 0; i-- {
+		ev := events[i]
+		if ev.Type != protocol.EventRunBlocked {
+			continue
+		}
+		var payload struct {
+			RequestID string `json:"request_id"`
+			Type      string `json:"type"`
+			Reason    string `json:"reason"`
+		}
+		if err := json.Unmarshal(ev.PayloadJSON, &payload); err != nil {
+			return perm
+		}
+		if payload.RequestID != "" {
+			perm.RequestID = payload.RequestID
+		}
+		if payload.Type != "" {
+			perm.Type = payload.Type
+		}
+		if payload.Reason != "" {
+			perm.Reason = payload.Reason
+		}
+		return perm
+	}
+	return perm
 }

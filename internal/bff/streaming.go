@@ -202,6 +202,11 @@ readLoop:
 			acc.Content += ev.Content
 			delta := protocol.TokenDelta{TurnID: sr.turnID, RunID: sr.runID, BranchID: sr.branchID, Text: ev.Content}
 			sr.sendNotification(protocol.EventTokenDelta, delta)
+			sr.appendRunProgress(ctx, map[string]any{
+				"type":    "token_delta",
+				"turn_id": sr.turnID,
+				"text":    ev.Content,
+			})
 
 		case provider.StreamEventToolCallStart:
 			tb := &toolBuilder{id: ev.ToolCall.ID, name: ev.ToolCall.Name}
@@ -360,6 +365,30 @@ func (sr *StreamRelay) persistAssistant(ctx context.Context, acc *relayResult) (
 
 func (sr *StreamRelay) appendTerminalRunEvent(ctx context.Context, typ, status, reason string, payload any) {
 	sr.appendRunEvent(ctx, typ, storage.RunStageCompletion, status, reason, payload)
+}
+
+func (sr *StreamRelay) appendRunProgress(ctx context.Context, payload any) {
+	if sr.conn == nil || sr.conn.server == nil || sr.runID == "" {
+		return
+	}
+	raw := json.RawMessage(`{}`)
+	if payload != nil {
+		if b, err := json.Marshal(payload); err == nil {
+			raw = b
+		}
+	}
+	run, err := sr.conn.server.store.GetRun(ctx, sr.runID)
+	if err != nil {
+		return
+	}
+	ev := storage.RunEvent{
+		Type:        protocol.EventRunProgress,
+		Stage:       run.Stage,
+		Status:      run.Status,
+		PayloadJSON: raw,
+		CreatedAt:   time.Now().UTC(),
+	}
+	_, _ = sr.conn.server.store.AppendRunEvent(ctx, sr.runID, ev, storage.RunStateUpdate{})
 }
 
 func (sr *StreamRelay) appendRunEvent(ctx context.Context, typ, stage, status, reason string, payload any) {
