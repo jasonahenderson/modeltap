@@ -4,12 +4,11 @@ This directory stores review artifacts for feature specs and feature-adjacent pl
 
 ## Layout
 
-Canonical per-feature findings stay at the root:
+Canonical per-feature findings stay at the root as markdown only:
 
 - `docs/features/.reviews/{feature-stem}-findings.md`
-- `docs/features/.reviews/{feature-stem}-findings.json`
 
-The `stem` matches the feature filename without the `.md` extension (e.g. `0003-web-dashboard`).
+The `stem` matches the feature filename without the `.md` extension (e.g. `0003-web-dashboard`). When a reviewer identity matters (model, role, or harness), include it in the filename — for example `0015-professional-harness-runtime-architect-sre-findings.md`.
 
 Plan reviews — reviews of implementation plans derived from a feature spec, technical design writeups tied to one feature, or narrower execution reviews — live under:
 
@@ -18,38 +17,36 @@ Plan reviews — reviews of implementation plans derived from a feature spec, te
 When the reviewing model or harness is known, include it in the plan-review filename:
 
 - `docs/features/.reviews/plan-reviews/codex-0008-bff-server-connectivity-review.md`
-- `docs/features/.reviews/plan-reviews/codex-0008-bff-server-connectivity-review.json`
 
 Cross-feature syntheses (baseline crosswalks, prereviews spanning a group of features, design-thoughts reviews) live under:
 
 - `docs/features/.reviews/syntheses/`
 
-## Canonical Files
+## Findings Format
 
-Each formally reviewed feature spec keeps exactly two canonical files:
+Review artifacts are markdown only. Each formally reviewed feature spec keeps a single canonical findings file:
 
-- `{stem}-findings.md` — markdown findings for humans
-- `{stem}-findings.json` — structured findings for tooling
+- `{stem}-findings.md`
 
-## Findings Schema
+Each finding documents:
 
-Each finding in the JSON file should include:
+- short identifier (e.g. `F1`)
+- one-line summary
+- reviewer role or identity (e.g. `Architecture`, `SRE`, `Security`)
+- severity — `blocking` | `significant` | `advisory`
+- affected sections of the feature spec
+- detail
+- recommendation
+- disposition — `accepted` | `rejected` | `deferred` | `null` until resolved
+- disposition rationale
 
-- `id` — short identifier (e.g. `F1`)
-- `summary` — one-line description
-- `reviewer` — reviewer role (e.g. `Architecture Conformance`, `Implementation Readiness`, `Security`)
-- `severity` — `blocking` | `significant` | `advisory`
-- `affected_sections` — sections of the feature spec the finding touches
-- `detail` — full explanation
-- `recommendation` — concrete next action
-- `disposition` — `accepted` | `rejected` | `deferred` | `null` until resolved
-- `disposition_rationale` — why the disposition was chosen
-
-The markdown file mirrors this structure for human reading and includes a top-line summary block:
+Each markdown file should include a top-line summary block at the top:
 
 ```
 total_findings, blocking, significant, advisory, top_line
 ```
+
+Dispositions live in a table at the bottom of the same markdown file. No paired JSON sidecar — the canonical rule is in `.agents/process.md` under "Review Artifact Placement".
 
 ## When to Write a Review
 

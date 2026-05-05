@@ -82,6 +82,34 @@ Prime directives:
 5. The current phase lives in `docs/releases/<version>/plan.md`.
 6. Phase transitions are explicit `ADMIN:` commits, never implicit.
 
+## Per-Release Branching
+
+Each release implements on its own dedicated branch.
+
+- **Naming**: `release/vX.Y.Z`, one per release.
+- **Creation**: cut **just in time** when the release opens Phase 1, in the
+  same `ADMIN:` commit that opens the release. Do not pre-create branches
+  for unstarted releases; their plans live in `docs/releases/<version>/`
+  until the gate opens.
+- **Base**: cut from `main` at the point all predecessor releases are merged
+  and any cross-release lockdown anchor (for example a series-level
+  `design-locked-vX.Y.x` tag) is reachable.
+- **Lifetime**: the branch hosts every commit for that release — Phase 1
+  design, Phase 2 review processing, Phase 3 implementation, and the
+  release-close `ADMIN:` commit that finalizes status, changelog, and the
+  release-readiness review.
+- **Merge**: when the release ships, merge the branch into `main` with
+  `--no-ff` so the release lands as a single visible integration commit.
+  Tag the release on the merge commit per the release-tag rules below, then
+  delete the branch. The tag is the durable anchor.
+- **Hotfixes**: post-ship hotfixes do not reuse a deleted release branch.
+  Open a new release (typically a patch bump) with its own branch.
+
+Rationale: per-release branches make rollback, cherry-picking, and
+parallel-release work tractable, and they keep `main` reflecting a sequence
+of release integrations rather than the day-to-day churn of design and WU
+commits.
+
 ## Design Artifact Placement
 
 - Design docs live under the active release directory's `designs/`

@@ -47,6 +47,18 @@ Use this location for:
 
 `docs/history/` remains the work-log location, but it should point to the canonical review artifact rather than serving as the review artifact itself.
 
+## Per-Release Branching
+
+Each release implements on its own dedicated branch named `release/vX.Y.Z`.
+Branches are cut **just in time** when the release opens Phase 1, in the
+same `ADMIN:` commit that opens the release. The branch hosts every commit
+for that release — design, review processing, implementation, and close —
+and merges back into `main` with `--no-ff` at release ship, after which the
+branch is deleted and the release tag remains the durable anchor.
+
+The canonical rule and rationale live in `.agents/process.md` under
+"Per-Release Branching".
+
 ## Versioning Policy
 
 - **Major (vX.0.0)**: breaking changes to the user-facing interface, config format, or data schema
