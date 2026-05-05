@@ -50,6 +50,25 @@ Each run may contain:
 - cost and usage summary
 - final outcome summary
 
+Every artifact uses a minimal envelope:
+
+- `artifact_id`
+- `run_id`
+- `type`
+- `schema_version`
+- `created_at`
+- `payload_ref`
+- optional `payload_inline`
+- `redaction_state`
+- `truncated`
+- provenance and source IDs when applicable
+
+Initial artifact types include `context_plan`, `prompt_metadata`,
+`policy_summary`, `tool_log`, `approval_log`, `command_log`,
+`validation_evidence`, `diff`, `changed_files`, `patch_summary`,
+`generated_output`, `usage_summary`, `routing_decision`, and `final_summary`.
+Per-type payload schemas are deferred to the artifact-storage ADR.
+
 ### Patch Evidence
 
 For mutating runs, the harness computes or requests:
@@ -63,6 +82,25 @@ For mutating runs, the harness computes or requests:
 - generated-file or vendored-path warnings
 
 The goal is not to block every large diff, but to make patch shape visible.
+
+Patch evidence is computed incrementally at the end of every `tool_loop` segment
+and at the start of each repair turn. The final patch artifact is the cumulative
+diff at `artifact_capture`; per-turn diffs are retained as sub-artifacts.
+
+The patch read set contains files explicitly read by tool calls during
+`tool_loop` and context-planner attachments whose content was rendered into the
+prompt. Validation reads do not count. The read set is recorded on the patch
+artifact.
+
+Default warning thresholds are active without extra configuration:
+
+- suspicious churn: more than 50% of changed files have less than 10% net change
+- broad formatting: more than 5 files changed with 10 or fewer net lines per file
+- generated-file and vendored-path warnings: use FEAT-0018 ignored/generated path
+  patterns
+
+Threshold overrides may tune or raise limits, but the warning system is enabled
+by default.
 
 ### Artifact Inspection
 
@@ -81,6 +119,39 @@ default. Users can expand or preview artifacts:
 The BFF stores artifact metadata and durable references. Large local files or
 logs may remain harness/executor-owned if they cannot safely be copied into BFF
 storage. The artifact record must say where and how the artifact can be read.
+
+Every artifact has a stable `artifact_id`. The artifact references its owning
+`run_id`; the run stores artifact references and indexes but does not embed
+artifact identity as run identity. Artifacts within a bundle remain
+independently addressable by `artifact_id`.
+
+Forked runs reference parent artifacts read-only through `inherited_from:
+artifact_id` and emit new artifacts with new IDs. Patch evidence on a fork is
+computed against the parent's final workspace state or explicit fork snapshot.
+
+BFF metadata is authoritative for artifact existence, identity, and provenance.
+Artifact content may live in BFF blob storage or remain harness-owned locally.
+Locally stored artifacts include a host fingerprint so the BFF can detect when
+content is unreachable from the current harness instance and surface a
+`content_unavailable` state on read. The BFF does not silently dereference
+artifact records when local content is missing; the artifact remains listed with
+metadata and a clear unavailability reason.
+
+On harness reattach, the harness reports artifacts it can serve. The BFF marks
+matching local artifacts available again. After a configurable grace period,
+defaulting to 30 days, stranded local artifacts transition to `unrecoverable` and
+may be garbage-collected. Host fingerprint changes are treated as new hosts; a
+user may explicitly rebind local artifacts.
+
+Artifact writes are content-first, metadata-second. The metadata write is the
+durability boundary. Orphan blobs are tolerated and reaped by GC; orphan metadata
+pointing to missing content is not allowed for newly written artifacts. The same
+ordering applies to BFF blob storage and harness-local artifacts.
+
+Artifact retention follows the FEAT-0015 retention envelope. Artifacts age out
+with their run unless promoted to durable memory or another explicit durable
+record. The run record or tombstone remains long enough to explain artifact
+retention and GC decisions.
 
 ## UI / CLI / API Integration
 
@@ -104,6 +175,20 @@ Configuration should support:
 - generated-file patterns
 - suspicious diff thresholds
 - whether large artifacts are stored inline or by reference
+- per-run artifact count cap
+- local-artifact stranded grace period
+
+Captured log size caps apply per artifact. Overflow truncates with tail-first
+retention, stores a checksum of the full output when available, and marks the
+artifact `truncated: true`. Many small artifacts are controlled by the artifact
+count cap, not the log-size cap.
+
+Redaction applies at capture time for known secret patterns and at retrieval time
+for role-based redaction. Capture-time redaction is irreversible. Policy changes
+schedule a re-scan job for stored artifacts.
+
+The default soft cap is 1000 artifacts per run. Overflow coalesces by category,
+keeping recent high-signal artifacts and a summary artifact.
 
 ## Non-Goals
 
