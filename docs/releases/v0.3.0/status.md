@@ -1,6 +1,6 @@
 # v0.3.0 — Status
 
-**Current phase:** Phase 3 — Implementation
+**Current phase:** Phase 3 — Implementation complete; pending release close
 
 **Branch:** `release/v0.3.0`  
 **Scope:** Run runtime foundation for FEAT-0016 and the first slice of
@@ -23,6 +23,10 @@ FEAT-0015, FEAT-0016, the FEAT-0017 foundation scope, and ADR-0015. The v0.2.x
 prerequisite BFF/harness surfaces were confirmed reachable on `release/v0.3.0`
 before the phase transition.
 
+Phase 3 implementation completed on 2026-05-05. Release readiness is recorded
+in `.reviews/v0.3.0-release-readiness.md`; release close/tagging remains a
+separate user decision.
+
 ## Work Units
 
 | WU | Title | Size | State | Design |
@@ -36,7 +40,7 @@ before the phase transition.
 | 114 | Harness run projection and active `/run` surface | M | implemented, coverage expanding | [designs/2026-05-05-design-harness-run-surface-114-116.md](designs/2026-05-05-design-harness-run-surface-114-116.md) |
 | 115 | Run list, attach/detach/cancel/retry/continue/fork commands | L | implemented, hardening pending | [designs/2026-05-05-design-harness-run-surface-114-116.md](designs/2026-05-05-design-harness-run-surface-114-116.md) |
 | 116 | Reconnect/resume behavior for active and detached runs | M | implemented, coverage expanding | [designs/2026-05-05-design-harness-run-surface-114-116.md](designs/2026-05-05-design-harness-run-surface-114-116.md) |
-| 117 | Runtime foundation tests and docs | M | in progress | [designs/2026-05-05-design-runtime-foundation-verification-117.md](designs/2026-05-05-design-runtime-foundation-verification-117.md) |
+| 117 | Runtime foundation tests and docs | M | implemented | [designs/2026-05-05-design-runtime-foundation-verification-117.md](designs/2026-05-05-design-runtime-foundation-verification-117.md) |
 
 ## Gates
 
@@ -83,5 +87,5 @@ Validation: `go test ./...` passes.
 
 ## Open Items
 
-- Finalize release readiness review and closeout artifacts.
+- User release validation and explicit release-close/tagging decision.
 - Finalize release changelog and readiness review after all WUs close.

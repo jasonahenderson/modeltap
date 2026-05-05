@@ -1,11 +1,11 @@
 # v0.3.0 Changelog
 
-**Status:** Phase 3 implementation
+**Status:** Phase 3 implementation complete; pending release close
 
-v0.3.0 is planned to ship the run runtime foundation for the Professional
-Harness Runtime series.
+v0.3.0 ships the run runtime foundation for the Professional Harness Runtime
+series.
 
-Anticipated scope:
+Implemented scope:
 
 - accepted run-runtime ADR
 - durable run IDs and lifecycle metadata
@@ -41,4 +41,5 @@ Implemented so far:
 - Replay gaps report summary fidelity with checkpoint fallback metadata instead
   of failing the request.
 
-Remaining before ship: final release-readiness review.
+Release readiness is recorded in `.reviews/v0.3.0-release-readiness.md`.
+Publishing and tagging remain a separate release-close decision.
