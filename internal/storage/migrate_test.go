@@ -7,19 +7,19 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-func TestMigration_FreshDB_GetsV2(t *testing.T) {
+func TestMigration_FreshDB_GetsV3(t *testing.T) {
 	store := newTestStore(t)
 
 	version, err := store.currentSchemaVersion()
 	if err != nil {
 		t.Fatalf("currentSchemaVersion: %v", err)
 	}
-	if version != 2 {
-		t.Errorf("schema version = %d, want 2", version)
+	if version != 3 {
+		t.Errorf("schema version = %d, want 3", version)
 	}
 
-	// All v2 tables should exist
-	for _, table := range []string{"requests", "hourly_usage", "daily_usage", "sessions", "turns", "session_events", "command_history"} {
+	// All v2 and v3 tables should exist.
+	for _, table := range []string{"requests", "hourly_usage", "daily_usage", "sessions", "turns", "session_events", "command_history", "runs", "run_turns", "run_events", "run_checkpoints", "run_attachments", "run_model_calls", "run_tool_results"} {
 		var name string
 		err := store.db.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name=?", table).Scan(&name)
 		if err != nil {
@@ -28,7 +28,7 @@ func TestMigration_FreshDB_GetsV2(t *testing.T) {
 	}
 }
 
-func TestMigration_V1DB_MigratesToV2(t *testing.T) {
+func TestMigration_V1DB_MigratesToV3(t *testing.T) {
 	// Create a raw v1 DB (user_version=0, v1 tables only)
 	db, err := sql.Open("sqlite", ":memory:?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)")
 	if err != nil {
@@ -116,13 +116,13 @@ func TestMigration_V1DB_MigratesToV2(t *testing.T) {
 		t.Fatalf("migrate: %v", err)
 	}
 
-	// Verify version is now 2
+	// Verify version is now 3.
 	version, err := store.currentSchemaVersion()
 	if err != nil {
 		t.Fatalf("currentSchemaVersion: %v", err)
 	}
-	if version != 2 {
-		t.Errorf("schema version = %d, want 2", version)
+	if version != 3 {
+		t.Errorf("schema version = %d, want 3", version)
 	}
 
 	// V1 data should be preserved
@@ -131,8 +131,8 @@ func TestMigration_V1DB_MigratesToV2(t *testing.T) {
 		t.Errorf("v1 request should be preserved: %v", err)
 	}
 
-	// V2 tables should exist
-	for _, table := range []string{"sessions", "turns", "session_events", "command_history"} {
+	// V2 and v3 tables should exist.
+	for _, table := range []string{"sessions", "turns", "session_events", "command_history", "runs", "run_events", "run_checkpoints", "run_attachments"} {
 		var name string
 		err := db2.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name=?", table).Scan(&name)
 		if err != nil {
@@ -141,7 +141,7 @@ func TestMigration_V1DB_MigratesToV2(t *testing.T) {
 	}
 }
 
-func TestMigration_V2DB_IsNoop(t *testing.T) {
+func TestMigration_V3DB_IsNoop(t *testing.T) {
 	store := newTestStore(t)
 
 	// Migrate is already run; run it again
@@ -153,8 +153,8 @@ func TestMigration_V2DB_IsNoop(t *testing.T) {
 	if err != nil {
 		t.Fatalf("currentSchemaVersion: %v", err)
 	}
-	if version != 2 {
-		t.Errorf("schema version = %d after double-migrate, want 2", version)
+	if version != 3 {
+		t.Errorf("schema version = %d after double-migrate, want 3", version)
 	}
 }
 
@@ -184,8 +184,8 @@ func TestMigration_DowngradeGuard(t *testing.T) {
 }
 
 func TestMigration_SchemaVersionConst(t *testing.T) {
-	if MaxKnownSchemaVersion != 2 {
-		t.Errorf("MaxKnownSchemaVersion = %d, want 2", MaxKnownSchemaVersion)
+	if MaxKnownSchemaVersion != 3 {
+		t.Errorf("MaxKnownSchemaVersion = %d, want 3", MaxKnownSchemaVersion)
 	}
 }
 

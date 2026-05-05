@@ -116,6 +116,11 @@ func (s *SQLiteStore) migrate() error {
 			return err
 		}
 	}
+	if version < 3 {
+		if err := s.migrateToV3(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -277,6 +282,151 @@ CREATE INDEX idx_command_history_session       ON command_history(user_id, sessi
 
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("committing v2 migration: %w", err)
+	}
+	return nil
+}
+
+// migrateToV3 adds durable run runtime tables.
+func (s *SQLiteStore) migrateToV3() error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("beginning v3 migration transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	const v3Schema = `
+CREATE TABLE runs (
+	id TEXT PRIMARY KEY,
+	trace_id TEXT NOT NULL,
+	idempotency_key TEXT NOT NULL,
+	user_id TEXT NOT NULL,
+	project TEXT NOT NULL,
+	session_id TEXT NOT NULL REFERENCES sessions(id),
+	parent_run_id TEXT NULL REFERENCES runs(id),
+	initiator_type TEXT NOT NULL,
+	title TEXT NOT NULL DEFAULT '',
+	workflow_type TEXT NOT NULL DEFAULT 'implementation',
+	status TEXT NOT NULL,
+	stage TEXT NOT NULL,
+	attachment_state TEXT NOT NULL,
+	attached_connection_id TEXT NOT NULL DEFAULT '',
+	attachment_grace_deadline TEXT NULL,
+	summary TEXT NOT NULL DEFAULT '',
+	last_advanced_at TEXT NOT NULL,
+	model TEXT NOT NULL DEFAULT '',
+	provider TEXT NOT NULL DEFAULT '',
+	input_tokens INTEGER NOT NULL DEFAULT 0,
+	output_tokens INTEGER NOT NULL DEFAULT 0,
+	total_cost REAL NOT NULL DEFAULT 0,
+	last_event_seq INTEGER NOT NULL DEFAULT 0,
+	last_checkpoint_id TEXT NOT NULL DEFAULT '',
+	extension_json TEXT NOT NULL DEFAULT '{}',
+	retention_class TEXT NOT NULL DEFAULT 'standard',
+	expires_at TEXT NULL,
+	schema_version INTEGER NOT NULL DEFAULT 1,
+	created_at TEXT NOT NULL,
+	updated_at TEXT NOT NULL,
+	terminal_at TEXT NULL
+);
+
+CREATE UNIQUE INDEX idx_runs_idempotency ON runs(user_id, project, idempotency_key);
+CREATE INDEX idx_runs_user_project_updated ON runs(user_id, project, updated_at DESC);
+CREATE INDEX idx_runs_session_updated ON runs(session_id, updated_at DESC);
+CREATE INDEX idx_runs_status_updated ON runs(status, updated_at DESC);
+
+CREATE TABLE run_turns (
+	run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+	turn_id TEXT NOT NULL,
+	sequence INTEGER NOT NULL,
+	role TEXT NOT NULL,
+	created_at TEXT NOT NULL,
+	PRIMARY KEY (run_id, turn_id),
+	UNIQUE (turn_id)
+);
+
+CREATE TABLE run_events (
+	run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+	seq INTEGER NOT NULL,
+	type TEXT NOT NULL,
+	stage TEXT NOT NULL DEFAULT '',
+	status TEXT NOT NULL DEFAULT '',
+	reason TEXT NOT NULL DEFAULT '',
+	payload_json TEXT NOT NULL DEFAULT '{}',
+	payload_schema_version INTEGER NOT NULL DEFAULT 1,
+	created_at TEXT NOT NULL,
+	PRIMARY KEY (run_id, seq)
+);
+
+CREATE TABLE run_checkpoints (
+	id TEXT PRIMARY KEY,
+	run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+	seq INTEGER NOT NULL,
+	stage TEXT NOT NULL,
+	status TEXT NOT NULL,
+	reason TEXT NOT NULL DEFAULT '',
+	turn_ids_json TEXT NOT NULL DEFAULT '[]',
+	model_call_ids_json TEXT NOT NULL DEFAULT '[]',
+	pending_tool_call_ids_json TEXT NOT NULL DEFAULT '[]',
+	summary TEXT NOT NULL DEFAULT '',
+	payload_json TEXT NOT NULL DEFAULT '{}',
+	schema_version INTEGER NOT NULL DEFAULT 1,
+	created_at TEXT NOT NULL
+);
+
+CREATE INDEX idx_run_checkpoints_run_seq ON run_checkpoints(run_id, seq DESC);
+
+CREATE TABLE run_attachments (
+	run_id TEXT PRIMARY KEY REFERENCES runs(id) ON DELETE CASCADE,
+	state TEXT NOT NULL,
+	attached_connection_id TEXT NOT NULL DEFAULT '',
+	attached_host_fingerprint TEXT NOT NULL DEFAULT '',
+	grace_deadline TEXT NULL,
+	updated_at TEXT NOT NULL
+);
+
+CREATE TABLE run_model_calls (
+	model_call_id TEXT PRIMARY KEY,
+	run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+	provider TEXT NOT NULL,
+	model TEXT NOT NULL,
+	stage TEXT NOT NULL DEFAULT 'model_call',
+	status TEXT NOT NULL,
+	input_tokens INTEGER NOT NULL DEFAULT 0,
+	output_tokens INTEGER NOT NULL DEFAULT 0,
+	total_cost REAL NOT NULL DEFAULT 0,
+	latency_ms INTEGER NOT NULL DEFAULT 0,
+	payload_json TEXT NOT NULL DEFAULT '{}',
+	created_at TEXT NOT NULL,
+	updated_at TEXT NOT NULL
+);
+
+CREATE INDEX idx_run_model_calls_run ON run_model_calls(run_id);
+
+CREATE TABLE run_tool_results (
+	tool_call_id TEXT PRIMARY KEY,
+	run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+	tool TEXT NOT NULL,
+	namespace TEXT NOT NULL DEFAULT '',
+	stage TEXT NOT NULL DEFAULT 'tool_loop',
+	status TEXT NOT NULL,
+	result_id TEXT NOT NULL DEFAULT '',
+	duration_ms INTEGER NOT NULL DEFAULT 0,
+	estimated_cost REAL NOT NULL DEFAULT 0,
+	payload_json TEXT NOT NULL DEFAULT '{}',
+	created_at TEXT NOT NULL,
+	updated_at TEXT NOT NULL
+);
+
+CREATE INDEX idx_run_tool_results_run ON run_tool_results(run_id);
+`
+	if _, err := tx.Exec(v3Schema); err != nil {
+		return fmt.Errorf("running v3 schema migration: %w", err)
+	}
+	if _, err := tx.Exec("PRAGMA user_version = 3"); err != nil {
+		return fmt.Errorf("setting user_version to 3: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("committing v3 migration: %w", err)
 	}
 	return nil
 }
