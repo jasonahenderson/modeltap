@@ -38,6 +38,7 @@ type Adapter struct {
 	// versa. Populated on SubmissionAcceptedEvent dispatch.
 	submissionToRun map[string]string
 	runToSubmission map[string]string
+	attachedRunID   string
 
 	// pendingPermissions tracks active permission requests by ID per
 	// WU-099 §"Mid-stream Pause". While the set is non-empty, the
@@ -46,8 +47,9 @@ type Adapter struct {
 	// PermissionResolvedEvents arrive; when it empties, the adapter
 	// replays buffered deltas in arrival order and resumes live
 	// forwarding.
-	pendingPermissions map[string]struct{}
-	pauseBuffer        []harnessshell.RunDeltaEvent
+	pendingPermissions  map[string]struct{}
+	pauseBuffer         []harnessshell.RunDeltaEvent
+	detachedTranscripts map[string][]harnessshell.RunDeltaEvent
 
 	// tokenAttachments correlates shell-emitted token IDs to the
 	// resolved Attachment so LoadPreviewAction can populate
@@ -92,14 +94,15 @@ func WithContextSource(ctx func() context.Context) Option {
 // implementation. Options apply in order.
 func New(shell harnessshell.Model, runtime Runtime, opts ...Option) Adapter {
 	a := Adapter{
-		shell:              shell,
-		runtime:            runtime,
-		resolver:           defaultAttachmentResolver,
-		ctx:                context.Background,
-		submissionToRun:    map[string]string{},
-		runToSubmission:    map[string]string{},
-		pendingPermissions: map[string]struct{}{},
-		tokenAttachments:   map[string]Attachment{},
+		shell:               shell,
+		runtime:             runtime,
+		resolver:            defaultAttachmentResolver,
+		ctx:                 context.Background,
+		submissionToRun:     map[string]string{},
+		runToSubmission:     map[string]string{},
+		pendingPermissions:  map[string]struct{}{},
+		detachedTranscripts: map[string][]harnessshell.RunDeltaEvent{},
+		tokenAttachments:    map[string]Attachment{},
 	}
 	for _, opt := range opts {
 		opt(&a)
@@ -127,6 +130,7 @@ func (a Adapter) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// as the typed shell event through the pause-aware helper.
 		a.submissionToRun[m.SubmissionID] = m.RunID
 		a.runToSubmission[m.RunID] = m.SubmissionID
+		a.attachedRunID = m.RunID
 		var cmd tea.Cmd
 		a, cmd = a.forwardEvent(harnessshell.SubmissionAcceptedEvent{
 			SubmissionID: m.SubmissionID,
@@ -189,6 +193,34 @@ func (a Adapter) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // All other events forward straight through to shell.Update.
 func (a Adapter) forwardEvent(evt harnessshell.HostEvent) (Adapter, tea.Cmd) {
 	switch e := evt.(type) {
+	case harnessshell.SubmissionAcceptedEvent:
+		if e.RunID != "" {
+			a.attachedRunID = e.RunID
+		}
+	case harnessshell.RunStartedEvent:
+		if e.RunID != "" {
+			a.attachedRunID = e.RunID
+		}
+		if e.RunID != "" && len(a.detachedTranscripts[e.RunID]) > 0 {
+			inner, cmd := a.shell.Update(evt)
+			a.shell = inner.(harnessshell.Model)
+			cmds := []tea.Cmd{}
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+			for _, d := range a.detachedTranscripts[e.RunID] {
+				inner, replayCmd := a.shell.Update(d)
+				a.shell = inner.(harnessshell.Model)
+				if replayCmd != nil {
+					cmds = append(cmds, replayCmd)
+				}
+			}
+			delete(a.detachedTranscripts, e.RunID)
+			if len(cmds) == 0 {
+				return a, nil
+			}
+			return a, tea.Batch(cmds...)
+		}
 	case harnessshell.PermissionRequestedEvent:
 		if e.Request.ID != "" {
 			a.pendingPermissions[e.Request.ID] = struct{}{}
@@ -222,6 +254,26 @@ func (a Adapter) forwardEvent(evt harnessshell.HostEvent) (Adapter, tea.Cmd) {
 		if len(a.pendingPermissions) > 0 {
 			a.pauseBuffer = append(a.pauseBuffer, e)
 			return a, nil
+		}
+		if e.RunID != "" && a.attachedRunID != "" && e.RunID != a.attachedRunID {
+			a.detachedTranscripts[e.RunID] = append(a.detachedTranscripts[e.RunID], e)
+			return a, nil
+		}
+		if e.RunID != "" && a.attachedRunID == "" {
+			a.detachedTranscripts[e.RunID] = append(a.detachedTranscripts[e.RunID], e)
+			return a, nil
+		}
+	case harnessshell.RunCompletedEvent:
+		if e.RunID == a.attachedRunID {
+			a.attachedRunID = ""
+		}
+	case harnessshell.RunStoppedEvent:
+		if e.RunID == a.attachedRunID {
+			a.attachedRunID = ""
+		}
+	case harnessshell.RunFailedEvent:
+		if e.RunID == a.attachedRunID {
+			a.attachedRunID = ""
 		}
 	}
 	inner, cmd := a.shell.Update(evt)

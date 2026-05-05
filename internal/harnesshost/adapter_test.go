@@ -328,3 +328,27 @@ func TestAdapterPassesNonActionMsgsToShell(t *testing.T) {
 		_ = au
 	}
 }
+
+func TestAdapterBuffersDetachedRunDeltasUntilAttach(t *testing.T) {
+	rt := &fakeRuntime{}
+	a := New(harnessshell.New(), rt)
+	a.attachedRunID = "run-active"
+
+	updated, cmd := a.Update(harnessshell.RunDeltaEvent{RunID: "run-detached", Delta: "background"})
+	a = updated.(Adapter)
+	if cmd != nil {
+		t.Fatalf("detached delta should not forward a command")
+	}
+	if got := len(a.detachedTranscripts["run-detached"]); got != 1 {
+		t.Fatalf("detached buffer length = %d, want 1", got)
+	}
+
+	updated, _ = a.Update(harnessshell.RunStartedEvent{RunID: "run-detached"})
+	a = updated.(Adapter)
+	if got := len(a.detachedTranscripts["run-detached"]); got != 0 {
+		t.Fatalf("detached buffer should clear on attach, got %d", got)
+	}
+	if a.attachedRunID != "run-detached" {
+		t.Fatalf("attachedRunID = %q, want run-detached", a.attachedRunID)
+	}
+}

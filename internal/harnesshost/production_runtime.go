@@ -770,6 +770,7 @@ func (r *ProductionRuntime) handleRunAttachCommand(ctx context.Context, args str
 		return r.statusError("run.attach", err)
 	}
 	r.mode.SetActiveRunID(resp.Run.RunID)
+	r.sender.Send(harnessshell.RunStartedEvent{RunID: resp.Run.RunID})
 	r.projectRunReplay(resp.Events)
 	r.sender.Send(harnessshell.HostStatusEvent{
 		Status: "Attached run: " + resp.Run.RunID + " (" + resp.Fidelity + " replay)",
@@ -796,6 +797,11 @@ func (r *ProductionRuntime) handleRunDetachCommand(ctx context.Context, args str
 	}
 	if r.mode.ActiveRunID() == runID {
 		r.mode.SetActiveRunID("")
+		r.sender.Send(harnessshell.RunStoppedEvent{
+			RunID:   runID,
+			Reason:  harnessshell.StopReasonHost,
+			Message: "Detached",
+		})
 	}
 	r.sender.Send(harnessshell.HostStatusEvent{
 		Status: "Detached run: " + resp.RunID,

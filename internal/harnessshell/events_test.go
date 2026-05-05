@@ -250,6 +250,20 @@ func TestDetachedRunDeltaDoesNotMutateForegroundTranscript(t *testing.T) {
 	}
 }
 
+func TestRunStartedWithoutSubmissionCreatesReplayRow(t *testing.T) {
+	m := newWithFixedClock()
+	m, _ = drainActions(t, m, RunStartedEvent{RunID: "run-replay"})
+	m, _ = drainActions(t, m, RunDeltaEvent{RunID: "run-replay", Delta: "replayed"})
+
+	if len(m.state.transcriptItems) != 1 {
+		t.Fatalf("transcript items = %d, want 1", len(m.state.transcriptItems))
+	}
+	row := m.state.transcriptItems[0]
+	if row.RunID != "run-replay" || row.Text != "replayed" || !row.Streaming {
+		t.Fatalf("replay row = %+v", row)
+	}
+}
+
 func TestRunCompletedAutoReleasesQueue(t *testing.T) {
 	m := newWithFixedClock()
 	m.state.input.SetValue("first")

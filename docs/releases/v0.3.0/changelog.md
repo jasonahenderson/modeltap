@@ -36,6 +36,8 @@ Implemented so far:
 - Run event replay includes event type metadata, token-delta progress events,
   terminal projection, and `run.permissions` blocker details when a stored
   `run.blocked` event is available.
+- Detached run deltas are buffered outside the foreground transcript and replay
+  into an explicit attached-run row when the user attaches the run.
 
-Remaining before ship: detached transcript buffer behavior, attach replay and
-summary-only fidelity tests, and final release-readiness review.
+Remaining before ship: summary-only fidelity tests and final release-readiness
+review.

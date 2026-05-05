@@ -169,15 +169,24 @@ func (s *state) applySubmissionFailed(e SubmissionFailedEvent) {
 }
 
 // applyRunStarted ensures the streaming flag is set and the assistant
-// placeholder is correlated to the run. Per WU-098 the placeholder is
-// inserted optimistically, so RunStarted carries no UX requirement
-// beyond chrome state and label updates.
+// placeholder is correlated to the run. For an attached/replayed run with no
+// local submission placeholder, it creates a selected assistant replay row.
 func (s *state) applyRunStarted(e RunStartedEvent) {
 	s.streaming = true
 	s.statusKind = StatusStreaming
 	if e.RunID != "" {
 		s.activeRunID = e.RunID
-		s.assignRunIDToPlaceholder(e.SubmissionID, e.RunID)
+		if e.SubmissionID != "" {
+			s.assignRunIDToPlaceholder(e.SubmissionID, e.RunID)
+		} else if s.assistantRowIndexForRun(e.RunID) < 0 {
+			s.transcriptItems = append(s.transcriptItems, TranscriptItem{
+				ID:        "run-" + e.RunID,
+				Kind:      TranscriptItemKindMessage,
+				Role:      RoleAssistant,
+				RunID:     e.RunID,
+				Streaming: true,
+			})
+		}
 	}
 	if e.Label != "" {
 		s.label = e.Label
@@ -305,7 +314,7 @@ func (s *state) assistantRowIndexForRun(runID string) int {
 	if runID != "" {
 		for i := range s.transcriptItems {
 			item := &s.transcriptItems[i]
-			if item.Role == RoleAssistant && item.RunID == runID {
+			if item.Role == RoleAssistant && item.RunID == runID && item.Streaming {
 				return i
 			}
 		}

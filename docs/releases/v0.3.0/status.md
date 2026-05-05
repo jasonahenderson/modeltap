@@ -35,7 +35,7 @@ before the phase transition.
 | 113 | Pipeline stage/status emission and checkpoint metadata | M | implemented, coverage expanding | [designs/2026-05-05-design-bff-run-runtime-111-113.md](designs/2026-05-05-design-bff-run-runtime-111-113.md) |
 | 114 | Harness run projection and active `/run` surface | M | implemented, coverage expanding | [designs/2026-05-05-design-harness-run-surface-114-116.md](designs/2026-05-05-design-harness-run-surface-114-116.md) |
 | 115 | Run list, attach/detach/cancel/retry/continue/fork commands | L | implemented, hardening pending | [designs/2026-05-05-design-harness-run-surface-114-116.md](designs/2026-05-05-design-harness-run-surface-114-116.md) |
-| 116 | Reconnect/resume behavior for active and detached runs | M | partially implemented | [designs/2026-05-05-design-harness-run-surface-114-116.md](designs/2026-05-05-design-harness-run-surface-114-116.md) |
+| 116 | Reconnect/resume behavior for active and detached runs | M | implemented, coverage expanding | [designs/2026-05-05-design-harness-run-surface-114-116.md](designs/2026-05-05-design-harness-run-surface-114-116.md) |
 | 117 | Runtime foundation tests and docs | M | in progress | [designs/2026-05-05-design-runtime-foundation-verification-117.md](designs/2026-05-05-design-runtime-foundation-verification-117.md) |
 
 ## Gates
@@ -74,12 +74,13 @@ before the phase transition.
 - Added replay event type metadata, checkpoint-backed run progress replay for
   token deltas, attach/reconnect replay projection, and blocker detail
   extraction for `run.permissions`.
+- Added adapter-level detached transcript buffers and replay-row creation when
+  a detached run is attached.
 - Updated user and embedding docs for run commands and run projection.
 
 Validation: `go test ./...` passes.
 
 ## Open Items
 
-- Complete detached transcript buffer behavior for WU-116.
-- Expand harness projection tests for attach replay and summary-only fidelity.
+- Expand harness projection tests for summary-only fidelity.
 - Finalize release changelog and readiness review after all WUs close.
