@@ -1,7 +1,7 @@
 ---
 feature: FEAT-0017
 title: Durable Runs and Background Agents
-status: draft
+status: accepted
 date: 2026-04-29
 parent: FEAT-0015
 series: Professional Harness Runtime
@@ -201,6 +201,13 @@ required evidence.
 
 ## Success Criteria
 
+Acceptance scope: v0.3.0 implements the durable-run foundation slice: run
+identity, attachment/detach/list/reattach behavior, separate detached
+transcripts, restart/replay behavior, and shared lifecycle semantics. Background
+blocked-operation policy, the full permission/input inbox, and isolated writer
+workspace behavior remain deferred to v0.3.3+ as recorded in the v0.3.0 release
+plan.
+
 1. A user can start a run, detach it, list it, and reattach later.
 2. A detached run has a separate transcript and artifact list.
 3. A background run that needs unapproved side effects pauses or follows an
@@ -215,12 +222,15 @@ required evidence.
 | ADR | Relationship |
 |---|---|
 | ADR-0014 | Requires the terminal harness to remain the universal orchestration client |
-| Future ADR | Should decide durable run persistence details, attachment grace-period policy, and the exact server-safe tool surface available without a local executor |
+| ADR-0015 | Decides durable run persistence, attachment grace-period policy, executor-disconnect behavior, and the no-server-side-local-effects rule for v0.3.0 |
 
-## Open Questions
+## Resolved or Deferred for v0.3.0
 
 1. What configurable grace-period values should apply before an attached run is
-   marked detached after harness disconnect?
+   marked detached after harness disconnect? Default: 60 seconds in ADR-0015.
 2. What is the default behavior for background write requests in solo mode?
+   Deferred to FEAT-0021/v0.3.3 policy work; v0.3.0 does not silently execute
+   disconnected local side effects.
 3. Should completed background transcripts be merged, summarized, or only linked
-   from the foreground session?
+   from the foreground session? v0.3.0 keeps detached transcripts separate and
+   does not merge unrelated background chatter into the foreground surface.

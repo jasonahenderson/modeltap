@@ -24,7 +24,7 @@ modeltap is a single-binary **Go** reverse proxy (ADR-0001) that captures AI/ML 
 | [0012](0012-background-execution-strategy.md) | launchd + systemd integration | Accepted |
 | [0013](0013-terminal-ui-framework.md) | Bubbletea (Charm ecosystem) for terminal UI | Proposed |
 | [0014](0014-harness-base-strategy.md) | Continue modeltap harness (universal orchestration client) | Accepted |
-| [0015](0015-run-runtime.md) | Run runtime ownership and semantics | Proposed |
+| [0015](0015-run-runtime.md) | Run runtime ownership and semantics | Accepted |
 
 ## When to Write an ADR
 

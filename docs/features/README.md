@@ -15,9 +15,9 @@ This directory holds **behavior-scoped** product definitions for modeltap that a
 | [FEAT-0012](0012-skills-and-agent-teams.md) | Skills | proposed |
 | [FEAT-0013](0013-agent-teams.md) | Agent Teams | proposed |
 | [FEAT-0014](0014-harness-conversation-shell.md) | Harness Conversation Shell | accepted |
-| [FEAT-0015](0015-professional-harness-runtime.md) | Professional Harness Runtime | draft |
-| [FEAT-0016](0016-managed-codegen-run-pipeline.md) | Managed Codegen Run Pipeline | draft |
-| [FEAT-0017](0017-durable-runs-and-background-agents.md) | Durable Runs and Background Agents | draft |
+| [FEAT-0015](0015-professional-harness-runtime.md) | Professional Harness Runtime | accepted |
+| [FEAT-0016](0016-managed-codegen-run-pipeline.md) | Managed Codegen Run Pipeline | accepted |
+| [FEAT-0017](0017-durable-runs-and-background-agents.md) | Durable Runs and Background Agents | accepted |
 | [FEAT-0018](0018-context-planner-and-project-rules.md) | Context Planner and Project Rules | draft |
 | [FEAT-0019](0019-validation-and-repair-loop.md) | Validation and Repair Loop | draft |
 | [FEAT-0020](0020-patch-evidence-and-run-artifacts.md) | Patch Evidence and Run Artifacts | draft |
