@@ -30,6 +30,9 @@ pre-tag fixes for relay errors, foreground-run persistence, heartbeat/stuck
 projection, registry bounds, and focused regressions have been applied.
 Release close/tagging remains a separate user decision.
 
+Manual UI smoke-test instructions are recorded in
+[`smoke-test.md`](smoke-test.md).
+
 ## Work Units
 
 | WU | Title | Size | State | Design |
