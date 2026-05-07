@@ -221,10 +221,12 @@ opens (see Open Questions and the dedicated ADR called for below).
    already supports it (FEAT-0010). When does the desktop client gain a
    user-switcher?
 
-6. **Release sequencing.** Earliest plausible release is v0.4.0, after
-   PATCH-0017 lands in v0.3.5 and the harness-role ADR is accepted.
-   Whether v0.4.0 ships GUI-foundation only or full multi-chat parity
-   with the TUI is a planning question for the v0.4.0 plan.
+6. **Release sequencing.** No committed target. PATCH-0017 lands in
+   v0.3.5 regardless, as architectural insurance against multi-chat
+   foreclosure. The GUI itself sequences after the harness-role ADR is
+   accepted and after the GUI becomes a forcing priority — that may be
+   v0.4.0, v0.6.0, or much later. This spec is a forward marker; it does
+   not claim a release.
 
 7. **Simple mode boundaries.** Where exactly does the developer surface
    end? File system tools (Read/Edit/Write/Bash) are the obvious
@@ -233,14 +235,18 @@ opens (see Open Questions and the dedicated ADR called for below).
 
 ## Implementation Sequencing (provisional)
 
-This sequencing is a planning sketch, not a commitment.
+This sequencing is a planning sketch, not a commitment. Only PATCH-0017
+has a concrete release target; everything below is **release TBD** and
+contingent on the GUI becoming a deliberate priority.
 
-1. **PATCH-0017 (v0.3.5):** session-scoped project context. Unblocks
-   multi-chat over one connection.
-2. **ADR-NNNN (pre-v0.4.0):** harness-role embodiment decision (native
-   vs. sidecar vs. hybrid). Settles the UI toolkit downstream.
-3. **FEAT-0023 v1 (v0.4.0 candidate):** desktop shell + multi-tab
-   workspace + tool execution + permissions, parity with the TUI's
-   single-chat behavior multiplied by N.
-4. **FEAT-0023 v2 (post-v0.4.0):** simple mode, MCP graphical
+1. **PATCH-0017 (v0.3.5):** session-scoped project context. Removes
+   the connection-scope foreclosure on multi-chat. Lands regardless of
+   when (or whether) the GUI itself ships, as architectural insurance.
+2. **ADR-NNNN (release TBD):** harness-role embodiment decision (native
+   vs. sidecar vs. hybrid). Required before this feature leaves
+   `draft`. Drafted when the GUI moves up the roadmap.
+3. **FEAT-0023 v1 (release TBD):** desktop shell + multi-tab workspace
+   + tool execution + permissions, parity with the TUI's single-chat
+   behavior multiplied by N.
+4. **FEAT-0023 v2 (release TBD, post-v1):** simple mode, MCP graphical
    management, auto-update, polish.

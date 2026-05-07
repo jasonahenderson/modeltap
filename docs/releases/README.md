@@ -109,6 +109,6 @@ Features are assigned to releases based on dependency chain and delivery priorit
 | FEAT-0020 (Patch Evidence and Run Artifacts) | v0.3.2 | Planning draft |
 | FEAT-0021 (Policy-Grade Tool Runtime) | v0.3.3 | Planning draft |
 | FEAT-0022 (Durable Memory, Quality Routing, and Workflow Extensions) | v0.3.4 | Planning draft |
-| FEAT-0023 (Desktop GUI Client) | v0.4.0 candidate | Draft; depends on PATCH-0017 (v0.3.5) and a pending harness-role-embodiment ADR |
+| FEAT-0023 (Desktop GUI Client) | release TBD | Draft, forward marker only. Depends on PATCH-0017 (v0.3.5) landing and on a pending harness-role-embodiment ADR. Timeline uncommitted. |
 
 Release assignments for FEAT-0010+ are tentative and will be confirmed during their planning phase. The v0.3.x plans are draft roadmap artifacts until an explicit `ADMIN:` commit opens each release's Phase 1.
