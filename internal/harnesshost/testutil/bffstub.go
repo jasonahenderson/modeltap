@@ -159,6 +159,14 @@ func (s *BFFStub) handleConn(conn net.Conn) {
 				"max_frame_size":      1 << 20,
 				"server_capabilities": map[string]any{},
 			}, nil)
+		case "session.create":
+			// PATCH-0028: harness auto-calls session.create on
+			// ConnStateReady. Return a stub session id so the
+			// harness can populate r.mode.SessionID().
+			s.respond(w, req.ID, map[string]any{
+				"session_id": "stub-session",
+				"project":    map[string]any{"root": "/tmp"},
+			}, nil)
 		case "turn.submit":
 			s.mu.Lock()
 			s.submits = append(s.submits, append(json.RawMessage(nil), req.Params...))

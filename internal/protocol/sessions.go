@@ -104,6 +104,16 @@ type ReviewerState struct {
 	BranchID string `json:"branch_id,omitempty"`
 }
 
+// SessionCreateResponse is the response to session.create. The server
+// returns the freshly-minted session id and echoes the project context
+// it bound. Per PATCH-0028, the harness calls session.create on
+// ConnStateReady so session-scoped RPCs (model.switch, context.list,
+// etc.) work before any turn.submit has run.
+type SessionCreateResponse struct {
+	SessionID string         `json:"session_id"`
+	Project   ProjectContext `json:"project"`
+}
+
 // SessionResumeResponse is the response to session.resume.
 type SessionResumeResponse struct {
 	SessionID     string         `json:"session_id"`

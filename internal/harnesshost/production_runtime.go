@@ -568,7 +568,30 @@ func (r *ProductionRuntime) observeRuntimeMessage(msg tea.Msg) {
 	if !ok || m.Info.State != harness.ConnStateReady {
 		return
 	}
+	go r.bootstrapSession(context.Background())
 	go r.resumeKnownRuns(context.Background())
+}
+
+// bootstrapSession requests a fresh session from the BFF on
+// ConnStateReady so that session-scoped RPCs (model.switch,
+// context.list, session.clear, etc.) work before the user has
+// submitted any turn. Failures are best-effort: turn.submit will
+// still create a session implicitly if this call fails. PATCH-0028.
+func (r *ProductionRuntime) bootstrapSession(ctx context.Context) {
+	if r.mode.SessionID() != "" {
+		return
+	}
+	client := r.cm.Client()
+	if client == nil {
+		return
+	}
+	var resp protocol.SessionCreateResponse
+	if err := client.CallInto(ctx, protocol.MethodSessionCreate, &protocol.SessionCreate{
+		Project: protocol.ProjectContext{Root: r.cfg.ProjectRoot},
+	}, &resp); err != nil {
+		return
+	}
+	r.mode.SetSessionID(resp.SessionID)
 }
 
 func (r *ProductionRuntime) resumeKnownRuns(ctx context.Context) {

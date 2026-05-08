@@ -31,6 +31,7 @@ Implementation-scoped work authorization documents. Patches are the lightweight 
 | [PATCH-0025](0025-cloud-probe-upstream-target.md) | Probe cloud-provider upstream directly in health check | approved |
 | [PATCH-0026](0026-shell-debug-daemon-log.md) | Capture auto-spawned daemon stdio to a log file via flag/env | approved |
 | [PATCH-0027](0027-truthful-footer-hints.md) | Strip misleading footer hints (sidebar / palette / agents) | approved |
+| [PATCH-0028](0028-session-create-rpc.md) | Add session.create RPC and harness auto-call on Ready | approved |
 
 ## When to Use a Patch
 

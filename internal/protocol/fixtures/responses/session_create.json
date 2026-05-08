@@ -1,0 +1,8 @@
+{
+  "session_id": "sess-abc-123",
+  "project": {
+    "root": "/Users/dev/myproject",
+    "config_file": ".modeltap.yaml",
+    "config_content": "model: claude-opus-4-6\nmode: auto"
+  }
+}

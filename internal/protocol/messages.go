@@ -20,6 +20,7 @@ const (
 	MethodTurnCancel           = "turn.cancel"
 	MethodToolResult           = "tool.result"
 	MethodContentTransform     = "content.transform"
+	MethodSessionCreate        = "session.create"
 	MethodSessionResume        = "session.resume"
 	MethodSessionList          = "session.list"
 	MethodSessionDetails       = "session.details"
@@ -158,6 +159,15 @@ type ContentTransform struct {
 	RawContent      string `json:"raw_content"`
 	ContentType     string `json:"content_type"`
 	MaxOutputTokens int    `json:"max_output_tokens"`
+}
+
+// SessionCreate establishes a new session for the current connection.
+// The server mints a session id, persists it, and binds the connection.
+// Used by the harness on connect so that session-scoped RPCs (e.g.
+// model.switch) work before any turn.submit has run (Finding F10 /
+// PATCH-0028).
+type SessionCreate struct {
+	Project ProjectContext `json:"project"`
 }
 
 // SessionResume rehydrates an existing session for the current connection.

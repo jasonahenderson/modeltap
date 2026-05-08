@@ -24,6 +24,7 @@ func TestMethodConstants(t *testing.T) {
 		{"TurnCancel", MethodTurnCancel, "turn.cancel"},
 		{"ToolResult", MethodToolResult, "tool.result"},
 		{"ContentTransform", MethodContentTransform, "content.transform"},
+		{"SessionCreate", MethodSessionCreate, "session.create"},
 		{"SessionResume", MethodSessionResume, "session.resume"},
 		{"SessionList", MethodSessionList, "session.list"},
 		{"SessionDetails", MethodSessionDetails, "session.details"},
