@@ -52,9 +52,7 @@ func TestSubcommandsRegistered(t *testing.T) {
 		subcmd string
 	}{
 		{"start", "start"},
-		{"logs", "logs"},
-		{"show", "show"},
-		{"export", "export"},
+		{"requests", "requests"},
 		{"config", "config"},
 		{"shell", "shell"},
 		{"shell-demo", "shell-demo"},
@@ -90,9 +88,10 @@ func TestSubcommandsAcceptHelp(t *testing.T) {
 		{"start --help", []string{"start", "--help"}},
 		{"shell --help", []string{"shell", "--help"}},
 		{"shell-demo --help", []string{"shell-demo", "--help"}},
-		{"logs --help", []string{"logs", "--help"}},
-		{"show --help", []string{"show", "--help"}},
-		{"export --help", []string{"export", "--help"}},
+		{"requests --help", []string{"requests", "--help"}},
+		{"requests list --help", []string{"requests", "list", "--help"}},
+		{"requests show --help", []string{"requests", "show", "--help"}},
+		{"requests export --help", []string{"requests", "export", "--help"}},
 		{"config --help", []string{"config", "--help"}},
 		{"config show --help", []string{"config", "show", "--help"}},
 		{"config set --help", []string{"config", "set", "--help"}},
@@ -142,7 +141,7 @@ func TestHelpListsAllSubcommands(t *testing.T) {
 
 	output := buf.String()
 	expected := []string{
-		"start", "logs", "show", "export", "config",
+		"start", "requests", "config",
 		"shell", "shell-demo",
 		"status", "metrics", "dashboard", "completion", "service",
 	}

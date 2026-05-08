@@ -8,53 +8,46 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jasonahenderson/modeltap/internal/storage"
 	"github.com/spf13/cobra"
 )
 
-// showStore is a package-level variable that allows injecting a Store for
-// the show command. In production this is set via SetShowStore before
-// command execution; in tests it is set directly.
-var showStore storage.Store
-
-// SetShowStore sets the store used by the show command.
-func SetShowStore(s storage.Store) {
-	showStore = s
-}
-
-func newShowCommand() *cobra.Command {
+// newRequestsShowCommand registers `modeltap requests show <id>`. Uses
+// the package-shared requestsStore (lazy-opened in production,
+// injected in tests). Per PATCH-0020, this replaces the previous
+// `modeltap show` top-level command.
+func newRequestsShowCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "show <id>",
-		Short: "Show detail of a captured request",
+		Short: "Show full detail for a captured request/response by id",
 		Long: `Show the full detail of a captured request/response pair by its ID.
 
-Prints a comprehensive view of a single captured request including headers,
-body content (pretty-printed JSON), token usage, cost estimate, and latency.
-Use "modeltap logs" to find request IDs, then pass one to this command for
-the complete picture.
+Prints a comprehensive view of a single capture including headers,
+body content (pretty-printed JSON), token usage, cost estimate, and
+latency. Use "modeltap requests list" to find request IDs, then pass
+one to this command for the complete picture.
 
-The request ID can be the full UUID or the short 8-character prefix shown
-in the logs table output.`,
-		Example: `  # Show full detail for a request by its short ID
-  modeltap show abc12345
+The request ID can be the full UUID or the short 8-character prefix
+shown in the list table output.`,
+		Example: `  # Show full detail for a capture by its short ID
+  modeltap requests show abc12345
 
   # Show detail using a full UUID
-  modeltap show 550e8400-e29b-41d4-a716-446655440000`,
+  modeltap requests show 550e8400-e29b-41d4-a716-446655440000`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if showStore == nil {
+			if requestsStore == nil {
 				s, err := openStoreFromConfig()
 				if err != nil {
 					return err
 				}
 				defer s.Close()
-				showStore = s
-				defer func() { showStore = nil }()
+				requestsStore = s
+				defer func() { requestsStore = nil }()
 			}
 
 			id := args[0]
 			ctx := context.Background()
-			req, err := showStore.GetRequest(ctx, id)
+			req, err := requestsStore.GetRequest(ctx, id)
 			if err != nil {
 				return fmt.Errorf("fetching request: %w", err)
 			}
@@ -65,7 +58,6 @@ in the logs table output.`,
 
 			w := cmd.OutOrStdout()
 
-			// Header section
 			fmt.Fprintln(w, "=== Request Detail ===")
 			fmt.Fprintf(w, "ID:        %s\n", req.ID)
 			fmt.Fprintf(w, "Timestamp: %s\n", req.Timestamp.Format(time.RFC3339))
@@ -76,7 +68,6 @@ in the logs table output.`,
 			fmt.Fprintf(w, "Tokens:    %d input / %d output\n", req.InputTokens, req.OutputTokens)
 			fmt.Fprintf(w, "Cost:      $%.4f\n", req.EstimatedCostUSD)
 
-			// Request section
 			fmt.Fprintln(w, "")
 			fmt.Fprintln(w, "--- Request ---")
 			fmt.Fprintf(w, "Method: %s\n", req.Method)
@@ -90,7 +81,6 @@ in the logs table output.`,
 				fmt.Fprintln(w, prettyJSON(req.RequestBody))
 			}
 
-			// Response section
 			fmt.Fprintln(w, "")
 			fmt.Fprintln(w, "--- Response ---")
 			fmt.Fprintf(w, "Status: %d\n", req.ResponseStatus)
@@ -132,7 +122,5 @@ func formatHeaders(s string) string {
 	for k, v := range headers {
 		lines = append(lines, fmt.Sprintf("  %s: %s", k, v))
 	}
-	// Sort for deterministic output is not strictly required but let's
-	// keep it simple - the map iteration order is non-deterministic.
 	return strings.Join(lines, "\n")
 }

@@ -14,17 +14,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// exportStore is a package-level variable that allows injecting a Store for
-// the export command. In production this is set via SetExportStore before
-// command execution; in tests it is set directly.
-var exportStore storage.Store
-
-// SetExportStore sets the store used by the export command.
-func SetExportStore(s storage.Store) {
-	exportStore = s
-}
-
-func newExportCommand() *cobra.Command {
+// newRequestsExportCommand registers `modeltap requests export`. Uses
+// the package-shared requestsStore (lazy-opened in production,
+// injected in tests). Per PATCH-0020, this replaces the previous
+// `modeltap export` top-level command.
+func newRequestsExportCommand() *cobra.Command {
 	var (
 		format string
 		since  string
@@ -33,10 +27,10 @@ func newExportCommand() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "export",
-		Short: "Export logs to JSONL or CSV",
-		Long: `Export captured request/response logs to JSONL or CSV format.
+		Short: "Export captured requests to JSONL or CSV",
+		Long: `Export captured request/response entries to JSONL or CSV format.
 
-Writes all matching log entries to stdout in the chosen format. JSONL
+Writes all matching captures to stdout in the chosen format. JSONL
 (JSON Lines) outputs one JSON object per line, suitable for streaming
 ingestion. CSV outputs a header row followed by one row per request.
 
@@ -46,30 +40,30 @@ the output.
 
 Time filters (--since, --until) accept either a duration shorthand relative
 to now (e.g. "24h", "7d") or an RFC3339 timestamp.`,
-		Example: `  # Export all logs as JSONL (default format)
-  modeltap export > logs.jsonl
+		Example: `  # Export all captures as JSONL (default format)
+  modeltap requests export > captures.jsonl
 
   # Export as CSV
-  modeltap export --format csv > logs.csv
+  modeltap requests export --format csv > captures.csv
 
   # Export only the last 7 days
-  modeltap export --since 7d > recent.jsonl
+  modeltap requests export --since 7d > recent.jsonl
 
   # Export a specific time window as CSV
-  modeltap export --format csv --since 2026-03-01T00:00:00Z --until 2026-03-08T00:00:00Z`,
+  modeltap requests export --format csv --since 2026-03-01T00:00:00Z --until 2026-03-08T00:00:00Z`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if format != "jsonl" && format != "csv" {
 				return fmt.Errorf("invalid format %q: must be jsonl or csv", format)
 			}
 
-			if exportStore == nil {
+			if requestsStore == nil {
 				s, err := openStoreFromConfig()
 				if err != nil {
 					return err
 				}
 				defer s.Close()
-				exportStore = s
-				defer func() { exportStore = nil }()
+				requestsStore = s
+				defer func() { requestsStore = nil }()
 			}
 
 			filter := storage.ListFilter{}
@@ -91,7 +85,7 @@ to now (e.g. "24h", "7d") or an RFC3339 timestamp.`,
 			}
 
 			ctx := context.Background()
-			requests, err := exportStore.ListRequests(ctx, filter)
+			requests, err := requestsStore.ListRequests(ctx, filter)
 			if err != nil {
 				return fmt.Errorf("listing requests: %w", err)
 			}

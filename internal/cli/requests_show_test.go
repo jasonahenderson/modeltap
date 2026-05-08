@@ -47,15 +47,15 @@ func seedShowTestStore(t *testing.T) storage.Store {
 
 func executeShow(t *testing.T, store storage.Store, args ...string) (string, error) {
 	t.Helper()
-	prev := showStore
-	showStore = store
-	t.Cleanup(func() { showStore = prev })
+	prev := requestsStore
+	requestsStore = store
+	t.Cleanup(func() { requestsStore = prev })
 
 	rootCmd := NewRootCommand("test")
 	buf := new(bytes.Buffer)
 	rootCmd.SetOut(buf)
 	rootCmd.SetErr(buf)
-	rootCmd.SetArgs(append([]string{"show"}, args...))
+	rootCmd.SetArgs(append([]string{"requests", "show"}, args...))
 
 	err := rootCmd.Execute()
 	return buf.String(), err

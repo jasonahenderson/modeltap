@@ -23,8 +23,8 @@ runtime in ` + "`internal/harnessdemo`" + `. Production provider integration via
 ` + "`harnesshost`" + ` ships in a follow-up release.
 
 Subcommands control the proxy and tooling — ` + "`start`" + ` to run the proxy
-server, ` + "`logs`" + ` / ` + "`show`" + ` / ` + "`export`" + ` / ` + "`metrics`" + ` to inspect captured
-traffic, ` + "`dashboard`" + ` for the web UI, ` + "`status`" + ` / ` + "`service`" + ` / ` + "`config`" + ` /
+server, ` + "`requests`" + ` / ` + "`metrics`" + ` to inspect captured traffic,
+` + "`dashboard`" + ` for the web UI, ` + "`status`" + ` / ` + "`service`" + ` / ` + "`config`" + ` /
 ` + "`completion`" + ` for administrative tasks, and ` + "`shell-demo`" + ` for the
 extracted conversation shell with a fake backend.
 
@@ -44,11 +44,11 @@ Key capabilities:
   # Start the proxy server
   modeltap start --port 9090 --dashboard
 
-  # View recent captured logs
-  modeltap logs --limit 20
+  # View recent captured requests
+  modeltap requests list --limit 20
 
-  # Export last 24 hours of logs as CSV
-  modeltap export --format csv --since 24h
+  # Export last 24 hours of captures as CSV
+  modeltap requests export --format csv --since 24h
 
   # Check proxy and database status
   modeltap status`,
@@ -63,9 +63,7 @@ Key capabilities:
 		newStartCommand(),
 		newShellCommand(),
 		newShellDemoCommand(),
-		newLogsCommand(),
-		newShowCommand(),
-		newExportCommand(),
+		newRequestsCommand(),
 		newConfigCommand(),
 		newStatusCommand(),
 		newMetricsCommand(),

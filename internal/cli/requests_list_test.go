@@ -73,15 +73,15 @@ func seedLogsTestStore(t *testing.T) storage.Store {
 
 func executeLogs(t *testing.T, store storage.Store, args ...string) (string, error) {
 	t.Helper()
-	prev := logsStore
-	logsStore = store
-	t.Cleanup(func() { logsStore = prev })
+	prev := requestsStore
+	requestsStore = store
+	t.Cleanup(func() { requestsStore = prev })
 
 	rootCmd := NewRootCommand("test")
 	buf := new(bytes.Buffer)
 	rootCmd.SetOut(buf)
 	rootCmd.SetErr(buf)
-	rootCmd.SetArgs(append([]string{"logs"}, args...))
+	rootCmd.SetArgs(append([]string{"requests", "list"}, args...))
 
 	err := rootCmd.Execute()
 	return buf.String(), err
@@ -232,7 +232,7 @@ func TestLogsLimitFlag(t *testing.T) {
 
 func TestLogsDefaultLimit(t *testing.T) {
 	// Verify the default limit is 50 by checking the flag default.
-	cmd := newLogsCommand()
+	cmd := newRequestsListCommand()
 	limitFlag := cmd.Flags().Lookup("limit")
 	if limitFlag == nil {
 		t.Fatal("expected --limit flag to be defined")
@@ -254,7 +254,7 @@ func TestLogsEmptyResults(t *testing.T) {
 		t.Fatalf("unexpected error: %v", execErr)
 	}
 
-	if !strings.Contains(output, "No log entries found.") {
+	if !strings.Contains(output, "No captures found.") {
 		t.Errorf("expected empty results message, got: %q", output)
 	}
 }
