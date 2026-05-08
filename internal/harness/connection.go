@@ -525,6 +525,11 @@ func (cm *ConnectionManager) autoStartServer(ctx context.Context) error {
 // binary) as a detached subprocess and polls for the socket. The
 // process detaches via Setpgid so the harness exit doesn't kill the
 // server.
+//
+// PATCH-0026: when MODELTAP_DAEMON_LOG=<path> is set on the harness
+// process, the auto-spawned daemon's stdout and stderr are redirected
+// to that file (append mode). Otherwise stdio stays nil → /dev/null,
+// preserving the TERM-corruption fix for production.
 func defaultStartServer(ctx context.Context, cfg ConnectionConfig) error {
 	if cfg.ServerBinary == "" {
 		return errors.New("ServerBinary is empty (no auto-start binary configured)")
@@ -534,18 +539,38 @@ func defaultStartServer(ctx context.Context, cfg ConnectionConfig) error {
 		args = []string{"start"}
 	}
 	cmd := exec.Command(cfg.ServerBinary, args...)
-	// Detach: server outlives harness.
-	// Setting Stdin/Stdout/Stderr to nil lets exec use /dev/null
-	// implicitly, so server startup logs don't leak into the harness
-	// TUI (TERM corruption fix).
+	// Default detach: stdio nilled so daemon output cannot corrupt
+	// the harness alt-screen.
 	cmd.Stdin = nil
 	cmd.Stdout = nil
 	cmd.Stderr = nil
+
+	// Optional: capture daemon stdio to a log file when the
+	// MODELTAP_DAEMON_LOG environment variable is set. The harness
+	// caller is responsible for surfacing the path to the user
+	// before the TUI takes over.
+	var daemonLog *os.File
+	if logPath := os.Getenv("MODELTAP_DAEMON_LOG"); logPath != "" {
+		f, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+		if err != nil {
+			return fmt.Errorf("opening MODELTAP_DAEMON_LOG %q: %w", logPath, err)
+		}
+		cmd.Stdout = f
+		cmd.Stderr = f
+		daemonLog = f
+	}
+
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
 	if err := cmd.Start(); err != nil {
+		if daemonLog != nil {
+			_ = daemonLog.Close()
+		}
 		return fmt.Errorf("launch %s: %w", cfg.ServerBinary, err)
 	}
 	// Don't wait — let the OS reap when the process eventually exits.
+	// The daemon-log file handle is intentionally leaked: it is owned
+	// by the long-lived daemon process, not the harness; closing it
+	// here would cut off daemon writes.
 	go func() { _ = cmd.Wait() }()
 
 	return waitForSocket(ctx, cfg.SocketPath)

@@ -20,10 +20,11 @@ import (
 // defaults"): --socket → viper bff.socket_path → built-in default;
 // --project → cwd; --model → viper default_model; --resume → empty.
 type shellFlags struct {
-	socketPath string
-	resumeID   string
-	project    string
-	modelName  string
+	socketPath     string
+	resumeID       string
+	project        string
+	modelName      string
+	debugDaemonLog string
 }
 
 func bindShellFlags(cmd *cobra.Command, f *shellFlags) {
@@ -31,6 +32,7 @@ func bindShellFlags(cmd *cobra.Command, f *shellFlags) {
 	cmd.Flags().StringVar(&f.resumeID, "resume", "", "resume the given session id at startup")
 	cmd.Flags().StringVar(&f.project, "project", "", "project directory (defaults to $PWD)")
 	cmd.Flags().StringVar(&f.modelName, "model", "", "initial model override for the session")
+	cmd.Flags().StringVar(&f.debugDaemonLog, "debug-daemon-log", "", "capture auto-spawned daemon stdout/stderr to this file (overrides MODELTAP_DAEMON_LOG)")
 }
 
 // newShellCommand registers the `modeltap shell` subcommand. It is
@@ -100,6 +102,19 @@ func runShell(cmd *cobra.Command, flags *shellFlags) error {
 	cfg, _, err := config.LoadWithViper("")
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
+	}
+
+	// PATCH-0026: --debug-daemon-log takes precedence over an
+	// inherited MODELTAP_DAEMON_LOG. Setting it before
+	// defaultStartServer reads the env ensures the auto-spawned
+	// daemon's stdio lands in the requested file. Print a one-line
+	// confirmation to stderr before the TUI takes over so the user
+	// knows where to look.
+	if flags.debugDaemonLog != "" {
+		_ = os.Setenv("MODELTAP_DAEMON_LOG", flags.debugDaemonLog)
+	}
+	if logPath := os.Getenv("MODELTAP_DAEMON_LOG"); logPath != "" {
+		fmt.Fprintf(cmd.ErrOrStderr(), "daemon log → %s\n", logPath)
 	}
 
 	effectiveSocket := flags.socketPath
