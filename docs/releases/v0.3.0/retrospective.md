@@ -19,12 +19,22 @@ shipped binary surfaced three defects:
 | F2 | `state.status` field in `internal/harnessshell` is written everywhere and never read by the renderer; every `HostStatusEvent` is silently a no-op, hiding output for `/models`, `/sessions`, `/runs`, `/context`, `/history`, `/mcp` | Blocking | Open — design-level |
 | F3 | Cloud provider health check probes `http://127.0.0.1:8080` (the local proxy) instead of the upstream, so Anthropic/OpenAI report "unavailable" even with valid keys | Open | Was masked by F1; surfaced when F1 was fixed in tree |
 | F4 | The BFF daemon ↔ TUI shell lifecycle is fragile: auto-spawned daemon stdio is nilled to `/dev/null`, stale daemons silently get reused, sockets aren't reliably cleaned up, `modeltap status` doesn't probe the running daemon, and manual daemon + shell coordination requires two terminals | High | Open — multiple distinct fixes (see Recommendation 10) |
+| F5 | `modeltap logs`, `show`, `export`, `metrics` all return "no store configured" — the `SetXxxStore` test-injection setters exist on each command but no production code path calls them, so every traffic-inspection command in v0.3.0 is non-functional | Blocking | Fix prepared as PATCH-0019 |
 
-F1 and F2 must be resolved before tagging v0.3.0. F3 may predate
-v0.3.0; needs investigation before scope decision. F4 is a class of
-issues observed during the smoke-test debug session itself; not
-release-blocking but materially impacts operator and contributor
-ergonomics.
+F1, F2, and F5 must be resolved before tagging v0.3.0. F3 may
+predate v0.3.0; needs investigation before scope decision. F4 is a
+class of issues observed during the smoke-test debug session
+itself; not release-blocking but materially impacts operator and
+contributor ergonomics.
+
+F5 was caught while trying to inspect a captured request body
+during smoke-test debug. The same shape as F1 — production wiring
+forgotten — and the same root cause as the F2 dead-state-field
+problem: a test-injection seam stayed in place but the production
+wiring that should have used it was never written. This brings the
+v0.3.0 production-wiring defect count to **three** missing-wiring
+findings (F1, F2, F5), all reachable by a binary-launch checklist
+in implementation review.
 
 ## What the prior cycles missed
 
@@ -77,6 +87,53 @@ defects that only manifest under user operation.
   "the implementation review didn't catch this because…" requires
   there to be an implementation review to point at. The structure
   helps locate where each defect should have been caught.
+
+## Process lessons
+
+The main lesson is not "do more review." v0.3.0 already had substantial
+design review, implementation review, and release-readiness review. The gap
+was that the final gates proved structural correctness rather than executable
+product behavior.
+
+1. **Add release validation before readiness/release close.** The readiness
+   review should consume the smoke-test result, not authorize it. A release
+   should not reach "ready for user release validation" until the shipped
+   binary has passed the release smoke test or the maintainer has explicitly
+   accepted a documented exception.
+
+2. **Split implementation review into static and runtime review.** Static
+   conformance review remains useful for design drift, transactions, bounds,
+   and internal correctness. Runtime review must build the binary, start the
+   daemon, launch the production shell, run each top-level slash command, and
+   observe rendered output.
+
+3. **Require production-wiring coverage for user-visible surfaces.** New
+   shell/BFF/user-facing behavior needs at least one test or scripted check
+   through the production constructor path. Unit tests for each link are not
+   enough when the failure mode crosses CLI wiring, daemon lifecycle, JSON-RPC,
+   harness projection, and rendering.
+
+4. **Make deadcode/static analysis a release gate.** Write-only state fields
+   and unused event projections should be treated as bugs. Add staticcheck or
+   an equivalent deadcode pass to CI and require a clean result before release
+   close.
+
+5. **Make observability part of daemon/TUI done criteria.** A daemonized TUI
+   path needs a supported way to capture logs and probe the live JSON-RPC
+   surface. Diagnostic tooling such as `modeltap bff call` and a daemon debug
+   log path should be expected for future daemon/shell work, not improvised
+   during smoke-test failure.
+
+6. **Tighten readiness review wording and checklist.** A readiness review
+   should distinguish "implementation structurally complete" from "release
+   operationally validated." The checklist should include smoke-test status,
+   binary-launch evidence, production-wiring coverage, lint/static-analysis
+   status, and any accepted exceptions.
+
+7. **Convert retrospective recommendations into tracked artifacts.** Process
+   findings should become ADMIN changes to `.agents/process.md` and release
+   templates. Tooling and architecture findings should become PATCH/FEAT
+   artifacts rather than informal follow-ups.
 
 ## Recommendations
 
