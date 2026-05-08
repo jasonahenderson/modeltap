@@ -653,3 +653,94 @@ func TestRunDeltaWithoutCorrelationFallsBackToLastStreaming(t *testing.T) {
 		t.Fatalf("fallback delta application failed; assistant text = %q", got)
 	}
 }
+
+func TestHostInfoEventAppendsTranscriptRow(t *testing.T) {
+	m := newWithFixedClock()
+	text := "Available models:\n  claude-sonnet-4-6 (anthropic)\n  qwen3.5:35b (ollama-local)"
+
+	m, _ = drainActions(t, m, HostInfoEvent{Text: text})
+
+	if len(m.state.transcriptItems) != 1 {
+		t.Fatalf("expected 1 transcript row, got %d", len(m.state.transcriptItems))
+	}
+	row := m.state.transcriptItems[0]
+	if row.Kind != TranscriptItemKindHostInfo {
+		t.Fatalf("row kind = %v, want TranscriptItemKindHostInfo", row.Kind)
+	}
+	if row.Role != RoleHostInfo {
+		t.Fatalf("row role = %q, want %q", row.Role, RoleHostInfo)
+	}
+	if row.Text != text {
+		t.Fatalf("row text = %q, want %q", row.Text, text)
+	}
+}
+
+func TestHostInfoEventEmptyTextIsNoop(t *testing.T) {
+	m := newWithFixedClock()
+	m, _ = drainActions(t, m, HostInfoEvent{Text: ""})
+	if len(m.state.transcriptItems) != 0 {
+		t.Fatalf("empty HostInfoEvent should not append; got %d rows", len(m.state.transcriptItems))
+	}
+}
+
+func TestHostInfoRowRendersInTranscript(t *testing.T) {
+	m := newWithFixedClock()
+	m, _ = drainActions(t, m, HostInfoEvent{Text: "Available models:\n  claude-sonnet-4-6"})
+
+	in := m.toRenderInput()
+	in.Width = 80
+	out := Render(in)
+
+	if !strings.Contains(out.Content, "Available models:") {
+		t.Fatalf("rendered output missing host-info text:\n%s", out.Content)
+	}
+	if !strings.Contains(out.Content, "claude-sonnet-4-6") {
+		t.Fatalf("rendered output missing host-info detail line:\n%s", out.Content)
+	}
+}
+
+func TestRenderChromeStatusVisibleAcrossKinds(t *testing.T) {
+	cases := []struct {
+		name       string
+		status     string
+		kind       StatusKind
+		mustNotBe  string
+		shouldShow string
+	}{
+		{"ready", "Mode: build", StatusReady, "", "Mode: build"},
+		{"streaming", "Streaming response", StatusStreaming, "", "Streaming response"},
+		{"error", "model.list failed: timeout", StatusError, "", "model.list failed"},
+		{"permission", "Permission required", StatusPermissionPending, "", "Permission required"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			in := RenderInput{
+				Width:      80,
+				Status:     tc.status,
+				StatusKind: tc.kind,
+				InputView:  "",
+			}
+			out := Render(in)
+			if !strings.Contains(out.Content, tc.shouldShow) {
+				t.Fatalf("status %q (%s) not visible in render output:\n%s", tc.status, tc.kind, out.Content)
+			}
+		})
+	}
+}
+
+func TestRenderChromeStatusEmptyCollapses(t *testing.T) {
+	in := RenderInput{Width: 80}
+	withStatus := in
+	withStatus.Status = "Streaming response"
+	withStatus.StatusKind = StatusStreaming
+
+	emptyOut := Render(in).Content
+	statusOut := Render(withStatus).Content
+
+	if len(statusOut) <= len(emptyOut) {
+		t.Fatalf("empty Status should produce shorter output than non-empty;\n  empty len=%d\n  status len=%d", len(emptyOut), len(statusOut))
+	}
+	if strings.Contains(emptyOut, "Streaming response") {
+		t.Fatalf("empty Status leaked status text into render output:\n%s", emptyOut)
+	}
+}

@@ -472,7 +472,7 @@ func (r *ProductionRuntime) handleModelsCommand(ctx context.Context) error {
 		return r.statusError("model.list", err)
 	}
 	if len(resp.Models) == 0 {
-		r.sender.Send(harnessshell.HostStatusEvent{Status: "No models available", Kind: harnessshell.StatusReady})
+		r.sender.Send(harnessshell.HostInfoEvent{Text: "No models available"})
 		return nil
 	}
 	var b strings.Builder
@@ -485,8 +485,13 @@ func (r *ProductionRuntime) handleModelsCommand(ctx context.Context) error {
 			b.WriteString(m.Provider)
 			b.WriteString(")")
 		}
+		if m.Status != "" {
+			b.WriteString(" [")
+			b.WriteString(m.Status)
+			b.WriteString("]")
+		}
 	}
-	r.sender.Send(harnessshell.HostStatusEvent{Status: b.String(), Kind: harnessshell.StatusReady})
+	r.sender.Send(harnessshell.HostInfoEvent{Text: b.String()})
 	return nil
 }
 
@@ -520,7 +525,7 @@ func (r *ProductionRuntime) handleSessionList(ctx context.Context) error {
 		return r.statusError("session.list", err)
 	}
 	if len(resp.Sessions) == 0 {
-		r.sender.Send(harnessshell.HostStatusEvent{Status: "No sessions", Kind: harnessshell.StatusReady})
+		r.sender.Send(harnessshell.HostInfoEvent{Text: "No sessions"})
 		return nil
 	}
 	var b strings.Builder
@@ -533,7 +538,7 @@ func (r *ProductionRuntime) handleSessionList(ctx context.Context) error {
 			b.WriteString(s.Summary)
 		}
 	}
-	r.sender.Send(harnessshell.HostStatusEvent{Status: b.String(), Kind: harnessshell.StatusReady})
+	r.sender.Send(harnessshell.HostInfoEvent{Text: b.String()})
 	return nil
 }
 
@@ -658,9 +663,8 @@ func (r *ProductionRuntime) handleContextCommand(ctx context.Context) error {
 	if err != nil {
 		return r.statusError("context.list", err)
 	}
-	r.sender.Send(harnessshell.HostStatusEvent{
-		Status: "Context: " + truncate(string(resp), 200),
-		Kind:   harnessshell.StatusReady,
+	r.sender.Send(harnessshell.HostInfoEvent{
+		Text: "Context:\n" + string(resp),
 	})
 	return nil
 }
@@ -712,9 +716,8 @@ func (r *ProductionRuntime) handleRunCommand(ctx context.Context, args string) e
 	if err := client.CallInto(ctx, protocol.MethodRunDetails, &protocol.RunDetails{RunID: runID}, &resp); err != nil {
 		return r.statusError("run.details", err)
 	}
-	r.sender.Send(harnessshell.HostStatusEvent{
-		Status: formatRunDetails(resp.Run),
-		Kind:   harnessshell.StatusReady,
+	r.sender.Send(harnessshell.HostInfoEvent{
+		Text: formatRunDetails(resp.Run),
 	})
 	return nil
 }
@@ -729,7 +732,7 @@ func (r *ProductionRuntime) handleRunsCommand(ctx context.Context) error {
 		return r.statusError("run.list", err)
 	}
 	if len(resp.Runs) == 0 {
-		r.sender.Send(harnessshell.HostStatusEvent{Status: "No runs", Kind: harnessshell.StatusReady})
+		r.sender.Send(harnessshell.HostInfoEvent{Text: "No runs"})
 		return nil
 	}
 	var b strings.Builder
@@ -752,7 +755,7 @@ func (r *ProductionRuntime) handleRunsCommand(ctx context.Context) error {
 			b.WriteString(truncate(run.Title, 60))
 		}
 	}
-	r.sender.Send(harnessshell.HostStatusEvent{Status: b.String(), Kind: harnessshell.StatusReady})
+	r.sender.Send(harnessshell.HostInfoEvent{Text: b.String()})
 	return nil
 }
 

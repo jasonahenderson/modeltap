@@ -496,6 +496,8 @@ func (m Model) toRenderInput() RenderInput {
 		StreamPulse:           m.state.streamPulse,
 		InterruptArmed:        m.state.interruptArmed,
 		QueuedCount:           len(m.state.queuedSubmissions),
+		Status:                m.state.status,
+		StatusKind:            m.state.statusKind,
 	}
 	if len(m.state.transcriptItems) > 0 {
 		in.Messages = make([]RenderMessage, 0, len(m.state.transcriptItems))

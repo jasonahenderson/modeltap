@@ -36,6 +36,8 @@ func (s *state) applyHostEvent(evt HostEvent) {
 		s.applyPreviewLoaded(e)
 	case HostStatusEvent:
 		s.applyHostStatus(e)
+	case HostInfoEvent:
+		s.applyHostInfo(e)
 	}
 }
 
@@ -61,6 +63,21 @@ func (s *state) applyHostStatus(e HostStatusEvent) {
 	if e.Kind != "" {
 		s.statusKind = e.Kind
 	}
+}
+
+// applyHostInfo appends a host-supplied informational row to the
+// transcript. Used for slash-command output that must persist in the
+// visible transcript rather than flash through the chrome status line.
+// Empty Text is a no-op so callers can guard at the emit site or here.
+func (s *state) applyHostInfo(e HostInfoEvent) {
+	if e.Text == "" {
+		return
+	}
+	s.transcriptItems = append(s.transcriptItems, TranscriptItem{
+		Kind: TranscriptItemKindHostInfo,
+		Role: RoleHostInfo,
+		Text: e.Text,
+	})
 }
 
 // applyPermissionRequested appends a transcript event row for the request

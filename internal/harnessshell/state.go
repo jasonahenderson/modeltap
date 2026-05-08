@@ -31,6 +31,10 @@ const (
 	RoleSystem Role = "system"
 	// RoleEvent identifies a non-conversational event row (e.g. permission).
 	RoleEvent Role = "event"
+	// RoleHostInfo identifies a host-supplied informational row appended
+	// via [HostInfoEvent] (slash-command output that persists in the
+	// transcript).
+	RoleHostInfo Role = "host_info"
 )
 
 // TranscriptItemKind enumerates the major transcript row varieties.
@@ -44,6 +48,9 @@ const (
 	// TranscriptItemKindQueued is a queued submission row rendered outside the
 	// committed transcript list.
 	TranscriptItemKindQueued
+	// TranscriptItemKindHostInfo is a host-supplied informational row
+	// (slash-command output).
+	TranscriptItemKindHostInfo
 )
 
 // EventState carries the transcript-side state for an event row, e.g. the

@@ -36,6 +36,10 @@ const (
 	RenderRoleUser      = "user"
 	RenderRoleAssistant = "assistant"
 	RenderRoleEvent     = "event"
+	// RenderRoleHostInfo is a host-supplied informational row appended via
+	// [HostInfoEvent] (slash-command output). Distinct from RenderRoleSystem
+	// so the renderer can apply different styling.
+	RenderRoleHostInfo = "host_info"
 )
 
 // RenderMessage is the per-row data the [Render] entry point consumes. It is
@@ -181,6 +185,19 @@ type RenderInput struct {
 	// surfaced in the footer hint. The shell does not own agent state, but
 	// FEAT-0014 lets the host show the count in the shell footer.
 	AgentCount int
+
+	// Status is the shell's chrome status line text — short single-line
+	// content set by the host (via [HostStatusEvent]) or by shell-internal
+	// transitions ("Submitted", "Done", "Streaming response"). Empty
+	// collapses cleanly: the chrome row is omitted entirely. Multi-line
+	// command output should not flow through this field; use a transcript
+	// row via [HostInfoEvent] instead.
+	Status string
+
+	// StatusKind tags [Status] semantically (ready, streaming, error,
+	// permission-pending, interrupt-armed) so the renderer can drive
+	// styling without parsing the display string.
+	StatusKind StatusKind
 }
 
 // RenderResult is the renderer's output. The string in [Content] should be
@@ -224,6 +241,8 @@ func Render(in RenderInput) RenderResult {
 			b.WriteString(renderEventRow(msg, contentWidth))
 		case RenderRoleAssistant:
 			renderAssistantRow(&b, in, msg, contentWidth)
+		case RenderRoleHostInfo:
+			b.WriteString(renderHostInfoRow(msg, contentWidth))
 		}
 	}
 	for _, queued := range in.Queued {
@@ -235,11 +254,37 @@ func Render(in RenderInput) RenderResult {
 	if b.Len() > 0 {
 		b.WriteString("\n\n")
 	}
+	if status := renderChromeStatus(in, contentWidth); status != "" {
+		b.WriteString(status)
+		b.WriteString("\n\n")
+	}
 	b.WriteString(renderComposerSurface(in))
 	return RenderResult{
 		Content:        b.String(),
 		TranscriptRefs: refs,
 	}
+}
+
+// renderChromeStatus returns the chrome status line for the current
+// shell state, or "" when there's nothing to show. Empty Status
+// collapses cleanly so the surface above the composer doesn't reserve
+// a blank line.
+func renderChromeStatus(in RenderInput, width int) string {
+	if in.Status == "" {
+		return ""
+	}
+	style := chromeStatusReadyStyle
+	switch in.StatusKind {
+	case StatusStreaming:
+		style = chromeStatusStreamingStyle
+	case StatusError:
+		style = chromeStatusErrorStyle
+	case StatusPermissionPending:
+		style = chromeStatusPermissionStyle
+	case StatusInterruptArmed:
+		style = chromeStatusInterruptStyle
+	}
+	return style.Width(width).Render(in.Status)
 }
 
 // renderWelcomeBlock renders the shell's compact empty-state identity mark.
@@ -297,6 +342,12 @@ func renderAssistantRow(b *strings.Builder, in RenderInput, msg RenderMessage, w
 	b.WriteString(assistantLabelStyle.Width(width).Render(label))
 	b.WriteString("\n")
 	b.WriteString(assistantBodyStyle.Width(width).Render(msg.Content))
+}
+
+// renderHostInfoRow renders a host-supplied informational row (slash-command
+// output) with a dim style distinct from assistant content.
+func renderHostInfoRow(msg RenderMessage, width int) string {
+	return hostInfoStyle.Width(width).Render(msg.Content)
 }
 
 // renderEventRow renders a non-conversational event row (permission,

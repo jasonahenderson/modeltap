@@ -1,7 +1,7 @@
 ---
 patch: "PATCH-0018"
 title: "Surface slash-command output via transcript host-info events"
-status: "proposed"
+status: "approved"
 date: "2026-05-07"
 related:
   - "FEAT-0014 (conversation shell)"
