@@ -153,12 +153,55 @@ func (s *state) emitSubmitOnEnter() bool {
 		return true
 	}
 
+	// PATCH-0023: dispatch host-native slash commands. /quit and
+	// /exit are intercepted earlier in model.go; /clear is handled
+	// just above. Any other leading-slash input with no attached
+	// tokens is a host-native command. The shell does not pre-validate
+	// the name; the host runtime's DispatchCommand emits an "Unknown
+	// command" status for anything it does not recognize.
+	if strings.HasPrefix(content, "/") && len(content) > 1 && len(s.inputTokens) == 0 {
+		s.dispatchHostCommand(content)
+		return true
+	}
+
 	var submittedTokens []InputToken
 	if len(s.inputTokens) > 0 {
 		submittedTokens = append(submittedTokens, s.inputTokens...)
 	}
 	s.beginSubmission(content, nil, submittedTokens, SubmissionSourceDirect)
 	return true
+}
+
+// dispatchHostCommand emits a [RunHostCommandAction] for a host-native
+// slash command. The input is the full "/name [args]" string with the
+// leading slash already verified by the caller. Per PATCH-0023, this
+// is the missing piece described in queue.go's pre-existing comment
+// ("host-native commands cross via [RunHostCommandAction] (added in a
+// later commit)") that was never added.
+func (s *state) dispatchHostCommand(content string) {
+	raw := content
+	trimmed := strings.TrimPrefix(content, "/")
+	name := trimmed
+	args := ""
+	if idx := strings.IndexAny(trimmed, " \t"); idx >= 0 {
+		name = trimmed[:idx]
+		args = strings.TrimSpace(trimmed[idx+1:])
+	}
+
+	s.input.Reset()
+	s.syncInputHeight()
+	s.inputTokens = nil
+	s.selectedToken = -1
+	s.status = "Running /" + name
+	s.statusKind = StatusReady
+
+	s.pendingActions = append(s.pendingActions, RunHostCommandAction{
+		Invocation: CommandInvocation{
+			Name: name,
+			Args: args,
+			Raw:  raw,
+		},
+	})
 }
 
 // releaseQueuedSubmission promotes queued work into a single merged

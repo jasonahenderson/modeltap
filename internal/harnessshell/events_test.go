@@ -110,6 +110,68 @@ func TestEnterSubmitShellNativeClearDoesNotEmit(t *testing.T) {
 	}
 }
 
+func TestEnterHostCommandEmitsRunHostCommandAction(t *testing.T) {
+	cases := []struct {
+		input    string
+		wantName string
+		wantArgs string
+	}{
+		{"/models", "models", ""},
+		{"/model qwen3.5:35b", "model", "qwen3.5:35b"},
+		{"/sessions", "sessions", ""},
+		{"/run policy", "run", "policy"},
+		{"/attach abc-123", "attach", "abc-123"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.input, func(t *testing.T) {
+			m := newWithFixedClock()
+			m.state.input.SetValue(tc.input)
+
+			m, actions := drainActions(t, m, enterKey())
+
+			if len(actions) != 1 {
+				t.Fatalf("expected 1 action, got %d (%+v)", len(actions), actions)
+			}
+			run, ok := actions[0].(RunHostCommandAction)
+			if !ok {
+				t.Fatalf("action[0] = %T, want RunHostCommandAction", actions[0])
+			}
+			if run.Invocation.Name != tc.wantName {
+				t.Errorf("name = %q, want %q", run.Invocation.Name, tc.wantName)
+			}
+			if run.Invocation.Args != tc.wantArgs {
+				t.Errorf("args = %q, want %q", run.Invocation.Args, tc.wantArgs)
+			}
+			if run.Invocation.Raw != tc.input {
+				t.Errorf("raw = %q, want %q", run.Invocation.Raw, tc.input)
+			}
+			// No optimistic transcript rows for host commands.
+			if len(m.state.transcriptItems) != 0 {
+				t.Errorf("expected no transcript items for host command, got %d", len(m.state.transcriptItems))
+			}
+			// Composer reset.
+			if got := m.state.input.Value(); got != "" {
+				t.Errorf("input should reset after host command, got %q", got)
+			}
+		})
+	}
+}
+
+func TestEnterBareSlashIsNotHostCommand(t *testing.T) {
+	// "/" alone has no command name; should fall through to a regular
+	// turn submission, not a host-command dispatch.
+	m := newWithFixedClock()
+	m.state.input.SetValue("/")
+
+	_, actions := drainActions(t, m, enterKey())
+	if len(actions) != 1 {
+		t.Fatalf("expected 1 action, got %d", len(actions))
+	}
+	if _, ok := actions[0].(SubmitTurnAction); !ok {
+		t.Fatalf("action[0] = %T, want SubmitTurnAction (bare slash is text)", actions[0])
+	}
+}
+
 func TestEnterShellNativeQuitCommandsReturnQuit(t *testing.T) {
 	for _, command := range []string{"/quit", "/exit"} {
 		t.Run(command, func(t *testing.T) {
