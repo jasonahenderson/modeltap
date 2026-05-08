@@ -18,9 +18,13 @@ shipped binary surfaced three defects:
 | F1 | Production wiring never starts provider health checks; Ollama discovery never runs and built-ins are forever flagged "unavailable" | Blocking | Fix prepared in tree (`bff_wiring.go`, `bff/server.go`); not committed |
 | F2 | `state.status` field in `internal/harnessshell` is written everywhere and never read by the renderer; every `HostStatusEvent` is silently a no-op, hiding output for `/models`, `/sessions`, `/runs`, `/context`, `/history`, `/mcp` | Blocking | Open — design-level |
 | F3 | Cloud provider health check probes `http://127.0.0.1:8080` (the local proxy) instead of the upstream, so Anthropic/OpenAI report "unavailable" even with valid keys | Open | Was masked by F1; surfaced when F1 was fixed in tree |
+| F4 | The BFF daemon ↔ TUI shell lifecycle is fragile: auto-spawned daemon stdio is nilled to `/dev/null`, stale daemons silently get reused, sockets aren't reliably cleaned up, `modeltap status` doesn't probe the running daemon, and manual daemon + shell coordination requires two terminals | High | Open — multiple distinct fixes (see Recommendation 10) |
 
 F1 and F2 must be resolved before tagging v0.3.0. F3 may predate
-v0.3.0; needs investigation before scope decision.
+v0.3.0; needs investigation before scope decision. F4 is a class of
+issues observed during the smoke-test debug session itself; not
+release-blocking but materially impacts operator and contributor
+ergonomics.
 
 ## What the prior cycles missed
 
@@ -135,6 +139,41 @@ defects that only manifest under user operation.
    (probe `https://api.anthropic.com` directly) or the proxy must
    correctly answer `HEAD /` with a non-5xx. F3 lives here.
 
+10. **BFF/TUI lifecycle robustness.** F4 covers a class of fragility
+    observed during the smoke-test debug session itself. Distinct
+    sub-fixes, each patch-sized, none individually blocking but
+    together a meaningful operator/contributor ergonomics gap:
+
+    - **a. Stale-daemon detection on shell startup.** Before
+      auto-connecting to an existing socket, probe the daemon for
+      its binary hash / start time / version and warn (or refuse)
+      when it doesn't match the shell binary. The current behavior
+      silently reuses a stale daemon — the trap that opened this
+      session.
+    - **b. Daemon stderr capture during development.** Recommendation
+      4 (`--debug-daemon-log`) covers the operator surface; the
+      ergonomic principle is that `nil → /dev/null` is correct
+      for production but should be opt-out.
+    - **c. Reliable socket cleanup.** Sockets sometimes survive
+      across daemon shutdowns and produce "another process is
+      listening" errors on the next start. Cleanup is best-effort
+      in `Server.Shutdown`; consider additional cleanup on `start`
+      when the socket exists but no listener answers it.
+    - **d. `modeltap status` should probe the running daemon.**
+      Currently it reads config and reports providers from disk;
+      it should connect to the socket, list registered endpoints
+      with their live status, and report whether the daemon's
+      binary matches the CLI.
+    - **e. Single-terminal daemon-plus-shell mode.** `modeltap
+      shell` could optionally background-run the daemon with a
+      stdio capture file when no daemon is on the socket, and
+      print the path on exit. Reduces the "two terminals + manual
+      coordination" tax for first-time users and contributors.
+    - **f. Daemon-vs-CLI binary mismatch warning.** If the
+      auto-spawned daemon's `os.Args[0]` differs from the shell's
+      `os.Executable()`, surface a one-time warning. Catches the
+      "I rebuilt but forgot to kill the old daemon" case.
+
 ## Outstanding work
 
 - **Decide patch/release scope for F1, F2, F3.** Options: (a) fold all
@@ -150,7 +189,9 @@ defects that only manifest under user operation.
   item is a candidate for its own `PATCH-NNNN` or `FEAT-NNNN`. The
   process items (1–3) likely belong in `.agents/process.md` and the
   release plan template; tooling items (4–6) and architecture items
-  (7–9) are patch-scoped.
+  (7–9) are patch-scoped. Recommendation 10 (F4) decomposes into
+  six patch-sized sub-items (10a–10f); file each independently as
+  bandwidth permits.
 
 ## Files touched this session
 
