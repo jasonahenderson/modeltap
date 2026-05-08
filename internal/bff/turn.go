@@ -243,6 +243,12 @@ func handleTurnSubmit(ctx context.Context, conn *Connection, params json.RawMess
 		Tools:        conn.Capabilities().Tools(),
 		Stream:       true,
 		WindowSize:   entry.Info.ContextWindow,
+		// PATCH-0022: a positive max_tokens is required by Anthropic
+		// and ignored-when-larger-than-supported by OpenAI. Zero (Go's
+		// default) reaches the wire as "max_tokens": 0 and produces a
+		// 400 from Anthropic. 4096 is the conservative fallback used
+		// by transform.go and accepted by every v0.3.0 catalog model.
+		MaxTokens: 4096,
 	}
 
 	// Provider dispatch (synchronous: returns the streaming response).

@@ -25,6 +25,7 @@ Implementation-scoped work authorization documents. Patches are the lightweight 
 | [PATCH-0019](0019-read-command-store-wiring.md) | Wire SQLite store into logs, show, export, metrics commands | approved |
 | [PATCH-0020](0020-requests-command-rename.md) | Rename logs/show/export to requests list/show/export | approved |
 | [PATCH-0021](0021-bff-health-check-wiring.md) | Wire provider health checks in BFF production startup | approved |
+| [PATCH-0022](0022-turn-submit-max-tokens-default.md) | Set default max_tokens for turn.submit dispatch | approved |
 
 ## When to Use a Patch
 
