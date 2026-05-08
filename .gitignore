@@ -30,6 +30,12 @@ vendor/
 # Local modeltap data if a developer runs the tool from the repo root
 .modeltap/
 
+# Smoke-test scratch directory: diagnostic probes, daemon logs,
+# captured stderr from manual smoke runs. Per repo convention the
+# user runs `cd .tmp && ../bin/modeltap shell ...` so .tmp/ accumulates
+# transient artifacts that should never be committed.
+.tmp/
+
 # dotenv (PATCH-0007): keys live in ~/.modeltap/.env or ./.env
 .env
 .env.local
