@@ -22,6 +22,7 @@ Implementation-scoped work authorization documents. Patches are the lightweight 
 | [PATCH-0015](0015-harness-shell-component-api.md) | Harness Shell Component API | approved |
 | [PATCH-0016](0016-pr1-ci-test-failures-triage.md) | Fix v0.2.x test suite failures and lint regressions surfaced by PR #1 CI | approved |
 | [PATCH-0018](0018-host-info-events.md) | Surface slash-command output via transcript host-info events | approved |
+| [PATCH-0019](0019-read-command-store-wiring.md) | Wire SQLite store into logs, show, export, metrics commands | approved |
 
 ## When to Use a Patch
 

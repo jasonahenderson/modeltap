@@ -43,7 +43,13 @@ in the logs table output.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if showStore == nil {
-				return fmt.Errorf("no store configured")
+				s, err := openStoreFromConfig()
+				if err != nil {
+					return err
+				}
+				defer s.Close()
+				showStore = s
+				defer func() { showStore = nil }()
 			}
 
 			id := args[0]

@@ -63,7 +63,13 @@ to now (e.g. "24h", "7d") or an RFC3339 timestamp.`,
 			}
 
 			if exportStore == nil {
-				return fmt.Errorf("no store configured")
+				s, err := openStoreFromConfig()
+				if err != nil {
+					return err
+				}
+				defer s.Close()
+				exportStore = s
+				defer func() { exportStore = nil }()
 			}
 
 			filter := storage.ListFilter{}

@@ -58,7 +58,13 @@ with other tools or dashboards.`,
   modeltap metrics --since 2026-03-01T00:00:00Z --until 2026-03-08T00:00:00Z`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if metricsStore == nil {
-				return fmt.Errorf("no store configured")
+				s, err := openStoreFromConfig()
+				if err != nil {
+					return err
+				}
+				defer s.Close()
+				metricsStore = s
+				defer func() { metricsStore = nil }()
 			}
 
 			filter := storage.MetricsFilter{}
@@ -144,7 +150,13 @@ stored request and recomputes all aggregated metric rows.`,
   modeltap metrics rebuild`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if metricsStore == nil {
-				return fmt.Errorf("no store configured")
+				s, err := openStoreFromConfig()
+				if err != nil {
+					return err
+				}
+				defer s.Close()
+				metricsStore = s
+				defer func() { metricsStore = nil }()
 			}
 
 			ctx := context.Background()

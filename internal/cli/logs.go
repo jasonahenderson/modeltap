@@ -56,7 +56,13 @@ to now (e.g. "24h", "7d", "30m") or an RFC3339 timestamp.`,
   modeltap logs --since 2026-03-01T00:00:00Z --until 2026-03-08T00:00:00Z`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if logsStore == nil {
-				return fmt.Errorf("no store configured")
+				s, err := openStoreFromConfig()
+				if err != nil {
+					return err
+				}
+				defer s.Close()
+				logsStore = s
+				defer func() { logsStore = nil }()
 			}
 
 			filter := storage.ListFilter{

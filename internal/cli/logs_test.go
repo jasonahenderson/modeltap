@@ -259,25 +259,11 @@ func TestLogsEmptyResults(t *testing.T) {
 	}
 }
 
-func TestLogsNoStoreError(t *testing.T) {
-	prev := logsStore
-	logsStore = nil
-	defer func() { logsStore = prev }()
-
-	rootCmd := NewRootCommand("test")
-	buf := new(bytes.Buffer)
-	rootCmd.SetOut(buf)
-	rootCmd.SetErr(buf)
-	rootCmd.SetArgs([]string{"logs"})
-
-	err := rootCmd.Execute()
-	if err == nil {
-		t.Fatal("expected error when no store configured")
-	}
-	if !strings.Contains(err.Error(), "no store configured") {
-		t.Errorf("expected 'no store configured' error, got: %v", err)
-	}
-}
+// PATCH-0019 removed the "no store configured" error path. Production
+// invocations now lazy-open a store via openStoreFromConfig when the
+// test-injection seam is nil; the corresponding failure-mode test is
+// deleted because asserting that contract no longer applies. Tests that
+// exercise the success path use the injection seam directly.
 
 func TestLogsSinceDurationDays(t *testing.T) {
 	store := seedLogsTestStore(t)
