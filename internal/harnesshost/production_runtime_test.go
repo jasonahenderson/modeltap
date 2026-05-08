@@ -293,6 +293,60 @@ func TestProductionRuntimeResolvePermissionUnblocksCallback(t *testing.T) {
 	}
 }
 
+// PATCH-0029: bootstrapSession must not overwrite a session id that
+// a racing turn.submit already wrote. The race shape: ConnStateReady
+// fires; bootstrapSession is goroutine'd; turn.submit runs first
+// because the user typed fast, auto-creates session "stub-session"
+// on the BFF, and stores it via SetSessionID. session.create then
+// returns later with a different id; bootstrapSession must observe
+// the existing id and skip the Set.
+func TestProductionRuntimeBootstrapSessionDoesNotOverwrite(t *testing.T) {
+	stub, err := testutil.NewBFFStub()
+	if err != nil {
+		t.Fatalf("NewBFFStub: %v", err)
+	}
+	defer stub.Close()
+
+	r := newProductionRuntimeForTest(t, stub)
+
+	// Simulate the race: a turn.submit completed before bootstrapSession.
+	r.mode.SetSessionID("turn-assigned-session")
+
+	// Run bootstrapSession directly (not via observeRuntimeMessage) to
+	// keep the test deterministic. The stub answers session.create with
+	// "stub-session"; we want to verify that response is discarded.
+	r.bootstrapSession(context.Background())
+
+	if got := r.mode.SessionID(); got != "turn-assigned-session" {
+		t.Errorf("bootstrapSession overwrote turn-assigned session id: got %q, want %q",
+			got, "turn-assigned-session")
+	}
+}
+
+// PATCH-0028 + PATCH-0029: when no turn raced ahead, bootstrapSession
+// adopts the session id returned by session.create.
+func TestProductionRuntimeBootstrapSessionAdoptsWhenEmpty(t *testing.T) {
+	stub, err := testutil.NewBFFStub()
+	if err != nil {
+		t.Fatalf("NewBFFStub: %v", err)
+	}
+	defer stub.Close()
+
+	r := newProductionRuntimeForTest(t, stub)
+
+	// Pre-condition: no session id stored.
+	if got := r.mode.SessionID(); got != "" {
+		t.Fatalf("expected empty session id pre-bootstrap, got %q", got)
+	}
+
+	r.bootstrapSession(context.Background())
+
+	if got := r.mode.SessionID(); got != "stub-session" {
+		t.Errorf("bootstrapSession did not adopt session.create id: got %q, want %q",
+			got, "stub-session")
+	}
+}
+
 func TestProductionRuntimeProjectRunReplay(t *testing.T) {
 	r, err := NewProductionRuntime(ProductionRuntimeConfig{
 		ConnConfig: harness.ConnectionConfig{SocketPath: "/nonexistent.sock"},

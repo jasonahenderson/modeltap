@@ -577,6 +577,14 @@ func (r *ProductionRuntime) observeRuntimeMessage(msg tea.Msg) {
 // context.list, session.clear, etc.) work before the user has
 // submitted any turn. Failures are best-effort: turn.submit will
 // still create a session implicitly if this call fails. PATCH-0028.
+//
+// PATCH-0029: re-check r.mode.SessionID() after the RPC returns. The
+// goroutine and a fast user turn race: if turn.submit auto-creates a
+// session (B) and stores its id while session.create is still in
+// flight, bootstrapSession's response (carrying session A) must not
+// overwrite B. Otherwise subsequent turns target A (conversation
+// sequence 0) while the harness's sequence counter advanced from B's
+// turn, producing "sequence X does not follow current 0".
 func (r *ProductionRuntime) bootstrapSession(ctx context.Context) {
 	if r.mode.SessionID() != "" {
 		return
@@ -589,6 +597,13 @@ func (r *ProductionRuntime) bootstrapSession(ctx context.Context) {
 	if err := client.CallInto(ctx, protocol.MethodSessionCreate, &protocol.SessionCreate{
 		Project: protocol.ProjectContext{Root: r.cfg.ProjectRoot},
 	}, &resp); err != nil {
+		return
+	}
+	// Re-check after the RPC: a turn.submit may have raced ahead of
+	// us and stored a session id from its auto-create response. If
+	// so, prefer that id — the conversation state lives there. The
+	// session we just created is orphaned but harmless.
+	if r.mode.SessionID() != "" {
 		return
 	}
 	r.mode.SetSessionID(resp.SessionID)
