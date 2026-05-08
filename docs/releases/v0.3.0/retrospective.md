@@ -23,21 +23,23 @@ shipped binary surfaced three defects:
 | F6 | `modeltap requests show <prefix>` claims to accept short-id prefixes but `storage.GetRequest` does an exact `WHERE id = ?` lookup; help text is misleading and short prefixes always return "request not found" | Medium | **Fixed in PATCH-0024** (storage prefix-fallback with ambiguity detection) |
 | F7 | Every `turn.submit` against Anthropic returns HTTP 400 because the BFF sends `"max_tokens": 0` on the wire (DispatchOpts.MaxTokens left at Go's zero value) | Blocking | **Fixed in PATCH-0022** |
 | F8 | `/models` (and likely other slash commands) typed in the production shell are submitted as user content in a turn.submit instead of being intercepted by the shell as host commands and dispatched via RunHostCommandAction | Blocking | **Fixed in PATCH-0023** (host-command dispatch in `emitSubmitOnEnter`) |
+| F9 | Composer footer advertises `Ctrl+B sidebar  Ctrl+T agents  Ctrl+K palette` and unconditionally renders `0 background agents running`, but none of those surfaces are wired in the post-WU-100 architecture. The spike (`internal/harnessspike`) had them; WU-100 dropped them as out-of-scope for the reusable shell and the host never re-implemented them | Medium | **Fixed in PATCH-0027** (footer cleanup); real implementation tracked under FEAT-0024 (Shell UX Chrome) for v0.3.x |
 
-All eight smoke-test findings are addressed in
-`release/v0.3.0`:
+All nine smoke-test findings are addressed in `release/v0.3.0`:
 
 - **Release-blocking, fixed:** F1, F2, F3, F5, F7, F8
-- **Medium, fixed:** F6
+- **Medium, fixed:** F6, F9 (chrome-truth fix; real chrome
+  tracked under FEAT-0024)
 - **High, partially fixed:** F4 — sub-item 10b shipped in
   PATCH-0026; 10c was already addressed by existing wiring
   (PATCH-0021); 10a / 10d / 10e / 10f deferred to v0.3.1 with
   retrospective Recommendation 10 carrying the design notes.
 
 The patch sweep that closed these findings lands as PATCH-0018
-through PATCH-0026 plus the supporting `ADMIN:` retrospective and
-process-doc commits. Smoke verification against the rebuilt
-binary still required to confirm end-to-end behavior.
+through PATCH-0027 plus the supporting `ADMIN:` retrospective and
+process-doc commits, and queues FEAT-0024 (draft) for v0.3.x. Smoke
+verification against the rebuilt binary still required to confirm
+end-to-end behavior.
 
 The defects in this release split cleanly into two failure modes:
 
