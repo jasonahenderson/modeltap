@@ -17,20 +17,27 @@ shipped binary surfaced three defects:
 |---|---|---|---|
 | F1 | Production wiring never starts provider health checks; Ollama discovery never runs and built-ins are forever flagged "unavailable" | Blocking | **Fixed in PATCH-0021** |
 | F2 | `state.status` field in `internal/harnessshell` is written everywhere and never read by the renderer; every `HostStatusEvent` is silently a no-op, hiding output for `/models`, `/sessions`, `/runs`, `/context`, `/history`, `/mcp` | Blocking | **Fixed in PATCH-0018** (HostInfoEvent + RenderInput.Status wiring) |
-| F3 | Cloud provider health check probes `http://127.0.0.1:8080` (the local proxy) instead of the upstream, so Anthropic/OpenAI report "unavailable" even with valid keys | Open | Confirmed in captured-requests table after PATCH-0019: every cloud probe is a 404 from the local proxy on a HEAD with empty path |
-| F4 | The BFF daemon ↔ TUI shell lifecycle is fragile: auto-spawned daemon stdio is nilled to `/dev/null`, stale daemons silently get reused, sockets aren't reliably cleaned up, `modeltap status` doesn't probe the running daemon, and manual daemon + shell coordination requires two terminals | High | Open — multiple distinct fixes (see Recommendation 10) |
+| F3 | Cloud provider health check probes `http://127.0.0.1:8080` (the local proxy) instead of the upstream, so Anthropic/OpenAI report "unavailable" even with valid keys | Blocking | **Fixed in PATCH-0025** (probe Upstream not Host) |
+| F4 | The BFF daemon ↔ TUI shell lifecycle is fragile: auto-spawned daemon stdio is nilled to `/dev/null`, stale daemons silently get reused, sockets aren't reliably cleaned up, `modeltap status` doesn't probe the running daemon, and manual daemon + shell coordination requires two terminals | High | **Sub-item 10b fixed in PATCH-0026** (`MODELTAP_DAEMON_LOG` / `--debug-daemon-log`); 10c already addressed by `Server.startSocketListener` + PATCH-0021; 10a / 10d / 10e / 10f deferred to v0.3.1 |
 | F5 | `modeltap logs`, `show`, `export`, `metrics` all return "no store configured" — the `SetXxxStore` test-injection setters exist on each command but no production code path calls them, so every traffic-inspection command in v0.3.0 is non-functional | Blocking | **Fixed in PATCH-0019** (lazy-open + shared store post-PATCH-0020 rename) |
-| F6 | `modeltap requests show <prefix>` claims to accept short-id prefixes but `storage.GetRequest` does an exact `WHERE id = ?` lookup; help text is misleading and short prefixes always return "request not found" | Medium | Open — workaround: pass full UUID or query SQLite directly |
+| F6 | `modeltap requests show <prefix>` claims to accept short-id prefixes but `storage.GetRequest` does an exact `WHERE id = ?` lookup; help text is misleading and short prefixes always return "request not found" | Medium | **Fixed in PATCH-0024** (storage prefix-fallback with ambiguity detection) |
 | F7 | Every `turn.submit` against Anthropic returns HTTP 400 because the BFF sends `"max_tokens": 0` on the wire (DispatchOpts.MaxTokens left at Go's zero value) | Blocking | **Fixed in PATCH-0022** |
-| F8 | `/models` (and likely other slash commands) typed in the production shell are submitted as user content in a turn.submit instead of being intercepted by the shell as host commands and dispatched via RunHostCommandAction | High | Open — the shell's input parser does not recognize them; needs investigation in `internal/harnessshell` |
+| F8 | `/models` (and likely other slash commands) typed in the production shell are submitted as user content in a turn.submit instead of being intercepted by the shell as host commands and dispatched via RunHostCommandAction | Blocking | **Fixed in PATCH-0023** (host-command dispatch in `emitSubmitOnEnter`) |
 
-F1, F2, F5, and F7 (release-blocking) are now fixed in the
-release/v0.3.0 branch via PATCH-0018 / 0019 / 0021 / 0022. F8 is
-high-severity and likely also blocking — without it, the most
-visible feature of the conversation shell (slash commands) sends
-the literal text to the model. F3 is open and confirmed by
-captured data. F6 is annoying but has a workaround. F4 is a
-multi-fix workstream tracked under Recommendation 10.
+All eight smoke-test findings are addressed in
+`release/v0.3.0`:
+
+- **Release-blocking, fixed:** F1, F2, F3, F5, F7, F8
+- **Medium, fixed:** F6
+- **High, partially fixed:** F4 — sub-item 10b shipped in
+  PATCH-0026; 10c was already addressed by existing wiring
+  (PATCH-0021); 10a / 10d / 10e / 10f deferred to v0.3.1 with
+  retrospective Recommendation 10 carrying the design notes.
+
+The patch sweep that closed these findings lands as PATCH-0018
+through PATCH-0026 plus the supporting `ADMIN:` retrospective and
+process-doc commits. Smoke verification against the rebuilt
+binary still required to confirm end-to-end behavior.
 
 The defects in this release split cleanly into two failure modes:
 
