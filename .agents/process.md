@@ -11,10 +11,12 @@ This file defines:
 - artifact taxonomy
 - release-phase rules
 - review artifact placement
+- implementation review guidelines
 - commit policy
 - activity logging expectations
 
-Detailed role contracts live in `.agents/contracts/`.
+Detailed role contracts live in `.agents/contracts/`. Detailed review
+guidelines live in `.agents/reviews/`.
 
 ## Artifact Taxonomy
 
@@ -129,6 +131,27 @@ commits.
   known, for example `codex-plan-review.md`.
 - `docs/history/` should record that the review happened and point to the
   canonical review artifact path.
+
+## Implementation Review
+
+Implementation reviews follow `.agents/reviews/implementation-review.md`.
+They verify post-implementation conformance and risk before release readiness
+or release close.
+
+Implementation review has two complementary parts:
+
+- **Static conformance review**: checks code, tests, design/ADR/feature/patch
+  conformance, transactions, state transitions, persistence, compatibility,
+  resource bounds, error handling, and diagnostics.
+- **Runtime evidence review**: checks evidence that the built artifact was
+  launched through the production path and that user-visible or operational
+  flows behave correctly. Automated E2E tests should provide this evidence
+  where feasible; manual smoke checks cover release-critical gaps until they
+  are automated.
+
+Readiness review should consume implementation-review dispositions and
+runtime/E2E/smoke evidence. Do not treat static implementation review alone as
+proof that a release is operationally validated.
 
 ## Release Tags
 
