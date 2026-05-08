@@ -38,11 +38,22 @@ const (
 // ProviderEndpoint is a configured provider instance with runtime
 // health/discovery state. Name is the user-assigned identifier
 // (e.g. "anthropic-prod"); Type selects the adapter behavior.
+//
+// Host controls dispatch routing: turn-submit traffic flows through
+// it. Per PATCH-0005, Host is auto-set to the local capture proxy
+// for cloud providers when the proxy is configured.
+//
+// Upstream is the canonical cloud-provider URL used by the health
+// check probe (PATCH-0025). It bypasses the local proxy so the probe
+// verifies the credentialed upstream is reachable rather than testing
+// the proxy's HEAD-on-empty-path behavior. For local providers
+// (Ollama, MLX) Upstream is unused and the probe reads Host directly.
 type ProviderEndpoint struct {
 	Name     string
 	Type     string
 	APIKey   string
 	Host     string
+	Upstream string
 	Discover bool
 
 	mu        sync.RWMutex
@@ -248,7 +259,19 @@ func (r *ProviderRegistry) checkCloudEndpoint(ctx context.Context, ep *ProviderE
 		ep.setStatus(ProviderStatusUnavailable, "api_key is empty", nil)
 		return
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodHead, ep.Host, nil)
+	// PATCH-0025: probe the canonical upstream rather than ep.Host.
+	// Host is the dispatch target (often the local capture proxy
+	// per PATCH-0005) which 404s on a HEAD with empty path. The
+	// probe must go to the credentialed cloud upstream directly.
+	// Production wiring populates Upstream; tests that exercise the
+	// cloud-probe path must set it explicitly. Falling back to
+	// defaultHostFor handles the case where neither is set, but is
+	// not used when Upstream is supplied.
+	probeURL := ep.Upstream
+	if probeURL == "" {
+		probeURL = defaultHostFor(ep.Type)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, probeURL, nil)
 	if err != nil {
 		ep.setStatus(ProviderStatusError, err.Error(), nil)
 		return

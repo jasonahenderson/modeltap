@@ -74,7 +74,7 @@ func TestCheckAnthropic_Ready(t *testing.T) {
 
 	reg := NewProviderRegistry()
 	reg.SetHTTPClient(srv.Client())
-	ep := &ProviderEndpoint{Name: "a", Type: ProviderTypeAnthropic, APIKey: "k", Host: srv.URL}
+	ep := &ProviderEndpoint{Name: "a", Type: ProviderTypeAnthropic, APIKey: "k", Host: srv.URL, Upstream: srv.URL}
 	_ = reg.Add(ep)
 
 	reg.CheckEndpoint(context.Background(), ep)
@@ -94,7 +94,7 @@ func TestCheckAnthropic_Unauthorized_StillReady(t *testing.T) {
 
 	reg := NewProviderRegistry()
 	reg.SetHTTPClient(srv.Client())
-	ep := &ProviderEndpoint{Name: "a", Type: ProviderTypeAnthropic, APIKey: "k", Host: srv.URL}
+	ep := &ProviderEndpoint{Name: "a", Type: ProviderTypeAnthropic, APIKey: "k", Host: srv.URL, Upstream: srv.URL}
 	_ = reg.Add(ep)
 
 	reg.CheckEndpoint(context.Background(), ep)
@@ -111,7 +111,7 @@ func TestCheckAnthropic_ServerError(t *testing.T) {
 
 	reg := NewProviderRegistry()
 	reg.SetHTTPClient(srv.Client())
-	ep := &ProviderEndpoint{Name: "a", Type: ProviderTypeAnthropic, APIKey: "k", Host: srv.URL}
+	ep := &ProviderEndpoint{Name: "a", Type: ProviderTypeAnthropic, APIKey: "k", Host: srv.URL, Upstream: srv.URL}
 	_ = reg.Add(ep)
 
 	reg.CheckEndpoint(context.Background(), ep)
@@ -128,6 +128,39 @@ func TestCheckAnthropic_MissingAPIKey(t *testing.T) {
 	reg.CheckEndpoint(context.Background(), ep)
 	if ep.Status() != ProviderStatusUnavailable {
 		t.Errorf("status = %q, want unavailable", ep.Status())
+	}
+}
+
+// PATCH-0025: cloud-probe targets Upstream, not Host. Host may point at
+// the local capture proxy per PATCH-0005; the probe must bypass that
+// and verify the credentialed cloud API itself is reachable.
+func TestCheckAnthropic_ProbesUpstreamNotHost(t *testing.T) {
+	var hits int
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits++
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer upstream.Close()
+
+	// Host points at a non-existent local proxy; the test fails if
+	// the probe hits Host instead of Upstream.
+	reg := NewProviderRegistry()
+	reg.SetHTTPClient(upstream.Client())
+	ep := &ProviderEndpoint{
+		Name:     "a",
+		Type:     ProviderTypeAnthropic,
+		APIKey:   "k",
+		Host:     "http://127.0.0.1:1", // unreachable local proxy
+		Upstream: upstream.URL,
+	}
+	_ = reg.Add(ep)
+
+	reg.CheckEndpoint(context.Background(), ep)
+	if ep.Status() != ProviderStatusReady {
+		t.Errorf("status = %q (err=%q), want ready", ep.Status(), ep.ErrorMessage())
+	}
+	if hits != 1 {
+		t.Errorf("upstream hits = %d, want 1 (probe should hit Upstream not Host)", hits)
 	}
 }
 
@@ -238,8 +271,8 @@ func TestProviderRegistry_CheckAll_Concurrent(t *testing.T) {
 
 	reg := NewProviderRegistry()
 	reg.SetHTTPClient(srv.Client())
-	_ = reg.Add(&ProviderEndpoint{Name: "a", Type: ProviderTypeAnthropic, APIKey: "k", Host: srv.URL})
-	_ = reg.Add(&ProviderEndpoint{Name: "b", Type: ProviderTypeOpenAI, APIKey: "k", Host: srv.URL})
+	_ = reg.Add(&ProviderEndpoint{Name: "a", Type: ProviderTypeAnthropic, APIKey: "k", Host: srv.URL, Upstream: srv.URL})
+	_ = reg.Add(&ProviderEndpoint{Name: "b", Type: ProviderTypeOpenAI, APIKey: "k", Host: srv.URL, Upstream: srv.URL})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()

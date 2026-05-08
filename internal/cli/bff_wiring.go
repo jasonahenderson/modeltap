@@ -40,6 +40,27 @@ func resolveProviderHost(pc config.ProviderConfig, proxyPort int) string {
 	return "http://127.0.0.1:" + strconv.Itoa(proxyPort)
 }
 
+// resolveProviderUpstream applies PATCH-0025: cloud-provider health
+// checks probe a canonical upstream URL rather than the dispatch
+// host (which may be the local capture proxy). pc.Upstream wins when
+// set; otherwise the per-type canonical default
+// (https://api.anthropic.com, https://api.openai.com, etc.) is used.
+// For local providers (Ollama, MLX) the per-type default is the
+// local service URL; the probe paths for those providers consult
+// ep.Host directly so the value here is unused but harmless.
+func resolveProviderUpstream(pc config.ProviderConfig) string {
+	if pc.Upstream != "" {
+		return pc.Upstream
+	}
+	switch pc.Type {
+	case bff.ProviderTypeAnthropic:
+		return "https://api.anthropic.com"
+	case bff.ProviderTypeOpenAI:
+		return "https://api.openai.com"
+	}
+	return ""
+}
+
 // startBFFServer constructs a BFF server, populates its provider /
 // adapter / model / routing surfaces from the loaded config, ensures
 // the socket directory exists, and starts listening. Returns the
@@ -90,6 +111,7 @@ func startBFFServer(cfg *config.Config, store storage.Store, stderr io.Writer) (
 			Type:     pc.Type,
 			APIKey:   pc.APIKey,
 			Host:     host,
+			Upstream: resolveProviderUpstream(pc),
 			Discover: pc.Discover,
 		}
 		if err := srv.Providers().Add(ep); err != nil {

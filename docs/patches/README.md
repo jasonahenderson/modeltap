@@ -28,6 +28,7 @@ Implementation-scoped work authorization documents. Patches are the lightweight 
 | [PATCH-0022](0022-turn-submit-max-tokens-default.md) | Set default max_tokens for turn.submit dispatch | approved |
 | [PATCH-0023](0023-shell-host-command-dispatch.md) | Dispatch host-native slash commands as RunHostCommandAction | approved |
 | [PATCH-0024](0024-show-short-id-prefix.md) | Support short-id prefix lookup in requests show | approved |
+| [PATCH-0025](0025-cloud-probe-upstream-target.md) | Probe cloud-provider upstream directly in health check | approved |
 
 ## When to Use a Patch
 
