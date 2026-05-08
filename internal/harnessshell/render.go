@@ -513,22 +513,34 @@ func renderPermissionDetails(p *RenderPendingPermission) string {
 	return permissionDetailsStyle.Render(strings.Join(lines, "\n"))
 }
 
-// renderFooter renders the composer's footer hint line (background-agent
-// count, scroll hints, queue count, key-cap hint).
+// renderFooter renders the composer's footer hint line. Per
+// PATCH-0027, the right-hand hint advertises only keybindings that
+// the current shell actually wires. Sidebar / palette / agent
+// surfaces (Ctrl+B / Ctrl+K / Ctrl+T in the spike) live behind
+// FEAT-0024 and are not wired in v0.3.x; they will reintroduce a
+// host-supplied footer hint when they ship.
+//
+// The agent-count label only appears when the host explicitly
+// supplies a non-zero AgentCount, so a default-zero RenderInput
+// no longer prints "0 background agents running".
 func renderFooter(in RenderInput, width int) string {
-	count := in.AgentCount
-	label := fmt.Sprintf("%d background agents running", count)
-	hint := "Ctrl+B sidebar  Ctrl+T agents  Ctrl+K palette"
-	if count == 1 {
-		label = "1 background agent running"
+	var labelParts []string
+
+	switch {
+	case in.AgentCount == 1:
+		labelParts = append(labelParts, "1 background agent running")
+	case in.AgentCount > 1:
+		labelParts = append(labelParts, fmt.Sprintf("%d background agents running", in.AgentCount))
 	}
 	if in.Focus == RenderFocusTranscript {
-		label += "  |  scroll: wheel/arrows  items: j/k  open: Enter"
+		labelParts = append(labelParts, "scroll: wheel/arrows  items: j/k  open: Enter")
 	}
 	if in.QueuedCount > 0 {
-		label += fmt.Sprintf("  |  %d queued", in.QueuedCount)
+		labelParts = append(labelParts, fmt.Sprintf("%d queued", in.QueuedCount))
 	}
-	left := footerStatusStyle.Render(label)
+
+	hint := "Tab focus  Enter submit  Ctrl+J newline"
+	left := footerStatusStyle.Render(strings.Join(labelParts, "  |  "))
 	right := footerHintStyle.Render(hint)
 	space := width - lipgloss.Width(left) - lipgloss.Width(right) - 4
 	if space < 1 {

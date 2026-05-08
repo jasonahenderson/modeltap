@@ -99,9 +99,12 @@ func TestIntegrationSubmitStreamCompletePipeline(t *testing.T) {
 	a = pumpAdapter(t, a, harness.StreamTokenMsg{TurnID: "run-1", Delta: "ld"}, 10)
 	a = pumpAdapter(t, a, harness.StreamCompleteMsg{TurnID: "run-1"}, 10)
 
-	// Sanity: View renders without panicking.
+	// Sanity: View renders without panicking. The footer hint is the
+	// most stable always-present marker after PATCH-0027 (the prior
+	// "background agents" marker no longer renders when AgentCount
+	// is zero, which is the default).
 	view := a.View()
-	if !strings.Contains(view, "background agents") {
+	if !strings.Contains(view, "Tab focus") {
 		t.Fatalf("View should render the composer chrome; got:\n%s", view)
 	}
 }
