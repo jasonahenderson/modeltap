@@ -98,6 +98,15 @@ func startBFFServer(cfg *config.Config, store storage.Store, stderr io.Writer) (
 		}
 		endpointCount++
 	}
+
+	// Run an initial health check pass and start the background poll
+	// loop. Without this, every endpoint stays at the zero-value status
+	// (reported as "unavailable"), Ollama/MLX discovery never runs, and
+	// the registry's built-in catalog reports every model as
+	// unavailable on model.list. StartHealthChecks runs CheckAll
+	// synchronously before returning, so the Refresh below sees current
+	// status and discovered model lists.
+	srv.Providers().StartHealthChecks(0)
 	srv.Models().Refresh()
 
 	// Manual model overrides.

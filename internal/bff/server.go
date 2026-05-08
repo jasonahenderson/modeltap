@@ -233,11 +233,15 @@ func (s *Server) Start() error {
 }
 
 // Shutdown gracefully stops the server. It closes listeners, cancels
-// live connections' contexts, and waits for the accept loops and
-// per-connection Run goroutines to return. Returns nil on clean
-// drainage or ctx.Err() if the provided context deadline is reached.
+// live connections' contexts, stops the provider health-check poll
+// loop, and waits for the accept loops and per-connection Run
+// goroutines to return. Returns nil on clean drainage or ctx.Err() if
+// the provided context deadline is reached.
 func (s *Server) Shutdown(ctx context.Context) error {
 	s.cancel() // signal per-connection contexts
+	if s.providers != nil {
+		s.providers.Stop()
+	}
 	if s.socketListener != nil {
 		_ = s.socketListener.Close()
 		// Best-effort: remove the socket file so subsequent Start calls
