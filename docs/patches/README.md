@@ -33,6 +33,7 @@ Implementation-scoped work authorization documents. Patches are the lightweight 
 | [PATCH-0027](0027-truthful-footer-hints.md) | Strip misleading footer hints (sidebar / palette / agents) | approved |
 | [PATCH-0028](0028-session-create-rpc.md) | Add session.create RPC and harness auto-call on Ready | approved |
 | [PATCH-0029](0029-bootstrap-session-race.md) | Fix bootstrapSession race that overwrites turn-assigned session id | approved |
+| [PATCH-0030](0030-shell-select-mode.md) | Add /select shell-native toggle for terminal text selection | approved |
 
 ## When to Use a Patch
 

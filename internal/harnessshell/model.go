@@ -299,6 +299,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (bool, Model, tea.Cmd) {
 				m.state.status = "Exiting"
 				return true, m, tea.Quit
 			}
+			if isShellNativeSelectCommand(m.state.input.Value()) && len(m.state.inputTokens) == 0 {
+				updated, cmd := m.toggleSelectMode()
+				return true, updated, cmd
+			}
 			if m.state.emitSubmitOnEnter() {
 				return true, m, nil
 			}
@@ -368,6 +372,27 @@ func (m Model) handleKey(msg tea.KeyMsg) (bool, Model, tea.Cmd) {
 // widget. Composer mutations (paste capture, dropped-path detection,
 // dynamic textarea height) run through the shell helpers immediately
 // after the textarea consumes the key.
+// toggleSelectMode flips the /select toggle (PATCH-0030). When entering
+// selection mode it returns tea.DisableMouse so the host program tells
+// the terminal to handle mouse natively (enabling click-drag selection
+// for copy). When exiting it returns tea.EnableMouseAllMotion to
+// restore the chrome's mouse-wheel scroll behavior. The composer is
+// reset so /select itself doesn't echo back as user content on the
+// next submit.
+func (m Model) toggleSelectMode() (Model, tea.Cmd) {
+	m.state.input.Reset()
+	m.state.syncInputHeight()
+	m.state.mouseCaptureDisabled = !m.state.mouseCaptureDisabled
+	if m.state.mouseCaptureDisabled {
+		m.state.status = "Selection mode — terminal handles mouse; type /select to return"
+		m.state.statusKind = StatusReady
+		return m, tea.DisableMouse
+	}
+	m.state.status = "Chat mode — mouse captured for scroll"
+	m.state.statusKind = StatusReady
+	return m, tea.EnableMouseAllMotion
+}
+
 func (m Model) routeKeyToFocus(msg tea.KeyMsg) (Model, tea.Cmd) {
 	switch m.state.focus {
 	case FocusInput:

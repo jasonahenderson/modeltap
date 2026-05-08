@@ -172,6 +172,50 @@ func TestEnterBareSlashIsNotHostCommand(t *testing.T) {
 	}
 }
 
+func TestEnterShellNativeSelectTogglesMouseCapture(t *testing.T) {
+	m := newWithFixedClock()
+
+	// First /select: enters selection mode.
+	m.state.input.SetValue("/select")
+	updated, cmd := m.Update(enterKey())
+	mu := updated.(Model)
+	if !mu.state.mouseCaptureDisabled {
+		t.Fatalf("first /select should set mouseCaptureDisabled=true")
+	}
+	if cmd == nil {
+		t.Fatalf("first /select should return a Cmd (tea.DisableMouse)")
+	}
+	if mu.state.input.Value() != "" {
+		t.Errorf("composer should be cleared after /select; got %q", mu.state.input.Value())
+	}
+	if !strings.Contains(mu.state.status, "Selection mode") {
+		t.Errorf("status should announce selection mode; got %q", mu.state.status)
+	}
+
+	// Second /select: returns to chat mode.
+	mu.state.input.SetValue("/select")
+	updated, cmd = mu.Update(enterKey())
+	mu = updated.(Model)
+	if mu.state.mouseCaptureDisabled {
+		t.Fatalf("second /select should set mouseCaptureDisabled=false")
+	}
+	if cmd == nil {
+		t.Fatalf("second /select should return a Cmd (tea.EnableMouseAllMotion)")
+	}
+	if !strings.Contains(mu.state.status, "Chat mode") {
+		t.Errorf("status should announce chat mode; got %q", mu.state.status)
+	}
+}
+
+func TestEnterShellNativeSelectDoesNotEmitAction(t *testing.T) {
+	m := newWithFixedClock()
+	m.state.input.SetValue("/select")
+	_, actions := drainActions(t, m, enterKey())
+	if len(actions) != 0 {
+		t.Fatalf("/select should not emit actions, got %d (%+v)", len(actions), actions)
+	}
+}
+
 func TestEnterShellNativeQuitCommandsReturnQuit(t *testing.T) {
 	for _, command := range []string{"/quit", "/exit"} {
 		t.Run(command, func(t *testing.T) {

@@ -228,6 +228,12 @@ type state struct {
 
 	sidebarOpen bool
 
+	// mouseCaptureDisabled tracks the /select toggle (PATCH-0030).
+	// When true, the host program has been instructed to relinquish
+	// mouse handling so the terminal's native click-drag selection
+	// works for copying transcript text.
+	mouseCaptureDisabled bool
+
 	preview *PreviewDialog
 
 	// pendingActions is the outbound action queue drained by Update on each

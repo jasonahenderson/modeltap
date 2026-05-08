@@ -27,6 +27,14 @@ func isShellNativeQuitCommand(content string) bool {
 	}
 }
 
+// isShellNativeSelectCommand reports whether content is the
+// /select shell-native command (PATCH-0030). /select toggles mouse
+// capture so the user can let the terminal handle native click-drag
+// text selection (e.g., to copy a run id from /runs output).
+func isShellNativeSelectCommand(content string) bool {
+	return strings.TrimSpace(content) == "/select"
+}
+
 // enqueueSubmission appends a queued follow-up entry to the visible queue.
 // Per WU-098 queue invariants, the visible queue is FIFO and merges happen
 // only at release time.
