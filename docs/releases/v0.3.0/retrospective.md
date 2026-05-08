@@ -25,10 +25,11 @@ shipped binary surfaced three defects:
 | F8 | `/models` (and likely other slash commands) typed in the production shell are submitted as user content in a turn.submit instead of being intercepted by the shell as host commands and dispatched via RunHostCommandAction | Blocking | **Fixed in PATCH-0023** (host-command dispatch in `emitSubmitOnEnter`) |
 | F9 | Composer footer advertises `Ctrl+B sidebar  Ctrl+T agents  Ctrl+K palette` and unconditionally renders `0 background agents running`, but none of those surfaces are wired in the post-WU-100 architecture. The spike (`internal/harnessspike`) had them; WU-100 dropped them as out-of-scope for the reusable shell and the host never re-implemented them | Medium | **Fixed in PATCH-0027** (footer cleanup); real implementation tracked under FEAT-0024 (Shell UX Chrome) for v0.3.x |
 | F10 | Session-scoped slash commands (`/model X`, `/context`, `/sessions clear`) fail with `-32602 session_id is required` when typed before the user submits their first turn — sessions were only auto-created on `turn.submit` or rehydrated by `session.resume`. The user has no path to switch model first and then submit | Blocking | **Fixed in PATCH-0028** (`session.create` RPC + harness auto-call on `ConnStateReady`) |
+| F11 | After PATCH-0028, the bootstrap goroutine racing a fast user turn could overwrite a turn-assigned session id, leaving subsequent turns on a different conversation than the harness sequence counter expected. Manifested as `-32602 turn.submit sequence 2 does not follow current 0` on the second turn after a fresh shell launch | Blocking | **Fixed in PATCH-0029** (re-check sessionID after `session.create` RPC; existing id wins) |
 
-All ten smoke-test findings are addressed in `release/v0.3.0`:
+All eleven smoke-test findings are addressed in `release/v0.3.0`:
 
-- **Release-blocking, fixed:** F1, F2, F3, F5, F7, F8, F10
+- **Release-blocking, fixed:** F1, F2, F3, F5, F7, F8, F10, F11
 - **Medium, fixed:** F6, F9 (chrome-truth fix; real chrome
   tracked under FEAT-0024)
 - **High, partially fixed:** F4 — sub-item 10b shipped in
