@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -137,6 +138,75 @@ func TestGetRequest_NotFound(t *testing.T) {
 	}
 	if got != nil {
 		t.Errorf("expected nil for nonexistent request, got %+v", got)
+	}
+}
+
+func TestGetRequest_PrefixMatchUnique(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	full := "33477705-a342-4376-9f37-9f77ed7dcc52"
+	if err := store.SaveRequest(ctx, &Request{
+		ID:        full,
+		Timestamp: time.Date(2026, 5, 8, 12, 0, 0, 0, time.UTC),
+		Provider:  "anthropic",
+		Model:     "claude-sonnet-4-6",
+	}); err != nil {
+		t.Fatalf("SaveRequest: %v", err)
+	}
+
+	got, err := store.GetRequest(ctx, "33477705")
+	if err != nil {
+		t.Fatalf("GetRequest with 8-char prefix: %v", err)
+	}
+	if got == nil {
+		t.Fatal("expected prefix match, got nil")
+	}
+	if got.ID != full {
+		t.Errorf("got ID %q, want %q", got.ID, full)
+	}
+}
+
+func TestGetRequest_PrefixMatchAmbiguous(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	for _, id := range []string{
+		"abcdef01-1111-1111-1111-111111111111",
+		"abcdef02-2222-2222-2222-222222222222",
+	} {
+		if err := store.SaveRequest(ctx, &Request{
+			ID:        id,
+			Timestamp: time.Date(2026, 5, 8, 12, 0, 0, 0, time.UTC),
+			Provider:  "anthropic",
+			Model:     "claude-sonnet-4-6",
+		}); err != nil {
+			t.Fatalf("SaveRequest: %v", err)
+		}
+	}
+
+	got, err := store.GetRequest(ctx, "abcdef")
+	if err == nil {
+		t.Fatalf("expected ambiguous-prefix error, got result %+v", got)
+	}
+	if got != nil {
+		t.Errorf("expected nil request on ambiguous prefix, got %+v", got)
+	}
+	if !strings.Contains(err.Error(), "ambiguous") {
+		t.Errorf("error %q should mention ambiguity", err.Error())
+	}
+}
+
+func TestGetRequest_PrefixMatchEmpty(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	got, err := store.GetRequest(ctx, "deadbeef")
+	if err != nil {
+		t.Fatalf("GetRequest: %v", err)
+	}
+	if got != nil {
+		t.Errorf("expected nil for non-matching prefix, got %+v", got)
 	}
 }
 

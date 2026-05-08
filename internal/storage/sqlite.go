@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -530,34 +531,91 @@ ON CONFLICT (day, provider, model) DO UPDATE SET
 	return nil
 }
 
-// GetRequest retrieves a single request by ID.
+// GetRequest retrieves a single request by ID. Per PATCH-0024, when
+// the exact-match query returns no row the lookup falls back to a
+// prefix match (id LIKE ? || '%') so that the short 8-character ids
+// shown by `modeltap requests list` resolve correctly. If the prefix
+// matches more than one row, GetRequest returns nil with an
+// "ambiguous prefix" error so the caller can ask for a longer id.
 func (s *SQLiteStore) GetRequest(ctx context.Context, id string) (*Request, error) {
-	const query = `
+	const exactQuery = `
 SELECT id, timestamp, provider, model, method, url,
        request_headers, request_body,
        response_status, response_headers, response_body,
        input_tokens, output_tokens, latency_ms, estimated_cost_usd
 FROM requests WHERE id = ?`
 
+	r, err := scanSingleRequest(s.db.QueryRowContext(ctx, exactQuery, id))
+	if err == nil {
+		return r, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("querying request %s: %w", id, err)
+	}
+
+	// Exact match missed; try prefix match. LIMIT 2 lets us detect
+	// ambiguity without scanning the whole table.
+	const prefixQuery = `
+SELECT id, timestamp, provider, model, method, url,
+       request_headers, request_body,
+       response_status, response_headers, response_body,
+       input_tokens, output_tokens, latency_ms, estimated_cost_usd
+FROM requests WHERE id LIKE ? || '%' LIMIT 2`
+
+	rows, err := s.db.QueryContext(ctx, prefixQuery, id)
+	if err != nil {
+		return nil, fmt.Errorf("querying request prefix %s: %w", id, err)
+	}
+	defer rows.Close()
+
+	var matches []*Request
+	for rows.Next() {
+		match, scanErr := scanSingleRequest(rows)
+		if scanErr != nil {
+			return nil, fmt.Errorf("scanning request prefix match for %s: %w", id, scanErr)
+		}
+		matches = append(matches, match)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating prefix matches for %s: %w", id, err)
+	}
+
+	switch len(matches) {
+	case 0:
+		return nil, nil
+	case 1:
+		return matches[0], nil
+	default:
+		return nil, fmt.Errorf("request id prefix %q is ambiguous (matches %d or more captures); use a longer id", id, len(matches))
+	}
+}
+
+// requestRowScanner is the minimal interface satisfied by both
+// *sql.Row and *sql.Rows so scanSingleRequest can serve both.
+type requestRowScanner interface {
+	Scan(dest ...any) error
+}
+
+// scanSingleRequest scans the column ordering used by both the exact
+// and prefix queries in GetRequest into a Request. Returns
+// sql.ErrNoRows when the underlying scanner reports it (only
+// applicable to *sql.Row).
+func scanSingleRequest(scanner requestRowScanner) (*Request, error) {
 	var r Request
 	var ts string
-	err := s.db.QueryRowContext(ctx, query, id).Scan(
+	if err := scanner.Scan(
 		&r.ID, &ts, &r.Provider, &r.Model, &r.Method, &r.URL,
 		&r.RequestHeaders, &r.RequestBody,
 		&r.ResponseStatus, &r.ResponseHeaders, &r.ResponseBody,
 		&r.InputTokens, &r.OutputTokens, &r.LatencyMs, &r.EstimatedCostUSD,
-	)
-	if err == sql.ErrNoRows {
-		return nil, nil
+	); err != nil {
+		return nil, err
 	}
+	t, err := time.Parse(time.RFC3339Nano, ts)
 	if err != nil {
-		return nil, fmt.Errorf("querying request %s: %w", id, err)
+		return nil, fmt.Errorf("parsing timestamp for request %s: %w", r.ID, err)
 	}
-
-	r.Timestamp, err = time.Parse(time.RFC3339Nano, ts)
-	if err != nil {
-		return nil, fmt.Errorf("parsing timestamp for request %s: %w", id, err)
-	}
+	r.Timestamp = t
 	return &r, nil
 }
 

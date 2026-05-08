@@ -27,6 +27,7 @@ Implementation-scoped work authorization documents. Patches are the lightweight 
 | [PATCH-0021](0021-bff-health-check-wiring.md) | Wire provider health checks in BFF production startup | approved |
 | [PATCH-0022](0022-turn-submit-max-tokens-default.md) | Set default max_tokens for turn.submit dispatch | approved |
 | [PATCH-0023](0023-shell-host-command-dispatch.md) | Dispatch host-native slash commands as RunHostCommandAction | approved |
+| [PATCH-0024](0024-show-short-id-prefix.md) | Support short-id prefix lookup in requests show | approved |
 
 ## When to Use a Patch
 
