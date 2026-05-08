@@ -26,12 +26,13 @@ shipped binary surfaced three defects:
 | F9 | Composer footer advertises `Ctrl+B sidebar  Ctrl+T agents  Ctrl+K palette` and unconditionally renders `0 background agents running`, but none of those surfaces are wired in the post-WU-100 architecture. The spike (`internal/harnessspike`) had them; WU-100 dropped them as out-of-scope for the reusable shell and the host never re-implemented them | Medium | **Fixed in PATCH-0027** (footer cleanup); real implementation tracked under FEAT-0024 (Shell UX Chrome) for v0.3.x |
 | F10 | Session-scoped slash commands (`/model X`, `/context`, `/sessions clear`) fail with `-32602 session_id is required` when typed before the user submits their first turn — sessions were only auto-created on `turn.submit` or rehydrated by `session.resume`. The user has no path to switch model first and then submit | Blocking | **Fixed in PATCH-0028** (`session.create` RPC + harness auto-call on `ConnStateReady`) |
 | F11 | After PATCH-0028, the bootstrap goroutine racing a fast user turn could overwrite a turn-assigned session id, leaving subsequent turns on a different conversation than the harness sequence counter expected. Manifested as `-32602 turn.submit sequence 2 does not follow current 0` on the second turn after a fresh shell launch | Blocking | **Fixed in PATCH-0029** (re-check sessionID after `session.create` RPC; existing id wins) |
+| F12 | Transcript text (assistant output, run ids, session ids, command output via HostInfoEvent) cannot be selected with the mouse because `tea.WithMouseAllMotion()` captures all mouse events, suppressing the terminal's native click-drag selection. Surfaced when the user tried to copy a `run-...` id from `/runs` output for use in `/run <run-id>` / `/attach <run-id>` and had no way to do so without retyping by hand | Medium | **Fixed in PATCH-0030** (`/select` shell-native toggle issuing `tea.DisableMouse` / `tea.EnableMouseAllMotion`) |
 
-All eleven smoke-test findings are addressed in `release/v0.3.0`:
+All twelve smoke-test findings are addressed in `release/v0.3.0`:
 
 - **Release-blocking, fixed:** F1, F2, F3, F5, F7, F8, F10, F11
 - **Medium, fixed:** F6, F9 (chrome-truth fix; real chrome
-  tracked under FEAT-0024)
+  tracked under FEAT-0024), F12
 - **High, partially fixed:** F4 — sub-item 10b shipped in
   PATCH-0026; 10c was already addressed by existing wiring
   (PATCH-0021); 10a / 10d / 10e / 10f deferred to v0.3.1 with
