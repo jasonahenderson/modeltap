@@ -47,6 +47,13 @@ func NewSSEParser(r io.Reader) *SSEParser {
 // exceeds the cap. `event:` headers and other field types are
 // silently skipped — the BFF only needs the data payload because both
 // Anthropic and OpenAI embed event-type info in the JSON.
+//
+// Also accepts NDJSON: lines that start with `{` are returned as bare
+// payloads so providers like Ollama that emit one JSON object per
+// newline (no SSE framing) flow through the same parser. The two
+// framings are textually disjoint — SSE field names cannot start
+// with `{` — so prefix detection is unambiguous and no per-provider
+// mode flag is needed. PATCH-0032.
 func (p *SSEParser) Next() ([]byte, error) {
 	for {
 		line, err := readBoundedLine(p.r, sseMaxLineBytes)
@@ -72,6 +79,10 @@ func (p *SSEParser) Next() ([]byte, error) {
 		if strings.HasPrefix(line, "data:") {
 			payload := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
 			return []byte(payload), nil
+		}
+		if strings.HasPrefix(line, "{") {
+			// NDJSON: bare JSON object per line. Pass through as-is.
+			return []byte(line), nil
 		}
 		// Other field types (event:, id:, retry:) — skip.
 	}

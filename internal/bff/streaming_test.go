@@ -145,6 +145,90 @@ func TestSSEParser_SkipsEventHeaders(t *testing.T) {
 	}
 }
 
+// PATCH-0032: Ollama and other local providers emit NDJSON (one bare
+// JSON object per line, no SSE framing). SSEParser must pass those
+// lines through to ParseStreamEvent so the streaming relay actually
+// sees the model's text. Before this, every NDJSON line was dropped
+// as an unknown SSE field and the assistant turn ended up empty.
+func TestSSEParser_NDJSONLinesPassThrough(t *testing.T) {
+	body := `{"model":"qwen","message":{"role":"assistant","content":"Hello"},"done":false}
+{"model":"qwen","message":{"role":"assistant","content":" world"},"done":false}
+{"model":"qwen","message":{"role":"assistant","content":""},"done":true,"eval_count":42}
+`
+	p := NewSSEParser(strings.NewReader(body))
+
+	want := []string{
+		`{"model":"qwen","message":{"role":"assistant","content":"Hello"},"done":false}`,
+		`{"model":"qwen","message":{"role":"assistant","content":" world"},"done":false}`,
+		`{"model":"qwen","message":{"role":"assistant","content":""},"done":true,"eval_count":42}`,
+	}
+	for i, w := range want {
+		got, err := p.Next()
+		if err != nil {
+			t.Fatalf("line %d: %v", i, err)
+		}
+		if string(got) != w {
+			t.Errorf("line %d = %q, want %q", i, got, w)
+		}
+	}
+	if _, err := p.Next(); !errors.Is(err, io.EOF) {
+		t.Errorf("expected EOF, got %v", err)
+	}
+}
+
+// PATCH-0032: drives the StreamRelay end-to-end through the real
+// OllamaProvider.ParseStreamEvent with an Ollama-shaped NDJSON
+// fixture and asserts the assistant content accumulates. Without
+// the NDJSON pass-through this test would persist an empty turn,
+// matching the v0.3.0 smoke-test symptom (F14).
+func TestStreamRelay_OllamaNDJSON_AccumulatesAssistantContent(t *testing.T) {
+	srv := newServerWithRealStore(t)
+	sid := seedSession(t, srv.store, SoloUserID, "/tmp/proj", "ollama ndjson")
+
+	c, frames := newRelayConnection(t, srv)
+	c.SetSessionID(sid)
+	active := srv.sessions.EnsureActive(sid, c)
+
+	if _, err := active.Conversation.AppendUserTurn(&protocol.TurnSubmit{
+		TurnID: "u1", SessionID: sid, Sequence: 1, Mode: protocol.ModeBuild, Content: "hi",
+	}); err != nil {
+		t.Fatalf("user append: %v", err)
+	}
+
+	body := `{"model":"qwen","message":{"role":"assistant","content":"v0.3.0 "},"done":false}
+{"model":"qwen","message":{"role":"assistant","content":"smoke "},"done":false}
+{"model":"qwen","message":{"role":"assistant","content":"ok"},"done":false}
+{"model":"qwen","message":{"role":"assistant","content":""},"done":true,"done_reason":"stop","prompt_eval_count":7,"eval_count":3}
+`
+	stream := io.NopCloser(strings.NewReader(body))
+	adapter := &provider.OllamaProvider{}
+
+	relay := NewStreamRelay(c, active, "turn-ollama-1", "", "qwen", "ollama")
+	turn, err := relay.Relay(context.Background(), stream, adapter)
+	if err != nil {
+		t.Fatalf("Relay: %v", err)
+	}
+	if turn == nil {
+		t.Fatalf("turn not persisted")
+	}
+
+	deltas := frames.byMethod(protocol.EventTokenDelta)
+	if len(deltas) != 3 {
+		t.Fatalf("token.delta count = %d, want 3", len(deltas))
+	}
+
+	// The persisted assistant turn's content blob must carry the
+	// concatenated text. messageToTurn stores the canonical
+	// provider.Message JSON in Turn.Content.
+	var msg provider.Message
+	if err := json.Unmarshal(turn.Content, &msg); err != nil {
+		t.Fatalf("unmarshal turn content: %v", err)
+	}
+	if msg.Content != "v0.3.0 smoke ok" {
+		t.Errorf("assistant content = %q, want %q", msg.Content, "v0.3.0 smoke ok")
+	}
+}
+
 func TestStreamRelay_TextChunks_PersistsAndCompletes(t *testing.T) {
 	srv := newServerWithRealStore(t)
 	sid := seedSession(t, srv.store, SoloUserID, "/tmp/proj", "stream test")
