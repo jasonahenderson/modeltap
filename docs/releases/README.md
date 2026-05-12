@@ -15,6 +15,7 @@ This directory organizes implementation plans and delivery artifacts by semver r
 | [v0.3.2](v0.3.2/) | planning draft | Validation, repair, and run artifacts (FEAT-0019, FEAT-0020) |
 | [v0.3.3](v0.3.3/) | planning draft | Policy-grade tool runtime (FEAT-0021) |
 | [v0.3.4](v0.3.4/) | planning draft | Memory, routing, and workflow extensions (FEAT-0022) |
+| v0.3.5 (planned) | not yet opened | PATCH-0017 session-scoped project context — BFF prep for FEAT-0023 desktop GUI |
 
 ## Structure
 
@@ -108,5 +109,6 @@ Features are assigned to releases based on dependency chain and delivery priorit
 | FEAT-0020 (Patch Evidence and Run Artifacts) | v0.3.2 | Planning draft |
 | FEAT-0021 (Policy-Grade Tool Runtime) | v0.3.3 | Planning draft |
 | FEAT-0022 (Durable Memory, Quality Routing, and Workflow Extensions) | v0.3.4 | Planning draft |
+| FEAT-0023 (Desktop GUI Client) | release TBD | Draft, forward marker only. Depends on PATCH-0017 (v0.3.5) landing and on a pending harness-role-embodiment ADR. Timeline uncommitted. |
 
 Release assignments for FEAT-0010+ are tentative and will be confirmed during their planning phase. The v0.3.x plans are draft roadmap artifacts until an explicit `ADMIN:` commit opens each release's Phase 1.
