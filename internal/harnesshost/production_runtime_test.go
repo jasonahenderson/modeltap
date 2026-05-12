@@ -347,6 +347,58 @@ func TestProductionRuntimeBootstrapSessionAdoptsWhenEmpty(t *testing.T) {
 	}
 }
 
+// PATCH-0033: statusError must strip the JSON-RPC wire framing from
+// harness.RPCError so users see "model.list failed: <message>" rather
+// than "model.list failed: rpc error -32602: <message>". Plain
+// (non-RPC) errors fall through unchanged.
+func TestProductionRuntimeStatusError_UnwrapsRPCError(t *testing.T) {
+	r, err := NewProductionRuntime(ProductionRuntimeConfig{
+		ConnConfig: harness.ConnectionConfig{SocketPath: "/nonexistent.sock"},
+	})
+	if err != nil {
+		t.Fatalf("NewProductionRuntime: %v", err)
+	}
+	defer r.Close()
+
+	var msgs []any
+	r.sender.onSend = func(msg tea.Msg) { msgs = append(msgs, msg) }
+
+	rpcErr := &harness.RPCError{Code: -32602, Message: "cannot attach terminal run"}
+	if err := r.statusError("run.attach", rpcErr); err != nil {
+		t.Fatalf("statusError returned non-nil: %v", err)
+	}
+
+	plainErr := errorString("disk full")
+	if err := r.statusError("session.list", plainErr); err != nil {
+		t.Fatalf("statusError returned non-nil: %v", err)
+	}
+
+	if len(msgs) != 2 {
+		t.Fatalf("msgs = %d, want 2", len(msgs))
+	}
+	got1, ok := msgs[0].(harnessshell.HostStatusEvent)
+	if !ok {
+		t.Fatalf("msgs[0] = %T, want HostStatusEvent", msgs[0])
+	}
+	if strings.Contains(got1.Status, "rpc error") {
+		t.Errorf("RPCError framing leaked: %q", got1.Status)
+	}
+	if !strings.Contains(got1.Status, "cannot attach terminal run") {
+		t.Errorf("inner message lost: %q", got1.Status)
+	}
+	got2, ok := msgs[1].(harnessshell.HostStatusEvent)
+	if !ok {
+		t.Fatalf("msgs[1] = %T, want HostStatusEvent", msgs[1])
+	}
+	if !strings.Contains(got2.Status, "disk full") {
+		t.Errorf("plain error mangled: %q", got2.Status)
+	}
+}
+
+type errorString string
+
+func (e errorString) Error() string { return string(e) }
+
 func TestProductionRuntimeProjectRunReplay(t *testing.T) {
 	r, err := NewProductionRuntime(ProductionRuntimeConfig{
 		ConnConfig: harness.ConnectionConfig{SocketPath: "/nonexistent.sock"},

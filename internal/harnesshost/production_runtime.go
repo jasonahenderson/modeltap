@@ -808,6 +808,18 @@ func (r *ProductionRuntime) handleRunAttachCommand(ctx context.Context, args str
 	}
 	var resp protocol.RunAttachResponse
 	if err := client.CallInto(ctx, protocol.MethodRunAttach, &protocol.RunAttach{RunID: runID}, &resp); err != nil {
+		// PATCH-0033: the BFF rejects attaching to terminal runs by
+		// design. Surface a friendlier hint pointing at /run for
+		// read-only inspection instead of leaking the JSON-RPC error.
+		var rpcErr *harness.RPCError
+		if errors.As(err, &rpcErr) && strings.Contains(rpcErr.Message, "cannot attach terminal run") {
+			r.sender.Send(harnessshell.HostStatusEvent{
+				Status: "run.attach failed: run " + runID +
+					" is already complete — use /run " + runID + " to inspect it",
+				Kind: harnessshell.StatusError,
+			})
+			return nil
+		}
 		return r.statusError("run.attach", err)
 	}
 	r.mode.SetActiveRunID(resp.Run.RunID)
@@ -920,9 +932,18 @@ func formatRunDetails(run protocol.RunSummary) string {
 // statusError emits a HostStatusEvent{Kind: StatusError} with the
 // command + error message and returns nil so the adapter doesn't
 // double-emit a RunFailedEvent.
+//
+// PATCH-0033: unwraps *harness.RPCError so the JSON-RPC wire framing
+// (`rpc error -%d: %s`) doesn't leak into user-facing status text.
+// Surfaces just the inner message for transport errors.
 func (r *ProductionRuntime) statusError(op string, err error) error {
+	msg := err.Error()
+	var rpcErr *harness.RPCError
+	if errors.As(err, &rpcErr) {
+		msg = rpcErr.Message
+	}
 	r.sender.Send(harnessshell.HostStatusEvent{
-		Status: op + " failed: " + err.Error(),
+		Status: op + " failed: " + msg,
 		Kind:   harnessshell.StatusError,
 	})
 	return nil
