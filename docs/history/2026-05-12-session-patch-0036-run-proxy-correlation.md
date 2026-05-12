@@ -29,3 +29,18 @@ filtering, and export/detail surfaces.
 
 - `go test ./internal/storage ./internal/proxy ./internal/bff ./internal/cli`
 - `go test ./...`
+
+## Follow-up: CI Lint Fix
+
+Fixed the PR lint failures reported by `make lint`:
+
+- Replaced `WriteString(fmt.Sprintf(...))` with `fmt.Fprintf` in run detail
+  formatting.
+- Replaced deprecated viewport `LineUp`/`LineDown` calls with
+  `ScrollUp`/`ScrollDown`.
+- Removed the unused BFF run registry `lastSeq` field.
+
+Verification:
+
+- `make lint`
+- `make test`

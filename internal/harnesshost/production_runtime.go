@@ -920,7 +920,7 @@ func formatRunDetails(run protocol.RunSummary) string {
 		b.WriteString(run.Model)
 	}
 	if run.TotalCost > 0 {
-		b.WriteString(fmt.Sprintf(" $%.4f", run.TotalCost))
+		fmt.Fprintf(&b, " $%.4f", run.TotalCost)
 	}
 	if run.Summary != "" {
 		b.WriteString("\n")

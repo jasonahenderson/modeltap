@@ -19,7 +19,6 @@ type activeRun struct {
 	sessionID            string
 	attachedConnectionID string
 	cancel               context.CancelFunc
-	lastSeq              int64
 }
 
 func newRunRegistry() *runRegistry {
