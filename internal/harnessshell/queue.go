@@ -29,8 +29,8 @@ func isShellNativeQuitCommand(content string) bool {
 
 // isShellNativeSelectCommand reports whether content is the
 // /select shell-native command (PATCH-0030). /select toggles mouse
-// capture so the user can let the terminal handle native click-drag
-// text selection (e.g., to copy a run id from /runs output).
+// capture between default terminal-native selection and app-owned
+// mouse-wheel scrolling.
 func isShellNativeSelectCommand(content string) bool {
 	return strings.TrimSpace(content) == "/select"
 }
@@ -138,18 +138,12 @@ func (s *state) emitSubmitOnEnter() bool {
 
 	s.pushHistory(content)
 
-	if s.streaming || len(s.queuedSubmissions) > 0 || len(s.pendingSubmissions) > 0 {
-		s.enqueueSubmission(content, s.inputTokens)
-		s.input.Reset()
-		s.syncInputHeight()
-		s.inputTokens = nil
-		s.selectedToken = -1
-		if !s.streaming {
-			s.releaseQueuedSubmission()
-		}
-		return true
-	}
-
+	// PATCH-0036: shell-native and host-native slash commands must
+	// dispatch immediately regardless of streaming state, so /cancel,
+	// /run, /detach, /sessions clear, etc. can take effect in-flight.
+	// Previously this check sat AFTER the streaming-queue branch
+	// below, so /cancel got enqueued as user content and the run
+	// continued to completion. F20.
 	if content == shellNativeClearCommand && len(s.inputTokens) == 0 {
 		s.transcriptItems = nil
 		s.transcriptRefs = nil
@@ -160,15 +154,21 @@ func (s *state) emitSubmitOnEnter() bool {
 		s.statusKind = StatusReady
 		return true
 	}
-
-	// PATCH-0023: dispatch host-native slash commands. /quit and
-	// /exit are intercepted earlier in model.go; /clear is handled
-	// just above. Any other leading-slash input with no attached
-	// tokens is a host-native command. The shell does not pre-validate
-	// the name; the host runtime's DispatchCommand emits an "Unknown
-	// command" status for anything it does not recognize.
 	if strings.HasPrefix(content, "/") && len(content) > 1 && len(s.inputTokens) == 0 {
 		s.dispatchHostCommand(content)
+		return true
+	}
+
+	// Non-slash content: queue while streaming, otherwise begin.
+	if s.streaming || len(s.queuedSubmissions) > 0 || len(s.pendingSubmissions) > 0 {
+		s.enqueueSubmission(content, s.inputTokens)
+		s.input.Reset()
+		s.syncInputHeight()
+		s.inputTokens = nil
+		s.selectedToken = -1
+		if !s.streaming {
+			s.releaseQueuedSubmission()
+		}
 		return true
 	}
 

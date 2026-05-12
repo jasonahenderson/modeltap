@@ -39,6 +39,7 @@ Implementation-scoped work authorization documents. Patches are the lightweight 
 | [PATCH-0033](0033-rpc-error-formatting.md) | Unwrap RPCError framing in shell statusError; friendlier terminal-run reject | proposed |
 | [PATCH-0034](0034-focus-agnostic-scroll.md) | Focus-agnostic transcript scroll hotkeys | proposed |
 | [PATCH-0035](0035-elapsed-seconds-placeholder.md) | v0.3.0 placeholder: append elapsed seconds to streaming status | proposed |
+| [PATCH-0036](0036-slash-commands-during-streaming.md) | Dispatch slash commands before queue check so /cancel works during streaming | proposed |
 
 ## When to Use a Patch
 

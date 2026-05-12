@@ -316,6 +316,49 @@ func TestEnterWhileStreamingEnqueues(t *testing.T) {
 	}
 }
 
+// PATCH-0036: slash commands typed during a streaming run must
+// dispatch as RunHostCommandAction immediately, not get enqueued
+// as user content. Before this fix, /cancel during streaming was
+// queued and the in-flight run continued to completion.
+func TestEnterSlashCommandDuringStreamingDispatches(t *testing.T) {
+	cases := []struct {
+		input    string
+		wantName string
+		wantArgs string
+	}{
+		{"/cancel run-abc", "cancel", "run-abc"},
+		{"/run", "run", ""},
+		{"/runs", "runs", ""},
+		{"/detach", "detach", ""},
+		{"/sessions clear", "sessions", "clear"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.input, func(t *testing.T) {
+			m := newWithFixedClock()
+			m.state.streaming = true
+			m.state.input.SetValue(tc.input)
+
+			m, actions := drainActions(t, m, enterKey())
+			if len(actions) != 1 {
+				t.Fatalf("expected 1 action, got %d (%+v)", len(actions), actions)
+			}
+			run, ok := actions[0].(RunHostCommandAction)
+			if !ok {
+				t.Fatalf("action[0] = %T, want RunHostCommandAction (slash should not enqueue during streaming)", actions[0])
+			}
+			if run.Invocation.Name != tc.wantName {
+				t.Errorf("name = %q, want %q", run.Invocation.Name, tc.wantName)
+			}
+			if run.Invocation.Args != tc.wantArgs {
+				t.Errorf("args = %q, want %q", run.Invocation.Args, tc.wantArgs)
+			}
+			if len(m.state.queuedSubmissions) != 0 {
+				t.Errorf("slash command should not enqueue during streaming, got %d queued", len(m.state.queuedSubmissions))
+			}
+		})
+	}
+}
+
 func TestEmptyEnterReleasesQueueWhenIdle(t *testing.T) {
 	m := newWithFixedClock()
 	m.state.queuedSubmissions = []QueuedSubmission{{ID: "q-1", Text: "queued one", Entries: []string{"queued one"}}}
