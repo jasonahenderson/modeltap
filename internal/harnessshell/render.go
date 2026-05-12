@@ -539,7 +539,10 @@ func renderFooter(in RenderInput, width int) string {
 		labelParts = append(labelParts, fmt.Sprintf("%d queued", in.QueuedCount))
 	}
 
-	hint := "Tab focus  Enter submit  Ctrl+J newline"
+	// PATCH-0034: advertise focus-agnostic scroll so users in the
+	// default input-focused state know how to look back through the
+	// transcript without typing /select or hunting for Tab focus.
+	hint := "PgUp/Dn scroll  Tab focus  Enter submit"
 	left := footerStatusStyle.Render(strings.Join(labelParts, "  |  "))
 	right := footerHintStyle.Render(hint)
 	space := width - lipgloss.Width(left) - lipgloss.Width(right) - 4

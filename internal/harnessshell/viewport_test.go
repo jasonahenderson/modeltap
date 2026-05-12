@@ -96,6 +96,86 @@ func TestManualScrollPreservedWhenNotFollowingTail(t *testing.T) {
 	}
 }
 
+// PATCH-0034: PgUp / PgDn and Alt+Up / Alt+Down must scroll the
+// transcript regardless of which focus zone owns the keyboard. The
+// default (input-focused, no /select) state needs a discoverable
+// keyboard scroll path after PATCH-0030 turned mouse capture off.
+func TestFocusAgnosticScrollFromInputFocus(t *testing.T) {
+	m := newWithFixedClock()
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 8})
+	m = updated.(Model)
+
+	for i := 0; i < 80; i++ {
+		m.state.transcriptItems = append(m.state.transcriptItems, TranscriptItem{
+			ID:   "msg-" + itoa(i),
+			Kind: TranscriptItemKindMessage,
+			Role: RoleUser,
+			Text: "seed line " + itoa(i) + " — long enough to occupy multiple rows after wrapping in a narrow viewport with the styling overhead the renderer applies",
+		})
+	}
+	// Prime the viewport content via Update so refresh() pushes the
+	// seeded transcriptItems into the underlying viewport. Without
+	// this, the first scroll event scrolls an empty viewport (no-op)
+	// while refresh() then fills it.
+	updated, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 8})
+	m = updated.(Model)
+
+	if !m.state.input.Focused() {
+		t.Fatalf("precondition: input should be focused by default")
+	}
+	if m.state.focus != FocusInput {
+		t.Fatalf("precondition: focus = %v, want FocusInput", m.state.focus)
+	}
+	if !m.ViewportState().AtBottom {
+		t.Fatalf("seed should leave viewport at bottom")
+	}
+
+	// PgUp from input focus scrolls the transcript without changing focus.
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyPgUp})
+	m = updated.(Model)
+	if m.state.focus != FocusInput {
+		t.Errorf("PgUp changed focus: %v", m.state.focus)
+	}
+	if m.ViewportState().AtBottom {
+		t.Errorf("PgUp from input focus did not scroll: still AtBottom")
+	}
+
+	afterPgUp := m.ViewportState().YOffset
+
+	// Alt+Up nudges by one line, still from input focus.
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp, Alt: true})
+	m = updated.(Model)
+	afterAltUp := m.ViewportState().YOffset
+	if afterAltUp >= afterPgUp {
+		t.Errorf("Alt+Up did not move YOffset up: before=%d after=%d", afterPgUp, afterAltUp)
+	}
+
+	// PgDn scrolls back down.
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyPgDown})
+	m = updated.(Model)
+	afterPgDn := m.ViewportState().YOffset
+	if afterPgDn <= afterAltUp {
+		t.Errorf("PgDn did not move YOffset down: before=%d after=%d", afterAltUp, afterPgDn)
+	}
+
+	// Alt+Down also nudges.
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown, Alt: true})
+	m = updated.(Model)
+	afterAltDn := m.ViewportState().YOffset
+	if afterAltDn <= afterPgDn {
+		t.Errorf("Alt+Down did not move YOffset down: before=%d after=%d", afterPgDn, afterAltDn)
+	}
+
+	// Plain Up arrow with empty input still recalls history (or is a
+	// no-op when history is empty); it must NOT scroll the viewport.
+	beforePlain := m.ViewportState().YOffset
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m = updated.(Model)
+	if got := m.ViewportState().YOffset; got != beforePlain {
+		t.Errorf("plain Up changed viewport YOffset (should be history recall instead): before=%d after=%d", beforePlain, got)
+	}
+}
+
 // itoa is a small int-to-string helper so the test does not import
 // strconv just for transcript seeding.
 func itoa(n int) string {

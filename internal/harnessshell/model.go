@@ -231,6 +231,30 @@ func (m Model) handleKey(msg tea.KeyMsg) (bool, Model, tea.Cmd) {
 		return true, m, nil
 	}
 
+	// PATCH-0034: focus-agnostic transcript scroll. PgUp/PgDn always
+	// page the transcript regardless of which zone has focus; Alt+Up
+	// / Alt+Down nudge by one line. This restores a discoverable
+	// scroll path in the default (input-focused, no /select) state
+	// where PATCH-0030 turned off mouse capture for native selection.
+	switch msg.Type {
+	case tea.KeyPgUp:
+		m.state.transcript.PageUp()
+		return true, m, nil
+	case tea.KeyPgDown:
+		m.state.transcript.PageDown()
+		return true, m, nil
+	}
+	if msg.Alt {
+		switch msg.Type {
+		case tea.KeyUp:
+			m.state.transcript.LineUp(1)
+			return true, m, nil
+		case tea.KeyDown:
+			m.state.transcript.LineDown(1)
+			return true, m, nil
+		}
+	}
+
 	switch strings.ToLower(msg.String()) {
 	case "ctrl+n":
 		if m.state.focus == FocusInput && len(m.state.inputTokens) > 0 {
