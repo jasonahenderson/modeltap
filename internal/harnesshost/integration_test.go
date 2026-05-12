@@ -19,6 +19,13 @@ import (
 // sequences from internal/harness so the projection + pause buffer +
 // inner shell pipeline is exercised end-to-end.
 
+// noopStreamTick is the test-side override for the shell's 1Hz
+// elapsed-seconds ticker (PATCH-0035). Tests that drive Update via
+// pumpAdapter run cmds synchronously; the real tea.Tick(time.Second,
+// ...) would block 1s per tick and self-reschedule, blowing the
+// pump's step budget.
+func noopStreamTick() tea.Cmd { return nil }
+
 // pumpAdapter feeds msg into the adapter, then drains every emitted
 // tea.Cmd back through Update until no more messages flow. Useful
 // for mid-stream tests where one Update invocation triggers a chain
@@ -70,7 +77,7 @@ func TestIntegrationSubmitStreamCompletePipeline(t *testing.T) {
 	// optimistic assistant placeholder); that is covered by the
 	// harnessshell event tests. This test asserts the adapter half.
 	rt := &fakeRuntime{submitResult: SubmitAccepted{RunID: "run-1", Label: "test-model"}}
-	a := New(harnessshell.New(), rt)
+	a := New(harnessshell.New(harnessshell.WithStreamTick(noopStreamTick)), rt)
 	updated, _ := a.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	a = updated.(Adapter)
 
@@ -99,9 +106,12 @@ func TestIntegrationSubmitStreamCompletePipeline(t *testing.T) {
 	a = pumpAdapter(t, a, harness.StreamTokenMsg{TurnID: "run-1", Delta: "ld"}, 10)
 	a = pumpAdapter(t, a, harness.StreamCompleteMsg{TurnID: "run-1"}, 10)
 
-	// Sanity: View renders without panicking.
+	// Sanity: View renders without panicking. The footer hint is the
+	// most stable always-present marker after PATCH-0027 (the prior
+	// "background agents" marker no longer renders when AgentCount
+	// is zero, which is the default).
 	view := a.View()
-	if !strings.Contains(view, "background agents") {
+	if !strings.Contains(view, "Tab focus") {
 		t.Fatalf("View should render the composer chrome; got:\n%s", view)
 	}
 }
@@ -115,7 +125,7 @@ func TestIntegrationMidStreamPermissionPauseAndResume(t *testing.T) {
 	// driven submit path; that integration is covered separately by
 	// the harnessshell event tests).
 	rt := &fakeRuntime{submitResult: SubmitAccepted{RunID: "run-1"}}
-	a := New(harnessshell.New(), rt)
+	a := New(harnessshell.New(harnessshell.WithStreamTick(noopStreamTick)), rt)
 	updated, _ := a.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	a = updated.(Adapter)
 

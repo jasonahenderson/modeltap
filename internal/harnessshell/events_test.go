@@ -48,6 +48,65 @@ func newWithFixedClock() Model {
 	return m
 }
 
+// PATCH-0035: RunStartedEvent stamps runStartedAt and queues a
+// streamTickCmd; the rendered status appends "(Ns)" once the clock
+// advances; RunCompletedEvent clears the timestamp and the next tick
+// is a no-op so the loop ends.
+func TestStreamingStatusAppendsElapsedSeconds(t *testing.T) {
+	m := New()
+	nowAt := time.Date(2026, 5, 11, 12, 0, 0, 0, time.UTC)
+	m.state.now = func() time.Time { return nowAt }
+
+	// Drive a RunStartedEvent through Update so the same pendingCmds
+	// drain path the host hits is exercised.
+	updated, cmd := m.Update(RunStartedEvent{RunID: "run-1", Label: "qwen"})
+	m = updated.(Model)
+	if m.state.runStartedAt.IsZero() {
+		t.Fatalf("runStartedAt not set after RunStartedEvent")
+	}
+	if cmd == nil {
+		t.Fatalf("RunStartedEvent did not return a tick cmd")
+	}
+	// Status during streaming with elapsed=0s is just the base
+	// status (composeStatusWithElapsed gates on elapsed > 0).
+	if got := composeStatusWithElapsed(&m.state); !strings.Contains(got, "Streaming") {
+		t.Errorf("base status missing 'Streaming': %q", got)
+	}
+
+	// Advance the clock 4s and recheck — the rendered status should
+	// now carry "(4s)".
+	nowAt = nowAt.Add(4 * time.Second)
+	if got := composeStatusWithElapsed(&m.state); !strings.Contains(got, "(4s)") {
+		t.Errorf("status missing '(4s)' after 4s elapsed: %q", got)
+	}
+
+	// A streamTickMsg while streaming reschedules itself.
+	_, tickCmd := m.Update(streamTickMsg(nowAt))
+	if tickCmd == nil {
+		t.Errorf("streamTickMsg during streaming did not reschedule")
+	}
+
+	// RunCompletedEvent clears runStartedAt and streaming; the next
+	// tick is a no-op (no rescheduled cmd).
+	updated, _ = m.Update(RunCompletedEvent{RunID: "run-1"})
+	m = updated.(Model)
+	if !m.state.runStartedAt.IsZero() {
+		t.Errorf("runStartedAt not cleared on RunCompletedEvent: %v", m.state.runStartedAt)
+	}
+	if m.state.streaming {
+		t.Errorf("streaming still true after RunCompletedEvent")
+	}
+	_, tickCmd = m.Update(streamTickMsg(nowAt.Add(5 * time.Second)))
+	if tickCmd != nil {
+		// drainPendingActions and other paths can return nil cmds;
+		// the tick loop must not reschedule itself once streaming
+		// has stopped.
+		if got, ok := tickCmd().(streamTickMsg); ok {
+			t.Errorf("streamTickMsg after completion rescheduled itself: got %v", got)
+		}
+	}
+}
+
 func TestEnterSubmitDirectEmitsAction(t *testing.T) {
 	m := newWithFixedClock()
 	m.state.input.SetValue("hello world")
@@ -107,6 +166,115 @@ func TestEnterSubmitShellNativeClearDoesNotEmit(t *testing.T) {
 	}
 	if m.state.statusKind != StatusReady {
 		t.Fatalf("statusKind = %v, want StatusReady", m.state.statusKind)
+	}
+}
+
+func TestEnterHostCommandEmitsRunHostCommandAction(t *testing.T) {
+	cases := []struct {
+		input    string
+		wantName string
+		wantArgs string
+	}{
+		{"/models", "models", ""},
+		{"/model qwen3.5:35b", "model", "qwen3.5:35b"},
+		{"/sessions", "sessions", ""},
+		{"/run policy", "run", "policy"},
+		{"/attach abc-123", "attach", "abc-123"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.input, func(t *testing.T) {
+			m := newWithFixedClock()
+			m.state.input.SetValue(tc.input)
+
+			m, actions := drainActions(t, m, enterKey())
+
+			if len(actions) != 1 {
+				t.Fatalf("expected 1 action, got %d (%+v)", len(actions), actions)
+			}
+			run, ok := actions[0].(RunHostCommandAction)
+			if !ok {
+				t.Fatalf("action[0] = %T, want RunHostCommandAction", actions[0])
+			}
+			if run.Invocation.Name != tc.wantName {
+				t.Errorf("name = %q, want %q", run.Invocation.Name, tc.wantName)
+			}
+			if run.Invocation.Args != tc.wantArgs {
+				t.Errorf("args = %q, want %q", run.Invocation.Args, tc.wantArgs)
+			}
+			if run.Invocation.Raw != tc.input {
+				t.Errorf("raw = %q, want %q", run.Invocation.Raw, tc.input)
+			}
+			// No optimistic transcript rows for host commands.
+			if len(m.state.transcriptItems) != 0 {
+				t.Errorf("expected no transcript items for host command, got %d", len(m.state.transcriptItems))
+			}
+			// Composer reset.
+			if got := m.state.input.Value(); got != "" {
+				t.Errorf("input should reset after host command, got %q", got)
+			}
+		})
+	}
+}
+
+func TestEnterBareSlashIsNotHostCommand(t *testing.T) {
+	// "/" alone has no command name; should fall through to a regular
+	// turn submission, not a host-command dispatch.
+	m := newWithFixedClock()
+	m.state.input.SetValue("/")
+
+	_, actions := drainActions(t, m, enterKey())
+	if len(actions) != 1 {
+		t.Fatalf("expected 1 action, got %d", len(actions))
+	}
+	if _, ok := actions[0].(SubmitTurnAction); !ok {
+		t.Fatalf("action[0] = %T, want SubmitTurnAction (bare slash is text)", actions[0])
+	}
+}
+
+func TestEnterShellNativeSelectTogglesMouseCapture(t *testing.T) {
+	m := newWithFixedClock()
+	if !m.state.mouseCaptureDisabled {
+		t.Fatalf("selection mode should be the default")
+	}
+
+	// First /select: enters chat mouse-capture mode.
+	m.state.input.SetValue("/select")
+	updated, cmd := m.Update(enterKey())
+	mu := updated.(Model)
+	if mu.state.mouseCaptureDisabled {
+		t.Fatalf("first /select should set mouseCaptureDisabled=false")
+	}
+	if cmd == nil {
+		t.Fatalf("first /select should return a Cmd (tea.EnableMouseAllMotion)")
+	}
+	if mu.state.input.Value() != "" {
+		t.Errorf("composer should be cleared after /select; got %q", mu.state.input.Value())
+	}
+	if !strings.Contains(mu.state.status, "Chat mode") {
+		t.Errorf("status should announce chat mode; got %q", mu.state.status)
+	}
+
+	// Second /select: returns to terminal-native selection mode.
+	mu.state.input.SetValue("/select")
+	updated, cmd = mu.Update(enterKey())
+	mu = updated.(Model)
+	if !mu.state.mouseCaptureDisabled {
+		t.Fatalf("second /select should set mouseCaptureDisabled=true")
+	}
+	if cmd == nil {
+		t.Fatalf("second /select should return a Cmd (tea.DisableMouse)")
+	}
+	if !strings.Contains(mu.state.status, "Selection mode") {
+		t.Errorf("status should announce selection mode; got %q", mu.state.status)
+	}
+}
+
+func TestEnterShellNativeSelectDoesNotEmitAction(t *testing.T) {
+	m := newWithFixedClock()
+	m.state.input.SetValue("/select")
+	_, actions := drainActions(t, m, enterKey())
+	if len(actions) != 0 {
+		t.Fatalf("/select should not emit actions, got %d (%+v)", len(actions), actions)
 	}
 }
 
@@ -229,6 +397,38 @@ func TestRunLifecycleHappyPath(t *testing.T) {
 	}
 	if m.state.activeRunID != "" {
 		t.Fatalf("activeRunID should reset, got %q", m.state.activeRunID)
+	}
+}
+
+func TestDetachedRunDeltaDoesNotMutateForegroundTranscript(t *testing.T) {
+	m := newWithFixedClock()
+	m.state.input.SetValue("ping")
+	m, actions := drainActions(t, m, enterKey())
+	subID := actions[0].(SubmitTurnAction).Submission.ID
+
+	m, _ = drainActions(t, m, SubmissionAcceptedEvent{SubmissionID: subID, RunID: "run-attached"})
+	m, _ = drainActions(t, m, RunDeltaEvent{RunID: "run-detached", Delta: "background chatter"})
+
+	if got := m.state.transcriptItems[1].Text; got != "" {
+		t.Fatalf("foreground assistant text = %q, want empty", got)
+	}
+	m, _ = drainActions(t, m, RunDeltaEvent{RunID: "run-attached", Delta: "foreground"})
+	if got := m.state.transcriptItems[1].Text; got != "foreground" {
+		t.Fatalf("foreground assistant text = %q, want foreground", got)
+	}
+}
+
+func TestRunStartedWithoutSubmissionCreatesReplayRow(t *testing.T) {
+	m := newWithFixedClock()
+	m, _ = drainActions(t, m, RunStartedEvent{RunID: "run-replay"})
+	m, _ = drainActions(t, m, RunDeltaEvent{RunID: "run-replay", Delta: "replayed"})
+
+	if len(m.state.transcriptItems) != 1 {
+		t.Fatalf("transcript items = %d, want 1", len(m.state.transcriptItems))
+	}
+	row := m.state.transcriptItems[0]
+	if row.RunID != "run-replay" || row.Text != "replayed" || !row.Streaming {
+		t.Fatalf("replay row = %+v", row)
 	}
 }
 
@@ -619,5 +819,96 @@ func TestRunDeltaWithoutCorrelationFallsBackToLastStreaming(t *testing.T) {
 	m, _ = drainActions(t, m, RunDeltaEvent{RunID: "run-1", Delta: "early"})
 	if got := m.state.transcriptItems[1].Text; got != "early" {
 		t.Fatalf("fallback delta application failed; assistant text = %q", got)
+	}
+}
+
+func TestHostInfoEventAppendsTranscriptRow(t *testing.T) {
+	m := newWithFixedClock()
+	text := "Available models:\n  claude-sonnet-4-6 (anthropic)\n  qwen3.5:35b (ollama-local)"
+
+	m, _ = drainActions(t, m, HostInfoEvent{Text: text})
+
+	if len(m.state.transcriptItems) != 1 {
+		t.Fatalf("expected 1 transcript row, got %d", len(m.state.transcriptItems))
+	}
+	row := m.state.transcriptItems[0]
+	if row.Kind != TranscriptItemKindHostInfo {
+		t.Fatalf("row kind = %v, want TranscriptItemKindHostInfo", row.Kind)
+	}
+	if row.Role != RoleHostInfo {
+		t.Fatalf("row role = %q, want %q", row.Role, RoleHostInfo)
+	}
+	if row.Text != text {
+		t.Fatalf("row text = %q, want %q", row.Text, text)
+	}
+}
+
+func TestHostInfoEventEmptyTextIsNoop(t *testing.T) {
+	m := newWithFixedClock()
+	m, _ = drainActions(t, m, HostInfoEvent{Text: ""})
+	if len(m.state.transcriptItems) != 0 {
+		t.Fatalf("empty HostInfoEvent should not append; got %d rows", len(m.state.transcriptItems))
+	}
+}
+
+func TestHostInfoRowRendersInTranscript(t *testing.T) {
+	m := newWithFixedClock()
+	m, _ = drainActions(t, m, HostInfoEvent{Text: "Available models:\n  claude-sonnet-4-6"})
+
+	in := m.toRenderInput()
+	in.Width = 80
+	out := Render(in)
+
+	if !strings.Contains(out.Content, "Available models:") {
+		t.Fatalf("rendered output missing host-info text:\n%s", out.Content)
+	}
+	if !strings.Contains(out.Content, "claude-sonnet-4-6") {
+		t.Fatalf("rendered output missing host-info detail line:\n%s", out.Content)
+	}
+}
+
+func TestRenderChromeStatusVisibleAcrossKinds(t *testing.T) {
+	cases := []struct {
+		name       string
+		status     string
+		kind       StatusKind
+		mustNotBe  string
+		shouldShow string
+	}{
+		{"ready", "Mode: build", StatusReady, "", "Mode: build"},
+		{"streaming", "Streaming response", StatusStreaming, "", "Streaming response"},
+		{"error", "model.list failed: timeout", StatusError, "", "model.list failed"},
+		{"permission", "Permission required", StatusPermissionPending, "", "Permission required"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			in := RenderInput{
+				Width:      80,
+				Status:     tc.status,
+				StatusKind: tc.kind,
+				InputView:  "",
+			}
+			out := Render(in)
+			if !strings.Contains(out.Content, tc.shouldShow) {
+				t.Fatalf("status %q (%s) not visible in render output:\n%s", tc.status, tc.kind, out.Content)
+			}
+		})
+	}
+}
+
+func TestRenderChromeStatusEmptyCollapses(t *testing.T) {
+	in := RenderInput{Width: 80}
+	withStatus := in
+	withStatus.Status = "Streaming response"
+	withStatus.StatusKind = StatusStreaming
+
+	emptyOut := Render(in).Content
+	statusOut := Render(withStatus).Content
+
+	if len(statusOut) <= len(emptyOut) {
+		t.Fatalf("empty Status should produce shorter output than non-empty;\n  empty len=%d\n  status len=%d", len(emptyOut), len(statusOut))
+	}
+	if strings.Contains(emptyOut, "Streaming response") {
+		t.Fatalf("empty Status leaked status text into render output:\n%s", emptyOut)
 	}
 }

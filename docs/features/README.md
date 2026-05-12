@@ -24,6 +24,7 @@ This directory holds **behavior-scoped** product definitions for modeltap that a
 | [FEAT-0021](0021-policy-grade-tool-runtime.md) | Policy-Grade Tool Runtime | draft |
 | [FEAT-0022](0022-memory-routing-and-workflow-extensions.md) | Durable Memory, Quality Routing, and Workflow Extensions | draft |
 | [FEAT-0023](0023-desktop-gui-client.md) | Desktop GUI Client | draft |
+| [FEAT-0024](0024-shell-ux-chrome.md) | Shell UX Chrome — sidebar, command palette, slash autocomplete, agents view | draft |
 
 Other previously feature-shaped docs were reclassified when they proved to be upstream explorations or implementation-scoped patches rather than active behavior contracts. See `docs/explorations/` and `docs/patches/`.
 

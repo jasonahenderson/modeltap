@@ -54,6 +54,88 @@ func newReadyConnection(t *testing.T, srv *Server) *Connection {
 	return c
 }
 
+// PATCH-0028: session.create mints a fresh session, persists it,
+// acquires the lock, and binds the connection.
+func TestSessionCreate_Success(t *testing.T) {
+	srv := newServerWithRealStore(t)
+	c := newReadyConnection(t, srv)
+
+	params, _ := json.Marshal(&protocol.SessionCreate{
+		Project: protocol.ProjectContext{Root: "/tmp/proj-new"},
+	})
+
+	raw, err := handleSessionCreate(context.Background(), c, params)
+	if err != nil {
+		t.Fatalf("handleSessionCreate: %v", err)
+	}
+	resp, ok := raw.(*protocol.SessionCreateResponse)
+	if !ok {
+		t.Fatalf("response type = %T, want *SessionCreateResponse", raw)
+	}
+	if resp.SessionID == "" {
+		t.Fatalf("expected non-empty SessionID")
+	}
+	if c.SessionID() != resp.SessionID {
+		t.Errorf("connection not bound to new session: conn=%q resp=%q", c.SessionID(), resp.SessionID)
+	}
+
+	// Storage row should exist with Project from request.
+	got, err := srv.store.GetSession(context.Background(), resp.SessionID)
+	if err != nil {
+		t.Fatalf("GetSession: %v", err)
+	}
+	if got == nil {
+		t.Fatal("session row not persisted")
+	}
+	if got.Project != "/tmp/proj-new" {
+		t.Errorf("persisted project = %q, want %q", got.Project, "/tmp/proj-new")
+	}
+	if got.Status != "active" {
+		t.Errorf("persisted status = %q, want active", got.Status)
+	}
+
+	// Lock acquired by this connection.
+	expiry := time.Now().Add(time.Second)
+	acquired, owner, err := srv.store.AcquireSessionLock(context.Background(), resp.SessionID, "different-conn", expiry)
+	if err != nil {
+		t.Fatalf("AcquireSessionLock: %v", err)
+	}
+	if acquired {
+		t.Errorf("lock should be held by conn-test; another conn acquired it")
+	}
+	if owner != c.ID() {
+		t.Errorf("lock owner = %q, want %q", owner, c.ID())
+	}
+
+	// Active session entry exists.
+	active := srv.sessions.GetActiveSession(resp.SessionID)
+	if active == nil {
+		t.Errorf("active session not registered for %q", resp.SessionID)
+	}
+
+	// Project context on the connection updated.
+	if got := c.Capabilities().ProjectContext().Root; got != "/tmp/proj-new" {
+		t.Errorf("connection project = %q, want %q", got, "/tmp/proj-new")
+	}
+}
+
+func TestSessionCreate_DecodeError(t *testing.T) {
+	srv := newServerWithRealStore(t)
+	c := newReadyConnection(t, srv)
+
+	_, err := handleSessionCreate(context.Background(), c, json.RawMessage(`{not-json`))
+	if err == nil {
+		t.Fatal("expected decode error")
+	}
+	var te *TransportError
+	if !errors.As(err, &te) {
+		t.Fatalf("error type = %T, want *TransportError", err)
+	}
+	if te.Code != CodeInvalidParams {
+		t.Errorf("code = %d, want %d", te.Code, CodeInvalidParams)
+	}
+}
+
 func TestSessionResume_Success(t *testing.T) {
 	srv := newServerWithRealStore(t)
 	sid := seedSession(t, srv.store, SoloUserID, "/tmp/proj", "hello world")

@@ -321,41 +321,11 @@ func TestMetrics_Rebuild(t *testing.T) {
 	}
 }
 
-func TestMetrics_RebuildNoStore(t *testing.T) {
-	metricsStore = nil
-
-	cmd := NewRootCommand("test")
-	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetArgs([]string{"metrics", "rebuild"})
-
-	err := cmd.Execute()
-	if err == nil {
-		t.Fatalf("expected error when no store configured")
-	}
-	if !strings.Contains(err.Error(), "no store configured") {
-		t.Errorf("expected 'no store configured' error, got: %v", err)
-	}
-}
-
-func TestMetrics_NoStore(t *testing.T) {
-	metricsStore = nil
-
-	cmd := NewRootCommand("test")
-	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetArgs([]string{"metrics"})
-
-	err := cmd.Execute()
-	if err == nil {
-		t.Fatalf("expected error when no store configured")
-	}
-	if !strings.Contains(err.Error(), "no store configured") {
-		t.Errorf("expected 'no store configured' error, got: %v", err)
-	}
-}
+// PATCH-0019 removed the "no store configured" error path. Production
+// invocations now lazy-open a store via openStoreFromConfig when the
+// test-injection seam is nil; the corresponding failure-mode tests
+// (TestMetrics_RebuildNoStore, TestMetrics_NoStore) are deleted
+// because asserting that contract no longer applies.
 
 func TestMetrics_InvalidGroupBy(t *testing.T) {
 	store := seedMetricsTestStore(t)

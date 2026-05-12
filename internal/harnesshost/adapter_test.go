@@ -94,7 +94,7 @@ func runActionThroughAdapter(t *testing.T, a Adapter, action harnessshell.Action
 
 func TestAdapterDispatchesSubmitTurnToRuntime(t *testing.T) {
 	rt := &fakeRuntime{submitResult: SubmitAccepted{RunID: "run-42", Label: "test-model"}}
-	a := New(harnessshell.New(), rt)
+	a := New(harnessshell.New(harnessshell.WithStreamTick(noopStreamTick)), rt)
 
 	sub := harnessshell.Submission{
 		ID:          "sub-1",
@@ -137,7 +137,7 @@ func TestAdapterDispatchesSubmitTurnToRuntime(t *testing.T) {
 
 func TestAdapterSubmitErrorEmitsSubmissionFailedEvent(t *testing.T) {
 	rt := &fakeRuntime{submitErr: errors.New("rate limited")}
-	a := New(harnessshell.New(), rt)
+	a := New(harnessshell.New(harnessshell.WithStreamTick(noopStreamTick)), rt)
 
 	sub := harnessshell.Submission{ID: "sub-1", Text: "x"}
 	_, msg := runActionThroughAdapter(t, a, harnessshell.SubmitTurnAction{Submission: sub})
@@ -153,7 +153,7 @@ func TestAdapterSubmitErrorEmitsSubmissionFailedEvent(t *testing.T) {
 
 func TestAdapterSubmissionAcceptedRecordsCorrelationAndForwardsEvent(t *testing.T) {
 	rt := &fakeRuntime{submitResult: SubmitAccepted{RunID: "run-7", Label: "lab"}}
-	a := New(harnessshell.New(), rt)
+	a := New(harnessshell.New(harnessshell.WithStreamTick(noopStreamTick)), rt)
 
 	// Inject the correlation message directly to exercise the second
 	// Update branch without driving through the dispatch tea.Cmd.
@@ -192,7 +192,7 @@ func TestAdapterSubmissionAcceptedRecordsCorrelationAndForwardsEvent(t *testing.
 
 func TestAdapterDispatchesInterruptToRuntime(t *testing.T) {
 	rt := &fakeRuntime{}
-	a := New(harnessshell.New(), rt)
+	a := New(harnessshell.New(harnessshell.WithStreamTick(noopStreamTick)), rt)
 
 	_, msg := runActionThroughAdapter(t, a, harnessshell.InterruptRunAction{RunID: "run-9"})
 
@@ -206,7 +206,7 @@ func TestAdapterDispatchesInterruptToRuntime(t *testing.T) {
 
 func TestAdapterInterruptErrorEmitsRunFailedEvent(t *testing.T) {
 	rt := &fakeRuntime{interruptErr: errors.New("network down")}
-	a := New(harnessshell.New(), rt)
+	a := New(harnessshell.New(harnessshell.WithStreamTick(noopStreamTick)), rt)
 
 	_, msg := runActionThroughAdapter(t, a, harnessshell.InterruptRunAction{RunID: "run-9"})
 
@@ -221,7 +221,7 @@ func TestAdapterInterruptErrorEmitsRunFailedEvent(t *testing.T) {
 
 func TestAdapterDispatchesResolvePermissionToRuntime(t *testing.T) {
 	rt := &fakeRuntime{}
-	a := New(harnessshell.New(), rt)
+	a := New(harnessshell.New(harnessshell.WithStreamTick(noopStreamTick)), rt)
 
 	_, msg := runActionThroughAdapter(t, a, harnessshell.ResolvePermissionAction{
 		RequestID: "perm-1", Decision: harnessshell.DecisionApproveSession,
@@ -241,7 +241,7 @@ func TestAdapterDispatchesResolvePermissionToRuntime(t *testing.T) {
 
 func TestAdapterResolvePermissionErrorEmitsResolvedDenied(t *testing.T) {
 	rt := &fakeRuntime{resolveErr: errors.New("permission service down")}
-	a := New(harnessshell.New(), rt)
+	a := New(harnessshell.New(harnessshell.WithStreamTick(noopStreamTick)), rt)
 
 	_, msg := runActionThroughAdapter(t, a, harnessshell.ResolvePermissionAction{
 		RequestID: "perm-1", Decision: harnessshell.DecisionApproveOnce,
@@ -258,7 +258,7 @@ func TestAdapterResolvePermissionErrorEmitsResolvedDenied(t *testing.T) {
 
 func TestAdapterDispatchesLoadPreviewToRuntime(t *testing.T) {
 	rt := &fakeRuntime{loadPreview: harnessshell.PreviewPayload{Title: "a.txt", Content: "file body"}}
-	a := New(harnessshell.New(), rt)
+	a := New(harnessshell.New(harnessshell.WithStreamTick(noopStreamTick)), rt)
 
 	target := harnessshell.PreviewTarget{TokenID: "file-1", Source: "composer"}
 	_, msg := runActionThroughAdapter(t, a, harnessshell.LoadPreviewAction{Target: target})
@@ -281,7 +281,7 @@ func TestAdapterDispatchesLoadPreviewToRuntime(t *testing.T) {
 
 func TestAdapterLoadPreviewErrorEmitsHostStatusEvent(t *testing.T) {
 	rt := &fakeRuntime{loadErr: errors.New("file missing")}
-	a := New(harnessshell.New(), rt)
+	a := New(harnessshell.New(harnessshell.WithStreamTick(noopStreamTick)), rt)
 
 	_, msg := runActionThroughAdapter(t, a, harnessshell.LoadPreviewAction{
 		Target: harnessshell.PreviewTarget{TokenID: "file-1"},
@@ -298,7 +298,7 @@ func TestAdapterLoadPreviewErrorEmitsHostStatusEvent(t *testing.T) {
 
 func TestAdapterDispatchesHostCommandToRuntime(t *testing.T) {
 	rt := &fakeRuntime{}
-	a := New(harnessshell.New(), rt)
+	a := New(harnessshell.New(harnessshell.WithStreamTick(noopStreamTick)), rt)
 
 	inv := harnessshell.CommandInvocation{Name: "model", Args: "claude-opus-4-7", Raw: "/model claude-opus-4-7"}
 	_, msg := runActionThroughAdapter(t, a, harnessshell.RunHostCommandAction{Invocation: inv})
@@ -317,7 +317,7 @@ func TestAdapterDispatchesHostCommandToRuntime(t *testing.T) {
 
 func TestAdapterPassesNonActionMsgsToShell(t *testing.T) {
 	rt := &fakeRuntime{}
-	a := New(harnessshell.New(), rt)
+	a := New(harnessshell.New(harnessshell.WithStreamTick(noopStreamTick)), rt)
 
 	updated, _ := a.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 	au := updated.(Adapter)
@@ -326,5 +326,29 @@ func TestAdapterPassesNonActionMsgsToShell(t *testing.T) {
 		// adapter forwarded the message and did not panic. The
 		// shell's own tests confirm WindowSizeMsg propagates state.
 		_ = au
+	}
+}
+
+func TestAdapterBuffersDetachedRunDeltasUntilAttach(t *testing.T) {
+	rt := &fakeRuntime{}
+	a := New(harnessshell.New(harnessshell.WithStreamTick(noopStreamTick)), rt)
+	a.attachedRunID = "run-active"
+
+	updated, cmd := a.Update(harnessshell.RunDeltaEvent{RunID: "run-detached", Delta: "background"})
+	a = updated.(Adapter)
+	if cmd != nil {
+		t.Fatalf("detached delta should not forward a command")
+	}
+	if got := len(a.detachedTranscripts["run-detached"]); got != 1 {
+		t.Fatalf("detached buffer length = %d, want 1", got)
+	}
+
+	updated, _ = a.Update(harnessshell.RunStartedEvent{RunID: "run-detached"})
+	a = updated.(Adapter)
+	if got := len(a.detachedTranscripts["run-detached"]); got != 0 {
+		t.Fatalf("detached buffer should clear on attach, got %d", got)
+	}
+	if a.attachedRunID != "run-detached" {
+		t.Fatalf("attachedRunID = %q, want run-detached", a.attachedRunID)
 	}
 }

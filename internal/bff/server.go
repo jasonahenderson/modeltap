@@ -47,6 +47,7 @@ type Server struct {
 	dispatch   *TurnDispatcher
 	cost       *CostTracker
 	turns      *turnTracker
+	runs       *runRegistry
 
 	mu    sync.Mutex
 	conns map[*Connection]struct{}
@@ -127,6 +128,7 @@ func NewServer(store storage.Store, config ServerConfig) *Server {
 	s.dispatch = NewTurnDispatcher(s.providers, s.adapters)
 	s.cost = NewCostTracker(s.models, s.store)
 	s.turns = newTurnTracker()
+	s.runs = newRunRegistry()
 	s.registerCoreHandlers()
 	s.sessions.Register(s.dispatcher)
 	s.dispatcher.Register(protocol.MethodModelList, handleModelList)
@@ -140,6 +142,7 @@ func NewServer(store storage.Store, config ServerConfig) *Server {
 	s.dispatcher.Register(protocol.MethodContentTransform, handleContentTransform)
 	s.dispatcher.Register(protocol.MethodSessionCompact, handleSessionCompact)
 	s.dispatcher.Register(protocol.MethodCompactApply, handleCompactApply)
+	s.registerRunHandlers()
 	return s
 }
 
@@ -230,11 +233,15 @@ func (s *Server) Start() error {
 }
 
 // Shutdown gracefully stops the server. It closes listeners, cancels
-// live connections' contexts, and waits for the accept loops and
-// per-connection Run goroutines to return. Returns nil on clean
-// drainage or ctx.Err() if the provided context deadline is reached.
+// live connections' contexts, stops the provider health-check poll
+// loop, and waits for the accept loops and per-connection Run
+// goroutines to return. Returns nil on clean drainage or ctx.Err() if
+// the provided context deadline is reached.
 func (s *Server) Shutdown(ctx context.Context) error {
 	s.cancel() // signal per-connection contexts
+	if s.providers != nil {
+		s.providers.Stop()
+	}
 	if s.socketListener != nil {
 		_ = s.socketListener.Close()
 		// Best-effort: remove the socket file so subsequent Start calls

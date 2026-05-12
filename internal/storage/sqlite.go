@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -113,6 +114,16 @@ func (s *SQLiteStore) migrate() error {
 	}
 	if version < 2 {
 		if err := s.migrateToV2(); err != nil {
+			return err
+		}
+	}
+	if version < 3 {
+		if err := s.migrateToV3(); err != nil {
+			return err
+		}
+	}
+	if version < 4 {
+		if err := s.migrateToV4(); err != nil {
 			return err
 		}
 	}
@@ -281,6 +292,216 @@ CREATE INDEX idx_command_history_session       ON command_history(user_id, sessi
 	return nil
 }
 
+// migrateToV3 adds durable run runtime tables.
+func (s *SQLiteStore) migrateToV3() error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("beginning v3 migration transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	const v3Schema = `
+CREATE TABLE runs (
+	id TEXT PRIMARY KEY,
+	trace_id TEXT NOT NULL,
+	idempotency_key TEXT NOT NULL,
+	user_id TEXT NOT NULL,
+	project TEXT NOT NULL,
+	session_id TEXT NOT NULL REFERENCES sessions(id),
+	parent_run_id TEXT NULL REFERENCES runs(id),
+	initiator_type TEXT NOT NULL,
+	title TEXT NOT NULL DEFAULT '',
+	workflow_type TEXT NOT NULL DEFAULT 'implementation',
+	status TEXT NOT NULL,
+	stage TEXT NOT NULL,
+	attachment_state TEXT NOT NULL,
+	attached_connection_id TEXT NOT NULL DEFAULT '',
+	attachment_grace_deadline TEXT NULL,
+	summary TEXT NOT NULL DEFAULT '',
+	last_advanced_at TEXT NOT NULL,
+	model TEXT NOT NULL DEFAULT '',
+	provider TEXT NOT NULL DEFAULT '',
+	input_tokens INTEGER NOT NULL DEFAULT 0,
+	output_tokens INTEGER NOT NULL DEFAULT 0,
+	total_cost REAL NOT NULL DEFAULT 0,
+	last_event_seq INTEGER NOT NULL DEFAULT 0,
+	last_checkpoint_id TEXT NOT NULL DEFAULT '',
+	extension_json TEXT NOT NULL DEFAULT '{}',
+	retention_class TEXT NOT NULL DEFAULT 'standard',
+	expires_at TEXT NULL,
+	schema_version INTEGER NOT NULL DEFAULT 1,
+	created_at TEXT NOT NULL,
+	updated_at TEXT NOT NULL,
+	terminal_at TEXT NULL
+);
+
+CREATE UNIQUE INDEX idx_runs_idempotency ON runs(user_id, project, idempotency_key);
+CREATE INDEX idx_runs_user_project_updated ON runs(user_id, project, updated_at DESC);
+CREATE INDEX idx_runs_session_updated ON runs(session_id, updated_at DESC);
+CREATE INDEX idx_runs_status_updated ON runs(status, updated_at DESC);
+
+CREATE TABLE run_turns (
+	run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+	turn_id TEXT NOT NULL,
+	sequence INTEGER NOT NULL,
+	role TEXT NOT NULL,
+	created_at TEXT NOT NULL,
+	PRIMARY KEY (run_id, turn_id),
+	UNIQUE (turn_id)
+);
+
+CREATE TABLE run_events (
+	run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+	seq INTEGER NOT NULL,
+	type TEXT NOT NULL,
+	stage TEXT NOT NULL DEFAULT '',
+	status TEXT NOT NULL DEFAULT '',
+	reason TEXT NOT NULL DEFAULT '',
+	payload_json TEXT NOT NULL DEFAULT '{}',
+	payload_schema_version INTEGER NOT NULL DEFAULT 1,
+	created_at TEXT NOT NULL,
+	PRIMARY KEY (run_id, seq)
+);
+
+CREATE TABLE run_checkpoints (
+	id TEXT PRIMARY KEY,
+	run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+	seq INTEGER NOT NULL,
+	stage TEXT NOT NULL,
+	status TEXT NOT NULL,
+	reason TEXT NOT NULL DEFAULT '',
+	turn_ids_json TEXT NOT NULL DEFAULT '[]',
+	model_call_ids_json TEXT NOT NULL DEFAULT '[]',
+	pending_tool_call_ids_json TEXT NOT NULL DEFAULT '[]',
+	summary TEXT NOT NULL DEFAULT '',
+	payload_json TEXT NOT NULL DEFAULT '{}',
+	schema_version INTEGER NOT NULL DEFAULT 1,
+	created_at TEXT NOT NULL
+);
+
+CREATE INDEX idx_run_checkpoints_run_seq ON run_checkpoints(run_id, seq DESC);
+
+CREATE TABLE run_attachments (
+	run_id TEXT PRIMARY KEY REFERENCES runs(id) ON DELETE CASCADE,
+	state TEXT NOT NULL,
+	attached_connection_id TEXT NOT NULL DEFAULT '',
+	attached_host_fingerprint TEXT NOT NULL DEFAULT '',
+	grace_deadline TEXT NULL,
+	updated_at TEXT NOT NULL
+);
+
+CREATE TABLE run_model_calls (
+	model_call_id TEXT PRIMARY KEY,
+	run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+	provider TEXT NOT NULL,
+	model TEXT NOT NULL,
+	stage TEXT NOT NULL DEFAULT 'model_call',
+	status TEXT NOT NULL,
+	input_tokens INTEGER NOT NULL DEFAULT 0,
+	output_tokens INTEGER NOT NULL DEFAULT 0,
+	total_cost REAL NOT NULL DEFAULT 0,
+	latency_ms INTEGER NOT NULL DEFAULT 0,
+	payload_json TEXT NOT NULL DEFAULT '{}',
+	created_at TEXT NOT NULL,
+	updated_at TEXT NOT NULL
+);
+
+CREATE INDEX idx_run_model_calls_run ON run_model_calls(run_id);
+
+CREATE TABLE run_tool_results (
+	tool_call_id TEXT PRIMARY KEY,
+	run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+	tool TEXT NOT NULL,
+	namespace TEXT NOT NULL DEFAULT '',
+	stage TEXT NOT NULL DEFAULT 'tool_loop',
+	status TEXT NOT NULL,
+	result_id TEXT NOT NULL DEFAULT '',
+	duration_ms INTEGER NOT NULL DEFAULT 0,
+	estimated_cost REAL NOT NULL DEFAULT 0,
+	payload_json TEXT NOT NULL DEFAULT '{}',
+	created_at TEXT NOT NULL,
+	updated_at TEXT NOT NULL
+);
+
+CREATE INDEX idx_run_tool_results_run ON run_tool_results(run_id);
+`
+	if _, err := tx.Exec(v3Schema); err != nil {
+		return fmt.Errorf("running v3 schema migration: %w", err)
+	}
+	if _, err := tx.Exec("PRAGMA user_version = 3"); err != nil {
+		return fmt.Errorf("setting user_version to 3: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("committing v3 migration: %w", err)
+	}
+	return nil
+}
+
+// migrateToV4 adds run/trace correlation fields to raw proxy captures.
+func (s *SQLiteStore) migrateToV4() error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("beginning v4 migration transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := addColumnIfMissing(tx, "requests", "run_id", "TEXT NOT NULL DEFAULT ''"); err != nil {
+		return fmt.Errorf("adding requests.run_id: %w", err)
+	}
+	if err := addColumnIfMissing(tx, "requests", "trace_id", "TEXT NOT NULL DEFAULT ''"); err != nil {
+		return fmt.Errorf("adding requests.trace_id: %w", err)
+	}
+
+	const indexes = `
+CREATE INDEX IF NOT EXISTS idx_requests_run_id ON requests(run_id);
+CREATE INDEX IF NOT EXISTS idx_requests_trace_id ON requests(trace_id);
+`
+	if _, err := tx.Exec(indexes); err != nil {
+		return fmt.Errorf("creating v4 request correlation indexes: %w", err)
+	}
+	if _, err := tx.Exec("PRAGMA user_version = 4"); err != nil {
+		return fmt.Errorf("setting user_version to 4: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("committing v4 migration: %w", err)
+	}
+	return nil
+}
+
+func addColumnIfMissing(tx *sql.Tx, table, column, definition string) error {
+	rows, err := tx.Query("PRAGMA table_info(" + table + ")")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notNull int
+		var defaultValue any
+		var pk int
+		if err := rows.Scan(&cid, &name, &typ, &notNull, &defaultValue, &pk); err != nil {
+			return err
+		}
+		if name == column {
+			return nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	_, err = tx.Exec("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition)
+	return err
+}
+
+const requestSelectColumns = `
+id, timestamp, run_id, trace_id, provider, model, method, url,
+request_headers, request_body,
+response_status, response_headers, response_body,
+input_tokens, output_tokens, latency_ms, estimated_cost_usd`
+
 // SaveRequest inserts a request record and atomically updates the hourly and
 // daily aggregation tables. If req.ID is empty, a new UUID is generated.
 func (s *SQLiteStore) SaveRequest(ctx context.Context, req *Request) error {
@@ -299,15 +520,17 @@ func (s *SQLiteStore) SaveRequest(ctx context.Context, req *Request) error {
 
 	const insertRequest = `
 INSERT INTO requests (
-	id, timestamp, provider, model, method, url,
+	id, timestamp, run_id, trace_id, provider, model, method, url,
 	request_headers, request_body,
 	response_status, response_headers, response_body,
 	input_tokens, output_tokens, latency_ms, estimated_cost_usd
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 	_, err = tx.ExecContext(ctx, insertRequest,
 		req.ID,
 		req.Timestamp.Format(time.RFC3339Nano),
+		req.RunID,
+		req.TraceID,
 		req.Provider,
 		req.Model,
 		req.Method,
@@ -380,34 +603,83 @@ ON CONFLICT (day, provider, model) DO UPDATE SET
 	return nil
 }
 
-// GetRequest retrieves a single request by ID.
+// GetRequest retrieves a single request by ID. Per PATCH-0024, when
+// the exact-match query returns no row the lookup falls back to a
+// prefix match (id LIKE ? || '%') so that the short 8-character ids
+// shown by `modeltap requests list` resolve correctly. If the prefix
+// matches more than one row, GetRequest returns nil with an
+// "ambiguous prefix" error so the caller can ask for a longer id.
 func (s *SQLiteStore) GetRequest(ctx context.Context, id string) (*Request, error) {
-	const query = `
-SELECT id, timestamp, provider, model, method, url,
-       request_headers, request_body,
-       response_status, response_headers, response_body,
-       input_tokens, output_tokens, latency_ms, estimated_cost_usd
+	const exactQuery = `SELECT ` + requestSelectColumns + `
 FROM requests WHERE id = ?`
 
-	var r Request
-	var ts string
-	err := s.db.QueryRowContext(ctx, query, id).Scan(
-		&r.ID, &ts, &r.Provider, &r.Model, &r.Method, &r.URL,
-		&r.RequestHeaders, &r.RequestBody,
-		&r.ResponseStatus, &r.ResponseHeaders, &r.ResponseBody,
-		&r.InputTokens, &r.OutputTokens, &r.LatencyMs, &r.EstimatedCostUSD,
-	)
-	if err == sql.ErrNoRows {
-		return nil, nil
+	r, err := scanSingleRequest(s.db.QueryRowContext(ctx, exactQuery, id))
+	if err == nil {
+		return r, nil
 	}
-	if err != nil {
+	if !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("querying request %s: %w", id, err)
 	}
 
-	r.Timestamp, err = time.Parse(time.RFC3339Nano, ts)
+	// Exact match missed; try prefix match. LIMIT 2 lets us detect
+	// ambiguity without scanning the whole table.
+	const prefixQuery = `SELECT ` + requestSelectColumns + `
+FROM requests WHERE id LIKE ? || '%' LIMIT 2`
+
+	rows, err := s.db.QueryContext(ctx, prefixQuery, id)
 	if err != nil {
-		return nil, fmt.Errorf("parsing timestamp for request %s: %w", id, err)
+		return nil, fmt.Errorf("querying request prefix %s: %w", id, err)
 	}
+	defer rows.Close()
+
+	var matches []*Request
+	for rows.Next() {
+		match, scanErr := scanSingleRequest(rows)
+		if scanErr != nil {
+			return nil, fmt.Errorf("scanning request prefix match for %s: %w", id, scanErr)
+		}
+		matches = append(matches, match)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating prefix matches for %s: %w", id, err)
+	}
+
+	switch len(matches) {
+	case 0:
+		return nil, nil
+	case 1:
+		return matches[0], nil
+	default:
+		return nil, fmt.Errorf("request id prefix %q is ambiguous (matches %d or more captures); use a longer id", id, len(matches))
+	}
+}
+
+// requestRowScanner is the minimal interface satisfied by both
+// *sql.Row and *sql.Rows so scanSingleRequest can serve both.
+type requestRowScanner interface {
+	Scan(dest ...any) error
+}
+
+// scanSingleRequest scans the column ordering used by both the exact
+// and prefix queries in GetRequest into a Request. Returns
+// sql.ErrNoRows when the underlying scanner reports it (only
+// applicable to *sql.Row).
+func scanSingleRequest(scanner requestRowScanner) (*Request, error) {
+	var r Request
+	var ts string
+	if err := scanner.Scan(
+		&r.ID, &ts, &r.RunID, &r.TraceID, &r.Provider, &r.Model, &r.Method, &r.URL,
+		&r.RequestHeaders, &r.RequestBody,
+		&r.ResponseStatus, &r.ResponseHeaders, &r.ResponseBody,
+		&r.InputTokens, &r.OutputTokens, &r.LatencyMs, &r.EstimatedCostUSD,
+	); err != nil {
+		return nil, err
+	}
+	t, err := time.Parse(time.RFC3339Nano, ts)
+	if err != nil {
+		return nil, fmt.Errorf("parsing timestamp for request %s: %w", r.ID, err)
+	}
+	r.Timestamp = t
 	return &r, nil
 }
 
@@ -423,6 +695,14 @@ func buildFilterQuery(filter ListFilter) (string, []any) {
 	if filter.Model != "" {
 		conditions = append(conditions, "model = ?")
 		args = append(args, filter.Model)
+	}
+	if filter.RunID != "" {
+		conditions = append(conditions, "run_id = ?")
+		args = append(args, filter.RunID)
+	}
+	if filter.TraceID != "" {
+		conditions = append(conditions, "trace_id = ?")
+		args = append(args, filter.TraceID)
 	}
 	if filter.Since != nil {
 		conditions = append(conditions, "timestamp >= ?")
@@ -449,11 +729,7 @@ func buildFilterQuery(filter ListFilter) (string, []any) {
 func (s *SQLiteStore) ListRequests(ctx context.Context, filter ListFilter) ([]Request, error) {
 	where, args := buildFilterQuery(filter)
 
-	query := `
-SELECT id, timestamp, provider, model, method, url,
-       request_headers, request_body,
-       response_status, response_headers, response_body,
-       input_tokens, output_tokens, latency_ms, estimated_cost_usd
+	query := `SELECT ` + requestSelectColumns + `
 FROM requests` + where + ` ORDER BY timestamp DESC`
 
 	if filter.Limit > 0 {
@@ -476,7 +752,7 @@ FROM requests` + where + ` ORDER BY timestamp DESC`
 		var r Request
 		var ts string
 		if err := rows.Scan(
-			&r.ID, &ts, &r.Provider, &r.Model, &r.Method, &r.URL,
+			&r.ID, &ts, &r.RunID, &r.TraceID, &r.Provider, &r.Model, &r.Method, &r.URL,
 			&r.RequestHeaders, &r.RequestBody,
 			&r.ResponseStatus, &r.ResponseHeaders, &r.ResponseBody,
 			&r.InputTokens, &r.OutputTokens, &r.LatencyMs, &r.EstimatedCostUSD,

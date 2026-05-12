@@ -35,6 +35,7 @@ const (
 // TokenDelta is an incremental text chunk streamed during a turn.
 type TokenDelta struct {
 	TurnID   string `json:"turn_id"`
+	RunID    string `json:"run_id,omitempty"`
 	BranchID string `json:"branch_id,omitempty"`
 	Text     string `json:"text"`
 }
@@ -126,6 +127,7 @@ type CompactNotice struct {
 
 // TurnComplete signals that a turn finished processing.
 type TurnComplete struct {
+	RunID             string  `json:"run_id,omitempty"`
 	TurnID            string  `json:"turn_id"`
 	FinalInputTokens  int     `json:"final_input_tokens"`
 	FinalOutputTokens int     `json:"final_output_tokens"`

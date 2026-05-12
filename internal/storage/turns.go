@@ -10,6 +10,10 @@ import (
 
 // CreateTurn inserts a new turn record.
 func (s *SQLiteStore) CreateTurn(ctx context.Context, t *Turn) error {
+	return insertTurn(ctx, s.db, t)
+}
+
+func insertTurn(ctx context.Context, e execer, t *Turn) error {
 	if t.Content == nil {
 		t.Content = json.RawMessage(`""`)
 	}
@@ -52,7 +56,7 @@ INSERT INTO turns (
 	compacted, compacted_summary, original_turns, created_at
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
-	_, err = s.db.ExecContext(ctx, query,
+	_, err = e.ExecContext(ctx, query,
 		t.ID, t.SessionID, t.Sequence, t.Role, string(t.Content), t.Model, t.Provider,
 		t.InputTokens, t.OutputTokens, t.Cost, t.LatencyMs,
 		string(t.ToolCalls), string(filesTouchedJSON), string(filesModifiedJSON),

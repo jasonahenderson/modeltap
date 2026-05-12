@@ -24,6 +24,8 @@ func seedLogsTestStore(t *testing.T) storage.Store {
 		{
 			ID:               "abcdefgh1234",
 			Timestamp:        now.Add(-1 * time.Hour),
+			RunID:            "run-a",
+			TraceID:          "trace-a",
 			Provider:         "openai",
 			Model:            "gpt-4",
 			Method:           "POST",
@@ -37,6 +39,8 @@ func seedLogsTestStore(t *testing.T) storage.Store {
 		{
 			ID:               "bbcdefgh5678",
 			Timestamp:        now.Add(-24 * time.Hour),
+			RunID:            "run-a",
+			TraceID:          "trace-b",
 			Provider:         "anthropic",
 			Model:            "claude-3",
 			Method:           "POST",
@@ -50,6 +54,8 @@ func seedLogsTestStore(t *testing.T) storage.Store {
 		{
 			ID:               "ccdefghi9012",
 			Timestamp:        now.Add(-72 * time.Hour),
+			RunID:            "run-b",
+			TraceID:          "trace-a",
 			Provider:         "openai",
 			Model:            "gpt-3.5-turbo",
 			Method:           "POST",
@@ -73,15 +79,15 @@ func seedLogsTestStore(t *testing.T) storage.Store {
 
 func executeLogs(t *testing.T, store storage.Store, args ...string) (string, error) {
 	t.Helper()
-	prev := logsStore
-	logsStore = store
-	t.Cleanup(func() { logsStore = prev })
+	prev := requestsStore
+	requestsStore = store
+	t.Cleanup(func() { requestsStore = prev })
 
 	rootCmd := NewRootCommand("test")
 	buf := new(bytes.Buffer)
 	rootCmd.SetOut(buf)
 	rootCmd.SetErr(buf)
-	rootCmd.SetArgs(append([]string{"logs"}, args...))
+	rootCmd.SetArgs(append([]string{"requests", "list"}, args...))
 
 	err := rootCmd.Execute()
 	return buf.String(), err
@@ -181,6 +187,41 @@ func TestLogsStatusFilter(t *testing.T) {
 	}
 }
 
+func TestLogsRunFilter(t *testing.T) {
+	store := seedLogsTestStore(t)
+	output, err := executeLogs(t, store, "--run", "run-a")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	if len(lines) != 3 {
+		t.Fatalf("expected 3 lines (1 header + 2 data), got %d: %s", len(lines), output)
+	}
+	if !strings.Contains(output, "abcdefgh") || !strings.Contains(output, "bbcdefgh") {
+		t.Errorf("expected run-a captures in output, got: %s", output)
+	}
+	if strings.Contains(output, "ccdefghi") {
+		t.Errorf("expected run-b capture to be filtered out, got: %s", output)
+	}
+}
+
+func TestLogsTraceFilter(t *testing.T) {
+	store := seedLogsTestStore(t)
+	output, err := executeLogs(t, store, "--trace", "trace-a")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	if len(lines) != 3 {
+		t.Fatalf("expected 3 lines (1 header + 2 data), got %d: %s", len(lines), output)
+	}
+	if !strings.Contains(output, "abcdefgh") || !strings.Contains(output, "ccdefghi") {
+		t.Errorf("expected trace-a captures in output, got: %s", output)
+	}
+}
+
 func TestLogsSinceFilter(t *testing.T) {
 	store := seedLogsTestStore(t)
 	// "2h" = last 2 hours, should get only the 1-hour-old request.
@@ -232,7 +273,7 @@ func TestLogsLimitFlag(t *testing.T) {
 
 func TestLogsDefaultLimit(t *testing.T) {
 	// Verify the default limit is 50 by checking the flag default.
-	cmd := newLogsCommand()
+	cmd := newRequestsListCommand()
 	limitFlag := cmd.Flags().Lookup("limit")
 	if limitFlag == nil {
 		t.Fatal("expected --limit flag to be defined")
@@ -254,30 +295,16 @@ func TestLogsEmptyResults(t *testing.T) {
 		t.Fatalf("unexpected error: %v", execErr)
 	}
 
-	if !strings.Contains(output, "No log entries found.") {
+	if !strings.Contains(output, "No captures found.") {
 		t.Errorf("expected empty results message, got: %q", output)
 	}
 }
 
-func TestLogsNoStoreError(t *testing.T) {
-	prev := logsStore
-	logsStore = nil
-	defer func() { logsStore = prev }()
-
-	rootCmd := NewRootCommand("test")
-	buf := new(bytes.Buffer)
-	rootCmd.SetOut(buf)
-	rootCmd.SetErr(buf)
-	rootCmd.SetArgs([]string{"logs"})
-
-	err := rootCmd.Execute()
-	if err == nil {
-		t.Fatal("expected error when no store configured")
-	}
-	if !strings.Contains(err.Error(), "no store configured") {
-		t.Errorf("expected 'no store configured' error, got: %v", err)
-	}
-}
+// PATCH-0019 removed the "no store configured" error path. Production
+// invocations now lazy-open a store via openStoreFromConfig when the
+// test-injection seam is nil; the corresponding failure-mode test is
+// deleted because asserting that contract no longer applies. Tests that
+// exercise the success path use the injection seam directly.
 
 func TestLogsSinceDurationDays(t *testing.T) {
 	store := seedLogsTestStore(t)

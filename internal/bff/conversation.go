@@ -18,14 +18,19 @@ import (
 // are kept in sync by AppendUserTurn / AppendAssistantTurn (producers)
 // and RestoreFromTurns (consumer of persisted state on resume).
 //
-// Sequence numbers are 1-based and must be consecutive. Turn submissions
-// whose sequence doesn't equal Sequence()+1 are rejected.
+// Two counters are tracked. userSequence is the wire-contract value:
+// the harness owns the on-wire turn.submit.Sequence and increments it
+// per user submission only (1, 2, 3, ...). AppendUserTurn validates
+// submit.Sequence against userSequence+1. storageSequence is the
+// per-message ordering used for Turn.Sequence in the turns table, so
+// "ORDER BY sequence" preserves user → assistant ordering. PATCH-0031.
 type Conversation struct {
 	sessionID string
 
-	mu       sync.RWMutex
-	turns    []provider.Message
-	sequence int
+	mu              sync.RWMutex
+	turns           []provider.Message
+	userSequence    int
+	storageSequence int
 }
 
 // NewConversation returns an empty Conversation for the given session.
@@ -44,13 +49,25 @@ func (c *Conversation) TurnCount() int {
 	return len(c.turns)
 }
 
-// Sequence returns the highest sequence number assigned so far. A fresh
-// conversation returns 0; the next valid turn.submit must carry
-// sequence == Sequence()+1.
+// Sequence returns the highest user-turn sequence number accepted so
+// far. This is the wire-contract value: a fresh conversation returns
+// 0, and the next valid turn.submit must carry sequence == Sequence()+1.
+// Assistant turns do not advance this counter; see StorageSequence for
+// the per-message ordering used inside the turns table. PATCH-0031.
 func (c *Conversation) Sequence() int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return c.sequence
+	return c.userSequence
+}
+
+// StorageSequence returns the per-message ordering counter — the value
+// assigned to Turn.Sequence in storage for the most recently appended
+// message. Tests use this to assert storage ordering; production code
+// generally wants Sequence (the wire contract). PATCH-0031.
+func (c *Conversation) StorageSequence() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.storageSequence
 }
 
 // Messages returns a defensive copy of the canonical message history.
@@ -72,7 +89,8 @@ func (c *Conversation) Reset() int {
 	defer c.mu.Unlock()
 	n := len(c.turns)
 	c.turns = nil
-	c.sequence = 0
+	c.userSequence = 0
+	c.storageSequence = 0
 	return n
 }
 
@@ -109,11 +127,11 @@ func (c *Conversation) AppendUserTurn(submit *protocol.TurnSubmit) (*storage.Tur
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if submit.Sequence != c.sequence+1 {
+	if submit.Sequence != c.userSequence+1 {
 		return nil, &TransportError{
 			Code: CodeInvalidParams,
 			Message: fmt.Sprintf("turn.submit sequence %d does not follow current %d",
-				submit.Sequence, c.sequence),
+				submit.Sequence, c.userSequence),
 		}
 	}
 
@@ -151,9 +169,10 @@ func (c *Conversation) AppendUserTurn(submit *protocol.TurnSubmit) (*storage.Tur
 	}
 
 	c.turns = append(c.turns, msg)
-	c.sequence = submit.Sequence
+	c.userSequence = submit.Sequence
+	c.storageSequence++
 
-	turn := messageToTurn(c.sessionID, c.sequence, msg, TurnMetadata{})
+	turn := messageToTurn(c.sessionID, c.storageSequence, msg, TurnMetadata{})
 	turn.ID = submit.TurnID
 	if turn.ID == "" {
 		turn.ID = uuid.NewString()
@@ -174,9 +193,9 @@ func (c *Conversation) AppendAssistantTurn(resp AssistantResponse) (*storage.Tur
 		ToolCalls: resp.ToolCalls,
 	}
 	c.turns = append(c.turns, msg)
-	c.sequence++
+	c.storageSequence++
 
-	turn := messageToTurn(c.sessionID, c.sequence, msg, TurnMetadata{
+	turn := messageToTurn(c.sessionID, c.storageSequence, msg, TurnMetadata{
 		Model:        resp.Model,
 		Provider:     resp.Provider,
 		InputTokens:  resp.InputTokens,
@@ -196,15 +215,19 @@ func (c *Conversation) RestoreFromTurns(turns []storage.Turn) error {
 	defer c.mu.Unlock()
 
 	c.turns = c.turns[:0]
-	c.sequence = 0
+	c.userSequence = 0
+	c.storageSequence = 0
 	for _, t := range turns {
 		msg, err := turnToMessage(&t)
 		if err != nil {
 			return fmt.Errorf("turn %s: %w", t.ID, err)
 		}
 		c.turns = append(c.turns, msg)
-		if t.Sequence > c.sequence {
-			c.sequence = t.Sequence
+		if t.Sequence > c.storageSequence {
+			c.storageSequence = t.Sequence
+		}
+		if msg.Role == "user" {
+			c.userSequence++
 		}
 	}
 	return nil
@@ -315,5 +338,8 @@ func (c *Conversation) appendMessageForTest(role, content string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.turns = append(c.turns, provider.Message{Role: role, Content: content})
-	c.sequence++
+	c.storageSequence++
+	if role == "user" {
+		c.userSequence++
+	}
 }

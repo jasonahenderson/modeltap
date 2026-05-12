@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -21,6 +22,8 @@ type turnTracker struct {
 	byTurnID map[string]context.CancelFunc
 }
 
+const maxTrackedTurns = 4096
+
 func newTurnTracker() *turnTracker {
 	return &turnTracker{byTurnID: make(map[string]context.CancelFunc)}
 }
@@ -28,6 +31,12 @@ func newTurnTracker() *turnTracker {
 func (tt *turnTracker) register(turnID string, cancel context.CancelFunc) {
 	tt.mu.Lock()
 	defer tt.mu.Unlock()
+	if _, exists := tt.byTurnID[turnID]; !exists && len(tt.byTurnID) >= maxTrackedTurns {
+		for oldTurnID := range tt.byTurnID {
+			delete(tt.byTurnID, oldTurnID)
+			break
+		}
+	}
 	tt.byTurnID[turnID] = cancel
 }
 
@@ -106,6 +115,9 @@ func handleTurnSubmit(ctx context.Context, conn *Connection, params json.RawMess
 		if err := verifySessionAccess(conn, sess); err != nil {
 			return nil, err
 		}
+		if sess.UserID == "" {
+			sess.UserID = conn.UserID()
+		}
 	}
 	if sess == nil {
 		sess = &storage.Session{
@@ -137,32 +149,58 @@ func handleTurnSubmit(ctx context.Context, conn *Connection, params json.RawMess
 		active.Project = sess.Project
 	}
 
-	// Append the user turn to the in-memory conversation and persist.
+	idempotencyKey := submit.IdempotencyKey
+	if idempotencyKey == "" {
+		idempotencyKey = "turn:" + submit.SessionID + ":" + submit.TurnID
+	}
+	if existing, err := srv.store.GetRunByIdempotency(ctx, sess.UserID, sess.Project, idempotencyKey); err == nil {
+		return &protocol.TurnSubmitResponse{
+			TurnID:    submit.TurnID,
+			SessionID: submit.SessionID,
+			Status:    "accepted",
+			RunID:     existing.ID,
+		}, nil
+	} else if !errors.Is(err, storage.ErrRunNotFound) {
+		return nil, &TransportError{Code: CodeInternalError, Message: "lookup run idempotency: " + err.Error()}
+	}
+
+	// Append the user turn to the in-memory conversation and persist the
+	// foreground run, initial event/checkpoint, turn, run link, and command
+	// history in one durable transaction before provider dispatch.
 	userTurn, err := active.Conversation.AppendUserTurn(submit)
 	if err != nil {
 		return nil, err
 	}
-	if err := srv.store.CreateTurn(ctx, userTurn); err != nil {
-		return nil, &TransportError{Code: CodeInternalError, Message: "persist user turn: " + err.Error()}
-	}
-	// Append to command history (best-effort; auto-append per WU-091).
-	_ = srv.store.AppendCommandHistory(ctx, &storage.CommandHistoryEntry{
+	history := &storage.CommandHistoryEntry{
 		UserID:    active.UserID,
 		Project:   active.Project,
 		SessionID: stringPtr(active.ID),
 		Content:   submit.Content,
 		CreatedAt: time.Now().UTC(),
-	})
+	}
+	run, err := createForegroundRunWithTurn(ctx, srv, conn, sess, createRunOptions{
+		IdempotencyKey:       idempotencyKey,
+		WorkflowType:         storage.RunWorkflowImplementation,
+		Title:                submit.Content,
+		Status:               storage.RunStatusRunning,
+		AttachmentState:      storage.RunAttachmentAttached,
+		AttachedConnectionID: conn.ID(),
+	}, userTurn, history)
+	if err != nil {
+		return nil, &TransportError{Code: CodeInternalError, Message: "create foreground run: " + err.Error()}
+	}
 
 	// Resolve the model via routing.
 	models, isMulti := srv.routing.ResolveForTurn(active, submit.Mode)
 	if len(models) == 0 {
+		_, _ = appendRunLifecycle(ctx, conn, run, protocol.EventRunFailed, storage.RunStagePreflight, storage.RunStatusFailed, "model_unavailable", nil)
 		return nil, &TransportError{
 			Code:    CodeModelUnavailable,
 			Message: "no model resolved by routing policy and no session override set",
 		}
 	}
 	if isMulti {
+		_, _ = appendRunLifecycle(ctx, conn, run, protocol.EventRunFailed, storage.RunStagePreflight, storage.RunStatusFailed, "multi_model_not_supported", nil)
 		// Multi-model fan-out is intentionally NOT implemented at the
 		// BFF level. The use case is handled by sub-agents (FEAT-0013):
 		// each model runs as its own sub-agent with isolated context;
@@ -179,11 +217,14 @@ func handleTurnSubmit(ctx context.Context, conn *Connection, params json.RawMess
 	modelName := models[0]
 	entry := srv.models.Get(modelName)
 	if entry == nil {
+		_, _ = appendRunLifecycle(ctx, conn, run, protocol.EventRunFailed, storage.RunStagePreflight, storage.RunStatusFailed, "model_unavailable", nil)
 		return nil, &TransportError{
 			Code:    CodeModelUnavailable,
 			Message: fmt.Sprintf("model %q not in registry", modelName),
 		}
 	}
+	_, _ = appendRunLifecycle(ctx, conn, run, protocol.EventRunStageChanged, storage.RunStagePromptPlan, storage.RunStatusRunning, "", map[string]string{"model": modelName, "provider": entry.Provider})
+	_, _ = appendRunLifecycle(ctx, conn, run, protocol.EventRunStageChanged, storage.RunStageModelCall, storage.RunStatusRunning, "", map[string]string{"model": modelName, "provider": entry.Provider})
 
 	// Build dispatch options. The system prompt is reassembled per turn.
 	var prompt string
@@ -199,14 +240,23 @@ func handleTurnSubmit(ctx context.Context, conn *Connection, params json.RawMess
 		SystemPrompt: prompt,
 		Model:        modelName,
 		EndpointName: entry.Provider,
+		RunID:        run.ID,
+		TraceID:      run.TraceID,
 		Tools:        conn.Capabilities().Tools(),
 		Stream:       true,
 		WindowSize:   entry.Info.ContextWindow,
+		// PATCH-0022: a positive max_tokens is required by Anthropic
+		// and ignored-when-larger-than-supported by OpenAI. Zero (Go's
+		// default) reaches the wire as "max_tokens": 0 and produces a
+		// 400 from Anthropic. 4096 is the conservative fallback used
+		// by transform.go and accepted by every v0.3.0 catalog model.
+		MaxTokens: 4096,
 	}
 
 	// Provider dispatch (synchronous: returns the streaming response).
 	resp, err := srv.dispatch.Dispatch(ctx, dispatchOpts)
 	if err != nil {
+		_, _ = appendRunLifecycle(ctx, conn, run, protocol.EventRunFailed, storage.RunStageModelCall, storage.RunStatusFailed, "provider_dispatch_failed", map[string]string{"error": err.Error()})
 		return nil, err
 	}
 
@@ -215,11 +265,19 @@ func handleTurnSubmit(ctx context.Context, conn *Connection, params json.RawMess
 	// status="accepted"; events flow asynchronously via notifications.
 	relayCtx, cancel := context.WithCancel(ctx)
 	srv.turns.register(submit.TurnID, cancel)
+	srv.runs.register(run.ID, submit.TurnID, submit.SessionID, conn.ID(), cancel)
 
-	relay := NewStreamRelay(conn, active, submit.TurnID, "", modelName, entry.Provider)
+	relay := NewStreamRelay(conn, active, submit.TurnID, "", modelName, entry.Provider).WithRun(run.ID)
 	go func() {
 		defer srv.turns.deregister(submit.TurnID)
-		turn, _ := relay.Relay(relayCtx, resp.Body, srv.adapterFor(entry.Provider))
+		defer srv.runs.deregister(run.ID, submit.TurnID)
+		turn, relayErr := relay.Relay(relayCtx, resp.Body, srv.adapterFor(entry.Provider))
+		if relayErr != nil {
+			slog.Error("run relay failed", "run_id", run.ID, "turn_id", submit.TurnID, "error", relayErr)
+			if got, err := srv.store.GetRun(context.Background(), run.ID); err == nil && !isTerminalRunStatus(got.Status) {
+				_, _ = appendRunLifecycle(context.Background(), conn, got, protocol.EventRunFailed, got.Stage, storage.RunStatusFailed, "relay_failed", map[string]string{"error": relayErr.Error()})
+			}
+		}
 		if turn != nil && srv.cost != nil {
 			srv.cost.UpdateAfterTurn(ctx, conn, active, turn)
 		}
@@ -229,6 +287,7 @@ func handleTurnSubmit(ctx context.Context, conn *Connection, params json.RawMess
 		TurnID:    submit.TurnID,
 		SessionID: submit.SessionID,
 		Status:    "accepted",
+		RunID:     run.ID,
 	}, nil
 }
 
@@ -243,7 +302,14 @@ func handleTurnCancel(_ context.Context, conn *Connection, params json.RawMessag
 	if req.TurnID == "" {
 		return nil, &TransportError{Code: CodeInvalidParams, Message: "turn_id is required"}
 	}
-	cancelled := conn.server.turns.cancel(req.TurnID)
+	runID := conn.server.runs.runIDForTurn(req.TurnID)
+	cancelled := false
+	if runID != "" {
+		cancelled = conn.server.runs.cancel(runID)
+	}
+	if !cancelled {
+		cancelled = conn.server.turns.cancel(req.TurnID)
+	}
 	return &protocol.TurnCancelResponse{TurnID: req.TurnID, Accepted: cancelled}, nil
 }
 

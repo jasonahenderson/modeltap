@@ -317,12 +317,29 @@ func (PreviewLoadedEvent) isHostEvent() {}
 // HostStatusEvent carries host-supplied display text and a structured
 // [StatusKind] so the shell can drive chrome (pulsing dot, interrupt-armed
 // styling, permission-pending highlight) without parsing the display string.
+//
+// Use HostStatusEvent for short single-line chrome state ("Submitted",
+// "Done", "Mode: build", "Resumed session: <id>"). For multi-line
+// command output that must persist in the transcript, use
+// [HostInfoEvent] instead.
 type HostStatusEvent struct {
 	Status string
 	Kind   StatusKind
 }
 
 func (HostStatusEvent) isHostEvent() {}
+
+// HostInfoEvent appends a host-supplied informational row to the
+// transcript. Used for slash-command output (/models, /sessions,
+// /runs, /context, /history) where the result is multi-line and must
+// persist in the visible transcript rather than flash through the
+// chrome status line. Distinct from [HostStatusEvent], which carries
+// short single-line chrome state.
+type HostInfoEvent struct {
+	Text string
+}
+
+func (HostInfoEvent) isHostEvent() {}
 
 // ActionMsg is the [tea.Msg] envelope used to forward outbound shell actions
 // to the host program. Per WU-098 §"Concrete forwarding shape", the exact

@@ -53,6 +53,29 @@ var (
 			Padding(0, 1).
 			Foreground(lipgloss.Color("#8EA2BC"))
 
+	hostInfoStyle = lipgloss.NewStyle().
+			Padding(0, 1).
+			Foreground(lipgloss.Color("#C8D1DC"))
+
+	chromeStatusReadyStyle = lipgloss.NewStyle().
+				Padding(0, 1).
+				Foreground(lipgloss.Color("#8EA2BC"))
+	chromeStatusStreamingStyle = lipgloss.NewStyle().
+					Padding(0, 1).
+					Foreground(lipgloss.Color("#79C0FF")).
+					Bold(true)
+	chromeStatusErrorStyle = lipgloss.NewStyle().
+				Padding(0, 1).
+				Foreground(lipgloss.Color("#F85149")).
+				Bold(true)
+	chromeStatusPermissionStyle = lipgloss.NewStyle().
+					Padding(0, 1).
+					Foreground(lipgloss.Color("#F2CC60")).
+					Bold(true)
+	chromeStatusInterruptStyle = lipgloss.NewStyle().
+					Padding(0, 1).
+					Foreground(lipgloss.Color("#F85149"))
+
 	userBodyStyle = lipgloss.NewStyle().
 			Padding(0, 1).
 			Foreground(lipgloss.Color("#E6EDF3"))

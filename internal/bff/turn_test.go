@@ -85,15 +85,38 @@ func TestHandleTurnSubmit_HappyPath(t *testing.T) {
 	if tr.Status != "accepted" || tr.TurnID != "turn-1" {
 		t.Errorf("response = %+v", tr)
 	}
+	if tr.RunID == "" {
+		t.Fatalf("RunID not set in turn.submit response")
+	}
 
 	// Wait for streaming to fire token.delta and turn.complete frames.
+	if started := frames.waitForFrame(t, protocol.EventRunStarted); len(started) == 0 {
+		t.Errorf("no run.started")
+	}
 	deltas := frames.waitForFrame(t, protocol.EventTokenDelta)
 	if len(deltas) == 0 {
 		t.Errorf("no token.delta")
 	}
+	var delta protocol.TokenDelta
+	if err := json.Unmarshal(deltas[0], &delta); err != nil {
+		t.Fatalf("decode token.delta: %v", err)
+	}
+	if delta.TurnID != "turn-1" || delta.RunID != tr.RunID {
+		t.Fatalf("token.delta ids = turn:%q run:%q, want turn-1/%s", delta.TurnID, delta.RunID, tr.RunID)
+	}
 	complete := frames.waitForFrame(t, protocol.EventTurnComplete)
 	if len(complete) != 1 {
 		t.Errorf("turn.complete count = %d", len(complete))
+	}
+	var turnComplete protocol.TurnComplete
+	if err := json.Unmarshal(complete[0], &turnComplete); err != nil {
+		t.Fatalf("decode turn.complete: %v", err)
+	}
+	if turnComplete.RunID != tr.RunID {
+		t.Fatalf("turn.complete run_id = %q, want %q", turnComplete.RunID, tr.RunID)
+	}
+	if runComplete := frames.waitForFrame(t, protocol.EventRunCompleted); len(runComplete) != 1 {
+		t.Errorf("run.completed count = %d", len(runComplete))
 	}
 
 	// User turn should be persisted in storage.
@@ -101,11 +124,71 @@ func TestHandleTurnSubmit_HappyPath(t *testing.T) {
 	if len(turns) < 1 {
 		t.Errorf("expected at least 1 persisted turn, got %d", len(turns))
 	}
+	run, err := srv.store.GetRun(context.Background(), tr.RunID)
+	if err != nil {
+		t.Fatalf("GetRun(%s): %v", tr.RunID, err)
+	}
+	if run.WorkflowType != "implementation" || run.Status != "completed" {
+		t.Errorf("run = %+v", run)
+	}
+}
+
+func TestHandleTurnSubmit_DuplicateIdempotencyReturnsExistingRun(t *testing.T) {
+	srv, _ := setupTurnSubmitServer(t)
+
+	c, frames := newRelayConnection(t, srv)
+	c.SetSessionID("sess-idem")
+	srv.sessions.EnsureActive("sess-idem", c)
+
+	submit := &protocol.TurnSubmit{
+		TurnID:         "turn-idem-1",
+		SessionID:      "sess-idem",
+		Sequence:       1,
+		Mode:           protocol.ModeBuild,
+		Content:        "say hi once",
+		IdempotencyKey: "idem-key-1",
+	}
+	params, _ := json.Marshal(submit)
+	resp, err := handleTurnSubmit(context.Background(), c, params)
+	if err != nil {
+		t.Fatalf("first handleTurnSubmit: %v", err)
+	}
+	first := resp.(*protocol.TurnSubmitResponse)
+	_ = frames.waitForFrame(t, protocol.EventRunCompleted)
+	if _, err := srv.store.GetRunByIdempotency(context.Background(), SoloUserID, "", "idem-key-1"); err != nil {
+		t.Fatalf("GetRunByIdempotency after first submit: %v", err)
+	}
+
+	submit.TurnID = "turn-idem-duplicate"
+	submit.Sequence = 2
+	params, _ = json.Marshal(submit)
+	resp, err = handleTurnSubmit(context.Background(), c, params)
+	if err != nil {
+		t.Fatalf("duplicate handleTurnSubmit: %v", err)
+	}
+	second := resp.(*protocol.TurnSubmitResponse)
+	if second.RunID != first.RunID {
+		t.Fatalf("duplicate RunID = %q, want %q", second.RunID, first.RunID)
+	}
+
+	turns, err := srv.store.ListTurns(context.Background(), "sess-idem")
+	if err != nil {
+		t.Fatalf("ListTurns: %v", err)
+	}
+	userTurns := 0
+	for _, turn := range turns {
+		if turn.Role == "user" {
+			userTurns++
+		}
+	}
+	if userTurns != 1 {
+		t.Fatalf("user turns = %d, want 1", userTurns)
+	}
 }
 
 func TestHandleTurnSubmit_MissingSession(t *testing.T) {
 	srv, _ := setupTurnSubmitServer(t)
-	c, _ := newRelayConnection(t, srv)
+	c, frames := newRelayConnection(t, srv)
 	submit := &protocol.TurnSubmit{
 		TurnID: "x", Sequence: 1, Mode: protocol.ModeBuild, Content: "hi",
 	}
@@ -121,6 +204,7 @@ func TestHandleTurnSubmit_MissingSession(t *testing.T) {
 	if ack.TurnID == "" {
 		t.Errorf("TurnID not set")
 	}
+	_ = frames.waitForFrame(t, protocol.EventRunCompleted)
 }
 
 func TestHandleTurnSubmit_UnknownModelInRouting(t *testing.T) {
@@ -202,6 +286,11 @@ func TestHandleTurnSubmit_RegistersStandardHandlers(t *testing.T) {
 		protocol.MethodTurnSubmit,
 		protocol.MethodTurnCancel,
 		protocol.MethodToolResult,
+		protocol.MethodRunList,
+		protocol.MethodRunDetails,
+		protocol.MethodRunAttach,
+		protocol.MethodRunDetach,
+		protocol.MethodRunCancel,
 	} {
 		if _, ok := srv.dispatcher.handlers[m]; !ok {
 			t.Errorf("handler %q not registered", m)

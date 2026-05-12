@@ -327,6 +327,22 @@ Artifact: `docs/releases/<version>/.reviews/<wu-or-bundle>/claude-subagent-pre-r
 - **Attention** — should address unless documented reason not to.
 - **Nit** — optional.
 
+### Implementation Review
+
+Implementation review guidelines live in
+`.agents/reviews/implementation-review.md`.
+
+Implementation review happens after implementation and before release
+readiness/release close. It has two complementary parts:
+
+- **Static conformance review** checks the code, tests, and implementation
+  against accepted features, ADRs, patches, and release designs.
+- **Runtime evidence review** checks evidence from automated E2E tests, smoke
+  tests, or manual launch checks that the built artifact works through the
+  production startup and user-facing paths.
+
+Do not treat static implementation review alone as release validation.
+
 ### Commit Points
 
 Commits happen at natural checkpoints within each work unit, not just at the end:

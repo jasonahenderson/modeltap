@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jasonahenderson/modeltap/internal/harness"
 	"github.com/jasonahenderson/modeltap/internal/harnesshost/testutil"
 	"github.com/jasonahenderson/modeltap/internal/harnessshell"
@@ -289,5 +290,145 @@ func TestProductionRuntimeResolvePermissionUnblocksCallback(t *testing.T) {
 		}
 	case <-time.After(50 * time.Millisecond):
 		t.Fatalf("ResolvePermission did not unblock the channel")
+	}
+}
+
+// PATCH-0029: bootstrapSession must not overwrite a session id that
+// a racing turn.submit already wrote. The race shape: ConnStateReady
+// fires; bootstrapSession is goroutine'd; turn.submit runs first
+// because the user typed fast, auto-creates session "stub-session"
+// on the BFF, and stores it via SetSessionID. session.create then
+// returns later with a different id; bootstrapSession must observe
+// the existing id and skip the Set.
+func TestProductionRuntimeBootstrapSessionDoesNotOverwrite(t *testing.T) {
+	stub, err := testutil.NewBFFStub()
+	if err != nil {
+		t.Fatalf("NewBFFStub: %v", err)
+	}
+	defer stub.Close()
+
+	r := newProductionRuntimeForTest(t, stub)
+
+	// Simulate the race: a turn.submit completed before bootstrapSession.
+	r.mode.SetSessionID("turn-assigned-session")
+
+	// Run bootstrapSession directly (not via observeRuntimeMessage) to
+	// keep the test deterministic. The stub answers session.create with
+	// "stub-session"; we want to verify that response is discarded.
+	r.bootstrapSession(context.Background())
+
+	if got := r.mode.SessionID(); got != "turn-assigned-session" {
+		t.Errorf("bootstrapSession overwrote turn-assigned session id: got %q, want %q",
+			got, "turn-assigned-session")
+	}
+}
+
+// PATCH-0028 + PATCH-0029: when no turn raced ahead, bootstrapSession
+// adopts the session id returned by session.create.
+func TestProductionRuntimeBootstrapSessionAdoptsWhenEmpty(t *testing.T) {
+	stub, err := testutil.NewBFFStub()
+	if err != nil {
+		t.Fatalf("NewBFFStub: %v", err)
+	}
+	defer stub.Close()
+
+	r := newProductionRuntimeForTest(t, stub)
+
+	// Pre-condition: no session id stored.
+	if got := r.mode.SessionID(); got != "" {
+		t.Fatalf("expected empty session id pre-bootstrap, got %q", got)
+	}
+
+	r.bootstrapSession(context.Background())
+
+	if got := r.mode.SessionID(); got != "stub-session" {
+		t.Errorf("bootstrapSession did not adopt session.create id: got %q, want %q",
+			got, "stub-session")
+	}
+}
+
+// PATCH-0033: statusError must strip the JSON-RPC wire framing from
+// harness.RPCError so users see "model.list failed: <message>" rather
+// than "model.list failed: rpc error -32602: <message>". Plain
+// (non-RPC) errors fall through unchanged.
+func TestProductionRuntimeStatusError_UnwrapsRPCError(t *testing.T) {
+	r, err := NewProductionRuntime(ProductionRuntimeConfig{
+		ConnConfig: harness.ConnectionConfig{SocketPath: "/nonexistent.sock"},
+	})
+	if err != nil {
+		t.Fatalf("NewProductionRuntime: %v", err)
+	}
+	defer r.Close()
+
+	var msgs []any
+	r.sender.onSend = func(msg tea.Msg) { msgs = append(msgs, msg) }
+
+	rpcErr := &harness.RPCError{Code: -32602, Message: "cannot attach terminal run"}
+	if err := r.statusError("run.attach", rpcErr); err != nil {
+		t.Fatalf("statusError returned non-nil: %v", err)
+	}
+
+	plainErr := errorString("disk full")
+	if err := r.statusError("session.list", plainErr); err != nil {
+		t.Fatalf("statusError returned non-nil: %v", err)
+	}
+
+	if len(msgs) != 2 {
+		t.Fatalf("msgs = %d, want 2", len(msgs))
+	}
+	got1, ok := msgs[0].(harnessshell.HostStatusEvent)
+	if !ok {
+		t.Fatalf("msgs[0] = %T, want HostStatusEvent", msgs[0])
+	}
+	if strings.Contains(got1.Status, "rpc error") {
+		t.Errorf("RPCError framing leaked: %q", got1.Status)
+	}
+	if !strings.Contains(got1.Status, "cannot attach terminal run") {
+		t.Errorf("inner message lost: %q", got1.Status)
+	}
+	got2, ok := msgs[1].(harnessshell.HostStatusEvent)
+	if !ok {
+		t.Fatalf("msgs[1] = %T, want HostStatusEvent", msgs[1])
+	}
+	if !strings.Contains(got2.Status, "disk full") {
+		t.Errorf("plain error mangled: %q", got2.Status)
+	}
+}
+
+type errorString string
+
+func (e errorString) Error() string { return string(e) }
+
+func TestProductionRuntimeProjectRunReplay(t *testing.T) {
+	r, err := NewProductionRuntime(ProductionRuntimeConfig{
+		ConnConfig: harness.ConnectionConfig{SocketPath: "/nonexistent.sock"},
+	})
+	if err != nil {
+		t.Fatalf("NewProductionRuntime: %v", err)
+	}
+	defer r.Close()
+
+	var msgs []any
+	r.sender.onSend = func(msg tea.Msg) {
+		msgs = append(msgs, msg)
+	}
+	r.projectRunReplay([]protocol.RunEventPayload{
+		{
+			RunID:   "run-1",
+			Type:    protocol.EventRunProgress,
+			Payload: json.RawMessage(`{"type":"token_delta","text":"hello"}`),
+		},
+		{RunID: "run-1", Type: protocol.EventRunCompleted},
+	})
+
+	if len(msgs) != 2 {
+		t.Fatalf("msgs = %d, want 2", len(msgs))
+	}
+	delta, ok := msgs[0].(harnessshell.RunDeltaEvent)
+	if !ok || delta.RunID != "run-1" || delta.Delta != "hello" {
+		t.Fatalf("delta msg = %#v", msgs[0])
+	}
+	if _, ok := msgs[1].(harnessshell.RunCompletedEvent); !ok {
+		t.Fatalf("complete msg = %T, want RunCompletedEvent", msgs[1])
 	}
 }

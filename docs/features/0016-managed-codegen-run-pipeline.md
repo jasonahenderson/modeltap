@@ -1,7 +1,7 @@
 ---
 feature: FEAT-0016
 title: Managed Codegen Run Pipeline
-status: draft
+status: accepted
 date: 2026-04-29
 parent: FEAT-0015
 series: Professional Harness Runtime
@@ -225,14 +225,14 @@ active-stage deadlines.
 | ADR | Relationship |
 |---|---|
 | ADR-0014 | Requires BFF-first orchestration with the harness as universal orchestration client |
-| Future ADR | Should decide run ownership, lifecycle terminology, transition policy, checkpoint schema, event buffering, and prompt/policy boundaries |
+| ADR-0015 | Decides run ownership, lifecycle terminology, transition policy, checkpoint schema, event buffering, executor availability, and v0.3.0 liveness semantics |
 
-## Open Questions
+## Resolved for v0.3.0
 
-1. Should `turn.submit` become run-aware or should new `run.*` methods wrap
-   turn submission?
-2. What minimum checkpoint data is required to safely continue a failed run?
-3. How should simple attached chat use a lightweight run representation without
-   forcing the full codegen pipeline onto low-risk conversation turns?
-4. How much prompt metadata can be exposed without leaking protected prompt
-   content?
+1. `turn.submit` remains compatible and becomes run-aware; new control and
+   inspection surfaces use `run.*`, including `run.create`.
+2. Minimum checkpoint data is defined by ADR-0015 and WU-109/WU-113.
+3. Simple attached chat is represented as a lightweight foreground run using
+   only the stages it needs.
+4. Full prompt metadata visibility is deferred to v0.3.1 prompt/context
+   planning and artifact redaction policy.

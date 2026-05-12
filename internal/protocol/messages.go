@@ -20,6 +20,7 @@ const (
 	MethodTurnCancel           = "turn.cancel"
 	MethodToolResult           = "tool.result"
 	MethodContentTransform     = "content.transform"
+	MethodSessionCreate        = "session.create"
 	MethodSessionResume        = "session.resume"
 	MethodSessionList          = "session.list"
 	MethodSessionDetails       = "session.details"
@@ -38,6 +39,19 @@ const (
 	MethodConnectionReady      = "connection.ready"
 	MethodHistoryAppend        = "history.append"
 	MethodHistoryList          = "history.list"
+	MethodRunList              = "run.list"
+	MethodRunCreate            = "run.create"
+	MethodRunDetails           = "run.details"
+	MethodRunAttach            = "run.attach"
+	MethodRunDetach            = "run.detach"
+	MethodRunCancel            = "run.cancel"
+	MethodRunRetry             = "run.retry"
+	MethodRunContinue          = "run.continue"
+	MethodRunFork              = "run.fork"
+	MethodRunEvents            = "run.events"
+	MethodRunPermissions       = "run.permissions"
+	MethodRunResolvePermission = "run.resolve_permission"
+	MethodRunHeartbeat         = "run.heartbeat"
 )
 
 // -----------------------------------------------------------------------
@@ -121,14 +135,15 @@ type ProjectContext struct {
 // ToolResults must be set; this package does not enforce that constraint
 // (see FEAT-0008 dispatch requirements for WU-046 / WU-051).
 type TurnSubmit struct {
-	TurnID      string       `json:"turn_id"`
-	SessionID   string       `json:"session_id"`
-	Sequence    int          `json:"sequence"`
-	Mode        Mode         `json:"mode"`
-	Content     string       `json:"content,omitempty"`
-	Attachments []Attachment `json:"attachments,omitempty"`
-	Paste       *Paste       `json:"paste,omitempty"`
-	ToolResults []ToolResult `json:"tool_results,omitempty"`
+	TurnID         string       `json:"turn_id"`
+	SessionID      string       `json:"session_id"`
+	Sequence       int          `json:"sequence"`
+	Mode           Mode         `json:"mode"`
+	Content        string       `json:"content,omitempty"`
+	IdempotencyKey string       `json:"idempotency_key,omitempty"`
+	Attachments    []Attachment `json:"attachments,omitempty"`
+	Paste          *Paste       `json:"paste,omitempty"`
+	ToolResults    []ToolResult `json:"tool_results,omitempty"`
 }
 
 // TurnCancel cancels an in-flight turn.
@@ -144,6 +159,15 @@ type ContentTransform struct {
 	RawContent      string `json:"raw_content"`
 	ContentType     string `json:"content_type"`
 	MaxOutputTokens int    `json:"max_output_tokens"`
+}
+
+// SessionCreate establishes a new session for the current connection.
+// The server mints a session id, persists it, and binds the connection.
+// Used by the harness on connect so that session-scoped RPCs (e.g.
+// model.switch) work before any turn.submit has run (Finding F10 /
+// PATCH-0028).
+type SessionCreate struct {
+	Project ProjectContext `json:"project"`
 }
 
 // SessionResume rehydrates an existing session for the current connection.
@@ -261,6 +285,7 @@ type TurnSubmitResponse struct {
 	TurnID    string               `json:"turn_id"`
 	SessionID string               `json:"session_id,omitempty"`
 	Status    string               `json:"status"`
+	RunID     string               `json:"run_id,omitempty"`
 	Sync      *SessionSyncResponse `json:"sync,omitempty"`
 }
 

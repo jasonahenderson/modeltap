@@ -80,6 +80,7 @@ func NewSessionManager(store storage.Store) *SessionManager {
 // Register attaches the session handlers to a Dispatcher. Called by
 // Server during construction.
 func (sm *SessionManager) Register(d *Dispatcher) {
+	d.Register(protocol.MethodSessionCreate, handleSessionCreate)
 	d.Register(protocol.MethodSessionResume, handleSessionResume)
 	d.Register(protocol.MethodSessionList, handleSessionList)
 	d.Register(protocol.MethodSessionDetails, handleSessionDetails)
@@ -122,6 +123,72 @@ func (sm *SessionManager) Deactivate(sessionID string) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	delete(sm.active, sessionID)
+}
+
+// handleSessionCreate implements session.create (PATCH-0028). It mints
+// a fresh session id, persists a new storage.Session, acquires the
+// session lock for the connection, binds the connection's session id,
+// and registers the active-session entry. Mirrors the lazy-create
+// branch of handleTurnSubmit (turn.go:122-138) so a session created
+// here is indistinguishable from one created on first turn.
+//
+// Used by the harness on ConnStateReady so session-scoped RPCs
+// (model.switch, context.list, history.list scoped to a session,
+// session.clear, session.fork) work before the user submits any turn.
+func handleSessionCreate(ctx context.Context, conn *Connection, params json.RawMessage) (any, error) {
+	var req protocol.SessionCreate
+	if err := json.Unmarshal(params, &req); err != nil {
+		return nil, &TransportError{Code: CodeInvalidParams, Message: "decode session.create: " + err.Error()}
+	}
+
+	srv := conn.server
+	sessionID := uuid.NewString()
+	now := time.Now().UTC()
+	sess := &storage.Session{
+		ID:        sessionID,
+		UserID:    conn.UserID(),
+		Project:   req.Project.Root,
+		Status:    "active",
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	if err := srv.store.CreateSession(ctx, sess); err != nil {
+		return nil, &TransportError{Code: CodeInternalError, Message: "create session: " + err.Error()}
+	}
+
+	expiry := time.Now().Add(SessionLockTTL)
+	acquired, owner, err := srv.store.AcquireSessionLock(ctx, sessionID, conn.ID(), expiry)
+	if err != nil {
+		return nil, &TransportError{Code: CodeInternalError, Message: "acquire lock: " + err.Error()}
+	}
+	if !acquired {
+		// Should not happen on a freshly-minted id, but treat
+		// defensively in case of a uuid collision or a stale lock
+		// row in storage.
+		diag := protocol.Diagnostic{
+			Code:     protocol.DiagSessionLocked,
+			Category: "session",
+			Cause:    fmt.Sprintf("freshly created session locked by %q", owner),
+		}
+		diagRaw, _ := json.Marshal(diag)
+		return nil, &TransportError{
+			Code:    CodeSessionLocked,
+			Message: "freshly created session locked",
+			Data:    json.RawMessage(diagRaw),
+		}
+	}
+
+	conn.Capabilities().UpdateProjectContext(req.Project)
+	conn.SetSessionID(sessionID)
+	active := srv.sessions.EnsureActive(sessionID, conn)
+	active.UserID = sess.UserID
+	active.Project = sess.Project
+	conn.cancelGracePeriodRelease()
+
+	return &protocol.SessionCreateResponse{
+		SessionID: sessionID,
+		Project:   conn.Capabilities().ProjectContext(),
+	}, nil
 }
 
 // handleSessionResume implements session.resume per design D2.3.

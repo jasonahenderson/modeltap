@@ -9,20 +9,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// logsStore is a package-level variable that allows injecting a Store for
-// the logs command. In production this is set via SetLogsStore before
-// command execution; in tests it is set directly.
-var logsStore storage.Store
-
-// SetLogsStore sets the store used by the logs command.
-func SetLogsStore(s storage.Store) {
-	logsStore = s
-}
-
-func newLogsCommand() *cobra.Command {
+// newRequestsListCommand registers `modeltap requests list`. Uses the
+// package-shared requestsStore (lazy-opened in production, injected in
+// tests). Per PATCH-0020, this replaces the previous `modeltap logs`
+// top-level command.
+func newRequestsListCommand() *cobra.Command {
 	var (
 		provider string
 		model    string
+		runID    string
+		traceID  string
 		since    string
 		until    string
 		status   int
@@ -30,9 +26,9 @@ func newLogsCommand() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "logs",
-		Short: "List captured request/response logs",
-		Long: `List captured request/response log entries with optional filtering.
+		Use:   "list",
+		Short: "List captured upstream API request/response exchanges",
+		Long: `List captured request/response entries with optional filtering.
 
 Displays a table of captured API requests showing the request ID, timestamp,
 provider, model, HTTP status, token counts, estimated cost, and latency.
@@ -40,28 +36,39 @@ Results are ordered by timestamp (newest first) and limited to 50 by default.
 
 Time filters (--since, --until) accept either a duration shorthand relative
 to now (e.g. "24h", "7d", "30m") or an RFC3339 timestamp.`,
-		Example: `  # Show the 50 most recent log entries
-  modeltap logs
+		Example: `  # Show the 50 most recent captures
+  modeltap requests list
 
   # Filter by provider
-  modeltap logs --provider anthropic
+  modeltap requests list --provider anthropic
 
   # Filter by model and limit results
-  modeltap logs --model gpt-4 --limit 10
+  modeltap requests list --model gpt-4 --limit 10
 
-  # Show only failed requests from the last hour
-  modeltap logs --status 500 --since 1h
+  # Filter by durable run
+  modeltap requests list --run run-123
 
-  # Show logs within a specific time window
-  modeltap logs --since 2026-03-01T00:00:00Z --until 2026-03-08T00:00:00Z`,
+  # Show only failed captures from the last hour
+  modeltap requests list --status 500 --since 1h
+
+  # Show captures within a specific time window
+  modeltap requests list --since 2026-03-01T00:00:00Z --until 2026-03-08T00:00:00Z`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if logsStore == nil {
-				return fmt.Errorf("no store configured")
+			if requestsStore == nil {
+				s, err := openStoreFromConfig()
+				if err != nil {
+					return err
+				}
+				defer s.Close()
+				requestsStore = s
+				defer func() { requestsStore = nil }()
 			}
 
 			filter := storage.ListFilter{
 				Provider: provider,
 				Model:    model,
+				RunID:    runID,
+				TraceID:  traceID,
 				Limit:    limit,
 			}
 
@@ -86,7 +93,7 @@ to now (e.g. "24h", "7d", "30m") or an RFC3339 timestamp.`,
 			}
 
 			ctx := cmd.Context()
-			requests, err := logsStore.ListRequests(ctx, filter)
+			requests, err := requestsStore.ListRequests(ctx, filter)
 			if err != nil {
 				return fmt.Errorf("listing requests: %w", err)
 			}
@@ -94,7 +101,7 @@ to now (e.g. "24h", "7d", "30m") or an RFC3339 timestamp.`,
 			w := cmd.OutOrStdout()
 
 			if len(requests) == 0 {
-				fmt.Fprintln(w, "No log entries found.")
+				fmt.Fprintln(w, "No captures found.")
 				return nil
 			}
 
@@ -125,8 +132,10 @@ to now (e.g. "24h", "7d", "30m") or an RFC3339 timestamp.`,
 
 	cmd.Flags().StringVar(&provider, "provider", "", "Filter by provider name")
 	cmd.Flags().StringVar(&model, "model", "", "Filter by model name")
-	cmd.Flags().StringVar(&since, "since", "", "Filter requests after this time (duration like 24h/7d or RFC3339)")
-	cmd.Flags().StringVar(&until, "until", "", "Filter requests before this time (duration like 24h/7d or RFC3339)")
+	cmd.Flags().StringVar(&runID, "run", "", "Filter by durable run id")
+	cmd.Flags().StringVar(&traceID, "trace", "", "Filter by trace id")
+	cmd.Flags().StringVar(&since, "since", "", "Filter captures after this time (duration like 24h/7d or RFC3339)")
+	cmd.Flags().StringVar(&until, "until", "", "Filter captures before this time (duration like 24h/7d or RFC3339)")
 	cmd.Flags().IntVar(&status, "status", 0, "Filter by HTTP response status code")
 	cmd.Flags().IntVar(&limit, "limit", 50, "Maximum number of results to return")
 

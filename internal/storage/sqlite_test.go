@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -48,7 +49,10 @@ func TestSaveAndGetRequest(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 
-	req := makeRequest()
+	req := makeRequest(func(r *Request) {
+		r.RunID = "run-1"
+		r.TraceID = "trace-1"
+	})
 	if err := store.SaveRequest(ctx, req); err != nil {
 		t.Fatalf("SaveRequest: %v", err)
 	}
@@ -67,6 +71,12 @@ func TestSaveAndGetRequest(t *testing.T) {
 	}
 	if !got.Timestamp.Equal(req.Timestamp) {
 		t.Errorf("Timestamp: got %v, want %v", got.Timestamp, req.Timestamp)
+	}
+	if got.RunID != req.RunID {
+		t.Errorf("RunID: got %q, want %q", got.RunID, req.RunID)
+	}
+	if got.TraceID != req.TraceID {
+		t.Errorf("TraceID: got %q, want %q", got.TraceID, req.TraceID)
 	}
 	if got.Provider != req.Provider {
 		t.Errorf("Provider: got %q, want %q", got.Provider, req.Provider)
@@ -140,6 +150,75 @@ func TestGetRequest_NotFound(t *testing.T) {
 	}
 }
 
+func TestGetRequest_PrefixMatchUnique(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	full := "33477705-a342-4376-9f37-9f77ed7dcc52"
+	if err := store.SaveRequest(ctx, &Request{
+		ID:        full,
+		Timestamp: time.Date(2026, 5, 8, 12, 0, 0, 0, time.UTC),
+		Provider:  "anthropic",
+		Model:     "claude-sonnet-4-6",
+	}); err != nil {
+		t.Fatalf("SaveRequest: %v", err)
+	}
+
+	got, err := store.GetRequest(ctx, "33477705")
+	if err != nil {
+		t.Fatalf("GetRequest with 8-char prefix: %v", err)
+	}
+	if got == nil {
+		t.Fatal("expected prefix match, got nil")
+	}
+	if got.ID != full {
+		t.Errorf("got ID %q, want %q", got.ID, full)
+	}
+}
+
+func TestGetRequest_PrefixMatchAmbiguous(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	for _, id := range []string{
+		"abcdef01-1111-1111-1111-111111111111",
+		"abcdef02-2222-2222-2222-222222222222",
+	} {
+		if err := store.SaveRequest(ctx, &Request{
+			ID:        id,
+			Timestamp: time.Date(2026, 5, 8, 12, 0, 0, 0, time.UTC),
+			Provider:  "anthropic",
+			Model:     "claude-sonnet-4-6",
+		}); err != nil {
+			t.Fatalf("SaveRequest: %v", err)
+		}
+	}
+
+	got, err := store.GetRequest(ctx, "abcdef")
+	if err == nil {
+		t.Fatalf("expected ambiguous-prefix error, got result %+v", got)
+	}
+	if got != nil {
+		t.Errorf("expected nil request on ambiguous prefix, got %+v", got)
+	}
+	if !strings.Contains(err.Error(), "ambiguous") {
+		t.Errorf("error %q should mention ambiguity", err.Error())
+	}
+}
+
+func TestGetRequest_PrefixMatchEmpty(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	got, err := store.GetRequest(ctx, "deadbeef")
+	if err != nil {
+		t.Fatalf("GetRequest: %v", err)
+	}
+	if got != nil {
+		t.Errorf("expected nil for non-matching prefix, got %+v", got)
+	}
+}
+
 func TestListRequests_Filters(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
@@ -150,18 +229,24 @@ func TestListRequests_Filters(t *testing.T) {
 		makeRequest(func(r *Request) {
 			r.Provider = "anthropic"
 			r.Model = "claude-sonnet-4-20250514"
+			r.RunID = "run-a"
+			r.TraceID = "trace-a"
 			r.Timestamp = now
 			r.ResponseStatus = 200
 		}),
 		makeRequest(func(r *Request) {
 			r.Provider = "anthropic"
 			r.Model = "claude-opus-4-20250514"
+			r.RunID = "run-a"
+			r.TraceID = "trace-b"
 			r.Timestamp = now.Add(-1 * time.Hour)
 			r.ResponseStatus = 200
 		}),
 		makeRequest(func(r *Request) {
 			r.Provider = "openai"
 			r.Model = "gpt-4"
+			r.RunID = "run-b"
+			r.TraceID = "trace-a"
 			r.Timestamp = now.Add(-2 * time.Hour)
 			r.ResponseStatus = 429
 		}),
@@ -212,6 +297,16 @@ func TestListRequests_Filters(t *testing.T) {
 			name:      "filter by model claude-sonnet-4-20250514",
 			filter:    ListFilter{Model: "claude-sonnet-4-20250514"},
 			wantCount: 1,
+		},
+		{
+			name:      "filter by run id",
+			filter:    ListFilter{RunID: "run-a"},
+			wantCount: 2,
+		},
+		{
+			name:      "filter by trace id",
+			filter:    ListFilter{TraceID: "trace-a"},
+			wantCount: 2,
 		},
 		{
 			name:      "filter by status code 429",

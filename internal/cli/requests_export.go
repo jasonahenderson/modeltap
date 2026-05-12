@@ -14,59 +14,67 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// exportStore is a package-level variable that allows injecting a Store for
-// the export command. In production this is set via SetExportStore before
-// command execution; in tests it is set directly.
-var exportStore storage.Store
-
-// SetExportStore sets the store used by the export command.
-func SetExportStore(s storage.Store) {
-	exportStore = s
-}
-
-func newExportCommand() *cobra.Command {
+// newRequestsExportCommand registers `modeltap requests export`. Uses
+// the package-shared requestsStore (lazy-opened in production,
+// injected in tests). Per PATCH-0020, this replaces the previous
+// `modeltap export` top-level command.
+func newRequestsExportCommand() *cobra.Command {
 	var (
-		format string
-		since  string
-		until  string
+		format  string
+		runID   string
+		traceID string
+		since   string
+		until   string
 	)
 
 	cmd := &cobra.Command{
 		Use:   "export",
-		Short: "Export logs to JSONL or CSV",
-		Long: `Export captured request/response logs to JSONL or CSV format.
+		Short: "Export captured requests to JSONL or CSV",
+		Long: `Export captured request/response entries to JSONL or CSV format.
 
-Writes all matching log entries to stdout in the chosen format. JSONL
+Writes all matching captures to stdout in the chosen format. JSONL
 (JSON Lines) outputs one JSON object per line, suitable for streaming
 ingestion. CSV outputs a header row followed by one row per request.
 
 Both formats include: id, timestamp, provider, model, status, input_tokens,
-output_tokens, latency_ms, and cost. Redirect stdout to a file to save
-the output.
+output_tokens, latency_ms, cost, run_id, and trace_id. Redirect stdout to a
+file to save the output.
 
 Time filters (--since, --until) accept either a duration shorthand relative
 to now (e.g. "24h", "7d") or an RFC3339 timestamp.`,
-		Example: `  # Export all logs as JSONL (default format)
-  modeltap export > logs.jsonl
+		Example: `  # Export all captures as JSONL (default format)
+  modeltap requests export > captures.jsonl
 
   # Export as CSV
-  modeltap export --format csv > logs.csv
+  modeltap requests export --format csv > captures.csv
 
   # Export only the last 7 days
-  modeltap export --since 7d > recent.jsonl
+  modeltap requests export --since 7d > recent.jsonl
+
+  # Export captures for a durable run
+  modeltap requests export --run run-123 > run-captures.jsonl
 
   # Export a specific time window as CSV
-  modeltap export --format csv --since 2026-03-01T00:00:00Z --until 2026-03-08T00:00:00Z`,
+  modeltap requests export --format csv --since 2026-03-01T00:00:00Z --until 2026-03-08T00:00:00Z`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if format != "jsonl" && format != "csv" {
 				return fmt.Errorf("invalid format %q: must be jsonl or csv", format)
 			}
 
-			if exportStore == nil {
-				return fmt.Errorf("no store configured")
+			if requestsStore == nil {
+				s, err := openStoreFromConfig()
+				if err != nil {
+					return err
+				}
+				defer s.Close()
+				requestsStore = s
+				defer func() { requestsStore = nil }()
 			}
 
-			filter := storage.ListFilter{}
+			filter := storage.ListFilter{
+				RunID:   runID,
+				TraceID: traceID,
+			}
 
 			if since != "" {
 				t, err := parseTimeFlag(since)
@@ -85,7 +93,7 @@ to now (e.g. "24h", "7d") or an RFC3339 timestamp.`,
 			}
 
 			ctx := context.Background()
-			requests, err := exportStore.ListRequests(ctx, filter)
+			requests, err := requestsStore.ListRequests(ctx, filter)
 			if err != nil {
 				return fmt.Errorf("listing requests: %w", err)
 			}
@@ -103,6 +111,8 @@ to now (e.g. "24h", "7d") or an RFC3339 timestamp.`,
 	}
 
 	cmd.Flags().StringVar(&format, "format", "jsonl", "Output format: jsonl or csv")
+	cmd.Flags().StringVar(&runID, "run", "", "Filter by durable run id")
+	cmd.Flags().StringVar(&traceID, "trace", "", "Filter by trace id")
 	cmd.Flags().StringVar(&since, "since", "", "Filter requests after this time (duration like 24h/7d or RFC3339)")
 	cmd.Flags().StringVar(&until, "until", "", "Filter requests before this time (duration like 24h/7d or RFC3339)")
 
@@ -113,6 +123,8 @@ to now (e.g. "24h", "7d") or an RFC3339 timestamp.`,
 type exportRecord struct {
 	ID           string  `json:"id"`
 	Timestamp    string  `json:"timestamp"`
+	RunID        string  `json:"run_id"`
+	TraceID      string  `json:"trace_id"`
 	Provider     string  `json:"provider"`
 	Model        string  `json:"model"`
 	Status       int     `json:"status"`
@@ -126,6 +138,8 @@ func toExportRecord(r storage.Request) exportRecord {
 	return exportRecord{
 		ID:           r.ID,
 		Timestamp:    r.Timestamp.Format(time.RFC3339Nano),
+		RunID:        r.RunID,
+		TraceID:      r.TraceID,
 		Provider:     r.Provider,
 		Model:        r.Model,
 		Status:       r.ResponseStatus,
@@ -148,7 +162,7 @@ func writeJSONL(w io.Writer, requests []storage.Request) error {
 }
 
 var csvHeader = []string{
-	"id", "timestamp", "provider", "model", "status",
+	"id", "timestamp", "run_id", "trace_id", "provider", "model", "status",
 	"input_tokens", "output_tokens", "latency_ms", "cost",
 }
 
@@ -164,6 +178,8 @@ func writeCSV(w io.Writer, requests []storage.Request) error {
 		row := []string{
 			r.ID,
 			r.Timestamp.Format(time.RFC3339Nano),
+			r.RunID,
+			r.TraceID,
 			r.Provider,
 			r.Model,
 			strconv.Itoa(r.ResponseStatus),

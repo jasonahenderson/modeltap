@@ -183,13 +183,13 @@ func TestUpgrade_V1ToV2_DataPreserved(t *testing.T) {
 		t.Fatalf("migrate: %v", err)
 	}
 
-	// Verify schema version is now 2.
+	// Verify schema version is now 4.
 	version, err := store.currentSchemaVersion()
 	if err != nil {
 		t.Fatalf("currentSchemaVersion: %v", err)
 	}
-	if version != 2 {
-		t.Errorf("schema version = %d, want 2", version)
+	if version != 4 {
+		t.Errorf("schema version = %d, want 4", version)
 	}
 
 	// Verify all v1 data is intact.
@@ -521,8 +521,8 @@ func TestUpgrade_V2Idempotent(t *testing.T) {
 	if version1 != version2 {
 		t.Errorf("schema version changed: first=%d, second=%d", version1, version2)
 	}
-	if version2 != 2 {
-		t.Errorf("schema version = %d, want 2", version2)
+	if version2 != 4 {
+		t.Errorf("schema version = %d, want 4", version2)
 	}
 
 	// Table count should not change.
@@ -629,8 +629,8 @@ func TestUpgrade_V1ToV2_ConcurrentAccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("currentSchemaVersion: %v", err)
 	}
-	if version != 2 {
-		t.Errorf("schema version = %d after concurrent migration, want 2", version)
+	if version != 4 {
+		t.Errorf("schema version = %d after concurrent migration, want 4", version)
 	}
 
 	// Verify v1 data is intact after concurrent access + migration.

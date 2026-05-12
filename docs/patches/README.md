@@ -22,6 +22,25 @@ Implementation-scoped work authorization documents. Patches are the lightweight 
 | [PATCH-0015](0015-harness-shell-component-api.md) | Harness Shell Component API | approved |
 | [PATCH-0016](0016-pr1-ci-test-failures-triage.md) | Fix v0.2.x test suite failures and lint regressions surfaced by PR #1 CI | approved |
 | [PATCH-0017](0017-session-scoped-project-context.md) | Session-scoped project context (BFF refactor, FEAT-0008 Amendment 001, target v0.3.5) | approved |
+| [PATCH-0018](0018-host-info-events.md) | Surface slash-command output via transcript host-info events | approved |
+| [PATCH-0019](0019-read-command-store-wiring.md) | Wire SQLite store into logs, show, export, metrics commands | approved |
+| [PATCH-0020](0020-requests-command-rename.md) | Rename logs/show/export to requests list/show/export | approved |
+| [PATCH-0021](0021-bff-health-check-wiring.md) | Wire provider health checks in BFF production startup | approved |
+| [PATCH-0022](0022-turn-submit-max-tokens-default.md) | Set default max_tokens for turn.submit dispatch | approved |
+| [PATCH-0023](0023-shell-host-command-dispatch.md) | Dispatch host-native slash commands as RunHostCommandAction | approved |
+| [PATCH-0024](0024-show-short-id-prefix.md) | Support short-id prefix lookup in requests show | approved |
+| [PATCH-0025](0025-cloud-probe-upstream-target.md) | Probe cloud-provider upstream directly in health check | approved |
+| [PATCH-0026](0026-shell-debug-daemon-log.md) | Capture auto-spawned daemon stdio to a log file via flag/env | approved |
+| [PATCH-0027](0027-truthful-footer-hints.md) | Strip misleading footer hints (sidebar / palette / agents) | approved |
+| [PATCH-0028](0028-session-create-rpc.md) | Add session.create RPC and harness auto-call on Ready | approved |
+| [PATCH-0029](0029-bootstrap-session-race.md) | Fix bootstrapSession race that overwrites turn-assigned session id | approved |
+| [PATCH-0030](0030-shell-select-mode.md) | Add terminal text selection support | done |
+| [PATCH-0031](0031-turn-sequence-semantics.md) | Align BFF Conversation.sequence with harness user-turn semantics | proposed |
+| [PATCH-0032](0032-sse-ndjson-dual-mode.md) | Make SSEParser pass NDJSON lines through for Ollama-style providers | proposed |
+| [PATCH-0033](0033-rpc-error-formatting.md) | Unwrap RPCError framing in shell statusError; friendlier terminal-run reject | proposed |
+| [PATCH-0034](0034-focus-agnostic-scroll.md) | Focus-agnostic transcript scroll hotkeys | proposed |
+| [PATCH-0035](0035-elapsed-seconds-placeholder.md) | v0.3.0 placeholder: append elapsed seconds to streaming status | proposed |
+| [PATCH-0036](0036-run-proxy-correlation.md) | Correlate proxy captures with durable runs | done |
 
 ## When to Use a Patch
 

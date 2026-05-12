@@ -57,11 +57,15 @@ type ProductionRuntimeConfig struct {
 // snippet) ensures no events fire before the program is attached.
 type deferredSender struct {
 	program atomic.Pointer[tea.Program]
+	onSend  func(tea.Msg)
 }
 
 // Send satisfies harness.ProgramSender. Drops messages silently when
 // no program is attached.
 func (d *deferredSender) Send(msg tea.Msg) {
+	if d.onSend != nil {
+		d.onSend(msg)
+	}
 	if p := d.program.Load(); p != nil {
 		p.Send(msg)
 	}
@@ -72,11 +76,12 @@ func (d *deferredSender) Send(msg tea.Msg) {
 // harness.ModeReader so harness.ToolDispatcher can read the current
 // execution mode.
 type runtimeState struct {
-	mu        sync.Mutex
-	mode      protocol.Mode
-	sessionID string
-	sequence  int
-	label     string // current model label
+	mu          sync.Mutex
+	mode        protocol.Mode
+	sessionID   string
+	activeRunID string
+	sequence    int
+	label       string // current model label
 }
 
 func newRuntimeState() *runtimeState {
@@ -111,6 +116,18 @@ func (s *runtimeState) SetSessionID(id string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.sessionID = id
+}
+
+func (s *runtimeState) ActiveRunID() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.activeRunID
+}
+
+func (s *runtimeState) SetActiveRunID(id string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.activeRunID = id
 }
 
 // NextSequence returns the next sequence counter for this session.
@@ -178,6 +195,7 @@ func NewProductionRuntime(cfg ProductionRuntimeConfig) (*ProductionRuntime, erro
 		sender: &deferredSender{},
 		mode:   newRuntimeState(),
 	}
+	r.sender.onSend = r.observeRuntimeMessage
 
 	// Construction order per WU-104 design (Kimi #10):
 	// 1. PlanAccumulator (passed into ToolDispatcher).
@@ -229,7 +247,11 @@ func (r *ProductionRuntime) AttachProgram(p *tea.Program) {
 // goroutine so the tea.Program's main loop can begin handling messages
 // while the connection is still being set up.
 func (r *ProductionRuntime) Start(ctx context.Context) error {
-	return r.cm.ConnectSync(ctx)
+	if err := r.cm.ConnectSync(ctx); err != nil {
+		return err
+	}
+	r.resumeKnownRuns(ctx)
+	return nil
 }
 
 // Close shuts down the connection.
@@ -274,12 +296,16 @@ func (r *ProductionRuntime) SubmitTurn(ctx context.Context, req SubmitRequest) (
 	}
 
 	finalID := ack.TurnID
+	if ack.RunID != "" {
+		finalID = ack.RunID
+	}
 	if finalID == "" {
 		finalID = turnID
 	}
 	if ack.SessionID != "" {
 		r.mode.SetSessionID(ack.SessionID)
 	}
+	r.mode.SetActiveRunID(finalID)
 
 	return SubmitAccepted{
 		RunID: finalID,
@@ -307,13 +333,15 @@ func (r *ProductionRuntime) InterruptRun(ctx context.Context, runID string) erro
 		})
 		return nil
 	}
-	if err := client.CancelTurn(ctx, runID); err != nil {
-		r.sender.Send(harnessshell.RunStoppedEvent{
-			RunID:   runID,
-			Reason:  harnessshell.StopReasonInterrupt,
-			Message: "stopped — backend reported: " + err.Error(),
-		})
-		return nil
+	if err := client.CancelRun(ctx, runID); err != nil {
+		if turnErr := client.CancelTurn(ctx, runID); turnErr != nil {
+			r.sender.Send(harnessshell.RunStoppedEvent{
+				RunID:   runID,
+				Reason:  harnessshell.StopReasonInterrupt,
+				Message: "stopped — backend reported: " + err.Error(),
+			})
+			return nil
+		}
 	}
 	// Success: the BFF accepted the cancel. Synthesize the stop
 	// event ourselves; the existing harness streaming layer doesn't
@@ -367,6 +395,22 @@ func (r *ProductionRuntime) DispatchCommand(ctx context.Context, cmd HostCommand
 		return r.handleHistoryCommand(ctx, cmd.Args)
 	case "mcp":
 		return r.handleMCPCommand(ctx, cmd.Args)
+	case "run":
+		return r.handleRunCommand(ctx, cmd.Args)
+	case "runs", "jobs":
+		return r.handleRunsCommand(ctx)
+	case "attach":
+		return r.handleRunAttachCommand(ctx, cmd.Args)
+	case "detach":
+		return r.handleRunDetachCommand(ctx, cmd.Args)
+	case "cancel":
+		return r.handleRunControlCommand(ctx, protocol.MethodRunCancel, cmd.Args)
+	case "retry":
+		return r.handleRunControlCommand(ctx, protocol.MethodRunRetry, cmd.Args)
+	case "continue":
+		return r.handleRunControlCommand(ctx, protocol.MethodRunContinue, cmd.Args)
+	case "fork":
+		return r.handleRunControlCommand(ctx, protocol.MethodRunFork, cmd.Args)
 	default:
 		r.sender.Send(harnessshell.HostStatusEvent{
 			Status: "Unknown command: /" + cmd.Name,
@@ -428,7 +472,7 @@ func (r *ProductionRuntime) handleModelsCommand(ctx context.Context) error {
 		return r.statusError("model.list", err)
 	}
 	if len(resp.Models) == 0 {
-		r.sender.Send(harnessshell.HostStatusEvent{Status: "No models available", Kind: harnessshell.StatusReady})
+		r.sender.Send(harnessshell.HostInfoEvent{Text: "No models available"})
 		return nil
 	}
 	var b strings.Builder
@@ -441,8 +485,13 @@ func (r *ProductionRuntime) handleModelsCommand(ctx context.Context) error {
 			b.WriteString(m.Provider)
 			b.WriteString(")")
 		}
+		if m.Status != "" {
+			b.WriteString(" [")
+			b.WriteString(m.Status)
+			b.WriteString("]")
+		}
 	}
-	r.sender.Send(harnessshell.HostStatusEvent{Status: b.String(), Kind: harnessshell.StatusReady})
+	r.sender.Send(harnessshell.HostInfoEvent{Text: b.String()})
 	return nil
 }
 
@@ -476,7 +525,7 @@ func (r *ProductionRuntime) handleSessionList(ctx context.Context) error {
 		return r.statusError("session.list", err)
 	}
 	if len(resp.Sessions) == 0 {
-		r.sender.Send(harnessshell.HostStatusEvent{Status: "No sessions", Kind: harnessshell.StatusReady})
+		r.sender.Send(harnessshell.HostInfoEvent{Text: "No sessions"})
 		return nil
 	}
 	var b strings.Builder
@@ -489,7 +538,7 @@ func (r *ProductionRuntime) handleSessionList(ctx context.Context) error {
 			b.WriteString(s.Summary)
 		}
 	}
-	r.sender.Send(harnessshell.HostStatusEvent{Status: b.String(), Kind: harnessshell.StatusReady})
+	r.sender.Send(harnessshell.HostInfoEvent{Text: b.String()})
 	return nil
 }
 
@@ -506,11 +555,118 @@ func (r *ProductionRuntime) handleSessionResume(ctx context.Context, id string) 
 		return r.statusError("session.resume", err)
 	}
 	r.mode.SetSessionID(resp.SessionID)
+	r.resumeKnownRuns(ctx)
 	r.sender.Send(harnessshell.HostStatusEvent{
 		Status: "Resumed session: " + resp.SessionID,
 		Kind:   harnessshell.StatusReady,
 	})
 	return nil
+}
+
+func (r *ProductionRuntime) observeRuntimeMessage(msg tea.Msg) {
+	m, ok := msg.(harness.ConnStateMsg)
+	if !ok || m.Info.State != harness.ConnStateReady {
+		return
+	}
+	go r.bootstrapSession(context.Background())
+	go r.resumeKnownRuns(context.Background())
+}
+
+// bootstrapSession requests a fresh session from the BFF on
+// ConnStateReady so that session-scoped RPCs (model.switch,
+// context.list, session.clear, etc.) work before the user has
+// submitted any turn. Failures are best-effort: turn.submit will
+// still create a session implicitly if this call fails. PATCH-0028.
+//
+// PATCH-0029: re-check r.mode.SessionID() after the RPC returns. The
+// goroutine and a fast user turn race: if turn.submit auto-creates a
+// session (B) and stores its id while session.create is still in
+// flight, bootstrapSession's response (carrying session A) must not
+// overwrite B. Otherwise subsequent turns target A (conversation
+// sequence 0) while the harness's sequence counter advanced from B's
+// turn, producing "sequence X does not follow current 0".
+func (r *ProductionRuntime) bootstrapSession(ctx context.Context) {
+	if r.mode.SessionID() != "" {
+		return
+	}
+	client := r.cm.Client()
+	if client == nil {
+		return
+	}
+	var resp protocol.SessionCreateResponse
+	if err := client.CallInto(ctx, protocol.MethodSessionCreate, &protocol.SessionCreate{
+		Project: protocol.ProjectContext{Root: r.cfg.ProjectRoot},
+	}, &resp); err != nil {
+		return
+	}
+	// Re-check after the RPC: a turn.submit may have raced ahead of
+	// us and stored a session id from its auto-create response. If
+	// so, prefer that id — the conversation state lives there. The
+	// session we just created is orphaned but harmless.
+	if r.mode.SessionID() != "" {
+		return
+	}
+	r.mode.SetSessionID(resp.SessionID)
+}
+
+func (r *ProductionRuntime) resumeKnownRuns(ctx context.Context) {
+	client := r.cm.Client()
+	if client == nil {
+		return
+	}
+	sessionID := r.mode.SessionID()
+	if sessionID == "" {
+		return
+	}
+	var list protocol.RunListResponse
+	if err := client.CallInto(ctx, protocol.MethodRunList, &protocol.RunList{SessionID: sessionID, Limit: 20}, &list); err != nil {
+		return
+	}
+	activeRunID := r.mode.ActiveRunID()
+	if activeRunID != "" {
+		var events protocol.RunEventsResponse
+		if err := client.CallInto(ctx, protocol.MethodRunEvents, &protocol.RunEvents{RunID: activeRunID, AfterSeq: 0, Limit: 100}, &events); err == nil {
+			r.projectRunReplay(events.Events)
+			r.sender.Send(harnessshell.HostStatusEvent{
+				Status: "Run replay: " + activeRunID + " (" + events.Fidelity + ")",
+				Kind:   harnessshell.StatusReady,
+			})
+			return
+		}
+	}
+	if len(list.Runs) > 0 {
+		r.sender.Send(harnessshell.HostStatusEvent{
+			Status: fmt.Sprintf("Recovered %d recent run(s)", len(list.Runs)),
+			Kind:   harnessshell.StatusReady,
+		})
+	}
+}
+
+func (r *ProductionRuntime) projectRunReplay(events []protocol.RunEventPayload) {
+	for _, ev := range events {
+		switch ev.Type {
+		case protocol.EventRunProgress:
+			var payload struct {
+				Type string `json:"type"`
+				Text string `json:"text"`
+			}
+			if err := json.Unmarshal(ev.Payload, &payload); err == nil && payload.Type == "token_delta" && payload.Text != "" {
+				r.sender.Send(harnessshell.RunDeltaEvent{RunID: ev.RunID, Delta: payload.Text})
+			}
+		case protocol.EventRunCompleted:
+			r.sender.Send(harnessshell.RunCompletedEvent{RunID: ev.RunID})
+		case protocol.EventRunFailed:
+			r.sender.Send(harnessshell.RunFailedEvent{RunID: ev.RunID, Message: ev.Reason})
+		case protocol.EventRunCancelled:
+			r.sender.Send(harnessshell.RunStoppedEvent{RunID: ev.RunID, Reason: harnessshell.StopReasonHost, Message: ev.Reason})
+		case protocol.EventRunBlocked:
+			status := "Run blocked"
+			if ev.Reason != "" {
+				status += ": " + ev.Reason
+			}
+			r.sender.Send(harnessshell.HostStatusEvent{Status: status, Kind: harnessshell.StatusPermissionPending})
+		}
+	}
 }
 
 func (r *ProductionRuntime) handleSessionMutation(ctx context.Context, method string) error {
@@ -545,9 +701,8 @@ func (r *ProductionRuntime) handleContextCommand(ctx context.Context) error {
 	if err != nil {
 		return r.statusError("context.list", err)
 	}
-	r.sender.Send(harnessshell.HostStatusEvent{
-		Status: "Context: " + truncate(string(resp), 200),
-		Kind:   harnessshell.StatusReady,
+	r.sender.Send(harnessshell.HostInfoEvent{
+		Text: "Context:\n" + string(resp),
 	})
 	return nil
 }
@@ -568,6 +723,175 @@ func (r *ProductionRuntime) handleHistoryCommand(ctx context.Context, args strin
 	return nil
 }
 
+func (r *ProductionRuntime) handleRunCommand(ctx context.Context, args string) error {
+	args = strings.TrimSpace(args)
+	switch args {
+	case "context", "prompt":
+		r.sender.Send(harnessshell.HostStatusEvent{
+			Status: "/run " + args + ": not enabled in v0.3.0 (planned for v0.3.1)",
+			Kind:   harnessshell.StatusReady,
+		})
+		return nil
+	case "policy":
+		r.sender.Send(harnessshell.HostStatusEvent{
+			Status: "/run policy: not enabled in v0.3.0 (planned for v0.3.3)",
+			Kind:   harnessshell.StatusReady,
+		})
+		return nil
+	}
+	runID := args
+	if runID == "" {
+		runID = r.mode.ActiveRunID()
+	}
+	if runID == "" {
+		return r.statusError("run.details", errors.New("no active run"))
+	}
+	client := r.cm.Client()
+	if client == nil {
+		return r.statusError("run.details", errNoLiveClient)
+	}
+	var resp protocol.RunDetailsResponse
+	if err := client.CallInto(ctx, protocol.MethodRunDetails, &protocol.RunDetails{RunID: runID}, &resp); err != nil {
+		return r.statusError("run.details", err)
+	}
+	r.sender.Send(harnessshell.HostInfoEvent{
+		Text: formatRunDetails(resp.Run),
+	})
+	return nil
+}
+
+func (r *ProductionRuntime) handleRunsCommand(ctx context.Context) error {
+	client := r.cm.Client()
+	if client == nil {
+		return r.statusError("run.list", errNoLiveClient)
+	}
+	var resp protocol.RunListResponse
+	if err := client.CallInto(ctx, protocol.MethodRunList, &protocol.RunList{SessionID: r.mode.SessionID(), Limit: 20}, &resp); err != nil {
+		return r.statusError("run.list", err)
+	}
+	if len(resp.Runs) == 0 {
+		r.sender.Send(harnessshell.HostInfoEvent{Text: "No runs"})
+		return nil
+	}
+	var b strings.Builder
+	b.WriteString("Runs:")
+	for _, run := range resp.Runs {
+		b.WriteString("\n  ")
+		b.WriteString(run.RunID)
+		b.WriteString(" ")
+		b.WriteString(run.Status)
+		b.WriteString("/")
+		b.WriteString(run.Stage)
+		if run.InputRequired {
+			b.WriteString(" input-required")
+		}
+		if run.Stuck {
+			b.WriteString(" stuck")
+		}
+		if run.Title != "" {
+			b.WriteString(" — ")
+			b.WriteString(truncate(run.Title, 60))
+		}
+	}
+	r.sender.Send(harnessshell.HostInfoEvent{Text: b.String()})
+	return nil
+}
+
+func (r *ProductionRuntime) handleRunAttachCommand(ctx context.Context, args string) error {
+	runID := strings.TrimSpace(args)
+	if runID == "" {
+		return r.statusError("run.attach", errors.New("attach requires <run-id>"))
+	}
+	client := r.cm.Client()
+	if client == nil {
+		return r.statusError("run.attach", errNoLiveClient)
+	}
+	var resp protocol.RunAttachResponse
+	if err := client.CallInto(ctx, protocol.MethodRunAttach, &protocol.RunAttach{RunID: runID}, &resp); err != nil {
+		// PATCH-0033: the BFF rejects attaching to terminal runs by
+		// design. Surface a friendlier hint pointing at /run for
+		// read-only inspection instead of leaking the JSON-RPC error.
+		var rpcErr *harness.RPCError
+		if errors.As(err, &rpcErr) && strings.Contains(rpcErr.Message, "cannot attach terminal run") {
+			r.sender.Send(harnessshell.HostStatusEvent{
+				Status: "run.attach failed: run " + runID +
+					" is already complete — use /run " + runID + " to inspect it",
+				Kind: harnessshell.StatusError,
+			})
+			return nil
+		}
+		return r.statusError("run.attach", err)
+	}
+	r.mode.SetActiveRunID(resp.Run.RunID)
+	r.sender.Send(harnessshell.RunStartedEvent{RunID: resp.Run.RunID})
+	r.projectRunReplay(resp.Events)
+	r.sender.Send(harnessshell.HostStatusEvent{
+		Status: "Attached run: " + resp.Run.RunID + " (" + resp.Fidelity + " replay)",
+		Kind:   harnessshell.StatusReady,
+	})
+	return nil
+}
+
+func (r *ProductionRuntime) handleRunDetachCommand(ctx context.Context, args string) error {
+	runID := strings.TrimSpace(args)
+	if runID == "" {
+		runID = r.mode.ActiveRunID()
+	}
+	if runID == "" {
+		return r.statusError("run.detach", errors.New("no active run"))
+	}
+	client := r.cm.Client()
+	if client == nil {
+		return r.statusError("run.detach", errNoLiveClient)
+	}
+	var resp protocol.RunDetachResponse
+	if err := client.CallInto(ctx, protocol.MethodRunDetach, &protocol.RunDetach{RunID: runID}, &resp); err != nil {
+		return r.statusError("run.detach", err)
+	}
+	if r.mode.ActiveRunID() == runID {
+		r.mode.SetActiveRunID("")
+		r.sender.Send(harnessshell.RunStoppedEvent{
+			RunID:   runID,
+			Reason:  harnessshell.StopReasonHost,
+			Message: "Detached",
+		})
+	}
+	r.sender.Send(harnessshell.HostStatusEvent{
+		Status: "Detached run: " + resp.RunID,
+		Kind:   harnessshell.StatusReady,
+	})
+	return nil
+}
+
+func (r *ProductionRuntime) handleRunControlCommand(ctx context.Context, method, args string) error {
+	runID := strings.TrimSpace(args)
+	if runID == "" && method == protocol.MethodRunCancel {
+		runID = r.mode.ActiveRunID()
+	}
+	if runID == "" {
+		return r.statusError(method, errors.New("requires <run-id>"))
+	}
+	client := r.cm.Client()
+	if client == nil {
+		return r.statusError(method, errNoLiveClient)
+	}
+	var resp protocol.RunControlResponse
+	if err := client.CallInto(ctx, method, &protocol.RunControl{RunID: runID}, &resp); err != nil {
+		return r.statusError(method, err)
+	}
+	status := method + " "
+	if resp.Accepted {
+		status += "accepted"
+	} else {
+		status += "not accepted"
+	}
+	if resp.Message != "" {
+		status += ": " + resp.Message
+	}
+	r.sender.Send(harnessshell.HostStatusEvent{Status: status, Kind: harnessshell.StatusReady})
+	return nil
+}
+
 // handleMCPCommand is the MCP lazy-start integration point. v0.2.2
 // ships with MCP wiring deferred to a follow-up release; the command
 // returns a clear "not yet configured" status rather than crashing.
@@ -579,12 +903,47 @@ func (r *ProductionRuntime) handleMCPCommand(ctx context.Context, args string) e
 	return nil
 }
 
+func formatRunDetails(run protocol.RunSummary) string {
+	var b strings.Builder
+	b.WriteString("Run ")
+	b.WriteString(run.RunID)
+	b.WriteString(": ")
+	b.WriteString(run.Status)
+	b.WriteString("/")
+	b.WriteString(run.Stage)
+	if run.AttachmentState != "" {
+		b.WriteString(" ")
+		b.WriteString(run.AttachmentState)
+	}
+	if run.Model != "" {
+		b.WriteString(" ")
+		b.WriteString(run.Model)
+	}
+	if run.TotalCost > 0 {
+		fmt.Fprintf(&b, " $%.4f", run.TotalCost)
+	}
+	if run.Summary != "" {
+		b.WriteString("\n")
+		b.WriteString(run.Summary)
+	}
+	return b.String()
+}
+
 // statusError emits a HostStatusEvent{Kind: StatusError} with the
 // command + error message and returns nil so the adapter doesn't
 // double-emit a RunFailedEvent.
+//
+// PATCH-0033: unwraps *harness.RPCError so the JSON-RPC wire framing
+// (`rpc error -%d: %s`) doesn't leak into user-facing status text.
+// Surfaces just the inner message for transport errors.
 func (r *ProductionRuntime) statusError(op string, err error) error {
+	msg := err.Error()
+	var rpcErr *harness.RPCError
+	if errors.As(err, &rpcErr) {
+		msg = rpcErr.Message
+	}
 	r.sender.Send(harnessshell.HostStatusEvent{
-		Status: op + " failed: " + err.Error(),
+		Status: op + " failed: " + msg,
 		Kind:   harnessshell.StatusError,
 	})
 	return nil

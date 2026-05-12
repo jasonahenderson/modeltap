@@ -1,5 +1,11 @@
 package harnessshell
 
+import (
+	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
+)
+
 // Host-event intake for the reusable shell. Per WU-098 §"Shell receives",
 // the shell applies host-driven state changes through typed events; no
 // callback hooks, no untyped messages.
@@ -9,6 +15,21 @@ package harnessshell
 // RunFailed. Permission, preview, and host-status events land in
 // subsequent Stage C commits; any unhandled event is silently ignored at
 // this stage so partial-implementation does not panic the host loop.
+
+// streamTickMsg is the 1Hz tick that drives the elapsed-seconds
+// component of the streaming status line. The tick handler in
+// Model.Update reschedules itself via streamTickCmd while
+// state.streaming is true; once streaming ends, the in-flight tick
+// arrives, finds streaming==false, and stops rescheduling. PATCH-0035.
+type streamTickMsg time.Time
+
+// streamTickCmd returns a tea.Cmd that fires a streamTickMsg one
+// second from now.
+func streamTickCmd() tea.Cmd {
+	return tea.Tick(time.Second, func(t time.Time) tea.Msg {
+		return streamTickMsg(t)
+	})
+}
 
 // applyHostEvent dispatches a typed [HostEvent] into shell-owned state.
 // Per WU-098, the shell mutates only shell-owned state in response.
@@ -36,6 +57,8 @@ func (s *state) applyHostEvent(evt HostEvent) {
 		s.applyPreviewLoaded(e)
 	case HostStatusEvent:
 		s.applyHostStatus(e)
+	case HostInfoEvent:
+		s.applyHostInfo(e)
 	}
 }
 
@@ -61,6 +84,21 @@ func (s *state) applyHostStatus(e HostStatusEvent) {
 	if e.Kind != "" {
 		s.statusKind = e.Kind
 	}
+}
+
+// applyHostInfo appends a host-supplied informational row to the
+// transcript. Used for slash-command output that must persist in the
+// visible transcript rather than flash through the chrome status line.
+// Empty Text is a no-op so callers can guard at the emit site or here.
+func (s *state) applyHostInfo(e HostInfoEvent) {
+	if e.Text == "" {
+		return
+	}
+	s.transcriptItems = append(s.transcriptItems, TranscriptItem{
+		Kind: TranscriptItemKindHostInfo,
+		Role: RoleHostInfo,
+		Text: e.Text,
+	})
 }
 
 // applyPermissionRequested appends a transcript event row for the request
@@ -169,15 +207,37 @@ func (s *state) applySubmissionFailed(e SubmissionFailedEvent) {
 }
 
 // applyRunStarted ensures the streaming flag is set and the assistant
-// placeholder is correlated to the run. Per WU-098 the placeholder is
-// inserted optimistically, so RunStarted carries no UX requirement
-// beyond chrome state and label updates.
+// placeholder is correlated to the run. For an attached/replayed run with no
+// local submission placeholder, it creates a selected assistant replay row.
 func (s *state) applyRunStarted(e RunStartedEvent) {
+	// PATCH-0035: start the elapsed-seconds clock and schedule the
+	// 1Hz tick that refreshes the status line. The tick reschedules
+	// itself while streaming==true and naturally stops on terminal
+	// events when runStartedAt is cleared. The cmd factory is
+	// injectable so tests can replace tea.Tick with a no-op.
+	if s.runStartedAt.IsZero() {
+		s.runStartedAt = s.nowOrDefault()
+		if tickFn := s.streamTick; tickFn != nil {
+			if cmd := tickFn(); cmd != nil {
+				s.pendingCmds = append(s.pendingCmds, cmd)
+			}
+		}
+	}
 	s.streaming = true
 	s.statusKind = StatusStreaming
 	if e.RunID != "" {
 		s.activeRunID = e.RunID
-		s.assignRunIDToPlaceholder(e.SubmissionID, e.RunID)
+		if e.SubmissionID != "" {
+			s.assignRunIDToPlaceholder(e.SubmissionID, e.RunID)
+		} else if s.assistantRowIndexForRun(e.RunID) < 0 {
+			s.transcriptItems = append(s.transcriptItems, TranscriptItem{
+				ID:        "run-" + e.RunID,
+				Kind:      TranscriptItemKindMessage,
+				Role:      RoleAssistant,
+				RunID:     e.RunID,
+				Streaming: true,
+			})
+		}
 	}
 	if e.Label != "" {
 		s.label = e.Label
@@ -213,6 +273,7 @@ func (s *state) applyRunCompleted(e RunCompletedEvent) {
 	s.streamPulse = 0
 	s.interruptArmed = false
 	s.activeRunID = ""
+	s.runStartedAt = time.Time{} // PATCH-0035
 	s.statusKind = StatusReady
 	s.status = "Done"
 
@@ -232,6 +293,7 @@ func (s *state) applyRunStopped(e RunStoppedEvent) {
 	s.streamPulse = 0
 	s.interruptArmed = false
 	s.activeRunID = ""
+	s.runStartedAt = time.Time{} // PATCH-0035
 	s.statusKind = StatusReady
 	switch {
 	case e.Message != "":
@@ -253,6 +315,7 @@ func (s *state) applyRunFailed(e RunFailedEvent) {
 	s.streamPulse = 0
 	s.interruptArmed = false
 	s.activeRunID = ""
+	s.runStartedAt = time.Time{} // PATCH-0035
 	s.statusKind = StatusError
 	if e.Message != "" {
 		s.status = "Run failed: " + e.Message
@@ -305,10 +368,17 @@ func (s *state) assistantRowIndexForRun(runID string) int {
 	if runID != "" {
 		for i := range s.transcriptItems {
 			item := &s.transcriptItems[i]
-			if item.Role == RoleAssistant && item.RunID == runID {
+			if item.Role == RoleAssistant && item.RunID == runID && item.Streaming {
 				return i
 			}
 		}
+		for i := len(s.transcriptItems) - 1; i >= 0; i-- {
+			item := &s.transcriptItems[i]
+			if item.Role == RoleAssistant && item.Streaming && item.RunID == "" {
+				return i
+			}
+		}
+		return -1
 	}
 	for i := len(s.transcriptItems) - 1; i >= 0; i-- {
 		item := &s.transcriptItems[i]

@@ -1,7 +1,7 @@
 ---
 feature: FEAT-0015
 title: Professional Harness Runtime
-status: draft
+status: accepted
 date: 2026-04-29
 series: Professional Harness Runtime
 series-role: umbrella
@@ -619,6 +619,12 @@ runtime will likely need:
 
 ## Success Criteria
 
+Acceptance scope: this umbrella is accepted as the governing behavior contract
+for the Professional Harness Runtime series. v0.3.0 implements only the run
+runtime foundation; context planning, validation, artifacts, policy-grade tools,
+memory/routing, isolated writer workspaces, and workflow-extension commands
+remain assigned to their downstream features/releases.
+
 1. Foreground and background work share the same durable run lifecycle and run
    artifact model.
 2. A user can start a long-running implementation, docs, exploration, ADR, or
@@ -643,9 +649,11 @@ runtime will likely need:
 | ADR | Relationship |
 |---|---|
 | ADR-0014 | Requires modeltap to continue evolving its own BFF-first Go/Bubbletea harness as the universal orchestration client |
-| Future ADR | Should decide run ownership, attachment semantics, workspace policy, and prompt/policy precedence before implementation |
+| ADR-0015 | Decides run ownership, attachment semantics, executor availability, checkpoint semantics, liveness, and event ordering for the v0.3.0 foundation |
 
 ## Open Questions
+
+These remain downstream design questions after v0.3.0 foundation acceptance:
 
 1. Should run queue persistence live in the existing BFF session store or in a
    separate run/job table family?
