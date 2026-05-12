@@ -40,6 +40,7 @@ Implementation-scoped work authorization documents. Patches are the lightweight 
 | [PATCH-0034](0034-focus-agnostic-scroll.md) | Focus-agnostic transcript scroll hotkeys | proposed |
 | [PATCH-0035](0035-elapsed-seconds-placeholder.md) | v0.3.0 placeholder: append elapsed seconds to streaming status | proposed |
 | [PATCH-0036](0036-slash-commands-during-streaming.md) | Dispatch slash commands before queue check so /cancel works during streaming | proposed |
+| [PATCH-0037](0037-help-command.md) | Add /help command listing the host slash-command surface | proposed |
 
 ## When to Use a Patch
 

@@ -411,6 +411,8 @@ func (r *ProductionRuntime) DispatchCommand(ctx context.Context, cmd HostCommand
 		return r.handleRunControlCommand(ctx, protocol.MethodRunContinue, cmd.Args)
 	case "fork":
 		return r.handleRunControlCommand(ctx, protocol.MethodRunFork, cmd.Args)
+	case "help":
+		return r.handleHelpCommand()
 	default:
 		r.sender.Send(harnessshell.HostStatusEvent{
 			Status: "Unknown command: /" + cmd.Name,
@@ -891,6 +893,26 @@ func (r *ProductionRuntime) handleRunControlCommand(ctx context.Context, method,
 	r.sender.Send(harnessshell.HostStatusEvent{Status: status, Kind: harnessshell.StatusReady})
 	return nil
 }
+
+// handleHelpCommand prints the host slash-command surface to the
+// transcript. Per-command argument detail (`/help <name>`) is out of
+// scope for v0.3.0 and tracked under FEAT-0024. PATCH-0037.
+func (r *ProductionRuntime) handleHelpCommand() error {
+	r.sender.Send(harnessshell.HostInfoEvent{Text: helpText})
+	return nil
+}
+
+const helpText = `Available commands:
+
+  modes:     /plan  /build  /auto
+  model:     /model <name>  /models
+  session:   /sessions [list|resume <id>|clear|fork]
+  context:   /context  /compact
+  history:   /history
+  mcp:       /mcp
+  runs:      /run [<id>]  /runs  /jobs
+  lifecycle: /attach <id>  /detach  /cancel  /retry  /continue  /fork
+  shell:     /clear  /select  /help  /quit  /exit`
 
 // handleMCPCommand is the MCP lazy-start integration point. v0.2.2
 // ships with MCP wiring deferred to a follow-up release; the command

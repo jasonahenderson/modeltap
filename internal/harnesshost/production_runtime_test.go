@@ -347,6 +347,50 @@ func TestProductionRuntimeBootstrapSessionAdoptsWhenEmpty(t *testing.T) {
 	}
 }
 
+// PATCH-0037: /help emits a HostInfoEvent that names each top-level
+// host command. The text is rendered into the transcript via the
+// PATCH-0018 HostInfo path; users who type /help should see the full
+// surface without leaving the shell.
+func TestProductionRuntimeHelpCommandListsCommands(t *testing.T) {
+	r, err := NewProductionRuntime(ProductionRuntimeConfig{
+		ConnConfig: harness.ConnectionConfig{SocketPath: "/nonexistent.sock"},
+	})
+	if err != nil {
+		t.Fatalf("NewProductionRuntime: %v", err)
+	}
+	defer r.Close()
+
+	var msgs []any
+	r.sender.onSend = func(msg tea.Msg) { msgs = append(msgs, msg) }
+
+	if err := r.DispatchCommand(context.Background(), HostCommand{Name: "help"}); err != nil {
+		t.Fatalf("DispatchCommand(help): %v", err)
+	}
+	if len(msgs) != 1 {
+		t.Fatalf("expected 1 HostInfoEvent, got %d (%+v)", len(msgs), msgs)
+	}
+	info, ok := msgs[0].(harnessshell.HostInfoEvent)
+	if !ok {
+		t.Fatalf("msg[0] = %T, want HostInfoEvent", msgs[0])
+	}
+	wantNames := []string{
+		"/plan", "/build", "/auto",
+		"/model", "/models",
+		"/sessions",
+		"/context", "/compact",
+		"/history",
+		"/mcp",
+		"/run", "/runs", "/jobs",
+		"/attach", "/detach", "/cancel", "/retry", "/continue", "/fork",
+		"/clear", "/select", "/help", "/quit", "/exit",
+	}
+	for _, name := range wantNames {
+		if !strings.Contains(info.Text, name) {
+			t.Errorf("help text missing %q in:\n%s", name, info.Text)
+		}
+	}
+}
+
 // PATCH-0033: statusError must strip the JSON-RPC wire framing from
 // harness.RPCError so users see "model.list failed: <message>" rather
 // than "model.list failed: rpc error -32602: <message>". Plain
