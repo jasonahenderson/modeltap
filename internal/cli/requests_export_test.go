@@ -27,6 +27,8 @@ func seedTestStore(t *testing.T) storage.Store {
 		{
 			ID:               "req-1",
 			Timestamp:        now.Add(-1 * time.Hour),
+			RunID:            "run-a",
+			TraceID:          "trace-a",
 			Provider:         "openai",
 			Model:            "gpt-4",
 			Method:           "POST",
@@ -40,6 +42,8 @@ func seedTestStore(t *testing.T) storage.Store {
 		{
 			ID:               "req-2",
 			Timestamp:        now.Add(-24 * time.Hour),
+			RunID:            "run-a",
+			TraceID:          "trace-b",
 			Provider:         "anthropic",
 			Model:            "claude-3",
 			Method:           "POST",
@@ -53,6 +57,8 @@ func seedTestStore(t *testing.T) storage.Store {
 		{
 			ID:               "req-3",
 			Timestamp:        now.Add(-72 * time.Hour),
+			RunID:            "run-b",
+			TraceID:          "trace-a",
 			Provider:         "openai",
 			Model:            "gpt-3.5-turbo",
 			Method:           "POST",
@@ -108,7 +114,7 @@ func TestExportJSONLDefault(t *testing.T) {
 			t.Errorf("line %d is not valid JSON: %v", i+1, err)
 		}
 		// Verify expected fields exist.
-		for _, field := range []string{"id", "timestamp", "provider", "model", "status", "input_tokens", "output_tokens", "latency_ms", "cost"} {
+		for _, field := range []string{"id", "timestamp", "run_id", "trace_id", "provider", "model", "status", "input_tokens", "output_tokens", "latency_ms", "cost"} {
 			if _, ok := obj[field]; !ok {
 				t.Errorf("line %d missing field %q", i+1, field)
 			}
@@ -156,7 +162,7 @@ func TestExportCSV(t *testing.T) {
 	}
 
 	// Verify header row.
-	expectedHeader := []string{"id", "timestamp", "provider", "model", "status", "input_tokens", "output_tokens", "latency_ms", "cost"}
+	expectedHeader := []string{"id", "timestamp", "run_id", "trace_id", "provider", "model", "status", "input_tokens", "output_tokens", "latency_ms", "cost"}
 	for i, col := range expectedHeader {
 		if records[0][i] != col {
 			t.Errorf("header column %d: expected %q, got %q", i, col, records[0][i])
@@ -168,6 +174,41 @@ func TestExportCSV(t *testing.T) {
 		if len(row) != len(expectedHeader) {
 			t.Errorf("data row %d: expected %d columns, got %d", i+1, len(expectedHeader), len(row))
 		}
+	}
+}
+
+func TestExportRunFilter(t *testing.T) {
+	store := seedTestStore(t)
+	output, err := executeExport(t, store, "--run", "run-a")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("expected 2 results with --run run-a, got %d", len(lines))
+	}
+	for _, line := range lines {
+		var obj map[string]interface{}
+		if err := json.Unmarshal([]byte(line), &obj); err != nil {
+			t.Fatalf("invalid JSON: %v", err)
+		}
+		if obj["run_id"] != "run-a" {
+			t.Errorf("run_id = %v, want run-a", obj["run_id"])
+		}
+	}
+}
+
+func TestExportTraceFilter(t *testing.T) {
+	store := seedTestStore(t)
+	output, err := executeExport(t, store, "--trace", "trace-a")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("expected 2 results with --trace trace-a, got %d", len(lines))
 	}
 }
 

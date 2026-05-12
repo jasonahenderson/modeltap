@@ -24,6 +24,8 @@ func seedLogsTestStore(t *testing.T) storage.Store {
 		{
 			ID:               "abcdefgh1234",
 			Timestamp:        now.Add(-1 * time.Hour),
+			RunID:            "run-a",
+			TraceID:          "trace-a",
 			Provider:         "openai",
 			Model:            "gpt-4",
 			Method:           "POST",
@@ -37,6 +39,8 @@ func seedLogsTestStore(t *testing.T) storage.Store {
 		{
 			ID:               "bbcdefgh5678",
 			Timestamp:        now.Add(-24 * time.Hour),
+			RunID:            "run-a",
+			TraceID:          "trace-b",
 			Provider:         "anthropic",
 			Model:            "claude-3",
 			Method:           "POST",
@@ -50,6 +54,8 @@ func seedLogsTestStore(t *testing.T) storage.Store {
 		{
 			ID:               "ccdefghi9012",
 			Timestamp:        now.Add(-72 * time.Hour),
+			RunID:            "run-b",
+			TraceID:          "trace-a",
 			Provider:         "openai",
 			Model:            "gpt-3.5-turbo",
 			Method:           "POST",
@@ -178,6 +184,41 @@ func TestLogsStatusFilter(t *testing.T) {
 	}
 	if !strings.Contains(lines[1], "429") {
 		t.Errorf("expected 429 in output, got: %s", lines[1])
+	}
+}
+
+func TestLogsRunFilter(t *testing.T) {
+	store := seedLogsTestStore(t)
+	output, err := executeLogs(t, store, "--run", "run-a")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	if len(lines) != 3 {
+		t.Fatalf("expected 3 lines (1 header + 2 data), got %d: %s", len(lines), output)
+	}
+	if !strings.Contains(output, "abcdefgh") || !strings.Contains(output, "bbcdefgh") {
+		t.Errorf("expected run-a captures in output, got: %s", output)
+	}
+	if strings.Contains(output, "ccdefghi") {
+		t.Errorf("expected run-b capture to be filtered out, got: %s", output)
+	}
+}
+
+func TestLogsTraceFilter(t *testing.T) {
+	store := seedLogsTestStore(t)
+	output, err := executeLogs(t, store, "--trace", "trace-a")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	if len(lines) != 3 {
+		t.Fatalf("expected 3 lines (1 header + 2 data), got %d: %s", len(lines), output)
+	}
+	if !strings.Contains(output, "abcdefgh") || !strings.Contains(output, "ccdefghi") {
+		t.Errorf("expected trace-a captures in output, got: %s", output)
 	}
 }
 

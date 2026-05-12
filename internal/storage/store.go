@@ -11,7 +11,7 @@ import (
 
 // MaxKnownSchemaVersion is the highest schema version this binary supports.
 // NewSQLiteStore rejects databases with user_version above this value.
-const MaxKnownSchemaVersion = 3
+const MaxKnownSchemaVersion = 4
 
 // Sentinel errors.
 var (
@@ -301,6 +301,8 @@ type SessionSummary struct {
 type Request struct {
 	ID               string
 	Timestamp        time.Time
+	RunID            string
+	TraceID          string
 	Provider         string
 	Model            string
 	Method           string
@@ -320,6 +322,8 @@ type Request struct {
 type ListFilter struct {
 	Provider   string
 	Model      string
+	RunID      string
+	TraceID    string
 	Since      *time.Time
 	Until      *time.Time
 	StatusCode *int

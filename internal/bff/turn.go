@@ -240,6 +240,8 @@ func handleTurnSubmit(ctx context.Context, conn *Connection, params json.RawMess
 		SystemPrompt: prompt,
 		Model:        modelName,
 		EndpointName: entry.Provider,
+		RunID:        run.ID,
+		TraceID:      run.TraceID,
 		Tools:        conn.Capabilities().Tools(),
 		Stream:       true,
 		WindowSize:   entry.Info.ContextWindow,

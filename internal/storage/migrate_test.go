@@ -7,15 +7,15 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-func TestMigration_FreshDB_GetsV3(t *testing.T) {
+func TestMigration_FreshDB_GetsV4(t *testing.T) {
 	store := newTestStore(t)
 
 	version, err := store.currentSchemaVersion()
 	if err != nil {
 		t.Fatalf("currentSchemaVersion: %v", err)
 	}
-	if version != 3 {
-		t.Errorf("schema version = %d, want 3", version)
+	if version != 4 {
+		t.Errorf("schema version = %d, want 4", version)
 	}
 
 	// All v2 and v3 tables should exist.
@@ -28,7 +28,7 @@ func TestMigration_FreshDB_GetsV3(t *testing.T) {
 	}
 }
 
-func TestMigration_V1DB_MigratesToV3(t *testing.T) {
+func TestMigration_V1DB_MigratesToV4(t *testing.T) {
 	// Create a raw v1 DB (user_version=0, v1 tables only)
 	db, err := sql.Open("sqlite", ":memory:?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)")
 	if err != nil {
@@ -116,19 +116,26 @@ func TestMigration_V1DB_MigratesToV3(t *testing.T) {
 		t.Fatalf("migrate: %v", err)
 	}
 
-	// Verify version is now 3.
+	// Verify version is now 4.
 	version, err := store.currentSchemaVersion()
 	if err != nil {
 		t.Fatalf("currentSchemaVersion: %v", err)
 	}
-	if version != 3 {
-		t.Errorf("schema version = %d, want 3", version)
+	if version != 4 {
+		t.Errorf("schema version = %d, want 4", version)
 	}
 
 	// V1 data should be preserved
 	var id string
 	if err := db2.QueryRow("SELECT id FROM requests WHERE id = 'req-1'").Scan(&id); err != nil {
 		t.Errorf("v1 request should be preserved: %v", err)
+	}
+	var runID, traceID string
+	if err := db2.QueryRow("SELECT run_id, trace_id FROM requests WHERE id = 'req-1'").Scan(&runID, &traceID); err != nil {
+		t.Errorf("v1 request should have correlation columns: %v", err)
+	}
+	if runID != "" || traceID != "" {
+		t.Errorf("new correlation columns = (%q, %q), want empty strings", runID, traceID)
 	}
 
 	// V2 and v3 tables should exist.
@@ -141,7 +148,7 @@ func TestMigration_V1DB_MigratesToV3(t *testing.T) {
 	}
 }
 
-func TestMigration_V3DB_IsNoop(t *testing.T) {
+func TestMigration_V4DB_IsNoop(t *testing.T) {
 	store := newTestStore(t)
 
 	// Migrate is already run; run it again
@@ -153,8 +160,56 @@ func TestMigration_V3DB_IsNoop(t *testing.T) {
 	if err != nil {
 		t.Fatalf("currentSchemaVersion: %v", err)
 	}
-	if version != 3 {
-		t.Errorf("schema version = %d after double-migrate, want 3", version)
+	if version != 4 {
+		t.Errorf("schema version = %d after double-migrate, want 4", version)
+	}
+}
+
+func TestMigration_V3DB_AddsRequestCorrelationColumns(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)")
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+
+	store := &SQLiteStore{db: db}
+	t.Cleanup(func() { store.Close() })
+	if err := store.migrateToV1(); err != nil {
+		t.Fatalf("migrateToV1: %v", err)
+	}
+	if err := store.migrateToV2(); err != nil {
+		t.Fatalf("migrateToV2: %v", err)
+	}
+	if err := store.migrateToV3(); err != nil {
+		t.Fatalf("migrateToV3: %v", err)
+	}
+	if _, err := db.Exec(`INSERT INTO requests (id, timestamp, provider, model) VALUES ('req-v3', '2026-05-12T00:00:00Z', 'anthropic', 'claude-3')`); err != nil {
+		t.Fatalf("inserting v3 request: %v", err)
+	}
+
+	if err := store.migrate(); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	version, err := store.currentSchemaVersion()
+	if err != nil {
+		t.Fatalf("currentSchemaVersion: %v", err)
+	}
+	if version != 4 {
+		t.Errorf("schema version = %d, want 4", version)
+	}
+
+	var runID, traceID string
+	if err := db.QueryRow("SELECT run_id, trace_id FROM requests WHERE id = 'req-v3'").Scan(&runID, &traceID); err != nil {
+		t.Fatalf("querying migrated request correlation: %v", err)
+	}
+	if runID != "" || traceID != "" {
+		t.Errorf("migrated correlation = (%q, %q), want empty strings", runID, traceID)
+	}
+	for _, idx := range []string{"idx_requests_run_id", "idx_requests_trace_id"} {
+		var name string
+		if err := db.QueryRow("SELECT name FROM sqlite_master WHERE type='index' AND name=?", idx).Scan(&name); err != nil {
+			t.Errorf("index %q not found: %v", idx, err)
+		}
 	}
 }
 
@@ -184,8 +239,8 @@ func TestMigration_DowngradeGuard(t *testing.T) {
 }
 
 func TestMigration_SchemaVersionConst(t *testing.T) {
-	if MaxKnownSchemaVersion != 3 {
-		t.Errorf("MaxKnownSchemaVersion = %d, want 3", MaxKnownSchemaVersion)
+	if MaxKnownSchemaVersion != 4 {
+		t.Errorf("MaxKnownSchemaVersion = %d, want 4", MaxKnownSchemaVersion)
 	}
 }
 
