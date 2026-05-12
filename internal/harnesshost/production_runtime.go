@@ -413,6 +413,8 @@ func (r *ProductionRuntime) DispatchCommand(ctx context.Context, cmd HostCommand
 		return r.handleRunControlCommand(ctx, protocol.MethodRunFork, cmd.Args)
 	case "help":
 		return r.handleHelpCommand()
+	case "clear":
+		return r.handleClearCommand(ctx)
 	default:
 		r.sender.Send(harnessshell.HostStatusEvent{
 			Status: "Unknown command: /" + cmd.Name,
@@ -499,7 +501,11 @@ func (r *ProductionRuntime) handleModelsCommand(ctx context.Context) error {
 
 func (r *ProductionRuntime) handleSessionCommand(ctx context.Context, name, args string) error {
 	args = strings.TrimSpace(args)
-	if name == "sessions" || args == "list" || args == "" {
+	// `/sessions` (alias-form, no args) or `/sessions list` or
+	// `/session list` route to list. Sub-commands like `current` and
+	// `resume <id>` reach the switch below. PATCH-0038 added
+	// `current`; PATCH-0039 will add `delete <id>` / `prune`.
+	if args == "" || args == "list" {
 		return r.handleSessionList(ctx)
 	}
 	parts := strings.Fields(args)
@@ -513,8 +519,60 @@ func (r *ProductionRuntime) handleSessionCommand(ctx context.Context, name, args
 		return r.handleSessionMutation(ctx, protocol.MethodSessionClear)
 	case "fork":
 		return r.handleSessionMutation(ctx, protocol.MethodSessionFork)
+	case "current":
+		return r.handleSessionCurrent()
 	}
 	return r.statusError("session", errors.New("unknown session subcommand: "+parts[0]))
+}
+
+// handleSessionCurrent prints the active session id. PATCH-0038.
+// Helpful for cross-referencing with /run / /runs output when
+// multiple sessions exist for the project.
+func (r *ProductionRuntime) handleSessionCurrent() error {
+	id := r.mode.SessionID()
+	if id == "" {
+		r.sender.Send(harnessshell.HostStatusEvent{
+			Status: "No active session",
+			Kind:   harnessshell.StatusReady,
+		})
+		return nil
+	}
+	r.sender.Send(harnessshell.HostInfoEvent{
+		Text: "Current session: " + id,
+	})
+	return nil
+}
+
+// handleClearCommand implements /clear's PATCH-0038 redefinition:
+// /clear starts a fresh conversation. Calls session.create to mint a
+// new session id, switches the harness's active session to it, and
+// emits TranscriptClearEvent so the shell wipes its visible
+// transcript only on success.
+//
+// Refuses while a run is streaming — mid-stream clear would require
+// cancelling the active run first; surface a clear error instead.
+func (r *ProductionRuntime) handleClearCommand(ctx context.Context) error {
+	if r.mode.ActiveRunID() != "" {
+		return r.statusError("clear", errors.New("cannot start new conversation while a run is in flight; press Esc twice to cancel first"))
+	}
+	client := r.cm.Client()
+	if client == nil {
+		return r.statusError("clear", errNoLiveClient)
+	}
+	var resp protocol.SessionCreateResponse
+	if err := client.CallInto(ctx, protocol.MethodSessionCreate, &protocol.SessionCreate{
+		Project: protocol.ProjectContext{Root: r.cfg.ProjectRoot},
+	}, &resp); err != nil {
+		return r.statusError("clear", err)
+	}
+	r.mode.SetSessionID(resp.SessionID)
+	r.mode.SetActiveRunID("")
+	r.sender.Send(harnessshell.TranscriptClearEvent{})
+	r.sender.Send(harnessshell.HostStatusEvent{
+		Status: "Started new conversation: " + resp.SessionID,
+		Kind:   harnessshell.StatusReady,
+	})
+	return nil
 }
 
 func (r *ProductionRuntime) handleSessionList(ctx context.Context) error {
@@ -574,19 +632,24 @@ func (r *ProductionRuntime) observeRuntimeMessage(msg tea.Msg) {
 	go r.resumeKnownRuns(context.Background())
 }
 
-// bootstrapSession requests a fresh session from the BFF on
-// ConnStateReady so that session-scoped RPCs (model.switch,
-// context.list, session.clear, etc.) work before the user has
-// submitted any turn. Failures are best-effort: turn.submit will
-// still create a session implicitly if this call fails. PATCH-0028.
+// bootstrapSession ensures the harness has an active session id on
+// ConnStateReady so session-scoped RPCs (model.switch, context.list,
+// session.clear, etc.) work before the user has submitted any turn.
+// PATCH-0028 added the bootstrap; PATCH-0029 fixed a race against a
+// fast turn.submit; PATCH-0038 changes the policy from "always create
+// new" to "auto-resume the most-recent session, or create one only
+// when none exist for this user/project."
 //
-// PATCH-0029: re-check r.mode.SessionID() after the RPC returns. The
-// goroutine and a fast user turn race: if turn.submit auto-creates a
-// session (B) and stores its id while session.create is still in
-// flight, bootstrapSession's response (carrying session A) must not
-// overwrite B. Otherwise subsequent turns target A (conversation
-// sequence 0) while the harness's sequence counter advanced from B's
-// turn, producing "sequence X does not follow current 0".
+// Net effect for the user: shell launches pick up where the previous
+// launch left off (Claude Code-style); `/clear` is the way to start a
+// fresh conversation, not relaunching the shell. Cuts down on
+// orphan-session accumulation (Finding F23).
+//
+// Failures of session.list fall back to the original create path so
+// users on a broken list endpoint still get a usable shell.
+//
+// Emits a HostInfoEvent welcome message naming the active session id
+// and how to start fresh.
 func (r *ProductionRuntime) bootstrapSession(ctx context.Context) {
 	if r.mode.SessionID() != "" {
 		return
@@ -595,20 +658,47 @@ func (r *ProductionRuntime) bootstrapSession(ctx context.Context) {
 	if client == nil {
 		return
 	}
-	var resp protocol.SessionCreateResponse
+
+	// Try resume-most-recent first.
+	var list protocol.SessionListResponse
+	listErr := client.CallInto(ctx, protocol.MethodSessionList, &protocol.SessionList{}, &list)
+	if listErr == nil && len(list.Sessions) > 0 {
+		// Sessions are returned newest-first per storage's
+		// updated_at DESC ordering.
+		mostRecent := list.Sessions[0]
+		var resumeResp protocol.SessionResumeResponse
+		if err := client.CallInto(ctx, protocol.MethodSessionResume, &protocol.SessionResume{
+			SessionID: mostRecent.ID,
+			Project:   protocol.ProjectContext{Root: r.cfg.ProjectRoot},
+		}, &resumeResp); err == nil {
+			// PATCH-0029 race re-check.
+			if r.mode.SessionID() != "" {
+				return
+			}
+			r.mode.SetSessionID(resumeResp.SessionID)
+			r.sender.Send(harnessshell.HostInfoEvent{
+				Text: "Resumed session " + resumeResp.SessionID + ". Type /clear to start a new conversation, /sessions list to see all sessions.",
+			})
+			return
+		}
+		// Resume failed — fall through to create.
+	}
+
+	// No sessions to resume, or list/resume failed: create fresh.
+	var createResp protocol.SessionCreateResponse
 	if err := client.CallInto(ctx, protocol.MethodSessionCreate, &protocol.SessionCreate{
 		Project: protocol.ProjectContext{Root: r.cfg.ProjectRoot},
-	}, &resp); err != nil {
+	}, &createResp); err != nil {
 		return
 	}
-	// Re-check after the RPC: a turn.submit may have raced ahead of
-	// us and stored a session id from its auto-create response. If
-	// so, prefer that id — the conversation state lives there. The
-	// session we just created is orphaned but harmless.
+	// PATCH-0029 race re-check.
 	if r.mode.SessionID() != "" {
 		return
 	}
-	r.mode.SetSessionID(resp.SessionID)
+	r.mode.SetSessionID(createResp.SessionID)
+	r.sender.Send(harnessshell.HostInfoEvent{
+		Text: "New session " + createResp.SessionID + ". Type /help for commands.",
+	})
 }
 
 func (r *ProductionRuntime) resumeKnownRuns(ctx context.Context) {
@@ -906,13 +996,13 @@ const helpText = `Available commands:
 
   modes:     /plan  /build  /auto
   model:     /model <name>  /models
-  session:   /sessions [list|resume <id>|clear|fork]
+  session:   /sessions [list|resume <id>|clear|fork|current]
   context:   /context  /compact
   history:   /history
   mcp:       /mcp
   runs:      /run [<id>]  /runs  /jobs
   lifecycle: /attach <id>  /detach  /cancel  /retry  /continue  /fork
-  shell:     /clear  /select  /help  /quit  /exit`
+  shell:     /clear (new conversation)  /select  /help  /quit  /exit`
 
 // handleMCPCommand is the MCP lazy-start integration point. v0.2.2
 // ships with MCP wiring deferred to a follow-up release; the command

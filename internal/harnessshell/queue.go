@@ -12,11 +12,10 @@ import (
 	"time"
 )
 
-// shellNativeClearCommand is the buffer text the shell handles locally
-// without crossing the boundary as an action. Per WU-100 §"Definite scope
-// rule for the reusable package", /clear is shell-native; host-native
-// commands cross via [RunHostCommandAction] (added in a later commit).
-const shellNativeClearCommand = "/clear"
+// PATCH-0038: shellNativeClearCommand removed. /clear is now
+// host-routed because starting a fresh conversation requires a BFF
+// session.create RPC. The host's handleClearCommand owns the path;
+// the shell wipes its transcript on receipt of TranscriptClearEvent.
 
 func isShellNativeQuitCommand(content string) bool {
 	switch strings.TrimSpace(content) {
@@ -138,22 +137,16 @@ func (s *state) emitSubmitOnEnter() bool {
 
 	s.pushHistory(content)
 
-	// PATCH-0036: shell-native and host-native slash commands must
-	// dispatch immediately regardless of streaming state, so /cancel,
-	// /run, /detach, /sessions clear, etc. can take effect in-flight.
-	// Previously this check sat AFTER the streaming-queue branch
-	// below, so /cancel got enqueued as user content and the run
-	// continued to completion. F20.
-	if content == shellNativeClearCommand && len(s.inputTokens) == 0 {
-		s.transcriptItems = nil
-		s.transcriptRefs = nil
-		s.selectedTranscriptRef = -1
-		s.input.Reset()
-		s.syncInputHeight()
-		s.status = "Transcript cleared"
-		s.statusKind = StatusReady
-		return true
-	}
+	// PATCH-0036: slash commands dispatch immediately regardless of
+	// streaming state so /cancel, /run, /detach, etc. can take effect
+	// in-flight. Previously this check sat AFTER the streaming-queue
+	// branch, so /cancel got enqueued and the run continued.
+	//
+	// PATCH-0038: /clear is no longer shell-native. Starting a fresh
+	// conversation requires a BFF session.create RPC, so /clear
+	// dispatches through the host like any other slash command. The
+	// host's handleClearCommand emits a TranscriptClearEvent on
+	// success, which is what actually wipes the shell transcript.
 	if strings.HasPrefix(content, "/") && len(content) > 1 && len(s.inputTokens) == 0 {
 		s.dispatchHostCommand(content)
 		return true
