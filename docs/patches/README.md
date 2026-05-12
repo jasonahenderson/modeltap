@@ -20,7 +20,8 @@ Implementation-scoped work authorization documents. Patches are the lightweight 
 | [PATCH-0013](0013-sqlite-busy-timeout.md) | Set SQLite `busy_timeout` on every pool connection | proposed |
 | [PATCH-0014](0014-bff-shutdown-waitgroup-race.md) | Fix BFF Server `sync.WaitGroup` race between accept and Shutdown | approved |
 | [PATCH-0015](0015-harness-shell-component-api.md) | Harness Shell Component API | approved |
-| [PATCH-0016](0016-pr1-ci-test-failures-triage.md) | Fix v0.2.x test suite failures and lint regressions surfaced by PR #1 CI | done |
+| [PATCH-0016](0016-pr1-ci-test-failures-triage.md) | Fix v0.2.x test suite failures and lint regressions surfaced by PR #1 CI | approved |
+| [PATCH-0017](0017-session-scoped-project-context.md) | Session-scoped project context (BFF refactor, FEAT-0008 Amendment 001, target v0.3.5) | approved |
 
 ## When to Use a Patch
 
