@@ -5,6 +5,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 // FocusZone identifies which interactive surface currently has input focus.
@@ -229,9 +230,9 @@ type state struct {
 	sidebarOpen bool
 
 	// mouseCaptureDisabled tracks the /select toggle (PATCH-0030).
-	// When true, the host program has been instructed to relinquish
-	// mouse handling so the terminal's native click-drag selection
-	// works for copying transcript text.
+	// Selection mode is the default; when true, the host program has
+	// relinquished mouse handling so the terminal's native click-drag
+	// selection works for copying transcript text.
 	mouseCaptureDisabled bool
 
 	preview *PreviewDialog
@@ -239,6 +240,24 @@ type state struct {
 	// pendingActions is the outbound action queue drained by Update on each
 	// tick to forward typed actions to the host program.
 	pendingActions []Action
+
+	// pendingCmds carries tea.Cmds that shell-internal handlers want
+	// the host's Update loop to schedule (e.g., the 1Hz elapsed-time
+	// ticker started by RunStartedEvent). Drained by Update alongside
+	// pendingActions. PATCH-0035.
+	pendingCmds []tea.Cmd
+
+	// runStartedAt is the wall-clock at which the current streaming
+	// run started, used to compose elapsed-seconds into the streaming
+	// status line. Zero when not streaming. PATCH-0035.
+	runStartedAt time.Time
+
+	// streamTick returns the tea.Cmd that schedules the next 1Hz
+	// elapsed-seconds tick. Production code uses [streamTickCmd]
+	// (real tea.Tick); tests that drive Update synchronously via a
+	// pump loop can replace it with a no-op so the real Tick's 1s
+	// sleep does not blow up the test budget. PATCH-0035.
+	streamTick func() tea.Cmd
 
 	// now is the time source for stamping outbound Submission.RequestedAt.
 	// Tests can inject a deterministic clock; production code uses time.Now.

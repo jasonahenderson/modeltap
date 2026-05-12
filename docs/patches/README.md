@@ -38,6 +38,7 @@ Implementation-scoped work authorization documents. Patches are the lightweight 
 | [PATCH-0032](0032-sse-ndjson-dual-mode.md) | Make SSEParser pass NDJSON lines through for Ollama-style providers | proposed |
 | [PATCH-0033](0033-rpc-error-formatting.md) | Unwrap RPCError framing in shell statusError; friendlier terminal-run reject | proposed |
 | [PATCH-0034](0034-focus-agnostic-scroll.md) | Focus-agnostic transcript scroll hotkeys | proposed |
+| [PATCH-0035](0035-elapsed-seconds-placeholder.md) | v0.3.0 placeholder: append elapsed seconds to streaming status | proposed |
 
 ## When to Use a Patch
 

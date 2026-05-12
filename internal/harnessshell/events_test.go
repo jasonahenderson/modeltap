@@ -48,6 +48,65 @@ func newWithFixedClock() Model {
 	return m
 }
 
+// PATCH-0035: RunStartedEvent stamps runStartedAt and queues a
+// streamTickCmd; the rendered status appends "(Ns)" once the clock
+// advances; RunCompletedEvent clears the timestamp and the next tick
+// is a no-op so the loop ends.
+func TestStreamingStatusAppendsElapsedSeconds(t *testing.T) {
+	m := New()
+	nowAt := time.Date(2026, 5, 11, 12, 0, 0, 0, time.UTC)
+	m.state.now = func() time.Time { return nowAt }
+
+	// Drive a RunStartedEvent through Update so the same pendingCmds
+	// drain path the host hits is exercised.
+	updated, cmd := m.Update(RunStartedEvent{RunID: "run-1", Label: "qwen"})
+	m = updated.(Model)
+	if m.state.runStartedAt.IsZero() {
+		t.Fatalf("runStartedAt not set after RunStartedEvent")
+	}
+	if cmd == nil {
+		t.Fatalf("RunStartedEvent did not return a tick cmd")
+	}
+	// Status during streaming with elapsed=0s is just the base
+	// status (composeStatusWithElapsed gates on elapsed > 0).
+	if got := composeStatusWithElapsed(&m.state); !strings.Contains(got, "Streaming") {
+		t.Errorf("base status missing 'Streaming': %q", got)
+	}
+
+	// Advance the clock 4s and recheck — the rendered status should
+	// now carry "(4s)".
+	nowAt = nowAt.Add(4 * time.Second)
+	if got := composeStatusWithElapsed(&m.state); !strings.Contains(got, "(4s)") {
+		t.Errorf("status missing '(4s)' after 4s elapsed: %q", got)
+	}
+
+	// A streamTickMsg while streaming reschedules itself.
+	_, tickCmd := m.Update(streamTickMsg(nowAt))
+	if tickCmd == nil {
+		t.Errorf("streamTickMsg during streaming did not reschedule")
+	}
+
+	// RunCompletedEvent clears runStartedAt and streaming; the next
+	// tick is a no-op (no rescheduled cmd).
+	updated, _ = m.Update(RunCompletedEvent{RunID: "run-1"})
+	m = updated.(Model)
+	if !m.state.runStartedAt.IsZero() {
+		t.Errorf("runStartedAt not cleared on RunCompletedEvent: %v", m.state.runStartedAt)
+	}
+	if m.state.streaming {
+		t.Errorf("streaming still true after RunCompletedEvent")
+	}
+	_, tickCmd = m.Update(streamTickMsg(nowAt.Add(5 * time.Second)))
+	if tickCmd != nil {
+		// drainPendingActions and other paths can return nil cmds;
+		// the tick loop must not reschedule itself once streaming
+		// has stopped.
+		if got, ok := tickCmd().(streamTickMsg); ok {
+			t.Errorf("streamTickMsg after completion rescheduled itself: got %v", got)
+		}
+	}
+}
+
 func TestEnterSubmitDirectEmitsAction(t *testing.T) {
 	m := newWithFixedClock()
 	m.state.input.SetValue("hello world")
@@ -174,36 +233,39 @@ func TestEnterBareSlashIsNotHostCommand(t *testing.T) {
 
 func TestEnterShellNativeSelectTogglesMouseCapture(t *testing.T) {
 	m := newWithFixedClock()
+	if !m.state.mouseCaptureDisabled {
+		t.Fatalf("selection mode should be the default")
+	}
 
-	// First /select: enters selection mode.
+	// First /select: enters chat mouse-capture mode.
 	m.state.input.SetValue("/select")
 	updated, cmd := m.Update(enterKey())
 	mu := updated.(Model)
-	if !mu.state.mouseCaptureDisabled {
-		t.Fatalf("first /select should set mouseCaptureDisabled=true")
+	if mu.state.mouseCaptureDisabled {
+		t.Fatalf("first /select should set mouseCaptureDisabled=false")
 	}
 	if cmd == nil {
-		t.Fatalf("first /select should return a Cmd (tea.DisableMouse)")
+		t.Fatalf("first /select should return a Cmd (tea.EnableMouseAllMotion)")
 	}
 	if mu.state.input.Value() != "" {
 		t.Errorf("composer should be cleared after /select; got %q", mu.state.input.Value())
 	}
-	if !strings.Contains(mu.state.status, "Selection mode") {
-		t.Errorf("status should announce selection mode; got %q", mu.state.status)
+	if !strings.Contains(mu.state.status, "Chat mode") {
+		t.Errorf("status should announce chat mode; got %q", mu.state.status)
 	}
 
-	// Second /select: returns to chat mode.
+	// Second /select: returns to terminal-native selection mode.
 	mu.state.input.SetValue("/select")
 	updated, cmd = mu.Update(enterKey())
 	mu = updated.(Model)
-	if mu.state.mouseCaptureDisabled {
-		t.Fatalf("second /select should set mouseCaptureDisabled=false")
+	if !mu.state.mouseCaptureDisabled {
+		t.Fatalf("second /select should set mouseCaptureDisabled=true")
 	}
 	if cmd == nil {
-		t.Fatalf("second /select should return a Cmd (tea.EnableMouseAllMotion)")
+		t.Fatalf("second /select should return a Cmd (tea.DisableMouse)")
 	}
-	if !strings.Contains(mu.state.status, "Chat mode") {
-		t.Errorf("status should announce chat mode; got %q", mu.state.status)
+	if !strings.Contains(mu.state.status, "Selection mode") {
+		t.Errorf("status should announce selection mode; got %q", mu.state.status)
 	}
 }
 

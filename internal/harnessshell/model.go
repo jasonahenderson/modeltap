@@ -1,7 +1,9 @@
 package harnessshell
 
 import (
+	"fmt"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -42,6 +44,21 @@ func WithPlaceholder(placeholder string) Option {
 func WithSidebarOpen(open bool) Option {
 	return func(m *Model) {
 		m.state.sidebarOpen = open
+	}
+}
+
+// WithStreamTick overrides the factory used to schedule the 1Hz
+// elapsed-seconds tick (PATCH-0035). Production code uses the
+// internal default (tea.Tick(time.Second, ...)). Tests that drive
+// Update synchronously via a pump loop should pass a no-op factory
+// (e.g. `func() tea.Cmd { return nil }`) so the real Tick's 1-second
+// sleep does not multiply their step budget. Passing nil leaves the
+// default in place.
+func WithStreamTick(factory func() tea.Cmd) Option {
+	return func(m *Model) {
+		if factory != nil {
+			m.state.streamTick = factory
+		}
 	}
 }
 
@@ -92,8 +109,10 @@ func New(opts ...Option) Model {
 			selectedToken:         -1,
 			selectedTranscriptRef: -1,
 			statusKind:            StatusReady,
+			mouseCaptureDisabled:  true,
 			input:                 ta,
 			transcript:            vp,
+			streamTick:            streamTickCmd, // PATCH-0035; tests may override
 		},
 	}
 	for _, opt := range opts {
@@ -160,6 +179,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case HostEvent:
 		m.state.applyHostEvent(msg)
 
+	case streamTickMsg:
+		// PATCH-0035: 1Hz elapsed-seconds ticker. Reschedule while a
+		// run is still streaming; let the loop expire on terminal
+		// events (applyRunCompleted / Stopped / Failed clear
+		// runStartedAt and streaming, so the next tick is a no-op).
+		if m.state.streaming && !m.state.runStartedAt.IsZero() && m.state.streamTick != nil {
+			if cmd := m.state.streamTick(); cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+		}
+
 	default:
 		// Forward other messages to the focused widget so cursor blink
 		// timers, paste events, and similar bubble-internal traffic still
@@ -178,6 +208,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	if drainCmd := m.drainPendingActions(); drainCmd != nil {
 		cmds = append(cmds, drainCmd)
+	}
+
+	// PATCH-0035: drain shell-internal pending tea.Cmds (e.g., the
+	// streamTickCmd queued by applyRunStarted).
+	if len(m.state.pendingCmds) > 0 {
+		cmds = append(cmds, m.state.pendingCmds...)
+		m.state.pendingCmds = nil
 	}
 
 	// FEAT-0014 SC3: keep the persistent viewport's content in sync
@@ -392,31 +429,30 @@ func (m Model) handleKey(msg tea.KeyMsg) (bool, Model, tea.Cmd) {
 	return false, m, nil
 }
 
-// routeKeyToFocus forwards an unhandled [tea.KeyMsg] to the focused
-// widget. Composer mutations (paste capture, dropped-path detection,
-// dynamic textarea height) run through the shell helpers immediately
-// after the textarea consumes the key.
-// toggleSelectMode flips the /select toggle (PATCH-0030). When entering
-// selection mode it returns tea.DisableMouse so the host program tells
-// the terminal to handle mouse natively (enabling click-drag selection
-// for copy). When exiting it returns tea.EnableMouseAllMotion to
-// restore the chrome's mouse-wheel scroll behavior. The composer is
-// reset so /select itself doesn't echo back as user content on the
-// next submit.
+// toggleSelectMode flips the /select toggle (PATCH-0030). Selection mode is
+// the default: the terminal handles mouse natively so click-drag selection,
+// copy, and paste shortcuts keep working. Toggling into chat mode enables
+// Bubble Tea mouse capture for mouse-wheel viewport scrolling; toggling back
+// disables capture again. The composer is reset so /select itself doesn't echo
+// back as user content on the next submit.
 func (m Model) toggleSelectMode() (Model, tea.Cmd) {
 	m.state.input.Reset()
 	m.state.syncInputHeight()
 	m.state.mouseCaptureDisabled = !m.state.mouseCaptureDisabled
-	if m.state.mouseCaptureDisabled {
-		m.state.status = "Selection mode — terminal handles mouse; type /select to return"
+	if !m.state.mouseCaptureDisabled {
+		m.state.status = "Chat mode - mouse captured for scroll; type /select for terminal selection"
 		m.state.statusKind = StatusReady
-		return m, tea.DisableMouse
+		return m, tea.EnableMouseAllMotion
 	}
-	m.state.status = "Chat mode — mouse captured for scroll"
+	m.state.status = "Selection mode - terminal handles mouse; type /select for mouse scroll"
 	m.state.statusKind = StatusReady
-	return m, tea.EnableMouseAllMotion
+	return m, tea.DisableMouse
 }
 
+// routeKeyToFocus forwards an unhandled [tea.KeyMsg] to the focused
+// widget. Composer mutations (paste capture, dropped-path detection,
+// dynamic textarea height) run through the shell helpers immediately
+// after the textarea consumes the key.
 func (m Model) routeKeyToFocus(msg tea.KeyMsg) (Model, tea.Cmd) {
 	switch m.state.focus {
 	case FocusInput:
@@ -545,7 +581,7 @@ func (m Model) toRenderInput() RenderInput {
 		StreamPulse:           m.state.streamPulse,
 		InterruptArmed:        m.state.interruptArmed,
 		QueuedCount:           len(m.state.queuedSubmissions),
-		Status:                m.state.status,
+		Status:                composeStatusWithElapsed(&m.state),
 		StatusKind:            m.state.statusKind,
 	}
 	if len(m.state.transcriptItems) > 0 {
@@ -597,6 +633,26 @@ func pendingPermissionView(s *state) *PendingPermission {
 		idx = len(s.pendingPermissions) - 1
 	}
 	return &s.pendingPermissions[idx]
+}
+
+// composeStatusWithElapsed appends "(Ns)" to the status when a run is
+// streaming and runStartedAt is set, so the user sees live elapsed
+// time alongside the static "Streaming response" / "Working" text.
+// PATCH-0035 v0.3.0 placeholder; FEAT-0024 will replace this with a
+// proper structured streaming-status surface.
+func composeStatusWithElapsed(s *state) string {
+	if !s.streaming || s.runStartedAt.IsZero() {
+		return s.status
+	}
+	elapsed := s.nowOrDefault().Sub(s.runStartedAt).Round(time.Second)
+	if elapsed <= 0 {
+		return s.status
+	}
+	secs := int(elapsed.Seconds())
+	if s.status == "" {
+		return fmt.Sprintf("(%ds)", secs)
+	}
+	return fmt.Sprintf("%s (%ds)", s.status, secs)
 }
 
 // transcriptItemToRender translates a shell-owned [TranscriptItem] into the
