@@ -8,13 +8,16 @@ repo facts, user attachments, memory placeholders, style examples, and
 provenance.
 
 This release implements FEAT-0018 and the project-rule/prompt-layer ADR work
-called out during FEAT-0015 review processing.
+called out during FEAT-0015 review processing. It also includes PATCH-0017 as
+prerequisite runtime/project-context plumbing so context planning is built on
+session-scoped project state rather than connection-scoped project state.
 
 ## Scope
 
 This release covers:
 
 - project-rule and prompt-layer ADR
+- session-scoped project context (PATCH-0017)
 - project rule discovery for `MODELTAP.md`, `.modeltap/`, `AGENTS.md`,
   `CLAUDE.md`, `.modeltap.yaml`, user/global config, and server/team policy
   metadata
@@ -34,6 +37,7 @@ This release does not cover:
 ## Feature Scope
 
 - FEAT-0018: Context Planner and Project Rules
+- PATCH-0017: session-scoped project context prerequisite
 - FEAT-0016: run integration from v0.3.0
 - EXP-0012 as advisory input for future deeper AST work
 
@@ -46,11 +50,12 @@ Current phase: **Planning draft — Phase 1 not opened.**
 | WU | Title | Dependencies | Size | Feature |
 |---|---|---|---|---|
 | 118 | Project rules and prompt-layer ADR | v0.3.0 | M | FEAT-0018 |
-| 119 | Context plan schema and protocol surface | 118 | M | FEAT-0018 |
-| 120 | Harness project-rule discovery and precedence reporting | 118 | M | FEAT-0018 |
+| PATCH-0017 | Session-scoped project context | 118 | M | PATCH-0017/FEAT-0008 |
+| 119 | Context plan schema and protocol surface | 118, PATCH-0017 | M | FEAT-0018 |
+| 120 | Harness project-rule discovery and precedence reporting | 118, PATCH-0017 | M | FEAT-0018 |
 | 121 | Lightweight repo map and recent-change scanner | 119 | L | FEAT-0018 |
 | 122 | Test and style-context discovery | 121 | M | FEAT-0018 |
-| 123 | runtime server context planner and budget accounting | 119-122 | L | FEAT-0018 |
+| 123 | runtime server context planner and budget accounting | PATCH-0017, 119-122 | L | FEAT-0018 |
 | 124 | Prompt-plan metadata and context provenance capture | 123 | M | FEAT-0018 |
 | 125 | Harness `/context` inspection surfaces | 123, 124 | M | FEAT-0018 |
 | 126 | Context planner verification and docs | 120-125 | M | FEAT-0018 |
@@ -66,11 +71,20 @@ Decide rule precedence, how `MODELTAP.md` coexists with `AGENTS.md` and
 shown safely. Align the prompt metadata taxonomy with the v0.3.0 run prompt
 and `turn.submit` compatibility decisions.
 
+**PATCH-0017: Session-scoped project context**
+
+Move project context from connection scope to session scope per PATCH-0017.
+Treat `capabilities.register.project` as a compatibility default, bind project
+context on `session.create` and `session.resume`, and migrate prompt assembly,
+history filtering, run controls, and turn submission to read the active
+session's project context.
+
 **WU-119: Context plan schema and protocol surface**
 
 Define run-correlated context plan payloads, provenance records, budget
 categories, and inspection methods. This WU activates the `context_plan`
-pipeline stage first defined by v0.3.0.
+pipeline stage first defined by v0.3.0. It depends on PATCH-0017 so
+context-plan schemas do not encode connection-scoped project state.
 
 ### Track B — Harness Context Discovery
 
@@ -119,6 +133,7 @@ path ignores, and `/context` rendering.
 ## Phase 1 Design Checklist
 
 - [ ] WU-118 ADR draft/design
+- [ ] PATCH-0017 session-scoped project context design
 - [ ] WU-119 protocol/schema design
 - [ ] WU-120 to WU-122 harness discovery design bundle
 - [ ] WU-123 to WU-125 planner/UI design bundle
@@ -132,11 +147,15 @@ path ignores, and `/context` rendering.
   downstream.
 - **R3 — prompt leakage.** Metadata inspection must not expose protected or
   secret-bearing prompt content by default.
+- **R4 — project-context collision.** Connection-scoped project context would
+  make context planning wrong for multi-session clients. PATCH-0017 must land
+  before the context-plan protocol/schema and planner WUs.
 
 ## Definition of Done
 
 1. Project-rule/prompt-layer ADR is accepted.
-2. Implementation runs produce context plans with provenance.
-3. The runtime server budgets context categories before model dispatch.
-4. The harness shows active context and why-selected details.
-5. Tests cover rule discovery, provenance, budget behavior, and UI inspection.
+2. Project context is session-scoped per PATCH-0017.
+3. Implementation runs produce context plans with provenance.
+4. The runtime server budgets context categories before model dispatch.
+5. The harness shows active context and why-selected details.
+6. Tests cover rule discovery, provenance, budget behavior, and UI inspection.

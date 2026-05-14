@@ -173,12 +173,12 @@ avoid cross-tab project-context collisions.
    surface. Its relationship to `~/.modeltap/config.yaml` needs design.
 5. **Simple mode boundaries.** The default hidden/exposed tool set needs
    product design before acceptance.
-6. **Release sequencing.** No committed target. PATCH-0017 is an enabling
-   prerequisite, but the GUI itself is release TBD.
+6. **Release sequencing.** PATCH-0017 is planned for v0.3.1 as enabling
+   runtime/project-context work, but the GUI itself is release TBD.
 
 ## Implementation Sequencing
 
-1. **PATCH-0017 (release TBD):** move project context to session scope so
+1. **PATCH-0017 (v0.3.1):** move project context to session scope so
    multiple tabs can safely share one runtime-server connection.
 2. **ADR-NNNN (release TBD):** decide desktop harness-role embodiment.
 3. **FEAT-0023 v1 (release TBD):** desktop shell, multi-tab workspace, tool
