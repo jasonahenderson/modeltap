@@ -7,7 +7,7 @@ related:
   - FEAT-0008: Runtime Server
   - FEAT-0023: Desktop GUI Client
 branch: patch/0017-session-scoped-project-context
-release: TBD
+release: v0.3.1
 ---
 
 # PATCH-0017: Session-scoped project context

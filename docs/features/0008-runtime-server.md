@@ -156,7 +156,7 @@ Or error:
 
 The server uses the project root for: session scoping (sessions are per-project), project instruction loading (Layer 4 system prompt — the server receives the config content from the harness rather than reading the filesystem directly, since the server may be remote), path normalization in session details, and knowledge layer project scoping. File paths in tool calls and results are relative to the project root.
 
-> **Planned amendment (Amendment 001, release TBD):** project context is logically a session attribute, not a connection attribute. A multi-chat client such as FEAT-0023 needs concurrent sessions on one connection, each scoped to a different project root. Today's implementation keeps project context on connection capabilities because the terminal harness is single-active-session. Amendment 001 moves project context into session create/resume payloads as canonical session state and treats any `capabilities.register.project` value as a legacy default for compatibility. Implementation is tracked by PATCH-0017.
+> **Planned amendment (Amendment 001, v0.3.1):** project context is logically a session attribute, not a connection attribute. A multi-chat client such as FEAT-0023 needs concurrent sessions on one connection, each scoped to a different project root. Today's implementation keeps project context on connection capabilities because the terminal harness is single-active-session. Amendment 001 moves project context into session create/resume payloads as canonical session state and treats any `capabilities.register.project` value as a legacy default for compatibility. Implementation is tracked by PATCH-0017.
 
 **Protocol versioning**: the harness and server exchange protocol versions during `capabilities.register`. The server declares its supported version range. If the harness's version is outside the range, the connection is rejected with a version-mismatch error. Within a compatible range, the server uses the highest mutually supported version.
 
@@ -1366,7 +1366,7 @@ type Diagnostic struct {
 
 ### Amendment 001: Session-scoped project context
 
-**Status:** planned. Implementation is tracked under PATCH-0017
+**Status:** planned for v0.3.1. Implementation is tracked under PATCH-0017
 (`docs/patches/0017-session-scoped-project-context.md`) and is an enabling
 prerequisite for FEAT-0023 (Desktop GUI Client).
 

@@ -8,6 +8,7 @@ professional harness runs.
 Anticipated scope:
 
 - project rules and prompt-layer ADR
+- session-scoped project context (PATCH-0017)
 - rule-file discovery and precedence reporting
 - lightweight repo map and style/test discovery
 - context plan records with provenance and budget accounting
