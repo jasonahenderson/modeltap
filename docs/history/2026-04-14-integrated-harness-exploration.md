@@ -1,5 +1,8 @@
 # 2026-04-14: Integrated Harness Exploration and Feature Specs
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Session Summary
 
 Deep product-architecture exploration session that reframed modeltap from a passive reverse proxy into an integrated professional AI environment. Started with a conversation about pairing a terminal harness with the proxy (BFF pattern), evolved through enterprise auth, deployment profiles, terminal UI framework evaluation, harness capabilities, session quality analysis, domain extensibility, and agent teams — then produced six feature specs with peer review processing.

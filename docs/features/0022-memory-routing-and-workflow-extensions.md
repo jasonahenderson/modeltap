@@ -53,7 +53,7 @@ Runs may produce memory candidates from:
 - release/process constraints
 - user-approved summaries
 
-The BFF separates durable knowledge from ephemeral traces by rule. Candidate
+The runtime server separates durable knowledge from ephemeral traces by rule. Candidate
 generation is triggered by accepted ADR/feature/release artifacts, validation
 commands the user explicitly approved, and user-marked moments such as
 `/remember`. Heuristic candidate generation is a future opt-in capability.
@@ -177,7 +177,7 @@ Expected commands:
 
 `<id>` refers to a memory candidate ID listed by `/memory`.
 
-The BFF protocol should expose memory candidates, active memory provenance, and
+The runtime server protocol should expose memory candidates, active memory provenance, and
 routing explanations through run details.
 
 ## Configuration
@@ -225,7 +225,7 @@ the feature is split or explicitly phased.
 | ADR | Relationship |
 |---|---|
 | ADR-0008 | Memory candidates and retrieval build on the knowledge layer |
-| ADR-0014 | Keeps routing and orchestration BFF-owned while the harness remains the terminal client |
+| ADR-0014 | Keeps routing and orchestration runtime-owned while the harness remains the terminal client |
 | Future ADR | Should decide memory promotion defaults, routing role taxonomy, and extension trust boundaries |
 
 ## Open Questions

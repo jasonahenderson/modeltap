@@ -1,5 +1,8 @@
 # v0.2.2 — Status
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 **Current phase:** Released (annotated tag `v0.2.2` at the close commit)
 **Branch:** `spike/scrolling-surface-eval` (TPM-decision-pending retarget
 to a release branch is acceptable post-tag for an unpublished release)

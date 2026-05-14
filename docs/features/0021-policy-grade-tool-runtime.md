@@ -30,7 +30,7 @@ manual, and enterprise/team usage cannot set reliable guardrails.
 
 ## Solution
 
-Extend the harness tool runtime with structured policy. The BFF supplies
+Extend the harness tool runtime with structured policy. The runtime server supplies
 applicable server/team/project constraints in run metadata and prompt planning.
 The local harness/executor enforces local side-effect policy for filesystem,
 shell, Git, network, and MCP tools. Every tool decision is recorded as run
@@ -129,21 +129,22 @@ until the harness re-acknowledges the effective version. Every decision artifact
 records the policy version.
 
 Permission decisions are made by the harness/local executor because it is the
-sole authority for local side effects. The BFF supplies the policy context used
-for the decision. After each decision, the harness reports the decision to the
-BFF, including `tool_call_id`, `decision_id`, outcome, policy source, and reason;
-the BFF records that report as durable run evidence. The BFF may reject a report
-when it detects a policy mismatch, such as a stale local policy version or
-server-policy override. On rejection, the BFF revokes the decision and the
-harness must not deliver the tool result to the model. The harness must
-acknowledge the BFF policy version before running tool calls in a run.
+sole authority for local side effects. The runtime server supplies the policy
+context used for the decision. After each decision, the harness reports the
+decision to the runtime server, including `tool_call_id`, `decision_id`,
+outcome, policy source, and reason; the runtime server records that report as
+durable run evidence. The runtime server may reject a report when it detects a
+policy mismatch, such as a stale local policy version or server-policy override.
+On rejection, the runtime server revokes the decision and the harness must not
+deliver the tool result to the model. The harness must acknowledge the runtime
+server policy version before running tool calls in a run.
 
 Mutating tools use a two-phase flow. Before execution, the harness requests a
-BFF commitment for the current policy version and tool intent. The harness runs
-the tool only if the commitment is fresh. Revocation applies only to uncommitted
-tools or stale decisions; already-executed side effects are retained as audit
-facts and may not be assumed reversible. Read-only tools may use a single-phase
-decision flow.
+runtime server commitment for the current policy version and tool intent. The
+harness runs the tool only if the commitment is fresh. Revocation applies only
+to uncommitted tools or stale decisions; already-executed side effects are
+retained as audit facts and may not be assumed reversible. Read-only tools may
+use a single-phase decision flow.
 
 Decision records are written to an append-only audit log indexed by
 `decision_id`. Run artifacts reference those records, but the audit log is the
@@ -152,14 +153,14 @@ requires.
 
 ### Server-Safe Tools
 
-The BFF may host a small set of server-safe tools that produce no local side
-effects, such as BFF-side retrieval, citation or quote extraction over already
-captured artifacts, and summarization. Server-safe tools follow the same audit
-record discipline with `tool_call_id`, `decision_id`, and `result_id`, but do
-not require a connected harness. The run-runtime ADR enumerates this tool
-surface. Tools not on that authoritative list are harness-owned regardless of
-BFF classification, and the harness rejects BFF-side execution for non-listed
-tools.
+The runtime server may host a small set of server-safe tools that produce no
+local side effects, such as runtime-side retrieval, citation or quote extraction
+over already captured artifacts, and summarization. Server-safe tools follow
+the same audit record discipline with `tool_call_id`, `decision_id`, and
+`result_id`, but do not require a connected harness. The run-runtime ADR
+enumerates this tool surface. Tools not on that authoritative list are
+harness-owned regardless of runtime server classification, and the harness
+rejects runtime-side execution for non-listed tools.
 
 ### Hooks and Extensions
 
@@ -184,7 +185,7 @@ Expected harness surfaces:
 - `/policy` to inspect active policy
 - run artifact view for approval history
 
-The BFF/run protocol should include policy metadata for prompt planning and
+The runtime server/run protocol should include policy metadata for prompt planning and
 artifact capture, but local execution authority remains harness-owned.
 
 ## Configuration
@@ -203,7 +204,7 @@ Configuration should support:
 
 ## Non-Goals
 
-- Do not move local side-effect enforcement fully into the BFF.
+- Do not move local side-effect enforcement fully into the runtime server.
 - Do not silently approve background writes by default.
 - Do not implement full enterprise RBAC here; this feature should integrate
   with FEAT-0010 when needed.
@@ -226,7 +227,7 @@ Configuration should support:
 
 | ADR | Relationship |
 |---|---|
-| ADR-0014 | Preserves harness-side local enforcement with BFF orchestration |
+| ADR-0014 | Preserves harness-side local enforcement with runtime server orchestration |
 | Future ADR | Should decide policy inheritance, sandbox/workspace boundaries, and non-overridable policy sources |
 
 ## Open Questions

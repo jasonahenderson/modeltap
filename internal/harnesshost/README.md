@@ -157,7 +157,7 @@ receive deltas during the pause window.
 
 Fake / demo runtime behavior — synthetic stream lifecycle events,
 example permission requests, queue/preview exercise without a real
-BFF — lives in [`internal/harnessdemo`](../harnessdemo), **not** in this
+runtime server — lives in [`internal/harnessdemo`](../harnessdemo), **not** in this
 package.
 
 The reusable shell has two valid host packages plus inline test fakes:

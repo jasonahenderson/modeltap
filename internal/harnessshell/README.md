@@ -37,7 +37,7 @@ the shell.
 | Token display and inline paste expansion | shell |
 | Shell-local key handling | shell |
 | Shell-native commands (`/clear`, transcript-local view actions) | shell |
-| Turn submission to runtime / BFF | host |
+| Turn submission to runtime server | host |
 | Stream lifecycle and result delivery | host |
 | Host-native command execution | host |
 | Preview / file inspection loading | host |

@@ -59,7 +59,7 @@ This feature re-homes the spike chrome in the host (`internal/harnesshost`) wher
 ### B. How does the palette discover host commands?
 
 - Hardcode the catalog in `internal/harnesshost/palette_commands.go` to start. Each entry has `name`, `args-template`, `kind` (host-command / shell-action / view-toggle), `description`.
-- Future: BFF could expose a `commands.list` RPC that returns server-defined commands.
+- Future: runtime server could expose a `commands.list` RPC that returns server-defined commands.
 
 ### C. How do new chrome surfaces compose with the existing transcript renderer?
 

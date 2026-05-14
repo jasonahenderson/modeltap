@@ -1,5 +1,8 @@
 # Implementation Plan: v0.3.0 — Run Runtime Foundation
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Context
 
 `v0.2.x` established the production conversation shell and BFF-backed harness

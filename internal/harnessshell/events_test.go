@@ -180,7 +180,7 @@ func TestEnterSlashClearDispatchesHostCommand(t *testing.T) {
 }
 
 // PATCH-0038: TranscriptClearEvent is what actually wipes the visible
-// transcript. The host emits it after a successful BFF session.create
+// transcript. The host emits it after a successful Runtime session.create
 // triggered by /clear.
 func TestTranscriptClearEventWipesTranscript(t *testing.T) {
 	m := newWithFixedClock()

@@ -138,16 +138,16 @@ browser-based view of captured traffic while the proxy is running.`,
 
 			fmt.Fprintf(cmd.OutOrStdout(), "modeltap proxy listening on :%d -> %s\n", srv.Port(), srv.UpstreamURL())
 
-			// Start the BFF server alongside the proxy. They share the
-			// same storage.Store. The BFF owns its own listeners
+			// Start the runtime server alongside the proxy. They share the
+			// same storage.Store. The runtime owns its own listeners
 			// (Unix socket + optional TLS).
-			bffSrv, err := startBFFServer(cfg, store, cmd.ErrOrStderr())
+			runtimeSrv, err := startRuntimeServer(cfg, store, cmd.ErrOrStderr())
 			if err != nil {
-				return fmt.Errorf("starting BFF: %w", err)
+				return fmt.Errorf("starting runtime server: %w", err)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "modeltap BFF listening on %s\n", cfg.BFF.SocketPath)
-			if cfg.BFF.TLSAddress != "" {
-				fmt.Fprintf(cmd.OutOrStdout(), "modeltap BFF TLS listening on %s\n", cfg.BFF.TLSAddress)
+			fmt.Fprintf(cmd.OutOrStdout(), "modeltap runtime server listening on %s\n", cfg.Runtime.SocketPath)
+			if cfg.Runtime.TLSAddress != "" {
+				fmt.Fprintf(cmd.OutOrStdout(), "modeltap runtime server TLS listening on %s\n", cfg.Runtime.TLSAddress)
 			}
 
 			// Start server in a goroutine.
@@ -166,8 +166,8 @@ browser-based view of captured traffic while the proxy is running.`,
 				fmt.Fprintf(cmd.OutOrStdout(), "\nshutting down gracefully...\n")
 				shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 				defer cancel()
-				if err := bffSrv.Shutdown(shutdownCtx); err != nil {
-					fmt.Fprintf(cmd.ErrOrStderr(), "BFF shutdown: %v\n", err)
+				if err := runtimeSrv.Shutdown(shutdownCtx); err != nil {
+					fmt.Fprintf(cmd.ErrOrStderr(), "runtime server shutdown: %v\n", err)
 				}
 				if err := srv.Shutdown(shutdownCtx); err != nil {
 					return fmt.Errorf("shutdown: %w", err)
@@ -175,7 +175,7 @@ browser-based view of captured traffic while the proxy is running.`,
 				return nil
 			case err := <-errCh:
 				if err != nil {
-					_ = bffSrv.Shutdown(context.Background())
+					_ = runtimeSrv.Shutdown(context.Background())
 					return fmt.Errorf("server error: %w", err)
 				}
 				return nil

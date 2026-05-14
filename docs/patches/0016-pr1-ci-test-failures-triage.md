@@ -11,6 +11,9 @@ branch: "patch/0016-pr1-ci-test-failures"
 
 # PATCH-0016: Fix v0.2.x test suite failures and lint regressions surfaced by PR #1 CI
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Problem
 
 PR #1 (`spike/scrolling-surface-eval` → `main`, integrating v0.2.0 + v0.2.1 + v0.2.2 + v0.3.x design lockdown) was the first push of the spike branch. CI ran for the first time on Linux ubuntu-latest with `go test -race ./...` and `golangci-lint v2.12.1`, surfacing four test failures and two lint findings. None are caused by the lockdown commits (which only touch `docs/` and `.github/workflows/ci.yml`); they are pre-existing platform/toolchain-sensitive bugs that never had a chance to surface because:

@@ -8,18 +8,18 @@ decision-makers: Jason Henderson
 
 ## Context and Problem Statement
 
-The integrated harness (EXP-0008) is the user-facing terminal interface for modeltap. It sends conversation turns to the server (BFF), streams model responses to the terminal, executes tools locally, enforces permissions, and displays session metadata (model, cost, context usage). The harness must render a conversational UI — not a dashboard, not a multi-pane IDE — with streaming markdown output, multi-line input, tool execution blocks, permission prompts, and a status bar.
+The integrated harness (EXP-0008) is the user-facing terminal interface for modeltap. It sends conversation turns to the server (runtime server), streams model responses to the terminal, executes tools locally, enforces permissions, and displays session metadata (model, cost, context usage). The harness must render a conversational UI — not a dashboard, not a multi-pane IDE — with streaming markdown output, multi-line input, tool execution blocks, permission prompts, and a status bar.
 
 This decision constrains the harness's rendering approach, language alignment with the Go server, distribution model (single binary vs. multi-runtime), and the complexity ceiling for future UI work. It also has second-order effects on contributor experience, build system, and test infrastructure.
 
-The harness is intentionally the thin half of the product — the intelligence lives in the server/BFF. The UI framework should match that philosophy: capable enough for the conversational interface, without pulling the harness toward IDE-level complexity.
+The harness is intentionally the thin half of the product — the intelligence lives in the server/runtime server. The UI framework should match that philosophy: capable enough for the conversational interface, without pulling the harness toward IDE-level complexity.
 
 ## Decision Drivers
 
 Drivers are weighted 1-5, where 5 = critical.
 
 * **D1 - Single binary distribution (5):** Modeltap ships as one compiled artifact containing both harness and server (EXP-0008). The UI framework must not introduce a second runtime dependency (Node.js, Python, Bun) that complicates installation, cross-compilation, or distribution via goreleaser.
-* **D2 - Streaming token display (5):** Model responses arrive token by token via the BFF. The framework must render incremental text updates at low latency without visual artifacts (flicker, layout jumps, orphaned escape codes). This is the core UX moment — any framework that cannot do this well is disqualifying.
+* **D2 - Streaming token display (5):** Model responses arrive token by token via the runtime server. The framework must render incremental text updates at low latency without visual artifacts (flicker, layout jumps, orphaned escape codes). This is the core UX moment — any framework that cannot do this well is disqualifying.
 * **D3 - Language alignment with server (4):** The harness and server share types (protocol messages, session state, tool definitions). A framework in the same language as the server (Go) eliminates a serialization boundary and simplifies the build, test, and contribution story. A different language creates a two-team problem.
 * **D4 - Markdown rendering quality (4):** Model responses are markdown. The framework (or its ecosystem) must render headings, code blocks, lists, bold/italic, and inline code in the terminal with reasonable fidelity. Streaming complicates this — partial markdown must render incrementally without waiting for the full response.
 * **D5 - Input editing capability (4):** Users compose multi-line messages with cursor movement, backspace, paste, and history recall. The framework must provide or support a text input component beyond basic readline.
@@ -27,7 +27,7 @@ Drivers are weighted 1-5, where 5 = critical.
 * **D7 - Permission prompt UX (3):** Tool calls require user approval. The framework must support modal-style prompts that interrupt the conversation flow, accept y/n input, and resume streaming. This is a common interaction — it must feel responsive, not hacky.
 * **D8 - Ecosystem and community (3):** A larger ecosystem means more reusable components, more Stack Overflow answers, more contributors who already know the framework. Matters for long-term maintenance and contributor onboarding.
 * **D9 - Minimal framework complexity (3):** The harness is the thin part of the product. The framework should not impose architectural overhead (large abstractions, complex state management, steep learning curves) disproportionate to the UI's actual complexity.
-* **D10 - Async event handling (2):** The harness handles concurrent events: streaming tokens, tool execution results, permission responses, status updates from the BFF. The framework must support async event delivery without blocking the render loop.
+* **D10 - Async event handling (2):** The harness handles concurrent events: streaming tokens, tool execution results, permission responses, status updates from the runtime server. The framework must support async event delivery without blocking the render loop.
 
 ## Considered Options
 
@@ -87,7 +87,7 @@ Scale: 1 (poor) - 5 (excellent). Weighted total = sum of (weight x score).
 * **D7 (4):** Permission prompts can be implemented as a state change in the Model — swap the active view component from the conversation to a prompt, capture the response, swap back. Not a built-in modal widget, but the pattern is straightforward in Elm architecture. Scored 4 because it works cleanly but requires manual implementation.
 * **D8 (5):** Largest ecosystem in the Go TUI space. ~18,000 dependent repositories. Charm actively maintains Bubbletea, Bubbles (components), Lipgloss (styling), and Glamour (markdown). Community contributions add components regularly. Contributors are likely to have encountered Bubbletea before.
 * **D9 (3):** Elm architecture (Model-Update-View) is clean but adds structural overhead. Every interaction requires defining a message type, handling it in Update, and reflecting it in View. For a simple conversation UI this is manageable; the architecture earns its weight if the UI grows more complex. Scored 3 — appropriate complexity for a production harness, slightly heavy for a prototype.
-* **D10 (5):** Bubbletea's Cmd system maps naturally to Go concurrency. Long-running operations (BFF communication, tool execution) run in goroutines and deliver results as messages. The Update loop is single-threaded — no race conditions in state management. Excellent fit for the harness's concurrent event streams.
+* **D10 (5):** Bubbletea's Cmd system maps naturally to Go concurrency. Long-running operations (runtime server communication, tool execution) run in goroutines and deliver results as messages. The Update loop is single-threaded — no race conditions in state management. Excellent fit for the harness's concurrent event streams.
 
 #### tview (108)
 
@@ -126,7 +126,7 @@ Scale: 1 (poor) - 5 (excellent). Weighted total = sum of (weight x score).
 * **D7 (5):** React's component model handles modal prompts cleanly — conditionally render a prompt component, capture input, unmount. Claude Code does this for every permission check.
 * **D8 (5):** Massive ecosystem. React is the most widely known UI framework. Ink has a healthy community. Claude Code's open source provides a reference implementation.
 * **D9 (2):** React + Ink is a powerful but complex stack. JSX compilation, React reconciler, Yoga layout engine, hook-based state management — significant abstraction layers for a terminal UI. Claude Code's 512k lines are partly a consequence of this complexity.
-* **D10 (5):** React's state management and effect hooks handle async naturally. Promises, async/await, and event emitters map well to concurrent BFF communication.
+* **D10 (5):** React's state management and effect hooks handle async naturally. Promises, async/await, and event emitters map well to concurrent runtime server communication.
 
 #### Minimal — No Framework (99)
 
@@ -146,7 +146,7 @@ Scale: 1 (poor) - 5 (excellent). Weighted total = sum of (weight x score).
 * Good, because Bubbletea's Elm architecture (Model-Update-View) provides a clean state management model that scales as the UI grows. The harness has enough interactive UI (session explorer, compaction selector, plan/build modes, status bar) to justify the framework.
 * Good, because Glamour produces high-quality markdown rendering, and the Charm ecosystem provides reusable components (textarea, viewport, spinner, table) that accelerate development.
 * Good, because the single-binary story is preserved — no runtime dependencies, simple installation, clean goreleaser integration.
-* Good, because Go alignment means shared types with the BFF server, one build, one test suite, and a single-language contribution path.
+* Good, because Go alignment means shared types with the runtime server, one build, one test suite, and a single-language contribution path.
 * Good, because OpenCode proves this stack works for this exact use case — plan/build modes, styled markdown, status bar, all in Bubbletea.
 * Bad, because streaming token display requires a debounced redraw workaround rather than direct `Write()` calls. This is the primary engineering challenge. The workaround is well-understood (buffer tokens, re-render every 50ms, final clean render on completion) but requires deliberate implementation.
 * Bad, because Glamour's batch markdown rendering means long responses may show brief render pauses during streaming. Mitigation: chunk the response buffer and only re-render the latest chunk during streaming; render the full response on completion.
@@ -155,7 +155,7 @@ Scale: 1 (poor) - 5 (excellent). Weighted total = sum of (weight x score).
 
 ### Confirmation
 
-The decision is confirmed when: the Bubbletea harness can connect to the BFF, render a session explorer with list navigation, display a persistent status bar with mode/model/context/cost, stream a model response with styled markdown (Glamour), execute tools with permission prompts that don't disrupt the conversation flow, and render the interactive compaction category selector. Streaming token display latency must be under 100ms perceived delay.
+The decision is confirmed when: the Bubbletea harness can connect to the runtime server, render a session explorer with list navigation, display a persistent status bar with mode/model/context/cost, stream a model response with styled markdown (Glamour), execute tools with permission prompts that don't disrupt the conversation flow, and render the interactive compaction category selector. Streaming token display latency must be under 100ms perceived delay.
 
 ### Why Not Phased
 

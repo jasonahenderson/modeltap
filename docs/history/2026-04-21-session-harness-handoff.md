@@ -1,5 +1,8 @@
 # 2026-04-21 Session — Harness Launch Path + Handoff
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 Third and final log for the 2026-04-21 working session. Follows `2026-04-21-session-root-readme.md` (PATCH-0009) and `2026-04-21-session-makefile-hygiene.md` (PATCH-0010).
 
 ## What was discussed

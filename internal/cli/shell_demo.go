@@ -20,11 +20,12 @@ func newShellDemoCommand() *cobra.Command {
 This path runs internal/harnessshell wrapped in internal/harnesshost.Adapter
 with internal/harnessdemo.FakeRuntime — useful for evaluating shell layout,
 streaming behavior, queue follow-ups, and the permission demo without a
-real BFF.
+real runtime server.
 
 Type a message and press Enter to submit. /perm triggers the permission
 request demo. /clear wipes the transcript. /quit and /exit leave the
-shell. Esc once arms an interrupt during streaming; Esc twice emits the
+shell. /select toggles terminal selection vs mouse scroll mode.
+Esc once arms an interrupt during streaming; Esc twice emits the
 InterruptRunAction.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			shell := harnessshell.New(
@@ -34,7 +35,7 @@ InterruptRunAction.`,
 			)
 			runtime := harnessdemo.New()
 			driver := harnessdemo.NewDriver(shell, runtime)
-			p := tea.NewProgram(driver, tea.WithAltScreen(), tea.WithMouseAllMotion())
+			p := tea.NewProgram(driver, tea.WithAltScreen())
 			_, err := p.Run()
 			return err
 		},

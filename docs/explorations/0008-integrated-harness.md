@@ -18,6 +18,9 @@ related:
 
 # EXP-0008: Integrated Harness — Modeltap as Professional AI Environment
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Context
 
 Modeltap was originally conceived as infrastructure — a reverse proxy that sits between AI clients and model providers, passively capturing traffic and computing metrics. The implicit product pitch was "add this to your stack and get observability for free." But this framing has a structural weakness: it positions modeltap as a thing users wire up and forget about, competing with every other observability tool on features they care about more.

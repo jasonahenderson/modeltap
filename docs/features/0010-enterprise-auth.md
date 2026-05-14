@@ -4,7 +4,7 @@ title: Enterprise Auth and Multi-User
 status: proposed
 date: 2026-04-14
 depends-on:
-  - FEAT-0008: BFF Server
+  - FEAT-0008: Runtime Server
   - FEAT-0009: Terminal Harness
 adr-constraints:
   - ADR-0002: SQLite storage (per-user scoping)
@@ -18,7 +18,7 @@ promoted-from:
 
 ## Problem
 
-FEAT-0008 (BFF Server) and FEAT-0009 (Terminal Harness) create a single-user product. Enterprise deployment requires:
+FEAT-0008 (Runtime Server) and FEAT-0009 (Terminal Harness) create a single-user product. Enterprise deployment requires:
 
 - **Centralized credentials**: the organization controls model API keys, not individual developers. No secrets on laptops.
 - **User identity**: the server must know who is making each request for isolation, metrics, and policy enforcement.
@@ -30,7 +30,7 @@ Without multi-user support, enterprises must run one server per developer (no ag
 
 ## Solution
 
-Add pluggable identity providers, per-user data isolation, server-owned provider credentials, role-based authorization, and policy enforcement to the BFF server. The harness authenticates to the server on connection; the server scopes all data and operations to the authenticated user.
+Add pluggable identity providers, per-user data isolation, server-owned provider credentials, role-based authorization, and policy enforcement to the runtime server. The harness authenticates to the server on connection; the server scopes all data and operations to the authenticated user.
 
 ## Key Capabilities
 

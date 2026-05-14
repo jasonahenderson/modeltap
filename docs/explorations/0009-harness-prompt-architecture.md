@@ -13,6 +13,9 @@ related:
 
 # EXP-0009: Harness Prompt Architecture — Lessons from the Claude Code Leak
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Context
 
 In March–April 2026, the Claude Code npm package (`@anthropic-ai/claude-code` 2.1.88) shipped source maps that were quickly reverse-engineered and published. Several independent analyses (ghuntley, Kir Shatrov, Piebald-AI, dbreunig, alex000kim) describe the internal architecture in enough detail to be used as a reference. EXP-0008 already cites Claude Code as architectural inspiration at a high level, but the leak exposes specific composition and hardening patterns that are not yet captured anywhere in Modeltap's design corpus.

@@ -1,5 +1,5 @@
 // Package harness implements the modeltap terminal harness — a
-// Bubbletea-based TUI that talks to the BFF over JSON-RPC. After the
+// Bubbletea-based TUI that talks to the Runtime over JSON-RPC. After the
 // v0.2.2 WU-100 extraction, this package retains only the runtime
 // plumbing (connection / protocol / tool dispatcher / context manager
 // / MCP); the App-level surfaces (input area, viewport, statusbar,
@@ -61,7 +61,7 @@ type CostUpdateMsg struct {
 	Total float64
 }
 
-// ToolCallMsg signals an incoming tool call from the BFF.
+// ToolCallMsg signals an incoming tool call from the Runtime.
 type ToolCallMsg struct {
 	TurnID     string
 	ToolCallID string

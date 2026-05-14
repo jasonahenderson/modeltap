@@ -4,7 +4,7 @@ title: Knowledge Integration
 status: proposed
 date: 2026-04-14
 depends-on:
-  - FEAT-0008: BFF Server
+  - FEAT-0008: Runtime Server
   - FEAT-0009: Terminal Harness
 adr-constraints:
   - ADR-0008: sqlite-vec for vector embeddings (optional per current ADR; amendment proposed but not required for acceptance)
@@ -25,14 +25,14 @@ The knowledge layer (EXP-0001, ADR-0008) was designed as an optional module for 
 
 ## Solution
 
-Wire the knowledge layer into the BFF's conversation loop so that:
+Wire the knowledge layer into the runtime server's conversation loop so that:
 
 1. Every conversation turn is automatically captured and embedded for future retrieval
-2. Before each turn, the BFF searches the knowledge base and injects relevant prior context
+2. Before each turn, the runtime server searches the knowledge base and injects relevant prior context
 3. Compaction is backed by the knowledge layer — compressed context is searchable, not lost
 4. Users can query, pin, forget, and manage their knowledge explicitly
 
-This feature implements the integration between the existing knowledge layer architecture (ADR-0008) and the BFF conversation loop (FEAT-0008). It does not re-implement embedding or vector search — it wires them together.
+This feature implements the integration between the existing knowledge layer architecture (ADR-0008) and the runtime server conversation loop (FEAT-0008). It does not re-implement embedding or vector search — it wires them together.
 
 **Relationship to ADR-0008 amendment**: EXP-0008 proposes changing the knowledge layer default from off to on. This feature does not depend on that amendment. It works under either default:
 - If the amendment is accepted (on by default): this feature is active for all harness users out of the box.
@@ -44,7 +44,7 @@ The feature's acceptance criteria are testable regardless of the default. The re
 
 ### Automatic Capture and Embedding
 
-Every conversation turn that flows through the BFF is:
+Every conversation turn that flows through the runtime server is:
 
 1. Stored in the request log (existing capture, ADR-0005)
 2. Queued for asynchronous embedding
@@ -62,7 +62,7 @@ Every conversation turn that flows through the BFF is:
 
 ### Transparent Context Enrichment
 
-Before each turn, the BFF performs relevance-gated knowledge injection:
+Before each turn, the runtime server performs relevance-gated knowledge injection:
 
 1. Embed the user's current message
 2. Search the knowledge base for semantically similar prior interactions
@@ -76,12 +76,12 @@ The user does not see the injection unless they ask (`/context` shows what was i
 
 ### Lossless Compaction
 
-When the BFF compacts conversation context (FEAT-0008 context window management):
+When the runtime server compacts conversation context (FEAT-0008 context window management):
 
 1. Identify low-value segments (old turns, resolved tangents, repeated instructions)
 2. Summarize them for the live context window
 3. The full original remains in storage and the knowledge layer
-4. If compacted content becomes relevant in a later turn, the BFF can re-retrieve it from the knowledge base and inject it
+4. If compacted content becomes relevant in a later turn, the runtime server can re-retrieve it from the knowledge base and inject it
 
 This makes compaction reversible from the user's perspective. Nothing is lost — it moves from working memory to searchable long-term memory.
 
@@ -98,7 +98,7 @@ This makes compaction reversible from the user's perspective. Nothing is lost �
 
 ### Metadata Extraction
 
-The BFF extracts structured metadata from conversations:
+The runtime server extracts structured metadata from conversations:
 
 - **Decisions**: "We decided to use JWT instead of sessions"
 - **Action items**: "TODO: add rate limiting to the auth endpoint"
@@ -106,7 +106,7 @@ The BFF extracts structured metadata from conversations:
 - **Files referenced**: which files were discussed or modified
 - **People mentioned**: names and roles referenced in conversation
 
-Extraction is model-driven: the BFF prompts a cheap/fast model to extract structured fields from completed turns. Extraction happens asynchronously — it does not block the conversation.
+Extraction is model-driven: the runtime server prompts a cheap/fast model to extract structured fields from completed turns. Extraction happens asynchronously — it does not block the conversation.
 
 ### Forget Semantics
 
@@ -127,7 +127,7 @@ The knowledge layer degrades gracefully when components are unavailable:
 
 - **No embedding model available**: knowledge layer operates in keyword-search-only mode. Capture continues. Embeddings are generated when a model becomes available (backfill queue).
 - **Knowledge disabled** (`knowledge.enabled: false`): capture continues. No embedding, no injection, no search. The harness works as a standard multi-model terminal tool.
-- **Knowledge database corrupted**: the BFF falls back to no-knowledge mode. The capture layer can rebuild the knowledge base from the raw request log.
+- **Knowledge database corrupted**: the runtime server falls back to no-knowledge mode. The capture layer can rebuild the knowledge base from the raw request log.
 
 ## CLI Integration
 
@@ -155,7 +155,7 @@ knowledge:
 
 - **Shared knowledge across users**: per-user isolation is the baseline (FEAT-0010). Shared knowledge is deferred per EXP-0002.
 - **Knowledge graph**: relationships between decisions, people, and projects. Future work.
-- **Context injection for external MCP clients**: the MCP stdio interface (ADR-0009) exposes search tools, but does not perform automatic injection. Injection is a BFF-to-model feature.
+- **Context injection for external MCP clients**: the MCP stdio interface (ADR-0009) exposes search tools, but does not perform automatic injection. Injection is a runtime server-to-model feature.
 - **Custom embedding models**: the feature supports configurable embedding models, but does not build a model management UI. Users configure the model name in YAML.
 
 ## Success Criteria
@@ -177,7 +177,7 @@ knowledge:
 |-----|-------------|
 | ADR-0005 (Capture) | Knowledge layer builds on full-fidelity capture — embeddings are generated from captured content |
 | ADR-0008 (sqlite-vec) | Vector storage and search use sqlite-vec. Amendment proposed: on by default. |
-| ADR-0009 (MCP stdio) | MCP interface exposes search_knowledge and related tools for external clients. Injection is BFF-internal. |
+| ADR-0009 (MCP stdio) | MCP interface exposes search_knowledge and related tools for external clients. Injection is runtime-internal. |
 
 ## Open Questions
 

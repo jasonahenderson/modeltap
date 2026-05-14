@@ -1,5 +1,8 @@
 # 2026-05-05 — Session: Triage PR #1 CI Failures (Investigate-Only)
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Context
 
 Resumed from `docs/history/2026-05-05-handoff-v0.2.x-test-failure-triage.md`. PR #1 (`spike/scrolling-surface-eval` → `main`) was still open. Per the handoff's "still open" guidance, the user picked **option 3: investigate-only** — reproduce, root-cause, and draft the patch doc, but commit nothing until PR #1 merges.

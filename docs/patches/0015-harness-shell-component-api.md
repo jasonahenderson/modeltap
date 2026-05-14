@@ -12,6 +12,9 @@ release: "v0.2.1"
 
 # PATCH-0015: Harness Shell Component API
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Problem
 
 The harness spike shell now has a stable interaction model, but it still lives

@@ -399,7 +399,7 @@ func TestHandleEvent_NilSender_DoesNotPanic(t *testing.T) {
 
 func TestConnMgr_ConnectSync_HappyPath(t *testing.T) {
 	sock := shortSockPath2(t)
-	srv := startMockBFF(t, sock)
+	srv := startMockRuntime(t, sock)
 	defer srv.close()
 
 	sender := &recordingSender{}
@@ -461,7 +461,7 @@ func TestConnMgr_ConnectSync_AutoStartHook_Invoked(t *testing.T) {
 		startServerFn: func(ctx context.Context, _ ConnectionConfig) error {
 			called = true
 			// Stand up a listener so the subsequent dial succeeds.
-			startMockBFF(t, sock)
+			startMockRuntime(t, sock)
 			return nil
 		},
 	}
@@ -567,28 +567,28 @@ func (cm *ConnectionManager) simulateSuccessfulPong() {
 }
 
 // -----------------------------------------------------------------------
-// Mock BFF socket — accepts a connection and answers
+// Mock Runtime socket — accepts a connection and answers
 // capabilities.register + connection.ping.
 // -----------------------------------------------------------------------
 
-type mockBFF struct {
+type mockRuntime struct {
 	ln net.Listener
 	t  *testing.T
 }
 
-func startMockBFF(t *testing.T, sock string) *mockBFF {
+func startMockRuntime(t *testing.T, sock string) *mockRuntime {
 	t.Helper()
 	ln, err := net.Listen("unix", sock)
 	if err != nil {
 		t.Fatalf("listen %s: %v", sock, err)
 	}
-	srv := &mockBFF{ln: ln, t: t}
+	srv := &mockRuntime{ln: ln, t: t}
 	go srv.acceptLoop()
 	t.Cleanup(srv.close)
 	return srv
 }
 
-func (s *mockBFF) close() {
+func (s *mockRuntime) close() {
 	if s.ln != nil {
 		// Don't nil s.ln — acceptLoop reads it from another goroutine.
 		// Closing the listener is sufficient to unblock Accept with
@@ -599,7 +599,7 @@ func (s *mockBFF) close() {
 	}
 }
 
-func (s *mockBFF) acceptLoop() {
+func (s *mockRuntime) acceptLoop() {
 	for {
 		conn, err := s.ln.Accept()
 		if err != nil {
@@ -609,7 +609,7 @@ func (s *mockBFF) acceptLoop() {
 	}
 }
 
-func (s *mockBFF) handle(conn net.Conn) {
+func (s *mockRuntime) handle(conn net.Conn) {
 	defer conn.Close()
 	r := protocol.NewFrameReader(conn)
 	w := protocol.NewFrameWriter(conn)

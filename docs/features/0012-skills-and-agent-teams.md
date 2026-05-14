@@ -4,7 +4,7 @@ title: Skills
 status: proposed
 date: 2026-04-14
 depends-on:
-  - FEAT-0008: BFF Server
+  - FEAT-0008: Runtime Server
   - FEAT-0009: Terminal Harness
 adr-constraints:
   - ADR-0006: Provider adapter interface (model override per skill)

@@ -31,7 +31,7 @@ patterns, ignore accepted decisions, or waste context on unrelated material.
 
 Add a context planner for implementation-quality runs. The planner selects and
 budgets project rules, user attachments, repository-derived context, memory,
-nearby style examples, and validation targets before prompt assembly. The BFF
+nearby style examples, and validation targets before prompt assembly. The runtime server
 owns the durable context plan. The harness helps discover local filesystem and
 repository facts, then displays context provenance to the user.
 
@@ -40,7 +40,7 @@ repository facts, then displays context provenance to the user.
 ### Project Rule Discovery
 
 The harness discovers configured project-rule sources and sends their content
-or metadata to the BFF. Sources may include:
+or metadata to the runtime server. Sources may include:
 
 - `MODELTAP.md`
 - `.modeltap/` rule files
@@ -78,7 +78,7 @@ subsequent `model_call` in the same run requires either an explicit re-plan even
 or reuse of the frozen plan with a recorded reason.
 
 Context planning has a default deadline of 10 seconds. If planning exceeds the
-deadline, the BFF proceeds with the partial plan when policy allows, marks the
+deadline, the runtime server proceeds with the partial plan when policy allows, marks the
 artifact `partial_plan`, and records omitted selectors. The harness may maintain
 a repo-map cache invalidated by file mtimes; richer incremental indexing is
 deferred to EXP-0012 follow-up work.
@@ -103,7 +103,7 @@ harness exposes this through `/context` and run artifact inspection.
 
 ### Budgeting
 
-The BFF tracks token budgets by category:
+The runtime server tracks token budgets by category:
 
 - project rules
 - selected files/snippets
@@ -137,7 +137,7 @@ warning and mark the plan `memory_unavailable`. Implementation and devops
 workflows may escalate to `waiting_user` so the user can proceed without memory
 or wait for recovery.
 
-Full prompt content is BFF-owned and is not transmitted to the harness by
+Full prompt content is runtime-owned and is not transmitted to the harness by
 default. The harness sees prompt-layer metadata such as layer name, byte budget,
 source category, and provenance, but not raw prompt text. A user-controlled
 debug flag may permit prompt content disclosure to the harness for inspection;
@@ -193,10 +193,10 @@ Configuration should support:
 
 | ADR | Relationship |
 |---|---|
-| ADR-0014 | Keeps intelligence in the BFF while the harness supplies local repo facts |
+| ADR-0014 | Keeps intelligence in the runtime server while the harness supplies local repo facts |
 | Future ADR | Should decide project-rule precedence and prompt-layer ownership |
 
 ## Open Questions
 
-1. How much repo-map construction belongs in the harness versus the BFF?
+1. How much repo-map construction belongs in the harness versus the runtime server?
 2. Should AST/symbol indexing from EXP-0012 be required for the first version?

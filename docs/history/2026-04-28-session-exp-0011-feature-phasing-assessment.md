@@ -1,5 +1,8 @@
 # 2026-04-28 — EXP-0011 Feature Phasing Assessment
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Context
 
 Assessed `EXP-0011: Harness Excellence Gap Analysis` to turn its gap map into a

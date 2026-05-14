@@ -12,6 +12,9 @@ branch: "exploration/integrated-harness"
 
 # PATCH-0003: Harness App ↔ ConnectionManager Wiring
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Problem
 
 The v0.2.0 harness has two independent halves: the Bubbletea `App` (Bundle 5 + Bundle 7 tools + WU-083/086 overlays) and the `ConnectionManager` + `ProtocolClient` (Bundle 6). Neither side references the other. The `App` produces `SubmitMsg` on submit and `PasteSummarizeRequestMsg` on paste summarize; nothing consumes them. The `App` has no way to read connection state or to request a reconnect, so the `/status` and `/reconnect` commands called out in the Bundle 13 design (D7) cannot be implemented. Downstream WUs keep running into the same gap: WU-083 summarize, WU-085 model commands, WU-092 history traversal all need a path from the `App` into the connection.

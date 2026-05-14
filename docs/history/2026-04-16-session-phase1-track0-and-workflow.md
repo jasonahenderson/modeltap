@@ -1,5 +1,8 @@
 # 2026-04-16 — Session: Phase 1 Track 0 Designs + Workflow Establishment
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Summary
 
 Long session covering two streams of work: (1) establishing the release-level phased workflow for v0.2.0 and (2) completing Phase 1 designs for all Track 0 bundles.

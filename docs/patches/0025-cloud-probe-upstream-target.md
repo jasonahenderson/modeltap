@@ -12,6 +12,9 @@ branch: "patch/0025-cloud-probe-upstream-target"
 
 # PATCH-0025: Probe cloud-provider upstream directly in health check
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Problem
 
 Cloud-provider health checks always report `unavailable` even when

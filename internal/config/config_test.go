@@ -396,8 +396,8 @@ func TestLoad_LegacyFallback_AppliesLegacyDefaults(t *testing.T) {
 		t.Errorf("DBPath = %q, want legacy %q", cfg.DBPath, wantDB)
 	}
 	wantSock := filepath.Join(home, ".local", "share", "modeltap", "server.sock")
-	if cfg.BFF.SocketPath != wantSock {
-		t.Errorf("BFF.SocketPath = %q, want legacy %q", cfg.BFF.SocketPath, wantSock)
+	if cfg.Runtime.SocketPath != wantSock {
+		t.Errorf("Runtime.SocketPath = %q, want legacy %q", cfg.Runtime.SocketPath, wantSock)
 	}
 	if !strings.Contains(stderr.String(), "legacy config") {
 		t.Errorf("expected legacy warning on stderr, got %q", stderr.String())
@@ -424,8 +424,8 @@ func TestLoad_FreshInstall_UsesUnifiedDir(t *testing.T) {
 		t.Errorf("DBPath = %q, want %q", cfg.DBPath, wantDB)
 	}
 	wantSock := filepath.Join(home, ".modeltap", "server.sock")
-	if cfg.BFF.SocketPath != wantSock {
-		t.Errorf("BFF.SocketPath = %q, want %q", cfg.BFF.SocketPath, wantSock)
+	if cfg.Runtime.SocketPath != wantSock {
+		t.Errorf("Runtime.SocketPath = %q, want %q", cfg.Runtime.SocketPath, wantSock)
 	}
 	if stderr.Len() != 0 {
 		t.Errorf("fresh install should emit no warning; got %q", stderr.String())

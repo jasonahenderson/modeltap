@@ -38,7 +38,7 @@ From here, two paths depending on what you want:
 
 ### Run the terminal harness
 
-`modeltap` with no subcommand launches the interactive Bubbletea harness — the v0.2.0 headline. It auto-starts a local BFF server over a unix socket and drops you into a chat UI with slash commands, 13 built-in tools, session history, and MCP support.
+`modeltap` with no subcommand launches the interactive Bubbletea harness — the v0.2.0 headline. It auto-starts a local runtime server over a unix socket and drops you into a chat UI with slash commands, 13 built-in tools, session history, and MCP support.
 
 ```sh
 export ANTHROPIC_API_KEY=sk-ant-...   # or OPENAI_API_KEY, or both
@@ -85,7 +85,7 @@ Full install, configuration, and client-integration details — including Claude
 | **Provider-agnostic routing** | One proxy address fronts both Anthropic and OpenAI traffic. Point any client that honors `ANTHROPIC_BASE_URL` or `OPENAI_BASE_URL` at modeltap and it just works. |
 | **Real cost and token accounting** | Per-request input/output tokens, latency, and estimated cost — extracted from live responses, including reassembled SSE streams. |
 | **Full record, not samples** | Captures every request and response in full, with retention-based pruning ([ADR-0005](docs/adr/0005-retention-based-pruning.md)). You can always go back and read the bytes. |
-| **Built to grow** | v0.2.0 adds a JSON-RPC BFF and a Bubbletea terminal harness with a tool framework and MCP client. A knowledge layer (sqlite-vec), skills, and agent teams are on the roadmap. |
+| **Built to grow** | v0.2.0 adds a JSON-RPC runtime server and a Bubbletea terminal harness with a tool framework and MCP client. A knowledge layer (sqlite-vec), skills, and agent teams are on the roadmap. |
 
 ---
 
@@ -94,7 +94,7 @@ Full install, configuration, and client-integration details — including Claude
 | Path | Purpose |
 |------|---------|
 | `cmd/modeltap/` | CLI entrypoint |
-| `internal/` | Proxy, storage, providers, harness, BFF, dashboard |
+| `internal/` | Proxy, storage, providers, harness, runtime server, dashboard |
 | `pkg/` | Public packages |
 | `docs/adr/` | Architecture Decision Records — accepted ones drive the codebase |
 | `docs/features/` | Feature specs — accepted specs drive work units |
@@ -110,7 +110,7 @@ Full install, configuration, and client-integration details — including Claude
 modeltap is pre-1.0. Interfaces may shift between minor versions.
 
 - **v0.1** — shipped. Reverse proxy, capture, metrics, dashboard, service management, Anthropic + OpenAI adapters.
-- **v0.2.0** — in development on branch `exploration/integrated-harness`. Adds a JSON-RPC BFF server, a Bubbletea terminal harness, a 13-tool built-in framework, an MCP client, and an Ollama adapter. See [`docs/releases/v0.2.0/`](docs/releases/v0.2.0/) for plan, status, and changelog.
+- **v0.2.0** — in development on branch `exploration/integrated-harness`. Adds a JSON-RPC runtime server, a Bubbletea terminal harness, a 13-tool built-in framework, an MCP client, and an Ollama adapter. See [`docs/releases/v0.2.0/`](docs/releases/v0.2.0/) for plan, status, and changelog.
 - **Direction** — enterprise auth and multi-user ([FEAT-0010](docs/features/0010-enterprise-auth.md)), knowledge integration ([FEAT-0011](docs/features/0011-knowledge-integration.md)), skills ([FEAT-0012](docs/features/0012-skills-and-agent-teams.md)), agent teams ([FEAT-0013](docs/features/0013-agent-teams.md)). Proposed, not yet accepted.
 
 ---
@@ -130,7 +130,7 @@ A few things to know up front:
 
 modeltap is [Apache-2.0 licensed](LICENSE) (per [ADR-0010](docs/adr/0010-open-source-license.md)). Fork it, remix it, ship something on top of it. If what you're building could be upstream, open a PR — the graduated tier system is there to take new contributors seriously.
 
-The integrated-harness direction in particular is a good substrate to fork against: the BFF protocol, the tool framework, and the session schema are all reusable pieces if you want your own AI environment with different choices.
+The integrated-harness direction in particular is a good substrate to fork against: the runtime server protocol, the tool framework, and the session schema are all reusable pieces if you want your own AI environment with different choices.
 
 ## License
 

@@ -1,5 +1,8 @@
 # 2026-04-15 — FEAT-0008 / FEAT-0009 interdependency review
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Summary
 
 Reviewed `docs/features/0008-bff-server.md` and `docs/features/0009-terminal-harness.md` together for harness/BFF interdependency gaps.

@@ -5,7 +5,7 @@ import (
 )
 
 // Message is the canonical representation of a single conversational turn
-// or continuation. The BFF assembles []Message from persisted session
+// or continuation. The Runtime assembles []Message from persisted session
 // state; each Provider.FormatMessages translates the canonical form into
 // the provider's wire format.
 type Message struct {

@@ -1,5 +1,8 @@
 # 2026-05-05 - Design: Harness Run Surface (WU-114 to WU-116)
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Scope
 
 This design covers:

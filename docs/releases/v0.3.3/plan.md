@@ -60,7 +60,7 @@ Current phase: **Planning draft — Phase 1 not opened.**
 **WU-138: Policy and workspace boundary ADR**
 
 Decide policy inheritance, non-overridable policy sources, workspace mode
-semantics, and local vs BFF enforcement boundaries. Avoid introducing a
+semantics, and local vs runtime server enforcement boundaries. Avoid introducing a
 general-purpose policy DSL; keep the release to structured policy shapes.
 
 **WU-139: Policy schema and inheritance model**

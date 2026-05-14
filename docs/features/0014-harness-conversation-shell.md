@@ -4,7 +4,7 @@ title: Harness Conversation Shell
 status: accepted
 date: 2026-04-24
 depends-on:
-  - FEAT-0008: BFF Server
+  - FEAT-0008: Runtime Server
   - FEAT-0009: Terminal Harness
 adr-constraints:
   - ADR-0001: Go as primary language

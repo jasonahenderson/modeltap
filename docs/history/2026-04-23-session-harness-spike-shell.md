@@ -1,5 +1,8 @@
 # 2026-04-23 — Harness spike shell
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 Started a replacement-harness spike on `spike/crush-shell-eval`.
 
 What landed:

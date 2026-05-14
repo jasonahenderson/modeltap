@@ -4,7 +4,7 @@ title: Agent Teams
 status: proposed
 date: 2026-04-14
 depends-on:
-  - FEAT-0008: BFF Server
+  - FEAT-0008: Runtime Server
   - FEAT-0009: Terminal Harness
   - FEAT-0012: Skills (shared prompt/tool configuration patterns)
 adr-constraints:
@@ -26,11 +26,11 @@ Single-agent conversations hit three limitations:
 - **Serial execution**: research, review, and analysis run sequentially through one model. Parallel execution across models is faster and produces richer results.
 - **One-size-fits-all cost**: every subtask uses the same model, whether it needs a $0.15/turn reasoning model or a $0.00 local model.
 
-Claude Code addresses this with sub-agents, but all sub-agents use the same provider and model, have no persistent shared memory, and coordinate client-side. Modeltap's BFF architecture enables multi-model teams coordinated server-side with shared knowledge.
+Claude Code addresses this with sub-agents, but all sub-agents use the same provider and model, have no persistent shared memory, and coordinate client-side. Modeltap's runtime server architecture enables multi-model teams coordinated server-side with shared knowledge.
 
 ## Solution
 
-Agent teams are BFF-coordinated groups of specialized agents that work on subtasks of a complex task. Each agent has its own model, system prompt, and tool permissions. The BFF manages the execution flow, context sharing between agents, cost tracking, and result synthesis. The harness renders progress and handles tool execution for all agents.
+Agent teams are runtime server-coordinated groups of specialized agents that work on subtasks of a complex task. Each agent has its own model, system prompt, and tool permissions. The runtime server manages the execution flow, context sharing between agents, cost tracking, and result synthesis. The harness renders progress and handles tool execution for all agents.
 
 ## Key Capabilities
 
@@ -89,40 +89,40 @@ teams:
 ### Team Execution
 
 1. User invokes `/team implement "Add rate limiting to the API"`
-2. BFF creates agent sessions — each gets its own conversation context with assigned model and system prompt
-3. BFF injects shared context: task description, knowledge layer results, prior agent outputs
-4. BFF runs agents per the flow definition (serial, parallel, or mixed)
+2. Runtime server creates agent sessions — each gets its own conversation context with assigned model and system prompt
+3. Runtime server injects shared context: task description, knowledge layer results, prior agent outputs
+4. Runtime server runs agents per the flow definition (serial, parallel, or mixed)
 5. Tool calls flow to the harness — the harness executes locally and returns results
-6. BFF captures every agent's conversation for the knowledge layer
-7. BFF synthesizes results and returns to the harness
+6. Runtime server captures every agent's conversation for the knowledge layer
+7. Runtime server synthesizes results and returns to the harness
 
 ### Safe Execution Rules
 
 Multi-agent execution introduces concurrency and conflict risks that single-agent mode does not have. These rules are mandatory and not configurable:
 
-**Write serialization**: at most one agent may have outstanding write tool calls at any time. The BFF serializes write operations across agents. If two agents request writes concurrently (e.g., in a parallel block), the BFF queues the second write until the first completes. Read-only tool calls are not serialized — multiple agents can read concurrently.
+**Write serialization**: at most one agent may have outstanding write tool calls at any time. The runtime server serializes write operations across agents. If two agents request writes concurrently (e.g., in a parallel block), the runtime server queues the second write until the first completes. Read-only tool calls are not serialized — multiple agents can read concurrently.
 
 **Failure behavior**:
 - If a **read-only agent** fails (reviewer, security): the team continues. The failure is reported in the results. Other agents are not affected.
-- If a **writing agent** fails (tool error, test failure): the BFF retries once with the error context included. If the retry fails, the team **pauses** and asks the user: `[r]etry with different approach, [s]kip this agent, [a]bort team`.
+- If a **writing agent** fails (tool error, test failure): the runtime server retries once with the error context included. If the retry fails, the team **pauses** and asks the user: `[r]etry with different approach, [s]kip this agent, [a]bort team`.
 - If the user aborts: all pending agents are cancelled. Completed work (files written, tests run) remains on disk. The team result shows partial completion.
 
 **Plan-scope enforcement**: when the user approves a plan (from the planner agent), subsequent agents operate within the plan's scope:
 - Tool calls that target files or operations outside the plan trigger explicit harness approval, even in accept-edits or auto mode.
-- The BFF tracks which files and operations the plan declared and flags out-of-scope tool calls as `plan_deviation: true` in the `tool.call` event.
+- The runtime server tracks which files and operations the plan declared and flags out-of-scope tool calls as `plan_deviation: true` in the `tool.call` event.
 - The harness shows deviations distinctly: `[backend] ⚠ Out of plan: Edit README.md — approve? [y/n]`
 
-**Cost cap**: team execution stops if the total team cost exceeds the configured `max_team_cost`. The BFF tracks running cost across all agents and halts new agent starts when the cap is approached. In-flight agents complete their current turn but do not start new turns.
+**Cost cap**: team execution stops if the total team cost exceeds the configured `max_team_cost`. The runtime server tracks running cost across all agents and halts new agent starts when the cap is approached. In-flight agents complete their current turn but do not start new turns.
 
 **No unsupervised infinite loops**: each agent has a maximum turn count (configurable, default: 20). If an agent hits its turn limit, it is stopped and its partial output is included in the team results.
 
 ### Agent Context Sharing
 
-**Explicit handoff**: the BFF includes prior agents' outputs in subsequent agents' context. The backend sees the planner's plan. The tester sees the backend's code changes.
+**Explicit handoff**: the runtime server includes prior agents' outputs in subsequent agents' context. The backend sees the planner's plan. The tester sees the backend's code changes.
 
 **Knowledge layer**: all agents query the same per-user knowledge base. This is automatic — agents inherit the session's knowledge access.
 
-**Context budget per agent**: each agent has its own context window (determined by its model). The BFF manages how much prior-agent output to include, summarizing if necessary for agents with smaller windows.
+**Context budget per agent**: each agent has its own context window (determined by its model). The runtime server manages how much prior-agent output to include, summarizing if necessary for agents with smaller windows.
 
 ### Tool Execution and Permissions
 
@@ -201,14 +201,14 @@ teams:
 ## Non-Goals
 
 - **Autonomous long-running swarms**: teams execute a bounded task and return. No infinite loops, no unsupervised background execution.
-- **Agent-to-agent direct communication**: agents don't talk to each other. The BFF mediates all sharing.
+- **Agent-to-agent direct communication**: agents don't talk to each other. The runtime server mediates all sharing.
 - **Dynamic team composition from natural language**: "use a cheap model to plan and a strong model to code" assembled at runtime. Future work.
 - **Cross-user agent teams**: all agents in a team run within one user's isolation boundary.
 - **Agent state persistence**: agent sessions are ephemeral. Knowledge layer captures outputs for future reference, but the agent's conversation is not resumable.
 
 ## Success Criteria
 
-1. A user can invoke `/team implement "task"` and the BFF coordinates planner → backend → tester → reviewer + security with the correct model for each agent.
+1. A user can invoke `/team implement "task"` and the runtime server coordinates planner → backend → tester → reviewer + security with the correct model for each agent.
 2. Plan approval pauses execution until the user approves, edits, or cancels.
 3. Parallel agents execute concurrently and their results are collected before the team completes. **Test**: reviewer and security start at the same time (within 1s), not sequentially.
 4. Write serialization works: if two agents in a parallel block request writes, the second waits until the first completes. **Test**: simulate two concurrent write requests, verify they execute serially.

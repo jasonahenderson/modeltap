@@ -1,5 +1,8 @@
 # 2026-04-16 — Design: Track Integration Tests Bundle (WU-067 + WU-087)
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Scope
 
 - **WU-067** — BFF server integration tests (`internal/bff/integration_test.go`): E2E with real BFF + in-memory storage + mock provider.

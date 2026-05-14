@@ -15,6 +15,9 @@ related:
 
 # EXP-0010: Harness Comparative Analysis — modeltap, OpenCode, and OpenHarness
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Context
 
 Modeltap is building a reverse proxy for AI/ML clients with capture, metrics, and multi-model orchestration. The **harness** is the terminal UI that interacts with the BFF (backend-for-frontend) server over JSON-RPC. The user needs the harness to serve a proxy-centric architecture: central model and cost control, central logging, granular context management across multiple models, and group context for pair/team projects.

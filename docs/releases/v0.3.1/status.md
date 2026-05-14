@@ -13,7 +13,7 @@
 | 120 | Harness project-rule discovery and precedence reporting | M | planned | pending |
 | 121 | Lightweight repo map and recent-change scanner | L | planned | pending |
 | 122 | Test and style-context discovery | M | planned | pending |
-| 123 | BFF context planner and budget accounting | L | planned | pending |
+| 123 | runtime server context planner and budget accounting | L | planned | pending |
 | 124 | Prompt-plan metadata and context provenance capture | M | planned | pending |
 | 125 | Harness `/context` inspection surfaces | M | planned | pending |
 | 126 | Context planner verification and docs | M | planned | pending |

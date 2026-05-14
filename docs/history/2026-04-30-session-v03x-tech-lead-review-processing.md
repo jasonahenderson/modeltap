@@ -1,5 +1,8 @@
 # 2026-04-30 — v0.3.x Tech Lead Review Processing
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 Processed the findings from
 `docs/releases/v0.3.0/.reviews/tech-lead-v03x-critical-review.md`.
 

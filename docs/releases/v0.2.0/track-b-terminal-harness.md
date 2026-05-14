@@ -1,5 +1,8 @@
 # Track B: FEAT-0009 Terminal Harness
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 **Release:** v0.2.0
 **WU Range:** WU-068 through WU-087, plus WU-092 (21 work units)
 **Depends on:**

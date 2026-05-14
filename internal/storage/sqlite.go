@@ -870,7 +870,7 @@ GROUP BY strftime('%%Y-%%m-%%d', timestamp), provider, model`
 	return nil
 }
 
-// Ping verifies the database connection is alive. Used by the BFF
+// Ping verifies the database connection is alive. Used by the Runtime
 // connection.health handler to report storage readiness.
 func (s *SQLiteStore) Ping(ctx context.Context) error {
 	return s.db.PingContext(ctx)

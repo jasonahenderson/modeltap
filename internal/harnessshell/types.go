@@ -343,7 +343,7 @@ func (HostInfoEvent) isHostEvent() {}
 
 // TranscriptClearEvent wipes the shell's visible transcript. Emitted by
 // the host when a new conversation begins (PATCH-0038's `/clear`
-// redefinition: clearing requires a BFF session.create RPC, so the
+// redefinition: clearing requires a Runtime session.create RPC, so the
 // wipe is host-driven rather than shell-native). Status text and
 // follow-up state (the new session id) ride on a sibling
 // [HostStatusEvent] / [HostInfoEvent] emitted alongside.

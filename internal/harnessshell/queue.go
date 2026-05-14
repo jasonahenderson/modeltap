@@ -13,7 +13,7 @@ import (
 )
 
 // PATCH-0038: shellNativeClearCommand removed. /clear is now
-// host-routed because starting a fresh conversation requires a BFF
+// host-routed because starting a fresh conversation requires a Runtime
 // session.create RPC. The host's handleClearCommand owns the path;
 // the shell wipes its transcript on receipt of TranscriptClearEvent.
 
@@ -143,7 +143,7 @@ func (s *state) emitSubmitOnEnter() bool {
 	// branch, so /cancel got enqueued and the run continued.
 	//
 	// PATCH-0038: /clear is no longer shell-native. Starting a fresh
-	// conversation requires a BFF session.create RPC, so /clear
+	// conversation requires a Runtime session.create RPC, so /clear
 	// dispatches through the host like any other slash command. The
 	// host's handleClearCommand emits a TranscriptClearEvent on
 	// success, which is what actually wipes the shell transcript.

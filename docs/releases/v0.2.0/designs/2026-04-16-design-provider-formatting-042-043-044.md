@@ -1,5 +1,8 @@
 # 2026-04-16 — Design: Provider Formatting Bundle (WU-042 + WU-043 + WU-044)
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Review Tier
 
 **Assigned:** C (bundled)
