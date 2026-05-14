@@ -60,7 +60,7 @@ The harness protocol is a JSON-RPC 2.0 transport with extensions for server-init
 
 **Tool call round-trips**: when the server emits `tool.call`, streaming pauses. The harness executes the tool (or rejects it) and sends `tool.result` with the matching `tool_call_id`. The server resumes streaming after receiving the result. Multiple `tool.call` events may be emitted in sequence within a single turn, each requiring a `tool.result` before the stream continues.
 
-**Capability and tool registration**: on connection establishment (after auth, see FEAT-0010), the harness sends a `capabilities.register` message declaring available tools, supported protocol version, harness metadata (version, platform), and the project context (see Project Context below).
+**Capability and tool registration**: on connection establishment (after auth, see FEAT-0010), the harness sends a `capabilities.register` message declaring available tools, supported protocol version, harness metadata (version, platform), and, until Amendment 001 lands, the project context (see Project Context below).
 
 The server uses the tool catalog when assembling the model prompt — only tools the harness has registered are included in the model's tool definitions. When MCP servers connect or disconnect, the harness sends `capabilities.update` to add or remove tools. The server can also send `capabilities.request` to ask the harness to re-register (e.g., after reconnection).
 
@@ -142,7 +142,7 @@ Or error:
 }
 ```
 
-**Project context**: the harness transmits the project root on connection and session start:
+**Project context**: the harness currently transmits the project root on connection and session start:
 
 ```json
 {
@@ -155,6 +155,8 @@ Or error:
 ```
 
 The server uses the project root for: session scoping (sessions are per-project), project instruction loading (Layer 4 system prompt — the server receives the config content from the harness rather than reading the filesystem directly, since the server may be remote), path normalization in session details, and knowledge layer project scoping. File paths in tool calls and results are relative to the project root.
+
+> **Planned amendment (Amendment 001, release TBD):** project context is logically a session attribute, not a connection attribute. A multi-chat client such as FEAT-0023 needs concurrent sessions on one connection, each scoped to a different project root. Today's implementation keeps project context on connection capabilities because the terminal harness is single-active-session. Amendment 001 moves project context into session create/resume payloads as canonical session state and treats any `capabilities.register.project` value as a legacy default for compatibility. Implementation is tracked by PATCH-0017.
 
 **Protocol versioning**: the harness and server exchange protocol versions during `capabilities.register`. The server declares its supported version range. If the harness's version is outside the range, the connection is rejected with a version-mismatch error. Within a compatible range, the server uses the highest mutually supported version.
 
@@ -1208,7 +1210,7 @@ These criteria cover specific protocol methods that FEAT-0009 depends on:
 23. `session.details` returns full session timeline including compacted turns, pinned items, files touched/modified, and server events (auto-compaction, restarts).
 24. `compact.plan` returns categorized context breakdown with per-category token counts, value scores, suggested actions, and summary previews.
 25. `compact.apply` accepts user-modified per-category actions and applies them. The server confirms what was compacted.
-26. `capabilities.register` accepts the tool catalog schema (name, namespace, description, input_schema, output_envelope, risk_level, capabilities_required) and project context. The server reflects registered tools in model prompts.
+26. `capabilities.register` accepts the tool catalog schema (name, namespace, description, input_schema, output_envelope, risk_level, capabilities_required) and, until Amendment 001 lands, project context as a legacy default. The server reflects registered tools in model prompts.
 27. `capabilities.update` adds or removes tools dynamically. The server updates model prompts on the next turn.
 28. `content.transform` accepts raw content and a transform type (e.g., "summarize"), routes to the cheap model, captures the raw content, and returns the transformed result with cost attribution.
 29. Multi-model turns emit `branch.started`, branch-tagged `token.delta`, branch-tagged `cost.update`, `branch.complete`/`branch.error`, and aggregate `turn.complete`. Branch state is available via `session.sync` after reconnect.
@@ -1359,6 +1361,38 @@ type Diagnostic struct {
 3. Protocol changes are PRs to this package, reviewed by both tracks
 4. After implementation, run the contract tests against real traffic to verify conformance
 5. The protocol package becomes the authoritative reference for future features (FEAT-0010, 0011, 0012, 0013) that add messages to the protocol
+
+## Planned Amendments
+
+### Amendment 001: Session-scoped project context
+
+**Status:** planned. Implementation is tracked under PATCH-0017
+(`docs/patches/0017-session-scoped-project-context.md`) and is an enabling
+prerequisite for FEAT-0023 (Desktop GUI Client).
+
+**Change.** Project context (`root`, `config_file`, `config_content`) moves
+from connection scope to session scope.
+
+| Where today | Where after Amendment 001 |
+|-------------|---------------------------|
+| Sent in `capabilities.register` as connection-scoped state | Optional legacy default only |
+| Sent on `session.create` and `session.resume`, then copied through connection capabilities | Stored directly on the session / active-session record |
+| Read by prompt assembly, history, and run controls through `Capabilities().ProjectContext()` | Read from the active session's project context |
+
+**Why.** The runtime server already supports multiple active session records,
+but connection-scoped project context is overwritten whenever the client
+switches sessions. A multi-chat client cannot safely run two tabs against
+different project roots until project context is session-owned.
+
+**Compatibility.** Existing single-session clients may continue sending project
+context in `capabilities.register`; the runtime server should treat that value
+as a default for subsequent session creation/resume when no per-session project
+is provided. New clients should omit project from registration and always send
+project context per session.
+
+**Out of scope.** GUI tab management, per-tab model controls, and multi-chat UI
+state belong to FEAT-0023. Amendment 001 only removes the protocol and runtime
+state collision.
 
 ## Resolved Questions
 
