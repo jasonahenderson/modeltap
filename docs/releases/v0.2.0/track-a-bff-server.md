@@ -1,5 +1,8 @@
 # Track A: FEAT-0008 BFF Server
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 **Release:** v0.2.0
 **WU Range:** WU-046 through WU-067, plus WU-091 (23 work units)
 **Depends on:** Track 0 (WU-039 through WU-045)

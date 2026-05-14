@@ -7,7 +7,7 @@ This directory organizes implementation plans and delivery artifacts by semver r
 | Version | Status | Scope |
 |---------|--------|-------|
 | [v0.1.0](v0.1.0/) | shipped | Proxy core, CLI, dashboard, service management |
-| [v0.2.0](v0.2.0/) | planning | BFF server + terminal harness (FEAT-0008, FEAT-0009) |
+| [v0.2.0](v0.2.0/) | planning | Runtime server + terminal harness (FEAT-0008, FEAT-0009) |
 | [v0.2.1](v0.2.1/) | planning | Harness conversation-shell componentization (FEAT-0014, PATCH-0015) |
 | [v0.2.2](v0.2.2/) | released | Production conversation-shell wiring |
 | [v0.3.0](v0.3.0/) | phase 3 implementation | Run runtime foundation (FEAT-0016, FEAT-0017 slice) |
@@ -93,7 +93,7 @@ Features are assigned to releases based on dependency chain and delivery priorit
 |---------|---------|-------------|
 | FEAT-0003 (Web Dashboard) | v0.1.0 | Shipped |
 | FEAT-0004 (Service Management) | v0.1.0 | Shipped |
-| FEAT-0008 (BFF Server) | v0.2.0 | In planning |
+| FEAT-0008 (Runtime Server) | v0.2.0 | In planning |
 | FEAT-0009 (Terminal Harness) | v0.2.0 | In planning |
 | FEAT-0010 (Enterprise Auth) | v0.4.0+ or TBD | Deferred by v0.3.x Professional Harness Runtime planning |
 | FEAT-0011 (Knowledge Integration) | related to v0.3.4; implementation TBD | Proposed, coordinated with FEAT-0022 |

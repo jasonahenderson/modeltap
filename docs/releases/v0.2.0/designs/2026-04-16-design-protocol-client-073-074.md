@@ -1,5 +1,8 @@
 # 2026-04-16 — Design: Protocol Client Bundle (WU-073 + WU-074)
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Scope
 
 This bundle covers the harness-side protocol client and connection manager in `internal/harness/`:

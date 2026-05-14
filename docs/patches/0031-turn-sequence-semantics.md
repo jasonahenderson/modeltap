@@ -11,6 +11,9 @@ branch: "patch/0031-turn-sequence-semantics"
 
 # PATCH-0031: Align BFF Conversation.sequence with harness user-turn semantics
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Problem
 
 `turn.submit` returns `-32602 turn.submit sequence 2 does not follow

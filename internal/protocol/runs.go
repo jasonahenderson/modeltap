@@ -200,7 +200,7 @@ type RunPermission struct {
 	Reason    string `json:"reason,omitempty"`
 }
 
-// RunHeartbeatResponse returns latest BFF-observed run status.
+// RunHeartbeatResponse returns latest Runtime-observed run status.
 type RunHeartbeatResponse struct {
 	RunID     string `json:"run_id"`
 	Status    string `json:"status"`

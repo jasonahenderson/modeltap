@@ -1,5 +1,8 @@
 # v0.3.0 — Status
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 **Current phase:** Phase 3 — Implementation complete; pending release close
 
 **Branch:** `release/v0.3.0`  

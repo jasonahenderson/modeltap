@@ -12,6 +12,9 @@ branch: "exploration/integrated-harness"
 
 # PATCH-0006: Unified `~/.modeltap/` Config & Data Directory
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Problem
 
 Today modeltap scatters its state across two XDG-style directories plus one quirk:

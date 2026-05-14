@@ -12,6 +12,9 @@ branch: "patch/0008-moonshot-provider-adapter"
 
 # PATCH-0008: Moonshot Provider Adapter
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Problem
 
 modeltap cannot route to Moonshot AI (Kimi K2.6 / K2.5) because no provider adapter exists in `internal/provider/`. The provider registry knows Anthropic, OpenAI, and Ollama only. Users who set `type: moonshot` in `config.yaml` get a startup error from the registry. Kimi's API is OpenAI-compatible, so the adapter is small — mostly defaults and response-field handling — but without it the harness cannot leverage Kimi's 256k context window or K2.6 reasoning capabilities.

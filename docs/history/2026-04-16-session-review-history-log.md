@@ -1,5 +1,8 @@
 # 2026-04-16 — session review history log
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Summary
 
 Logged the review work completed across this chat session and the immediately preceding review refinements that remained part of the same working thread.

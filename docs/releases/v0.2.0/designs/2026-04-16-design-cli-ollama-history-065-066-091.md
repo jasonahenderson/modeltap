@@ -1,5 +1,8 @@
 # 2026-04-16 — Design: CLI, Ollama Provider, Command History Bundle (WU-065 + WU-066 + WU-091)
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Scope
 
 - **WU-065** — CLI commands (`internal/cli/`): `modeltap serve`, `server status`, `server sessions`, `server session <id>`, `session unlock`.

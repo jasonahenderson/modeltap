@@ -1,5 +1,8 @@
 # v0.2.0 Changelog
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 **Status:** unreleased (in development on `exploration/integrated-harness`)
 
 v0.2.0 reframes modeltap from a pure capture proxy into an integrated AI environment. The proxy layer from v0.1 is unchanged and fully retained; v0.2.0 adds a JSON-RPC BFF server, a Bubbletea terminal harness, a complete built-in tool framework, an MCP client, and end-to-end session / routing / context / history machinery.

@@ -1,5 +1,5 @@
 // Package protocol defines the on-the-wire types and framing used by the
-// Modeltap BFF server and terminal harness.
+// Modeltap Runtime server and terminal harness.
 //
 // The protocol is JSON-RPC 2.0 over NDJSON (newline-delimited JSON) carried
 // by either a Unix-domain socket or TLS. Every wire field uses snake_case;
@@ -7,7 +7,7 @@
 //
 // This package contains only type definitions and serialization helpers.
 // Dispatch, validation, and business logic live in higher-level packages
-// (internal/bff and internal/harness).
+// (internal/runtime and internal/harness).
 //
 // Scope for WU-039: protocol version constants, JSON-RPC 2.0 envelope
 // (Request / Response / Notification / ErrorObject), NDJSON framing
@@ -37,7 +37,7 @@
 // form onto the wire.
 //
 // References:
-//   - Feature spec: docs/features/0008-bff-server.md (Protocol Specification,
+//   - Feature spec: docs/features/0008-runtime-server.md (Protocol Specification,
 //     Protocol Messages, Protocol Payload Schemas, Canonical Field Names).
 //   - JSON-RPC 2.0: https://www.jsonrpc.org/specification
 //   - Cross-track conformance (golden fixtures, round-trip tests against

@@ -272,7 +272,7 @@ func (r *ProductionRuntime) Close() error {
 func (r *ProductionRuntime) SubmitTurn(ctx context.Context, req SubmitRequest) (SubmitAccepted, error) {
 	client := r.cm.Client()
 	if client == nil {
-		return SubmitAccepted{}, errors.New("no live BFF client")
+		return SubmitAccepted{}, errors.New("no live runtime client")
 	}
 
 	content, attachments, err := r.buildSubmitContent(ctx, req)
@@ -319,7 +319,7 @@ func (r *ProductionRuntime) SubmitTurn(ctx context.Context, req SubmitRequest) (
 //
 // On error the runtime synthesizes harnessshell.RunStoppedEvent
 // (per Kimi #7) so the shell's transcript shows a clean stop instead
-// of a red error when the BFF doesn't support cancellation.
+// of a red error when the Runtime doesn't support cancellation.
 func (r *ProductionRuntime) InterruptRun(ctx context.Context, runID string) error {
 	client := r.cm.Client()
 	if client == nil {
@@ -329,7 +329,7 @@ func (r *ProductionRuntime) InterruptRun(ctx context.Context, runID string) erro
 		r.sender.Send(harnessshell.RunStoppedEvent{
 			RunID:   runID,
 			Reason:  harnessshell.StopReasonInterrupt,
-			Message: "stopped — no live BFF client",
+			Message: "stopped — no live runtime client",
 		})
 		return nil
 	}
@@ -343,7 +343,7 @@ func (r *ProductionRuntime) InterruptRun(ctx context.Context, runID string) erro
 			return nil
 		}
 	}
-	// Success: the BFF accepted the cancel. Synthesize the stop
+	// Success: the Runtime accepted the cancel. Synthesize the stop
 	// event ourselves; the existing harness streaming layer doesn't
 	// emit a terminal Run* message on cancel, so we surface one
 	// directly to keep the shell's chrome consistent.
@@ -900,7 +900,7 @@ func (r *ProductionRuntime) handleRunAttachCommand(ctx context.Context, args str
 	}
 	var resp protocol.RunAttachResponse
 	if err := client.CallInto(ctx, protocol.MethodRunAttach, &protocol.RunAttach{RunID: runID}, &resp); err != nil {
-		// PATCH-0033: the BFF rejects attaching to terminal runs by
+		// PATCH-0033: the Runtime rejects attaching to terminal runs by
 		// design. Surface a friendlier hint pointing at /run for
 		// read-only inspection instead of leaking the JSON-RPC error.
 		var rpcErr *harness.RPCError
@@ -1061,9 +1061,9 @@ func (r *ProductionRuntime) statusError(op string, err error) error {
 	return nil
 }
 
-// errNoLiveClient is the canonical "no live BFF client" error; helper
+// errNoLiveClient is the canonical "no live runtime client" error; helper
 // constants reuse it to keep the user-visible message stable.
-var errNoLiveClient = errors.New("no live BFF client")
+var errNoLiveClient = errors.New("no live runtime client")
 
 // nonEmpty returns s if non-empty, else fallback.
 func nonEmpty(s, fallback string) string {
@@ -1182,7 +1182,7 @@ func lastSlash(s string) int {
 // SummarizePaste implements [harnesshost.Runtime] via the existing
 // content.transform RPC. Per Kimi #17 the fallback on RPC error is
 // a passthrough — the shell already has its own built-in paste
-// summarizer, so a missing/failing BFF transform doesn't break
+// summarizer, so a missing/failing Runtime transform doesn't break
 // paste capture.
 func (r *ProductionRuntime) SummarizePaste(ctx context.Context, raw string) (string, error) {
 	client := r.cm.Client()
@@ -1216,7 +1216,7 @@ func (r *ProductionRuntime) SummarizePaste(ctx context.Context, raw string) (str
 //
 // WU-104a stub: the channel is registered but ResolvePermission can't
 // fulfill it yet (returns not-implemented). WU-104b completes the
-// loop. For WU-104a's BFF stub Layer 3 tests, no permission prompts
+// loop. For WU-104a's Runtime stub Layer 3 tests, no permission prompts
 // fire so this stub is exercised only by WU-104b's tests.
 func (r *ProductionRuntime) permissionPromptCallback(ctx context.Context, tool tools.Tool, input json.RawMessage) bool {
 	requestID := fmt.Sprintf("perm-%d", r.permCounter.Add(1))
@@ -1316,7 +1316,7 @@ func newToolResultSender(cm *harness.ConnectionManager) *toolResultSender {
 func (t *toolResultSender) SendToolResult(ctx context.Context, result *protocol.ToolResult) error {
 	client := t.cm.Client()
 	if client == nil {
-		return errors.New("tool result dropped: no live BFF client")
+		return errors.New("tool result dropped: no live runtime client")
 	}
 	return client.SendToolResult(ctx, result)
 }

@@ -1,5 +1,8 @@
 # 2026-04-17 — Session: BFF Foundation Phase 3 (WU-046 + WU-048)
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Topic
 
 Continued v0.2.0 Phase 3 (Implementation). Track 0 was complete entering

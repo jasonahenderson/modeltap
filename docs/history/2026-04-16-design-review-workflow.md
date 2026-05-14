@@ -1,5 +1,8 @@
 # 2026-04-16 — Design Review Workflow Added to Agent Team
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Context
 
 Post-WU-039, identified a gap in the agent workflow: the pipeline went Designer → Tester with no review step. Design errors baked into tests and cascaded. WU-039's design was produced and consumed by the same agent (me, in different roles), with no fresh-eyes check before tests were written.

@@ -34,7 +34,7 @@ A foreground run is attached and owns the active conversation surface. A
 background run is detached or non-focused, appears in a run queue, and continues
 under explicit permission and workspace policy.
 
-The BFF stores run state and progress. The harness renders the attached run in
+The runtime server stores run state and progress. The harness renders the attached run in
 the conversation shell and exposes a jobs/runs surface for detached work.
 
 ## Key Capabilities
@@ -53,11 +53,11 @@ for runs in `waiting_permission` or `waiting_user`.
 Users can attach, detach, cancel, continue, retry, or fork a run without losing
 its transcript or artifacts.
 
-Attachment state is BFF-authoritative. A run has at most one attached client at
+Attachment state is runtime server-authoritative. A run has at most one attached client at
 a time; additional connected clients may observe it. The harness requests
-attachment through `/attach <run-id>`, and the BFF grants or rejects the request
+attachment through `/attach <run-id>`, and the runtime server grants or rejects the request
 with a reason such as already attached elsewhere, terminal run, or unavailable
-run. If an attached harness disconnects without detaching, the BFF moves the run
+run. If an attached harness disconnects without detaching, the runtime server moves the run
 to `detached` after a configurable grace period, defaulting to 60 seconds.
 During the grace period, the run may continue only according to its configured
 background-policy posture for stages that do not require local side effects.
@@ -70,7 +70,7 @@ locked by the run-runtime ADR.
 Attachment never auto-promotes from an observer. When an attached client misses
 the grace period, the run becomes `detached`; clients must explicitly attach.
 The first valid attach claim wins, and concurrent attach requests are serialized
-BFF-side.
+runtime-side.
 
 Attachment state is orthogonal to run status and pipeline stage. A run can be
 `running` while `detached`, `waiting_permission` while `attached`, or
@@ -93,10 +93,10 @@ The default for mutating operations should be pause, not silent mutation.
 
 When a run requires a local side-effect tool and no harness/local executor is
 connected, the run pauses with status `waiting_user` and an executor-disconnected
-reason. BFF-only stages may continue when they do not simulate local side
+reason. runtime-only stages may continue when they do not simulate local side
 effects, including prompt/context planning, routing, model calls that can
 complete without tool calls, and summarization over already captured artifacts.
-The precise BFF-safe tool surface is enumerated by the run-runtime ADR.
+The precise runtime-safe tool surface is enumerated by the run-runtime ADR.
 
 ### Run Queue
 
@@ -127,15 +127,15 @@ when attached or observing, the selected run's transcript stream.
 
 ### Resume After Restart
 
-If the harness restarts while the BFF is still available, the user can list
-active runs for the current session and reattach. The BFF replays run events from
+If the harness restarts while the runtime server is still available, the user can list
+active runs for the current session and reattach. The runtime server replays run events from
 the last observed sequence number when the events are within retention. If full
-replay is unavailable, the BFF returns a summary plus the latest checkpoint with
+replay is unavailable, the runtime server returns a summary plus the latest checkpoint with
 a visible fidelity note.
 
 Tools already running when a harness disconnects may complete locally. On
 reconnect, the harness reports each terminal result. If the run reaches the
-grace-period deadline without reconnect while such a tool is unresolved, the BFF
+grace-period deadline without reconnect while such a tool is unresolved, the runtime server
 transitions the run to `failed` with reason
 `executor_disconnected_during_tool_call`; later reported results are retained as
 forensic artifacts and are not fed back into the active model loop.
@@ -213,7 +213,7 @@ plan.
 3. A background run that needs unapproved side effects pauses or follows an
    explicit auto-deny policy.
 4. Blocked background runs surface in a visible permission/input inbox.
-5. Harness restart does not erase BFF-known active runs.
+5. Harness restart does not erase runtime-known active runs.
 6. Foreground runs and background runs share the same run lifecycle and
    artifact model from FEAT-0016.
 

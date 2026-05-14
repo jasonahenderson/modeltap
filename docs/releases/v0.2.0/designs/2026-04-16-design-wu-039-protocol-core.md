@@ -1,5 +1,8 @@
 # 2026-04-16 — Design: WU-039 Protocol Core Messages and Framing
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 **Work Unit:** WU-039 (Track 0)
 **Agent role:** Designer
 **Inputs:** FEAT-0008 §"Protocol Messages", §"Protocol Payload Schemas", §"Canonical Field Names", §"Protocol Specification"; `docs/releases/v0.2.0/track-0-shared.md` WU-039 spec.

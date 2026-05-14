@@ -1,5 +1,8 @@
 # v0.2.2 Changelog
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 **Status:** released (tagged on branch `spike/scrolling-surface-eval`)
 
 v0.2.2 lands the production conversation-shell wiring deferred from

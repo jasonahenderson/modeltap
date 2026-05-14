@@ -16,10 +16,10 @@ import (
 )
 
 // WU-104a integration tests for ProductionRuntime.SubmitTurn against
-// the testutil BFF stub. Verifies the live ConnectionManager →
+// the testutil Runtime stub. Verifies the live ConnectionManager →
 // ProtocolClient → SubmitTurn → ack pipeline end-to-end.
 
-func newProductionRuntimeForTest(t *testing.T, stub *testutil.BFFStub) *ProductionRuntime {
+func newProductionRuntimeForTest(t *testing.T, stub *testutil.RuntimeStub) *ProductionRuntime {
 	t.Helper()
 	cfg := ProductionRuntimeConfig{
 		ConnConfig: harness.ConnectionConfig{
@@ -56,9 +56,9 @@ func newProductionRuntimeForTest(t *testing.T, stub *testutil.BFFStub) *Producti
 }
 
 func TestProductionRuntimeSubmitTurnReachesStub(t *testing.T) {
-	stub, err := testutil.NewBFFStub()
+	stub, err := testutil.NewRuntimeStub()
 	if err != nil {
-		t.Fatalf("NewBFFStub: %v", err)
+		t.Fatalf("NewRuntimeStub: %v", err)
 	}
 	defer stub.Close()
 
@@ -85,7 +85,7 @@ func TestProductionRuntimeSubmitTurnReachesStub(t *testing.T) {
 
 	submits := stub.Submits()
 	if len(submits) != 1 {
-		t.Fatalf("BFF stub received %d submits, want 1", len(submits))
+		t.Fatalf("Runtime stub received %d submits, want 1", len(submits))
 	}
 	var got struct {
 		TurnID    string `json:"turn_id"`
@@ -109,9 +109,9 @@ func TestProductionRuntimeSubmitTurnReachesStub(t *testing.T) {
 }
 
 func TestProductionRuntimeSubmitTurnRecordsServerSession(t *testing.T) {
-	stub, err := testutil.NewBFFStub()
+	stub, err := testutil.NewRuntimeStub()
 	if err != nil {
-		t.Fatalf("NewBFFStub: %v", err)
+		t.Fatalf("NewRuntimeStub: %v", err)
 	}
 	defer stub.Close()
 
@@ -164,8 +164,8 @@ func TestProductionRuntimeSubmitTurnFailsWithoutClient(t *testing.T) {
 	if err == nil {
 		t.Fatalf("SubmitTurn before connect should error")
 	}
-	if !strings.Contains(err.Error(), "no live BFF client") {
-		t.Fatalf("error = %v, want 'no live BFF client'", err)
+	if !strings.Contains(err.Error(), "no live runtime client") {
+		t.Fatalf("error = %v, want 'no live runtime client'", err)
 	}
 }
 
@@ -217,9 +217,9 @@ func TestProductionRuntimeWU104bWU104cStubs(t *testing.T) {
 }
 
 func TestProductionRuntimeLoadPreviewReadsFile(t *testing.T) {
-	stub, err := testutil.NewBFFStub()
+	stub, err := testutil.NewRuntimeStub()
 	if err != nil {
-		t.Fatalf("NewBFFStub: %v", err)
+		t.Fatalf("NewRuntimeStub: %v", err)
 	}
 	defer stub.Close()
 
@@ -297,13 +297,13 @@ func TestProductionRuntimeResolvePermissionUnblocksCallback(t *testing.T) {
 // a racing turn.submit already wrote. The race shape: ConnStateReady
 // fires; bootstrapSession is goroutine'd; turn.submit runs first
 // because the user typed fast, auto-creates session "stub-session"
-// on the BFF, and stores it via SetSessionID. session.create then
+// on the Runtime, and stores it via SetSessionID. session.create then
 // returns later with a different id; bootstrapSession must observe
 // the existing id and skip the Set.
 func TestProductionRuntimeBootstrapSessionDoesNotOverwrite(t *testing.T) {
-	stub, err := testutil.NewBFFStub()
+	stub, err := testutil.NewRuntimeStub()
 	if err != nil {
-		t.Fatalf("NewBFFStub: %v", err)
+		t.Fatalf("NewRuntimeStub: %v", err)
 	}
 	defer stub.Close()
 
@@ -326,9 +326,9 @@ func TestProductionRuntimeBootstrapSessionDoesNotOverwrite(t *testing.T) {
 // PATCH-0028 + PATCH-0029: when no turn raced ahead, bootstrapSession
 // adopts the session id returned by session.create.
 func TestProductionRuntimeBootstrapSessionAdoptsWhenEmpty(t *testing.T) {
-	stub, err := testutil.NewBFFStub()
+	stub, err := testutil.NewRuntimeStub()
 	if err != nil {
-		t.Fatalf("NewBFFStub: %v", err)
+		t.Fatalf("NewRuntimeStub: %v", err)
 	}
 	defer stub.Close()
 
@@ -348,13 +348,13 @@ func TestProductionRuntimeBootstrapSessionAdoptsWhenEmpty(t *testing.T) {
 }
 
 // PATCH-0038: bootstrapSession falls through to session.create when
-// session.list fails (e.g. unsupported by the BFF stub) or returns
+// session.list fails (e.g. unsupported by the Runtime stub) or returns
 // zero sessions. The harness ends up with a session id and emits a
 // welcome HostInfoEvent.
 func TestProductionRuntimeBootstrapFallsBackToCreateWhenListUnavailable(t *testing.T) {
-	stub, err := testutil.NewBFFStub()
+	stub, err := testutil.NewRuntimeStub()
 	if err != nil {
-		t.Fatalf("NewBFFStub: %v", err)
+		t.Fatalf("NewRuntimeStub: %v", err)
 	}
 	defer stub.Close()
 

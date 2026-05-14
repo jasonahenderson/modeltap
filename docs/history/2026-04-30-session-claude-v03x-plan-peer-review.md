@@ -1,5 +1,8 @@
 # 2026-04-30 — Session: Claude peer review of v0.3.x plans against FEAT-0015–0022
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Summary
 
 User requested a peer review of the v0.3.x release plans (v0.3.0 through

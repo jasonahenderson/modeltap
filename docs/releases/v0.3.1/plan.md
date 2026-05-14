@@ -50,7 +50,7 @@ Current phase: **Planning draft — Phase 1 not opened.**
 | 120 | Harness project-rule discovery and precedence reporting | 118 | M | FEAT-0018 |
 | 121 | Lightweight repo map and recent-change scanner | 119 | L | FEAT-0018 |
 | 122 | Test and style-context discovery | 121 | M | FEAT-0018 |
-| 123 | BFF context planner and budget accounting | 119-122 | L | FEAT-0018 |
+| 123 | runtime server context planner and budget accounting | 119-122 | L | FEAT-0018 |
 | 124 | Prompt-plan metadata and context provenance capture | 123 | M | FEAT-0018 |
 | 125 | Harness `/context` inspection surfaces | 123, 124 | M | FEAT-0018 |
 | 126 | Context planner verification and docs | 120-125 | M | FEAT-0018 |
@@ -62,7 +62,7 @@ Current phase: **Planning draft — Phase 1 not opened.**
 **WU-118: Project rules and prompt-layer ADR**
 
 Decide rule precedence, how `MODELTAP.md` coexists with `AGENTS.md` and
-`CLAUDE.md`, which prompt layers are BFF-owned, and what prompt metadata can be
+`CLAUDE.md`, which prompt layers are runtime-owned, and what prompt metadata can be
 shown safely. Align the prompt metadata taxonomy with the v0.3.0 run prompt
 and `turn.submit` compatibility decisions.
 
@@ -90,9 +90,9 @@ ceilings so repo-map generation remains bounded on large workspaces.
 Infer nearby tests and local style examples from selected files and packages.
 No full AST dependency in this release.
 
-### Track C — BFF Planner and Harness UI
+### Track C — runtime server Planner and Harness UI
 
-**WU-123: BFF context planner and budget accounting**
+**WU-123: runtime server context planner and budget accounting**
 
 Assemble a context plan from user attachments, rule sources, repo map input,
 recent changes, style samples, and memory placeholders. Track budget by
@@ -137,6 +137,6 @@ path ignores, and `/context` rendering.
 
 1. Project-rule/prompt-layer ADR is accepted.
 2. Implementation runs produce context plans with provenance.
-3. The BFF budgets context categories before model dispatch.
+3. The runtime server budgets context categories before model dispatch.
 4. The harness shows active context and why-selected details.
 5. Tests cover rule discovery, provenance, budget behavior, and UI inspection.

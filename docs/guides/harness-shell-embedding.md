@@ -93,7 +93,7 @@ typed events back into the shell.
 
 ### Host-owned
 
-- turn submission to the runtime / BFF
+- turn submission to the runtime / runtime server
 - stream lifecycle and result delivery
 - host-native command execution
 - preview / file inspection loading
@@ -140,7 +140,7 @@ func main() {
     var runtime harnesshost.Runtime = newMyRuntime() // your impl
     adapter := harnesshost.New(shell, runtime)
 
-    p := tea.NewProgram(adapter, tea.WithAltScreen(), tea.WithMouseAllMotion())
+    p := tea.NewProgram(adapter, tea.WithAltScreen())
     if _, err := p.Run(); err != nil {
         panic(err)
     }
@@ -184,7 +184,7 @@ func (m model) View() string { return m.shell.View() }
 A submit followed by a streaming response runs as follows.
 
 Starting in v0.3.0, the `RunID` that crosses the host/shell boundary is the
-BFF-owned durable run ID when the server returns one. Older BFFs may still echo
+runtime-owned durable run ID when the server returns one. Older BFFs may still echo
 the turn ID; production runtime code keeps that fallback for compatibility.
 Host integrations should treat `RunID` as opaque and should call `run.*`
 methods for run-native inspection and control.
@@ -309,9 +309,9 @@ Embedding hosts should preserve these rules:
 - Do not append detached-run deltas to the active foreground transcript.
 - Keep per-run replay state keyed by run ID, including the last observed run
   sequence.
-- Prefer `run.cancel` for BFF-owned run IDs and fall back to `turn.cancel` only
+- Prefer `run.cancel` for runtime-owned run IDs and fall back to `turn.cancel` only
   when speaking to older BFFs.
-- Render BFF-provided `input_required`, `stuck`, and replay-fidelity fields
+- Render runtime-provided `input_required`, `stuck`, and replay-fidelity fields
   directly instead of recomputing them in the shell.
 
 The shell package itself remains protocol-free. Protocol payloads are converted
@@ -527,7 +527,7 @@ architecture. It composes `harnessshell` + `harnesshost.Adapter` +
 `harnessdemo.FakeRuntime` (via `harnessdemo.Driver`) to drive the shell
 end-to-end against a synthetic backend. Useful for evaluating shell
 layout, streaming behavior, queue follow-ups, and the `/perm`
-permission demo without a real BFF.
+permission demo without a real runtime server.
 
 The legacy `modeltap harness-spike` command was removed in WU-100
 Stage E.

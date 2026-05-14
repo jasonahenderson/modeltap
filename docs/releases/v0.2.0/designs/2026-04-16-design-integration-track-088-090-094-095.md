@@ -1,5 +1,8 @@
 # 2026-04-16 — Design: Integration Track Bundle (WU-088 + WU-089 + WU-090 + WU-094 + WU-095)
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Scope
 
 - **WU-088** — End-to-end tests: harness → BFF → mock provider (`internal/integration/`)

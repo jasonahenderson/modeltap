@@ -17,7 +17,7 @@ import (
 )
 
 // DefaultDialTimeout is the default timeout for the initial connection
-// to the BFF socket / TLS endpoint.
+// to the Runtime socket / TLS endpoint.
 const DefaultDialTimeout = 5 * time.Second
 
 // EventHandler processes server-initiated notifications. Implementations
@@ -98,7 +98,7 @@ type ProtocolClient struct {
 	exitErr atomic.Value // stores error
 }
 
-// Dial opens a connection to the BFF and starts the read loop.
+// Dial opens a connection to the Runtime and starts the read loop.
 func Dial(ctx context.Context, opts DialOptions) (*ProtocolClient, error) {
 	if opts.SocketPath == "" && opts.TLSAddress == "" {
 		return nil, errors.New("dial: SocketPath or TLSAddress required")

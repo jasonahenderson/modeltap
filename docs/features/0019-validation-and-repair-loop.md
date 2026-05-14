@@ -28,7 +28,7 @@ can loop over the same failed fix.
 ## Solution
 
 Add validation planning and repair-loop behavior to implementation and debug
-runs. The harness discovers and executes relevant checks under policy. The BFF
+runs. The harness discovers and executes relevant checks under policy. The runtime server
 stores validation evidence as run artifacts and feeds concise failure summaries
 back into repair turns.
 
@@ -36,7 +36,7 @@ back into repair turns.
 
 ### Validation Plan
 
-For mutating runs, the BFF composes a validation plan from facts reported by the
+For mutating runs, the runtime server composes a validation plan from facts reported by the
 harness or local executor. Inputs include:
 
 - changed files
@@ -87,7 +87,7 @@ artifact cap, and stores a checksum plus truncation metadata for the full output
 
 ### Failure Summarization
 
-The BFF turns validation output into concise repair context:
+The runtime server turns validation output into concise repair context:
 
 - failing test names
 - compile/lint diagnostics
@@ -168,7 +168,7 @@ checks. All are configurable.
 
 | ADR | Relationship |
 |---|---|
-| ADR-0014 | Harness executes local checks while BFF owns orchestration and evidence |
+| ADR-0014 | Harness executes local checks while runtime server owns orchestration and evidence |
 | Future ADR | Should decide validation artifact schema and repair-loop limits |
 
 ## Open Questions

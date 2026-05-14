@@ -4,7 +4,7 @@ This directory holds the architectural decisions that constrain modeltap's desig
 
 ## Current Architecture (Effective Decisions)
 
-modeltap is a single-binary **Go** reverse proxy (ADR-0001) that captures AI/ML API traffic into a per-installation **SQLite** database via `modernc.org/sqlite` in WAL mode (ADR-0002). The CLI uses **Cobra** (ADR-0003) and configuration is managed by **Viper** with non-global instances (ADR-0004). Capture is **always full-fidelity** with retention-based pruning (ADR-0005). Provider adapters implement a clean **multi-provider interface**, with Anthropic and OpenAI built in for v1 (ADR-0006). Usage metrics are pre-computed into **aggregation tables** for fast queries (ADR-0007). The optional knowledge layer uses **sqlite-vec** for vector search (ADR-0008) and exposes its content over an **MCP stdio transport** (ADR-0009). The project ships under **Apache 2.0** (ADR-0010) and is governed under a **BDFL model with contributor tiers** (ADR-0011). Background execution uses **platform-native service managers** (launchd/systemd) rather than a custom daemon (ADR-0012).
+modeltap is a single-binary **Go** reverse proxy (ADR-0001) that captures AI/ML API traffic into a per-installation **SQLite** database via `modernc.org/sqlite` in WAL mode (ADR-0002). The CLI uses **Cobra** (ADR-0003) and configuration is managed by **Viper** with non-global instances (ADR-0004). Capture is **always full-fidelity** with retention-based pruning (ADR-0005). Provider adapters implement a clean **multi-provider interface**, with Anthropic and OpenAI built in for v1 (ADR-0006). Usage metrics are pre-computed into **aggregation tables** for fast queries (ADR-0007). The optional knowledge layer uses **sqlite-vec** for vector search (ADR-0008) and exposes its content over an **MCP stdio transport** (ADR-0009). The project ships under **Apache 2.0** (ADR-0010) and is governed under a **BDFL model with contributor tiers** (ADR-0011). Background execution uses **platform-native service managers** (launchd/systemd) rather than a custom daemon (ADR-0012). The terminal harness remains a Bubbletea thin client (ADR-0013, ADR-0014), durable run state is owned by the runtime (ADR-0015), and the former BFF concept is now the **runtime server** with multiple client surfaces (ADR-0016).
 
 ## ADR Index
 
@@ -25,6 +25,7 @@ modeltap is a single-binary **Go** reverse proxy (ADR-0001) that captures AI/ML 
 | [0013](0013-terminal-ui-framework.md) | Bubbletea (Charm ecosystem) for terminal UI | Proposed |
 | [0014](0014-harness-base-strategy.md) | Continue modeltap harness (universal orchestration client) | Accepted |
 | [0015](0015-run-runtime.md) | Run runtime ownership and semantics | Accepted |
+| [0016](0016-runtime-server-and-client-surfaces.md) | Runtime server and client surfaces | Accepted |
 
 ## When to Write an ADR
 

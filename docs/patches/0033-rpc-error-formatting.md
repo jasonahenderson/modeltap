@@ -10,6 +10,9 @@ branch: "patch/0033-rpc-error-formatting"
 
 # PATCH-0033: Unwrap RPCError framing in shell statusError; friendlier terminal-run reject
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Problem
 
 Every slash command in the production shell that hits a BFF error

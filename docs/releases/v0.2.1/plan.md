@@ -1,5 +1,8 @@
 # Implementation Plan: FEAT-0014 (Harness Conversation Shell) + PATCH-0015 (Harness Shell Component API)
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Context
 
 `v0.2.0` remains the active implementation release for the first integrated BFF

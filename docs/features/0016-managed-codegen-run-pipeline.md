@@ -8,7 +8,7 @@ series: Professional Harness Runtime
 series-role: member
 series-order: 1
 depends-on:
-  - FEAT-0008: BFF Server
+  - FEAT-0008: Runtime Server
   - FEAT-0009: Terminal Harness
   - FEAT-0014: Harness Conversation Shell
 adr-constraints:
@@ -31,14 +31,14 @@ state models.
 
 ## Solution
 
-Define code generation as a durable run pipeline owned primarily by the BFF and
+Define code generation as a durable run pipeline owned primarily by the runtime server and
 surfaced by the harness. Each implementation or debug run moves through explicit
 stages, but the pipeline is a state graph rather than a one-shot linear
 sequence:
 
 `preflight -> context_plan -> prompt_plan -> model_call -> tool_loop -> validation -> artifact_capture -> checkpoint -> completion`
 
-The BFF stores lifecycle metadata and emits progress events. The harness renders
+The runtime server stores lifecycle metadata and emits progress events. The harness renders
 the active stage compactly, enforces local side-effect policy, executes local
 tools, and lets the user inspect or recover the run.
 
@@ -98,7 +98,7 @@ execution. Each tool call resolves to one of `success`, `failure`, `denied`,
 halts the run. A run-level `tool_loop` failure is emitted only when the model or
 policy determines that the run cannot proceed.
 
-Checkpoints are written atomically through the BFF's durable store before the
+Checkpoints are written atomically through the runtime server's durable store before the
 runtime advances to the next stage. Exact transaction/fsync boundaries and
 minimum checkpoint data belong in the run-runtime ADR.
 
@@ -116,7 +116,7 @@ more than one run. Repair, validation triage, and clarification turns reenter
 `model_call`, or `prompt_plan` when context or prompt layers must be revised,
 within the same `run_id`.
 
-### BFF Responsibilities
+### runtime server Responsibilities
 
 - create a run ID before dispatching model work
 - persist run stage transitions
@@ -131,12 +131,12 @@ with provider, model, tokens, cost, and latency; per `tool_call_id` with
 executor, duration, and outcome; and per pipeline stage as aggregated totals.
 Run-level totals are derived from those lower-level records.
 
-Run status and pipeline-stage transitions are BFF-authoritative. The harness
+Run status and pipeline-stage transitions are runtime server-authoritative. The harness
 reports facts such as tool results, user actions taken locally, local errors,
-and executor disconnects; the BFF integrates those reports and is the sole
+and executor disconnects; the runtime server integrates those reports and is the sole
 emitter of status and stage change events. Harness rendering reflects the last
-BFF-emitted state. Harness commands such as cancel, retry, continue, and
-fork are requests to the BFF; the BFF acknowledges and emits the resulting
+runtime-emitted state. Harness commands such as cancel, retry, continue, and
+fork are requests to the runtime server; the runtime server acknowledges and emits the resulting
 transition or rejects the request with a reason.
 
 ### Harness Responsibilities
@@ -162,10 +162,10 @@ design detail, but the harness needs:
 - checkpoint recorded
 - run completed, failed, cancelled, or blocked
 
-BFF-to-harness event streams use bounded buffering. Overflow may coalesce or drop
+runtime-to-harness event streams use bounded buffering. Overflow may coalesce or drop
 older non-essential progress updates, but must not drop stage transitions,
 tool-request/result events, artifact events, checkpoints, or terminal events.
-If essential-event buffering is exhausted, the BFF pauses upstream streaming or
+If essential-event buffering is exhausted, the runtime server pauses upstream streaming or
 transitions the run according to liveness policy rather than silently losing
 events.
 
@@ -180,7 +180,7 @@ demand:
 - `/run policy` shows active policy and workspace
 - `/cancel`, `/continue`, `/retry`, and `/fork` operate on the active run
 
-The BFF protocol needs run-aware submit and inspection surfaces, either by
+The runtime server protocol needs run-aware submit and inspection surfaces, either by
 extending `turn.submit` or adding run-specific methods.
 
 `/run` is singular and always refers to the currently attached run. `/runs` or
@@ -211,7 +211,7 @@ active-stage deadlines.
 ## Success Criteria
 
 1. An implementation request creates a stable run ID before model dispatch.
-2. The BFF records and emits stage transitions for the run.
+2. The runtime server records and emits stage transitions for the run.
 3. Tool calls, model selection, cost, and terminal outcome are correlated with
    the run ID.
 4. The harness renders stage/status and can inspect run metadata on demand.
@@ -224,7 +224,7 @@ active-stage deadlines.
 
 | ADR | Relationship |
 |---|---|
-| ADR-0014 | Requires BFF-first orchestration with the harness as universal orchestration client |
+| ADR-0014 | Requires runtime-first orchestration with the harness as universal orchestration client |
 | ADR-0015 | Decides run ownership, lifecycle terminology, transition policy, checkpoint schema, event buffering, executor availability, and v0.3.0 liveness semantics |
 
 ## Resolved for v0.3.0

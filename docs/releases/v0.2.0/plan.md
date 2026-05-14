@@ -1,5 +1,8 @@
 # Implementation Plan: FEAT-0008 (BFF Server) + FEAT-0009 (Terminal Harness)
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Context
 
 Modeltap v1 is a complete reverse proxy (~4,500 lines Go) with capture, metrics, CLI, dashboard, and service management (WU-001 through WU-038). FEAT-0008 and FEAT-0009 transform it into an integrated professional AI environment: a BFF server that manages conversations, routing, and sessions, plus a Bubbletea terminal harness that handles tools, permissions, and UI.

@@ -1,5 +1,8 @@
 # 2026-04-18 — Session: Bundle 9 (mostly) + WU-052
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Topic
 
 Continuation of the "continue until complete" autonomous Phase 3 push.

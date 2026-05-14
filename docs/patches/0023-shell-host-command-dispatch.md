@@ -12,6 +12,9 @@ branch: "patch/0023-shell-host-command-dispatch"
 
 # PATCH-0023: Dispatch host-native slash commands as RunHostCommandAction
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Problem
 
 When the user types a host-native slash command in the production

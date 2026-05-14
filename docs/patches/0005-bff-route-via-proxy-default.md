@@ -12,6 +12,9 @@ branch: "exploration/integrated-harness"
 
 # PATCH-0005: BFF Routes Through Local Proxy by Default
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Problem
 
 When `modeltap harness` auto-starts the BFF, the auto-start subprocess is `modeltap start` — which runs **both** the v0.1 reverse proxy on `:8080` **and** the v0.2 BFF server on a unix socket. Today, though, the BFF dials provider endpoints (`api.anthropic.com`, `api.openai.com`) **directly** over HTTPS, not through the local proxy that's sitting right there capturing:

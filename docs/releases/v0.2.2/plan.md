@@ -1,5 +1,8 @@
 # Implementation Plan: v0.2.2 — Production Conversation-Shell Wiring
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Context
 
 `v0.2.1` extracted the conversation shell into a reusable Bubble Tea

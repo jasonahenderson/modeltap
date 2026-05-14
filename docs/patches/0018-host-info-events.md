@@ -12,6 +12,9 @@ branch: "patch/0018-host-info-events"
 
 # PATCH-0018: Surface slash-command output via transcript host-info events
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Problem
 
 The conversation shell has no surface for displaying multi-line output

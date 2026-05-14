@@ -13,6 +13,9 @@ branch: "exploration/integrated-harness"
 
 # PATCH-0009: Root `README.md`
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Problem
 
 The repo root has no `README.md`. Anyone landing on the GitHub page — or on a local clone — gets a directory listing with no framing: no elevator pitch, no "what is this," no quick start, no pointer to the user guide or contribution docs. The install story ("clone, `make build`, run `./bin/modeltap`") lives only in `docs/usage-guide.md`, which a visitor has to know to open.

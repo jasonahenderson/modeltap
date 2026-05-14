@@ -11,6 +11,9 @@ branch: "patch/0022-turn-submit-max-tokens-default"
 
 # PATCH-0022: Set default max_tokens for turn.submit dispatch
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Problem
 
 Every `turn.submit` against an Anthropic provider returns

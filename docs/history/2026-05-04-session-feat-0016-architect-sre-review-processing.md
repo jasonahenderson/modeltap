@@ -1,5 +1,8 @@
 # 2026-05-04 — FEAT-0016 Architect/SRE Review Processing
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 Processed `docs/features/.reviews/0016-managed-codegen-run-pipeline-architect-sre-findings.md`.
 
 ## Changes

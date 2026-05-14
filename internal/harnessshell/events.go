@@ -66,7 +66,7 @@ func (s *state) applyHostEvent(evt HostEvent) {
 
 // applyTranscriptClear wipes the visible transcript. Used by the
 // host-routed /clear path (PATCH-0038) so the shell's visible
-// transcript zeroes out only on a successful BFF session.create. The
+// transcript zeroes out only on a successful Runtime session.create. The
 // status text (e.g. "Started new conversation") rides on a sibling
 // HostStatusEvent emitted by the host alongside.
 func (s *state) applyTranscriptClear() {

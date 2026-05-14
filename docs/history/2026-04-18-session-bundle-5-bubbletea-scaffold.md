@@ -1,5 +1,8 @@
 # 2026-04-18 — Session: Bundle 5 (Track B Bubbletea scaffold)
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Topic
 
 Continued the "one at a time" sequence of decision points. Two

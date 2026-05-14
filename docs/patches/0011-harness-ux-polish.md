@@ -13,6 +13,9 @@ branch: "exploration/integrated-harness"
 
 # PATCH-0011: Harness UX Polish — OpenCode Theme Port, Borders, Sensible Keybindings
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Problem
 
 The v0.2.0 harness ships a Bubbletea TUI with three issues that make it unusable for real users, and a baseline visual style that is well below the bar for a tool others will be asked to use.

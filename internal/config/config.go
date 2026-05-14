@@ -35,24 +35,24 @@ type DashboardConfig struct {
 //   - Upstream is used by the v0.1 reverse proxy (`modeltap start`)
 //     when this entry's key matches a well-known provider name
 //     ("anthropic", "openai", ...).
-//   - Type / APIKey / Host / Discover are used by the v0.2 BFF
+//   - Type / APIKey / Host / Discover are used by the v0.2 Runtime
 //     server's ProviderRegistry. The map key is the user-assigned
 //     endpoint name (e.g., "anthropic-prod").
 //
 // Both groups can coexist in one `providers:` map; the proxy uses
-// entries with Upstream set, the BFF uses entries with Type set.
+// entries with Upstream set, the Runtime uses entries with Type set.
 type ProviderConfig struct {
 	Upstream string `yaml:"upstream,omitempty" mapstructure:"upstream"`
 
-	// BFF endpoint fields (WU-057).
+	// Runtime endpoint fields (WU-057).
 	Type     string `yaml:"type,omitempty" mapstructure:"type"`
 	APIKey   string `yaml:"api_key,omitempty" mapstructure:"api_key"`
 	Host     string `yaml:"host,omitempty" mapstructure:"host"`
 	Discover bool   `yaml:"discover,omitempty" mapstructure:"discover"`
 }
 
-// ModelOverrideConfig is one entry in BFFConfig.Models, applied as a
-// manual catalog override on the BFF's ModelRegistry per WU-058.
+// ModelOverrideConfig is one entry in RuntimeConfig.Models, applied as a
+// manual catalog override on the Runtime's ModelRegistry per WU-058.
 type ModelOverrideConfig struct {
 	Provider      string   `yaml:"provider" mapstructure:"provider"`
 	ContextWindow int      `yaml:"context_window" mapstructure:"context_window"`
@@ -60,11 +60,11 @@ type ModelOverrideConfig struct {
 	Description   string   `yaml:"description,omitempty" mapstructure:"description"`
 }
 
-// BFFConfig holds settings for the v0.2 BFF JSON-RPC server.
+// RuntimeConfig holds settings for the v0.2 Runtime JSON-RPC server.
 //
 // Listener fields default to a Unix socket only; TLS is opt-in by
 // setting TLSAddress + cert/key paths.
-type BFFConfig struct {
+type RuntimeConfig struct {
 	SocketPath        string `yaml:"socket_path,omitempty" mapstructure:"socket_path"`
 	SocketMode        uint32 `yaml:"socket_mode,omitempty" mapstructure:"socket_mode"`
 	TLSAddress        string `yaml:"tls_address,omitempty" mapstructure:"tls_address"`
@@ -83,7 +83,7 @@ type BFFConfig struct {
 	// be a single model name string or an array of names (multi-model).
 	// Stored as map[string]any so YAML loading handles both shapes; the
 	// CLI converts each value to json.RawMessage when handing the tree
-	// to the BFF's RoutingPolicy.
+	// to the Runtime's RoutingPolicy.
 	Routing map[string]any `yaml:"routing,omitempty" mapstructure:"routing"`
 }
 
@@ -107,7 +107,7 @@ type Config struct {
 	Dashboard     DashboardConfig           `yaml:"dashboard" mapstructure:"dashboard"`
 	Providers     map[string]ProviderConfig `yaml:"providers" mapstructure:"providers"`
 	Pricing       PricingConfig             `yaml:"pricing" mapstructure:"pricing"`
-	BFF           BFFConfig                 `yaml:"bff" mapstructure:"bff"`
+	Runtime       RuntimeConfig             `yaml:"runtime" mapstructure:"runtime"`
 	Harness       HarnessConfig             `yaml:"harness" mapstructure:"harness"`
 }
 
@@ -146,7 +146,7 @@ func LegacyConfigPath() string {
 	return filepath.Join(homeDir(), ".config", "modeltap", "config.yaml")
 }
 
-// DefaultDataDir returns the directory in which the SQLite DB, BFF
+// DefaultDataDir returns the directory in which the SQLite DB, Runtime
 // socket, and service log live for a fresh install. Honors
 // $XDG_DATA_HOME when explicitly set; otherwise ~/.modeltap
 // (PATCH-0006).
@@ -173,9 +173,9 @@ func legacySocketPath() string {
 	return filepath.Join(homeDir(), ".local", "share", "modeltap", "server.sock")
 }
 
-// DefaultBFFSocketPath returns the canonical Unix-domain socket path
-// for the BFF JSON-RPC listener.
-func DefaultBFFSocketPath() string {
+// DefaultRuntimeSocketPath returns the canonical Unix-domain socket path
+// for the Runtime JSON-RPC listener.
+func DefaultRuntimeSocketPath() string {
 	return filepath.Join(DefaultDataDir(), "server.sock")
 }
 
@@ -235,19 +235,19 @@ func applyDefaults(v *viper.Viper, legacy bool) {
 	v.SetDefault("upstream", "https://api.anthropic.com")
 	if legacy {
 		v.SetDefault("db_path", legacyDBPath())
-		v.SetDefault("bff.socket_path", legacySocketPath())
+		v.SetDefault("runtime.socket_path", legacySocketPath())
 	} else {
 		v.SetDefault("db_path", filepath.Join(DefaultDataDir(), "modeltap.db"))
-		v.SetDefault("bff.socket_path", DefaultBFFSocketPath())
+		v.SetDefault("runtime.socket_path", DefaultRuntimeSocketPath())
 	}
 	v.SetDefault("retention_days", 30)
 	v.SetDefault("max_body_size", "10MB")
 	v.SetDefault("dashboard.enabled", false)
 	v.SetDefault("dashboard.port", 8081)
 	v.SetDefault("dashboard.bind", "127.0.0.1")
-	v.SetDefault("bff.socket_mode", uint32(0o600))
-	v.SetDefault("bff.max_connections", 100)
-	v.SetDefault("bff.max_attachment_size", 5*1024*1024)
+	v.SetDefault("runtime.socket_mode", uint32(0o600))
+	v.SetDefault("runtime.max_connections", 100)
+	v.SetDefault("runtime.max_attachment_size", 5*1024*1024)
 }
 
 // expandHome expands a leading ~ in a path to the user's home directory.
@@ -375,9 +375,9 @@ func loadInternal(configPath string, stderr io.Writer) (*Config, *viper.Viper, e
 	}
 
 	cfg.DBPath = expandHome(cfg.DBPath)
-	cfg.BFF.SocketPath = expandHome(cfg.BFF.SocketPath)
-	cfg.BFF.TLSCertFile = expandHome(cfg.BFF.TLSCertFile)
-	cfg.BFF.TLSKeyFile = expandHome(cfg.BFF.TLSKeyFile)
+	cfg.Runtime.SocketPath = expandHome(cfg.Runtime.SocketPath)
+	cfg.Runtime.TLSCertFile = expandHome(cfg.Runtime.TLSCertFile)
+	cfg.Runtime.TLSKeyFile = expandHome(cfg.Runtime.TLSKeyFile)
 
 	if err := resolveProviderSecrets(&cfg); err != nil {
 		return nil, nil, err
@@ -394,9 +394,9 @@ func UnmarshalFrom(v *viper.Viper) (*Config, error) {
 		return nil, fmt.Errorf("unmarshalling config: %w", err)
 	}
 	cfg.DBPath = expandHome(cfg.DBPath)
-	cfg.BFF.SocketPath = expandHome(cfg.BFF.SocketPath)
-	cfg.BFF.TLSCertFile = expandHome(cfg.BFF.TLSCertFile)
-	cfg.BFF.TLSKeyFile = expandHome(cfg.BFF.TLSKeyFile)
+	cfg.Runtime.SocketPath = expandHome(cfg.Runtime.SocketPath)
+	cfg.Runtime.TLSCertFile = expandHome(cfg.Runtime.TLSCertFile)
+	cfg.Runtime.TLSKeyFile = expandHome(cfg.Runtime.TLSKeyFile)
 	if err := resolveProviderSecrets(&cfg); err != nil {
 		return nil, err
 	}

@@ -1,5 +1,8 @@
 # v0.3.0 Smoke Test
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 Use this UI runthrough before release close/tagging. It exercises the
 production shell and the v0.3.0 durable-run surface without requiring a
 low-level JSON-RPC client.

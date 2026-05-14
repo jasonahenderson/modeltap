@@ -10,6 +10,9 @@ branch: "exploration/integrated-harness"
 
 # PATCH-0004: Secret Prefix Resolver for Provider API Keys
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 ## Problem
 
 `ProviderConfig.APIKey` is loaded as a plain string from `~/.config/modeltap/config.yaml`. Users today either commit the key to YAML or export it via `MODELTAP_PROVIDERS_ANTHROPIC_API_KEY`. Neither is good:

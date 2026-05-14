@@ -14,7 +14,7 @@ related:
 
 ## Context and Problem Statement
 
-Modeltap's harness **is already** a thin client: it delegates model routing, cost control, logging, and capture to the BFF over JSON-RPC. **Crucially, the harness must continue to support larger sub-agent teams coordinating across tasks and potentially across different models as a first-class capability.** The question is whether to evolve this existing architecture or abandon it by forking OpenCode or OpenHarness — both of which are self-contained agent loops that would require inverting to BFF delegation.
+Modeltap's harness **is already** a thin client: it delegates model routing, cost control, logging, and capture to the runtime server over JSON-RPC. **Crucially, the harness must continue to support larger sub-agent teams coordinating across tasks and potentially across different models as a first-class capability.** The question is whether to evolve this existing architecture or abandon it by forking OpenCode or OpenHarness — both of which are self-contained agent loops that would require inverting to runtime server delegation.
 
 This decision constrains multi-agent orchestration architecture, language/runtime alignment, maintenance burden, and distribution model.
 
@@ -22,9 +22,9 @@ This decision constrains multi-agent orchestration architecture, language/runtim
 
 Weights are expressed as hundredths and sum to **1.00** (see ADR Template Conventions).
 
-* **D1 — Proxy-centric control (0.25):** The harness must delegate model routing, cost control, and logging to the BFF. A self-contained agent loop is a project-threatening anti-pattern for modeltap's core value proposition.
-* **D2 — Multi-agent orchestration (0.25):** Running larger sub-agent teams that coordinate across tasks and potentially across models is a critical strategic capability. The base must either already support this or be structured so the BFF can own orchestration and dispatch to the harness.
-* **D3 — Language/runtime alignment (0.15):** The BFF is Go. A harness in the same language shares types, build system, and contributor pool. A different runtime (Python, Node.js) creates a permanent two-team tax and complicates deployment.
+* **D1 — Proxy-centric control (0.25):** The harness must delegate model routing, cost control, and logging to the runtime server. A self-contained agent loop is a project-threatening anti-pattern for modeltap's core value proposition.
+* **D2 — Multi-agent orchestration (0.25):** Running larger sub-agent teams that coordinate across tasks and potentially across models is a critical strategic capability. The base must either already support this or be structured so the runtime server can own orchestration and dispatch to the harness.
+* **D3 — Language/runtime alignment (0.15):** The runtime server is Go. A harness in the same language shares types, build system, and contributor pool. A different runtime (Python, Node.js) creates a permanent two-team tax and complicates deployment.
 * **D4 — Upstream maintainability (0.15):** Forking without upstream continuity means owning 100% of future maintenance. Tracking upstream reduces burden but introduces merge tax. An archived upstream is a liability.
 * **D5 — Terminal UX quality (0.10):** Streaming token rendering, markdown display, multi-line input, and scrollback are the core daily UX. The base must handle this well without heroic engineering.
 * **D6 — Single binary distribution (0.05):** Modeltap ships as one compiled artifact. A second runtime complicates install, CI, and cross-compilation. Important but secondary to orchestration and proxy alignment.
@@ -32,12 +32,12 @@ Weights are expressed as hundredths and sum to **1.00** (see ADR Template Conven
 
 ## Considered Options
 
-* **O1 — Continue modeltap harness (universal orchestration client).** Evolve the existing in-tree Go/Bubbletea thin client. The harness remains the **primary human interface for orchestration** — it displays subagent team status, allows users to kick off multi-agent tasks, approves team-level tool calls, and observes cross-model coordination — while all execution stays in the BFF. To close capability gaps, selectively port proven subsystems from OpenHarness (e.g., `coordinator/` swarm logic, `memory/` compression, `permissions/` governance) into Go as BFF subsystems. The harness grows orchestration-aware UI; the BFF grows agent richness. No fork.
-* **O2 — Fork OpenCode (hard fork).** Fork the archived `opencode-ai/opencode` Go/Bubbletea codebase, then gut its self-contained agent loop and invert it into a thin BFF client. Abandon upstream tracking.
-* **O3 — Fork OpenCode (soft fork, track Crush).** Fork OpenCode but maintain a merge strategy with its successor `charmbracelet/crush`. Periodically pull upstream fixes and re-apply the BFF-inversion patches.
-* **O4 — Fork OpenHarness (hard fork).** Fork the active Python `HKUDS/OpenHarness` project, then rewrite its TUI in Go/Bubbletea and invert its agent loop to delegate to the BFF. Abandon upstream tracking.
-* **O5 — Fork OpenHarness (soft fork, track upstream).** Fork OpenHarness but maintain a merge strategy with upstream. Periodically pull Python/Node.js updates and re-apply Go-port + BFF-inversion patches.
-* **O6 — Conversation-only harness.** Draw a hard boundary: all multi-agent orchestration lives in the BFF. The harness remains a **strictly single-model conversation client** — it renders streaming responses, approves tool calls, and manages sessions, but it is **oblivious to subagents, teams, or cross-model coordination**. Orchestration UI (team dashboards, subagent status, model fan-out controls) lives exclusively in the web dashboard, Slack bot, or API. The harness knows nothing more than a single-turn conversation loop.
+* **O1 — Continue modeltap harness (universal orchestration client).** Evolve the existing in-tree Go/Bubbletea thin client. The harness remains the **primary human interface for orchestration** — it displays subagent team status, allows users to kick off multi-agent tasks, approves team-level tool calls, and observes cross-model coordination — while all execution stays in the runtime server. To close capability gaps, selectively port proven subsystems from OpenHarness (e.g., `coordinator/` swarm logic, `memory/` compression, `permissions/` governance) into Go as runtime server subsystems. The harness grows orchestration-aware UI; the runtime server grows agent richness. No fork.
+* **O2 — Fork OpenCode (hard fork).** Fork the archived `opencode-ai/opencode` Go/Bubbletea codebase, then gut its self-contained agent loop and invert it into a thin runtime server client. Abandon upstream tracking.
+* **O3 — Fork OpenCode (soft fork, track Crush).** Fork OpenCode but maintain a merge strategy with its successor `charmbracelet/crush`. Periodically pull upstream fixes and re-apply the runtime server-inversion patches.
+* **O4 — Fork OpenHarness (hard fork).** Fork the active Python `HKUDS/OpenHarness` project, then rewrite its TUI in Go/Bubbletea and invert its agent loop to delegate to the runtime server. Abandon upstream tracking.
+* **O5 — Fork OpenHarness (soft fork, track upstream).** Fork OpenHarness but maintain a merge strategy with upstream. Periodically pull Python/Node.js updates and re-apply Go-port + runtime server-inversion patches.
+* **O6 — Conversation-only harness.** Draw a hard boundary: all multi-agent orchestration lives in the runtime server. The harness remains a **strictly single-model conversation client** — it renders streaming responses, approves tool calls, and manages sessions, but it is **oblivious to subagents, teams, or cross-model coordination**. Orchestration UI (team dashboards, subagent status, model fan-out controls) lives exclusively in the web dashboard, Slack bot, or API. The harness knows nothing more than a single-turn conversation loop.
 
 ## Decision Outcome
 
@@ -64,18 +64,18 @@ Scale: 1–10 (poor → excellent). Weighted total = sum of (weight × score/10)
 
 #### O1 — Continue modeltap harness (0.730)
 
-* **D1 (9):** Native thin-client architecture. The BFF owns routing, costing, logging, and capture. Zero architectural inversion required.
-* **D2 (4):** No multi-agent orchestration today, which is a genuine gap (FEAT-0013 unimplemented). The score reflects current capability, not future aspiration. The justification for accepting this gap is strategic: the thin-client model gives the BFF a clean place to insert orchestration, and the harness can grow orchestration-aware UI incrementally as the BFF matures. Selective porting of OpenHarness `coordinator/` logic into Go BFF subsystems is a credible path.
+* **D1 (9):** Native thin-client architecture. The runtime server owns routing, costing, logging, and capture. Zero architectural inversion required.
+* **D2 (4):** No multi-agent orchestration today, which is a genuine gap (FEAT-0013 unimplemented). The score reflects current capability, not future aspiration. The justification for accepting this gap is strategic: the thin-client model gives the runtime server a clean place to insert orchestration, and the harness can grow orchestration-aware UI incrementally as the runtime server matures. Selective porting of OpenHarness `coordinator/` logic into Go runtime server subsystems is a credible path.
 * **D3 (9):** Pure Go. Shared types, one build, one test suite, no serialization boundary.
 * **D4 (9):** No upstream dependency other than Go stdlib, Bubbletea, and Charm ecosystem — all actively maintained. No merge tax.
 * **D5 (7):** Bubbletea + Glamour is proven (OpenCode precedent). Streaming requires debouncing but is solvable. Slightly behind OpenCode which already solved the same pattern.
-* **D6 (9):** Single compiled binary with the BFF. No runtime dependencies.
+* **D6 (9):** Single compiled binary with the runtime server. No runtime dependencies.
 * **D7 (4):** MCP only today. Memory, plugins, slash commands, and 43+ tools are missing. These must be built or ported.
 
 #### O2 — Hard fork OpenCode (0.445)
 
-* **D1 (3):** Requires gutting the self-contained agent loop and inverting it to BFF delegation. OpenCode was never designed for proxy-centric control.
-* **D2 (2):** Recursive agent tool exists but is single-process. No multi-model orchestration. Converting this to BFF-mediated swarm is substantial redesign, not adaptation.
+* **D1 (3):** Requires gutting the self-contained agent loop and inverting it to runtime server delegation. OpenCode was never designed for proxy-centric control.
+* **D2 (2):** Recursive agent tool exists but is single-process. No multi-model orchestration. Converting this to runtime-mediated swarm is substantial redesign, not adaptation.
 * **D3 (9):** Go. Same as modeltap.
 * **D4 (2):** Archived upstream. No upstream fixes. All maintenance is owned. Effectively a one-time snapshot.
 * **D5 (8):** Bubbletea implementation is mature and proven at scale. Direct reference for streaming markdown, plan/build modes, session explorer.
@@ -96,7 +96,7 @@ Scale: 1–10 (poor → excellent). Weighted total = sum of (weight × score/10)
 
 * **D1 (4):** Self-contained agent loop, but Python's dynamic nature makes inversion *slightly* easier than Go (monkey-patching, hook points). Still requires a significant architectural rewrite.
 * **D2 (8):** `coordinator/` provides mature swarm/subagent logic with team registries and background tasks. Best-in-class for this driver.
-* **D3 (2):** Python for engine + Node.js for TUI. Cannot compile into Go binary. Requires either a Python runtime alongside the BFF or a complete Go rewrite of the TUI layer.
+* **D3 (2):** Python for engine + Node.js for TUI. Cannot compile into Go binary. Requires either a Python runtime alongside the runtime server or a complete Go rewrite of the TUI layer.
 * **D4 (5):** Active upstream, but hard fork means absorbing the entire codebase and owning it. No merge tax, but also no upstream fixes.
 * **D5 (5):** React/Ink is proven (Claude Code precedent), but requires Node.js. Porting to Bubbletea is a full rewrite.
 * **D6 (1):** `pip install` + Node.js runtime. Not a single binary.
@@ -104,10 +104,10 @@ Scale: 1–10 (poor → excellent). Weighted total = sum of (weight × score/10)
 
 #### O5 — Soft fork OpenHarness, track upstream (0.405)
 
-* **D1 (3):** Same inversion burden as O4, plus the added complexity of maintaining BFF-inversion patches across upstream releases.
+* **D1 (3):** Same inversion burden as O4, plus the added complexity of maintaining runtime server-inversion patches across upstream releases.
 * **D2 (7):** Same richness as O4, but patches may conflict when `coordinator/` changes upstream. Merge tax erodes the orchestration advantage.
 * **D3 (2):** Same as O4.
-* **D4 (2):** Unsustainable. Active upstream moves fast. Re-applying architectural inversion patches (Go-port + BFF-delegation) on every upstream sync is a high ongoing tax.
+* **D4 (2):** Unsustainable. Active upstream moves fast. Re-applying architectural inversion patches (Go-port + runtime server-delegation) on every upstream sync is a high ongoing tax.
 * **D5 (5):** Same as O4.
 * **D6 (1):** Same as O4.
 * **D7 (8):** Same richness as O4, but with the merge-tax risk that new upstream features may not integrate cleanly.
@@ -120,7 +120,7 @@ Scale: 1–10 (poor → excellent). Weighted total = sum of (weight × score/10)
 * **D4 (9):** Same as O1.
 * **D5 (7):** Same as O1.
 * **D6 (9):** Same as O1.
-* **D7 (4):** Same gap as O1 — missing rich tools, memory, plugins today. Additionally, the harness deliberately excludes orchestration awareness, so it cannot grow into a richer agent UI even as the BFF gains capability.
+* **D7 (4):** Same gap as O1 — missing rich tools, memory, plugins today. Additionally, the harness deliberately excludes orchestration awareness, so it cannot grow into a richer agent UI even as the runtime server gains capability.
 
 ### Why O1 beats O6
 
@@ -130,11 +130,11 @@ Both are thin-client architectures with identical scores on proxy-centric contro
 
 The D2 score gap (O1=4, O6=3) reflects this: neither option delivers orchestration today, but O1's path preserves the terminal as the primary surface, while O6's path deliberately surrenders it. The numeric margin (0.730 vs 0.705) is real but secondary to the architectural argument.
 
-Both options assume the BFF grows orchestration capability; neither avoids that work. O1 is preferred because it keeps the harness as the **universal orchestration client**.
+Both options assume the runtime server grows orchestration capability; neither avoids that work. O1 is preferred because it keeps the harness as the **universal orchestration client**.
 
 ## Consequences
 
-* Good, because the thin-client architecture is preserved — central model control, logging, and costing remain native to the BFF.
+* Good, because the thin-client architecture is preserved — central model control, logging, and costing remain native to the runtime server.
 * Good, because the Go single-binary story is preserved — no Python or Node.js runtime in the client.
 * Good, because there is no upstream merge tax — modeltap owns its own roadmap without re-applying patches on every external release.
 * Good, because selective porting of OpenHarness subsystems (swarm logic, memory compression, governance) is a viable path to feature parity without architectural inversion.
@@ -145,7 +145,7 @@ Both options assume the BFF grows orchestration capability; neither avoids that 
 ## Confirmation
 
 This-ADR confirmation (gates `accepted` status):
-- The harness connects to the BFF, renders a multi-session explorer, streams a model response with styled markdown, executes tools with permission prompts, and displays orchestration-aware UI elements (e.g., session list with team indicators).
+- The harness connects to the runtime server, renders a multi-session explorer, streams a model response with styled markdown, executes tools with permission prompts, and displays orchestration-aware UI elements (e.g., session list with team indicators).
 
 Future-feature confirmation (tracked under FEAT-0013 or successor):
 - The harness can observe and meaningfully interact with a server-orchestrated subagent team's progress and results (view team status, approve team-level tool calls, initiate coordinated tasks).
@@ -154,8 +154,8 @@ Future-feature confirmation (tracked under FEAT-0013 or successor):
 
 **Comparable tools and their relevance:**
 
-* **OpenCode** (`opencode-ai/opencode`, archived, succeeded by `charmbracelet/crush`) is the closest Bubbletea precedent. It proves that a Go terminal AI agent can achieve high UX quality with streaming markdown, plan/build modes, and session management. It is best treated as a **design reference for TUI patterns**, not a fork base, because retrofitting BFF delegation would require gutting its core architecture.
-* **OpenHarness** (`HKUDS/OpenHarness`, active Python) is the richest agent runtime. Its `coordinator/`, `memory/`, and `permissions/` subsystems are proven and well-designed. It is best treated as a **design reference for agent subsystems** and a **selective porting source** for BFF-side features, not a fork base, because its Python/Node.js runtime is fundamentally incompatible with modeltap's Go single-binary model.
+* **OpenCode** (`opencode-ai/opencode`, archived, succeeded by `charmbracelet/crush`) is the closest Bubbletea precedent. It proves that a Go terminal AI agent can achieve high UX quality with streaming markdown, plan/build modes, and session management. It is best treated as a **design reference for TUI patterns**, not a fork base, because retrofitting runtime server delegation would require gutting its core architecture.
+* **OpenHarness** (`HKUDS/OpenHarness`, active Python) is the richest agent runtime. Its `coordinator/`, `memory/`, and `permissions/` subsystems are proven and well-designed. It is best treated as a **design reference for agent subsystems** and a **selective porting source** for runtime-side features, not a fork base, because its Python/Node.js runtime is fundamentally incompatible with modeltap's Go single-binary model.
 
 **Open questions:**
 

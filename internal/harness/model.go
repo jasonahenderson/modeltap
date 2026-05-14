@@ -12,7 +12,7 @@ package harness
 // Connection state constants matching FEAT-0008 §"Connection states"
 // verbatim. These string values are wire-visible (`HealthResponse`,
 // `Diagnostic`, `session.sync` payloads) so the harness renders
-// against the same canonical names the BFF emits.
+// against the same canonical names the Runtime emits.
 const (
 	ConnStateDiscovering    = "discovering"
 	ConnStateStarting       = "starting"

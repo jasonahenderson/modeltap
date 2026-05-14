@@ -1,5 +1,8 @@
 # 2026-05-05 — FEAT-0015..0022 Architect/SRE Review Creation
 
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
 Generated architect-and-SRE-perspective review findings for the entire
 Professional Harness Runtime series (FEAT-0015 umbrella plus seven members)
 plus a cross-feature continuity synthesis. Companion to the

@@ -116,8 +116,8 @@ default. Users can expand or preview artifacts:
 
 ### Artifact Persistence
 
-The BFF stores artifact metadata and durable references. Large local files or
-logs may remain harness/executor-owned if they cannot safely be copied into BFF
+The runtime server stores artifact metadata and durable references. Large local files or
+logs may remain harness/executor-owned if they cannot safely be copied into runtime server
 storage. The artifact record must say where and how the artifact can be read.
 
 Every artifact has a stable `artifact_id`. The artifact references its owning
@@ -129,15 +129,15 @@ Forked runs reference parent artifacts read-only through `inherited_from:
 artifact_id` and emit new artifacts with new IDs. Patch evidence on a fork is
 computed against the parent's final workspace state or explicit fork snapshot.
 
-BFF metadata is authoritative for artifact existence, identity, and provenance.
-Artifact content may live in BFF blob storage or remain harness-owned locally.
-Locally stored artifacts include a host fingerprint so the BFF can detect when
+Runtime server metadata is authoritative for artifact existence, identity, and provenance.
+Artifact content may live in runtime server blob storage or remain harness-owned locally.
+Locally stored artifacts include a host fingerprint so the runtime server can detect when
 content is unreachable from the current harness instance and surface a
-`content_unavailable` state on read. The BFF does not silently dereference
+`content_unavailable` state on read. The runtime server does not silently dereference
 artifact records when local content is missing; the artifact remains listed with
 metadata and a clear unavailability reason.
 
-On harness reattach, the harness reports artifacts it can serve. The BFF marks
+On harness reattach, the harness reports artifacts it can serve. The runtime server marks
 matching local artifacts available again. After a configurable grace period,
 defaulting to 30 days, stranded local artifacts transition to `unrecoverable` and
 may be garbage-collected. Host fingerprint changes are treated as new hosts; a
@@ -146,7 +146,7 @@ user may explicitly rebind local artifacts.
 Artifact writes are content-first, metadata-second. The metadata write is the
 durability boundary. Orphan blobs are tolerated and reaped by GC; orphan metadata
 pointing to missing content is not allowed for newly written artifacts. The same
-ordering applies to BFF blob storage and harness-local artifacts.
+ordering applies to runtime server blob storage and harness-local artifacts.
 
 Artifact retention follows the FEAT-0015 retention envelope. Artifacts age out
 with their run unless promoted to durable memory or another explicit durable
@@ -213,7 +213,7 @@ keeping recent high-signal artifacts and a summary artifact.
 | ADR | Relationship |
 |---|---|
 | ADR-0002 | Storage constraints affect artifact persistence |
-| ADR-0014 | Harness and BFF split artifact capture according to local side-effect ownership |
+| ADR-0014 | Harness and runtime server split artifact capture according to local side-effect ownership |
 | Future ADR | Should decide artifact storage, redaction, and retention boundaries |
 
 ## Open Questions

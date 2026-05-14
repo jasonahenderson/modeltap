@@ -6,7 +6,7 @@ date: 2026-04-29
 series: Professional Harness Runtime
 series-role: umbrella
 depends-on:
-  - FEAT-0008: BFF Server
+  - FEAT-0008: Runtime Server
   - FEAT-0009: Terminal Harness
   - FEAT-0014: Harness Conversation Shell
 adr-constraints:
@@ -30,7 +30,7 @@ related:
 
 ## Problem
 
-Modeltap's current harness and BFF architecture can submit turns, stream model
+Modeltap's current harness and runtime server architecture can submit turns, stream model
 responses, execute local tools, and render a usable terminal shell. That is a
 strong foundation, but it is not yet a professional coding harness for complex
 structured work.
@@ -52,13 +52,13 @@ and evidence-producing.
 
 ## Solution
 
-Add a professional harness runtime on top of the existing BFF and terminal
+Add a professional harness runtime on top of the existing runtime server and terminal
 harness. The runtime treats all meaningful work as a durable run. A run may be
 foreground or background, single-agent or multi-agent, read-only or mutating,
 attached or detached. The same lifecycle, permission model, artifact capture,
 and recovery controls apply across those modes.
 
-The terminal harness remains the primary attached UI. The BFF owns orchestration
+The terminal harness remains the primary attached UI. The runtime server owns orchestration
 state, prompt/context planning, routing, persistence, and run artifacts. The
 local harness or local executor owns filesystem access, local tool execution,
 permission enforcement, and optional workspace isolation.
@@ -191,9 +191,9 @@ Runs record:
 - checkpoints and final outcome
 
 Cancellation is cooperative by default and bounded by a runtime deadline. The
-BFF records the cancellation request, asks active model calls and tool calls to
-stop, and transitions the run to `cancelled` when active work has stopped or the
-deadline expires. In-flight tool calls may either return a final result or an
+runtime server records the cancellation request, asks active model calls and
+tool calls to stop, and transitions the run to `cancelled` when active work has
+stopped or the deadline expires. In-flight tool calls may either return a final result or an
 interrupted result; the runtime must not assume local filesystem writes can be
 rolled back automatically. Artifacts, logs, approvals, and partial diffs
 captured before cancellation are retained. Cancelling a parent run cascades to
@@ -234,7 +234,7 @@ Required behavior:
 - users can start a run in the foreground or send it to the background
 - users can detach from an active run without cancelling it
 - users can list, inspect, attach, cancel, continue, retry, or fork runs
-- run progress survives harness restart or reconnect when the BFF remains
+- run progress survives harness restart or reconnect when the runtime server remains
   available
 - blocked background runs surface a visible permission or user-input inbox
 - background agent transcripts remain inspectable separately from the main
@@ -287,22 +287,22 @@ For every tool call, the runtime records:
 - files read, written, or deleted when knowable
 - timing and exit status for shell commands
 
-The BFF may request tools, but local side effects remain harness/executor-owned.
+The runtime server may request tools, but local side effects remain harness/executor-owned.
 The harness enforces local permission policy and returns structured tool
-results to the BFF.
+results to the runtime server.
 
 Permission flow is sequenced as:
 
 1. The harness or local executor detects that a tool request needs approval.
-2. The harness reports the pending decision to the BFF with `run_id` and
+2. The harness reports the pending decision to the runtime server with `run_id` and
    `tool_call_id`.
-3. The BFF records the pending decision, emits `waiting_permission`, and surfaces
+3. The runtime server records the pending decision, emits `waiting_permission`, and surfaces
    an inbox event for the appropriate attached or authorized user.
 4. The user resolves the decision through the harness inbox or attached run.
-5. The harness records the decision and policy context; the BFF persists the
+5. The harness records the decision and policy context; the runtime server persists the
    decision and emits the resulting run transition.
 
-The BFF is authoritative for run status and permission-inbox state. The harness
+The runtime server is authoritative for run status and permission-inbox state. The harness
 is authoritative for local side-effect enforcement.
 
 ### Workspace Policy
@@ -330,7 +330,7 @@ Default policy:
 - reviewer and validator agents read the target run workspace, usually
   read-only
 
-The BFF stores workspace metadata on the run. The local harness/executor
+The runtime server stores workspace metadata on the run. The local harness/executor
 creates and manages local workspaces because it owns the filesystem.
 
 Workspace lifecycle follows the same authority split:
@@ -344,16 +344,16 @@ Workspace lifecycle follows the same authority split:
 4. Cancellation retains captured artifacts, then triggers workspace cleanup
    according to the same terminal-state rule.
 5. On reconnect, the harness scans for orphaned local workspaces whose runs are
-   no longer active according to the BFF and cleans them with user-visible
+   no longer active according to the runtime server and cleans them with user-visible
    notice.
 6. If a workspace becomes unexpectedly missing during an active run, the harness
-   reports a `workspace_lost` fact and the BFF transitions the run to `failed`
+   reports a `workspace_lost` fact and the runtime server transitions the run to `failed`
    with that reason.
 
-`remote` workspaces are owned by the BFF or remote sandbox provider; the harness
+`remote` workspaces are owned by the runtime server or remote sandbox provider; the harness
 acts as policy and permission relay for those workspaces.
 
-When no harness or local executor is connected, the BFF never simulates local
+When no harness or local executor is connected, the runtime server never simulates local
 side effects. Runs that require local filesystem, process, or workspace effects
 pause with an executor-disconnected reason until an executor reconnects or a
 server-safe alternative exists under an accepted ADR.
@@ -402,7 +402,7 @@ approvals.
 
 ### Memory and Routing
 
-Successful runs may produce memory candidates. The BFF separates durable
+Successful runs may produce memory candidates. The runtime server separates durable
 project decisions from ephemeral debugging traces and lets users inspect,
 accept, edit, or reject memory before promotion when policy requires it.
 
@@ -425,7 +425,7 @@ usage, or bypass the run queue and budget policy.
 Runs expose operator-facing metrics and structured logs, not only transcript UI.
 At minimum, the runtime reports queue depth, time in stage, stuck-stage counts,
 validation outcomes, permission-inbox age, and per-stage failure rates. Each run
-has a trace ID that propagates across BFF, harness/executor, and model-provider
+has a trace ID that propagates across runtime server, harness/executor, and model-provider
 calls.
 
 Harnesses and local executors send heartbeats while attached or executing run
@@ -434,7 +434,7 @@ configurable. Runs that exceed heartbeat, stage, or permission-input deadlines
 transition according to policy, with stuck stages defaulting to `failed` with a
 structured reason.
 
-Run durability is BFF-owned. Stage transitions, tool results, permission
+Run durability is runtime-owned. Stage transitions, tool results, permission
 decisions, checkpoints, and artifact metadata are durable before they are used
 to advance the run. The run-runtime ADR should define exact fsync boundaries
 and checkpoint-format compatibility across at least the previous minor version.
@@ -520,7 +520,7 @@ engineering tracks.
 
 | Rank | Artifact | Purpose |
 |---|---|---|
-| 1 | ADR: Run Runtime Ownership and Semantics | Decide BFF vs harness ownership, lifecycle states, attachment semantics, prompt/policy precedence, and workspace policy boundaries |
+| 1 | ADR: Run Runtime Ownership and Semantics | Decide runtime server vs harness ownership, lifecycle states, attachment semantics, prompt/policy precedence, and workspace policy boundaries |
 | 2 | FEAT-0016: Managed Codegen Run Pipeline | Make implementation turns durable run transactions with preflight, context/prompt planning, tool loop, artifact capture, and checkpoints |
 | 3 | FEAT-0017: Durable Runs and Background Agents | Add attached/detached run semantics, background run queue, permission inbox, resume/attach/detach, and separate run transcripts |
 | 4 | FEAT-0018: Context Planner and Project Rules | Add repo-aware context selection, project-rule discovery, prompt-layer inspection, and provenance |
@@ -565,7 +565,7 @@ have future constraint value:
 
 | ADR topic | Covers | Related features |
 |---|---|---|
-| Run runtime ownership and semantics | BFF vs harness ownership, run status/stage terminology, attachment leases, cancellation, checkpoint and reconnect semantics, local-executor availability | FEAT-0015, FEAT-0016, FEAT-0017 |
+| Run runtime ownership and semantics | runtime server vs harness ownership, run status/stage terminology, attachment leases, cancellation, checkpoint and reconnect semantics, local-executor availability | FEAT-0015, FEAT-0016, FEAT-0017 |
 | Run event stream, idempotency, and schema semantics | Event ordering, sequence checkpoints, gap detection, idempotency keys, duplicate result handling, `model_call_id`, and run/artifact/workflow schema versioning | FEAT-0015, FEAT-0016, FEAT-0017, FEAT-0020 |
 | Project rules and prompt layering | Rule-file precedence, prompt-layer ownership, prompt metadata visibility, context budget authority | FEAT-0018 |
 | Validation and repair artifacts | Validation artifact schema, repair-loop limits, failure classification, retry boundaries | FEAT-0019 |
@@ -608,7 +608,7 @@ runtime will likely need:
 
 ## Non-Goals
 
-- Do not fork an external harness or invert modeltap's BFF-first architecture.
+- Do not fork an external harness or invert modeltap's runtime-first architecture.
 - Do not require every background run to use a Git worktree.
 - Do not make background agents a separate execution system from foreground
   runs.
@@ -640,7 +640,7 @@ remain assigned to their downstream features/releases.
    defaults.
 7. Workspace policy is explicit and testable; background writers do not mutate
    the current checkout unexpectedly unless policy and user approval allow it.
-8. The BFF can resume or summarize run streams after harness reconnect.
+8. The runtime server can resume or summarize run streams after harness reconnect.
 9. Existing FEAT-0008/0009/0014 behavior remains compatible: normal attached
    chat still works as a foreground run.
 
@@ -648,14 +648,14 @@ remain assigned to their downstream features/releases.
 
 | ADR | Relationship |
 |---|---|
-| ADR-0014 | Requires modeltap to continue evolving its own BFF-first Go/Bubbletea harness as the universal orchestration client |
+| ADR-0014 | Requires modeltap to continue evolving its own runtime-first Go/Bubbletea harness as the universal orchestration client |
 | ADR-0015 | Decides run ownership, attachment semantics, executor availability, checkpoint semantics, liveness, and event ordering for the v0.3.0 foundation |
 
 ## Open Questions
 
 These remain downstream design questions after v0.3.0 foundation acceptance:
 
-1. Should run queue persistence live in the existing BFF session store or in a
+1. Should run queue persistence live in the existing runtime server session store or in a
    separate run/job table family?
 2. Which workflow types should ship first: `implementation`, `debug`,
    `docs`, and `exploration`; or all initial workflow contracts together?

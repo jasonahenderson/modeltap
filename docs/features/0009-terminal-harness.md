@@ -4,7 +4,7 @@ title: Terminal Harness
 status: proposed
 date: 2026-04-14
 depends-on:
-  - FEAT-0008: BFF Server
+  - FEAT-0008: Runtime Server
 adr-constraints:
   - ADR-0001: Go as primary language
   - ADR-0003: Cobra CLI framework
@@ -17,9 +17,9 @@ promoted-from:
 
 ## Problem
 
-Modeltap v1 has no interactive interface — it is a background proxy with CLI query commands. The integrated harness (EXP-0008) needs a terminal UI that lets users have conversations with AI models through the modeltap server. Without it, the BFF server (FEAT-0008) has no client, and the product's differentiators (cross-model memory, cost-aware routing, knowledge enrichment) have no user-facing surface.
+Modeltap v1 has no interactive interface — it is a background proxy with CLI query commands. The integrated harness (EXP-0008) needs a terminal UI that lets users have conversations with AI models through the modeltap server. Without it, the runtime server (FEAT-0008) has no client, and the product's differentiators (cross-model memory, cost-aware routing, knowledge enrichment) have no user-facing surface.
 
-Existing terminal AI tools (Claude Code, aider, Codex) are either single-provider, lack cross-model memory, or run in sandboxed environments. The modeltap harness is a thin client that delegates intelligence to the BFF — it handles terminal rendering, local tool execution, and permission enforcement while the server handles everything else.
+Existing terminal AI tools (Claude Code, aider, Codex) are either single-provider, lack cross-model memory, or run in sandboxed environments. The modeltap harness is a thin client that delegates intelligence to the runtime server — it handles terminal rendering, local tool execution, and permission enforcement while the server handles everything else.
 
 ## Solution
 
@@ -36,12 +36,12 @@ separately in FEAT-0014.
 
 - Multi-line text input with cursor movement, cut/copy/paste, and configurable submit key
 - Streaming markdown output rendered with terminal styling (headings, code blocks, lists, bold/italic)
-- Command history traversal (up/down arrows) sourced from the BFF (cross-session, cross-project)
+- Command history traversal (up/down arrows) sourced from the runtime server (cross-session, cross-project)
 - Scrollable conversation viewport with auto-scroll-to-bottom on new output
 
 ### Tool Execution
 
-The harness executes tools locally on the user's machine. The BFF forwards model tool calls; the harness decides whether to execute based on the current permission level and execution mode.
+The harness executes tools locally on the user's machine. The runtime server forwards model tool calls; the harness decides whether to execute based on the current permission level and execution mode.
 
 **Built-in tool set:**
 
@@ -84,7 +84,7 @@ Three permission levels, matching the proven pattern from Claude Code:
 - **Accept edits**: auto-approve file operations (Read, Write, Edit, Glob, Grep). Bash still prompts.
 - **Autonomous**: auto-approve all tools within safety limits. Dangerous bash commands (rm -rf, git push --force) still prompt.
 
-Permissions are enforced entirely in the harness. The BFF has no knowledge of the current permission level and cannot override it.
+Permissions are enforced entirely in the harness. The runtime server has no knowledge of the current permission level and cannot override it.
 
 ### Execution Modes
 
@@ -203,7 +203,7 @@ When the harness detects a paste exceeding the configurable threshold (default: 
 - Show preview (first 5 lines + line count + byte size)
 - Offer: summarize (via cheap model), include full, truncate (first N lines), cancel
 - **Full or truncate**: the harness includes the chosen representation directly in `turn.submit` with `paste.raw` (full content for capture) and `paste.content` (user's choice).
-- **Summarize**: the harness sends `content.transform` (FEAT-0008) to the BFF with the raw paste and `transform: "summarize"`. The BFF routes to the cheap model, captures the raw content per ADR-0005, and returns the summary. The harness then includes the summary in `turn.submit`. This preserves the rule that the harness never speaks provider protocols directly — all model calls go through the BFF, even pre-turn transformations. The `content.transform` call is captured and cost-attributed separately from the conversation turn.
+- **Summarize**: the harness sends `content.transform` (FEAT-0008) to the runtime server with the raw paste and `transform: "summarize"`. The runtime server routes to the cheap model, captures the raw content per ADR-0005, and returns the summary. The harness then includes the summary in `turn.submit`. This preserves the rule that the harness never speaks provider protocols directly — all model calls go through the runtime server, even pre-turn transformations. The `content.transform` call is captured and cost-attributed separately from the conversation turn.
 
 ### Status Bar
 
@@ -459,7 +459,7 @@ When a model override is active:
 Current: claude-opus-4-6 [override] — /model auto to clear
 ```
 
-**Multi-model review display**: when the BFF routes to a multi-model role, each reviewer runs as a background thread with progressive completion. Results stream as each reviewer finishes — the harness does not wait for all reviewers before showing any output:
+**Multi-model review display**: when the runtime server routes to a multi-model role, each reviewer runs as a background thread with progressive completion. Results stream as each reviewer finishes — the harness does not wait for all reviewers before showing any output:
 
 ```
 → code_review (2 reviewers)
@@ -481,7 +481,7 @@ Current: claude-opus-4-6 [override] — /model auto to clear
 ─── 2 reviewers | $0.20 total | 4.2s ───
 ```
 
-Each reviewer's output is rendered in its own labeled section as soon as it completes. Spinners show which reviewers are still working. The BFF streams `branch.started`, `token.delta` (tagged with `branch_id`), `branch.complete`/`branch.error`, and aggregate `turn.complete` events (FEAT-0008). The harness routes `token.delta` events to the appropriate section by `branch_id`. This is the same pattern as Claude Code's background sub-agents — parallel work with progressive results.
+Each reviewer's output is rendered in its own labeled section as soon as it completes. Spinners show which reviewers are still working. The runtime server streams `branch.started`, `token.delta` (tagged with `branch_id`), `branch.complete`/`branch.error`, and aggregate `turn.complete` events (FEAT-0008). The harness routes `token.delta` events to the appropriate section by `branch_id`. This is the same pattern as Claude Code's background sub-agents — parallel work with progressive results.
 
 ### Session Commands
 
@@ -505,7 +505,7 @@ Each reviewer's output is rendered in its own labeled section as soon as it comp
 
 ### Connection UX and Recovery
 
-The harness renders the BFF connection lifecycle (FEAT-0008) as visible UI state. The user always knows the connection status and what to do when something goes wrong.
+The harness renders the runtime server connection lifecycle (FEAT-0008) as visible UI state. The user always knows the connection status and what to do when something goes wrong.
 
 **Status bar connection indicator** (leftmost element):
 
@@ -682,7 +682,7 @@ All criteria use Bubbletea for rendering (per ADR-0013 — no phased UI approach
 
 ## Parallel Build Strategy
 
-This feature can be built in parallel with FEAT-0008 (BFF Server). See FEAT-0008's Parallel Build Strategy section for the full approach.
+This feature can be built in parallel with FEAT-0008 (Runtime Server). See FEAT-0008's Parallel Build Strategy section for the full approach.
 
 **Harness team builds against a mock server**: a Go server that returns scripted protocol responses per FEAT-0008's Protocol Payload Schemas. The mock covers: turn streaming, tool calls, session list/details, model list/selected, compaction plans, connection health, diagnostic codes, and multi-model branch events.
 
@@ -703,7 +703,7 @@ This feature can be built in parallel with FEAT-0008 (BFF Server). See FEAT-0008
 
 | Feature | Relationship |
 |---------|-------------|
-| FEAT-0008 (BFF Server) | FEAT-0008 defines the server-side protocol, routing, and session model the harness connects to. |
+| FEAT-0008 (Runtime Server) | FEAT-0008 defines the server-side protocol, routing, and session model the harness connects to. |
 | FEAT-0014 (Harness Conversation Shell) | FEAT-0014 is the canonical refinement for the main conversation-shell UX inside the broader terminal harness defined here. |
 
 ## Open Questions
