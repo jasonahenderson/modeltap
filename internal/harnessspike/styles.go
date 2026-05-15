@@ -11,7 +11,6 @@ var (
 			BorderForeground(lipgloss.Color("#2A3648"))
 
 	sidebarTitleStyle       = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#F5F7FB"))
-	sidebarSectionStyle     = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#79C0FF"))
 	sidebarItemStyle        = lipgloss.NewStyle().Padding(0, 1).Foreground(lipgloss.Color("#C8D1DC"))
 	sidebarItemActiveStyle  = lipgloss.NewStyle().Padding(0, 1).Background(lipgloss.Color("#1C2635")).Foreground(lipgloss.Color("#FFFFFF"))
 	sidebarItemFocusedStyle = lipgloss.NewStyle().
@@ -31,10 +30,6 @@ var (
 	transcriptBoxStyle = lipgloss.NewStyle().
 				Padding(1, 2)
 
-	inputBoxStyle = lipgloss.NewStyle().
-			Padding(0, 2, 1, 2)
-	footerBoxStyle = lipgloss.NewStyle().
-			Padding(0, 2, 1, 2)
 	composerBoxStyle = lipgloss.NewStyle().
 				Padding(1, 1).
 				Border(lipgloss.NormalBorder(), true, false, true, false).
@@ -89,8 +84,7 @@ var (
 			Padding(0, 1).
 			Foreground(lipgloss.Color("#8EA2BC"))
 
-	userLabelStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#AAB7C6"))
-	userBodyStyle  = lipgloss.NewStyle().
+	userBodyStyle = lipgloss.NewStyle().
 			Padding(0, 1).
 			Foreground(lipgloss.Color("#E6EDF3"))
 	queuedLabelStyle = lipgloss.NewStyle().

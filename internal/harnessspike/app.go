@@ -1822,9 +1822,7 @@ func demoReply() string {
 	var parts []string
 	for i := 1; i <= 12; i++ {
 		parts = append(parts, fmt.Sprintf("Step %02d.", i))
-		for _, segment := range segments {
-			parts = append(parts, segment)
-		}
+		parts = append(parts, segments...)
 	}
 	parts = append(parts, "Demo stream complete. The queue should now release the next waiting message.")
 	return strings.Join(parts, " ")
