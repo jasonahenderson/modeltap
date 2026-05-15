@@ -15,7 +15,7 @@ Modeltap's value increases with the number of model providers it can proxy. User
 Drivers are weighted 1–5, where 5 = critical.
 
 * **D1 – Breadth of provider coverage (5):** The knowledge layer and cross-model brain features only become valuable when modeltap captures traffic from all providers a user interacts with. Supporting only one provider undermines the core vision.
-* **D2 – Accuracy of metadata extraction (5):** Each provider returns token counts, model names, and usage data in different response formats. Modeltap must parse these correctly for metrics (ADR-0007) and the knowledge layer (ADR-0008) to work.
+* **D2 – Accuracy of metadata extraction (5):** Each provider returns token counts, model names, and usage data in different response formats. Modeltap must parse these correctly for metrics and usage tracking to work.
 * **D3 – Ease of adding new providers (4):** The AI model ecosystem changes rapidly. New providers and API formats emerge frequently. Adding support for a new provider should be a contained, well-defined task.
 * **D4 – Time to first working provider (4):** Getting Anthropic (Claude Code's provider) working quickly validates the core proxy architecture. The first provider should not be blocked by abstraction layer design.
 * **D5 – Streaming format handling (4):** Providers use different streaming approaches — Anthropic uses SSE with `message_start`/`content_block_delta` events, OpenAI uses SSE with `data: [DONE]` terminators, Ollama uses newline-delimited JSON. The architecture must handle all of these.
