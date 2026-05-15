@@ -7,7 +7,7 @@ related:
   - FEAT-0009
   - FEAT-0013
   - ADR-0013
-  - docs/adr/.reviews/0014-harness-base-strategy-findings.md
+  - .sdlc/adr/.reviews/0014-harness-base-strategy-findings.md
 ---
 
 # ADR-0014: Harness Base Strategy
@@ -166,14 +166,14 @@ Future-feature confirmation (tracked under FEAT-0013 or successor):
 
 ## Review Findings
 
-Reviewed per `docs/adr/.reviews/0014-harness-base-strategy-findings.md`. Dispositions below.
+Reviewed per `.sdlc/adr/.reviews/0014-harness-base-strategy-findings.md`. Dispositions below.
 
 | ID | Severity | Disposition | Rationale |
 |----|----------|-------------|-----------|
 | F1 | blocking | accepted | Recomputed all weighted totals using `weight × score/10`. Four totals corrected (O2: 0.445, O3: 0.430, O4: 0.505, O5: 0.405). |
 | F2 | blocking | accepted | Renumbered O7 → O6 throughout. |
-| F3 | significant | accepted | Added ADR-0014 row to `docs/adr/README.md` index (see separate edit). |
-| F4 | significant | accepted | ADR-0014 uses hundredths-weighted scoring (user requirement). Template convention updated in `docs/adr/README.md`. |
+| F3 | significant | accepted | Added ADR-0014 row to `.sdlc/adr/README.md` index (see separate edit). |
+| F4 | significant | accepted | ADR-0014 uses hundredths-weighted scoring (user requirement). Template convention updated in `.sdlc/adr/README.md`. |
 | F5 | significant | accepted | Lowered O1 D2 from 7 to 4 to reflect current gap. Added explicit note that the score combines current capability with a forward commitment, and that the strategic claim (not the margin) justifies O1 over O6. |
 | F6 | significant | accepted | Lowered O6 D2 from 5 to 3 to match the "orchestration-oblivious" description. |
 | F7 | significant | accepted | Split Confirmation into two tiers: this-ADR confirmation and future-feature confirmation tracked under FEAT-0013. |

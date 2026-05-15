@@ -39,7 +39,7 @@ Other previously feature-shaped docs were reclassified when they proved to be up
 
 - The work is still problem framing or design-space exploration → use an **exploration** in `.sdlc/explorations/`
 - The work is implementation-scoped (bug fix, missing endpoint coverage, internal plumbing) → use a **patch** in `.sdlc/patches/`
-- The work is an architectural decision with future constraint value → use an **ADR** in `docs/adr/`
+- The work is an architectural decision with future constraint value → use an **ADR** in `.sdlc/adr/`
 - The change is repo process / workflow / instruction-file only → commit with `ADMIN:` prefix, no doc needed
 
 ## Naming
@@ -169,7 +169,7 @@ Review artifacts (canonical findings, plan reviews, syntheses) live under `.sdlc
 | Doc Type | Scope | Lives In |
 |----------|-------|----------|
 | Exploration | Upstream problem framing and design-space exploration | `.sdlc/explorations/` |
-| ADR | Architectural decisions with future constraint value | `docs/adr/` |
+| ADR | Architectural decisions with future constraint value | `.sdlc/adr/` |
 | **Feature spec** | **Behavior — user-visible capabilities** | **`.sdlc/features/`** |
 | Patch | Implementation — fixes, missing endpoints, internal work | `.sdlc/patches/` |
 | Work unit (`WU-NNN`) | Planned increments inside a feature, tracked in status.md | `.sdlc/history/` |

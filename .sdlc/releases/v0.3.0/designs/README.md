@@ -1,7 +1,7 @@
 # v0.3.0 Design Review Index
 
 > [!NOTE]
-> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`.sdlc/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
 
 This directory contains the complete Phase 1 design set for `v0.3.0` Run
 Runtime Foundation.
@@ -24,7 +24,7 @@ basic run inspection/list/control commands, reconnect/replay behavior, and
 Read in this order:
 
 1. [WU-108 run-runtime ADR design](2026-05-05-design-run-runtime-adr-108.md)
-   and [ADR-0015](../../../../docs/adr/0015-run-runtime.md)
+   and [ADR-0015](../../../adr/0015-run-runtime.md)
 2. [WU-109 run storage design](2026-05-05-design-run-storage-109.md)
 3. [WU-110 run protocol design](2026-05-05-design-run-protocol-110.md)
 4. [WU-111 to WU-113 BFF runtime design](2026-05-05-design-bff-run-runtime-111-113.md)

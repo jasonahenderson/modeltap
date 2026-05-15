@@ -28,7 +28,7 @@ intuition.
 | `EXP` | upstream problem framing and design-space exploration | `.sdlc/explorations/` |
 | `FEAT` | behavior-scoped product definition | `.sdlc/features/` |
 | `PATCH` | implementation-scoped product or engineering-system work | `.sdlc/patches/` |
-| `ADR` | architectural decision with future constraint value | `docs/adr/` |
+| `ADR` | architectural decision with future constraint value | `.sdlc/adr/` |
 | `WU` | implementation work unit under an accepted feature | `.sdlc/releases/<version>/` |
 | `ADMIN` | repo process / workflow / instruction changes | no numbered doc required by default |
 

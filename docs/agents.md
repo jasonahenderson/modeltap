@@ -1,7 +1,7 @@
 # Agent Team
 
 > [!NOTE]
-> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`.sdlc/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
 
 This document defines the agent team responsible for designing, building, testing, and shipping modeltap. Each agent has a specific role, clear inputs/outputs, and operates on small, independently completable work units.
 
@@ -17,7 +17,7 @@ This document defines the agent team responsible for designing, building, testin
 - `.sdlc/explorations/` holds upstream problem framing and design-space exploration. Explorations can promote into features, patches, or ADRs, but do not authorize implementation by themselves.
 - `.sdlc/features/` holds behavior-scoped work that can drive `WU-NNN` implementation once accepted.
 - `.sdlc/patches/` holds implementation-scoped work authorization for fixes, tooling, infra, and internal plumbing.
-- `docs/adr/` holds architectural decisions with future constraint value.
+- `.sdlc/adr/` holds architectural decisions with future constraint value.
 - `ADMIN:` work covers repo process and instruction changes such as `CLAUDE.md`, `AGENTS.md`, prompts, hooks, or documentation structure.
 
 ## Review Artifact Naming
@@ -36,7 +36,7 @@ This document defines the agent team responsible for designing, building, testin
 **Role:** Coordinates the team. Reads accepted ADRs and features, breaks work into incremental tasks, assigns to agents, tracks progress.
 
 **Responsibilities:**
-- Read accepted ADRs (`docs/adr/`) and features (`.sdlc/features/`) to determine project scope
+- Read accepted ADRs (`.sdlc/adr/`) and features (`.sdlc/features/`) to determine project scope
 - Break scope into ordered, independently completable work units
 - Write and maintain the plan in the current release directory (`.sdlc/releases/<version>/plan.md` and per-track files)
 - Update the status file (`.sdlc/releases/<version>/status.md`) after each unit completes

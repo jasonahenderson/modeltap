@@ -26,8 +26,8 @@ The user asked to:
 
 ### ADRs (light reconciliation — already mostly aligned)
 
-- Added `docs/adr/README.md` with a current-architecture summary, ADR index table, when-to-write/not-to-write guidance, naming convention, format template, lifecycle, and relationship table.
-- Added `docs/adr/.reviews/README.md` with canonical findings layout, findings JSON schema, and when-to-review guidance.
+- Added `.sdlc/adr/README.md` with a current-architecture summary, ADR index table, when-to-write/not-to-write guidance, naming convention, format template, lifecycle, and relationship table.
+- Added `.sdlc/adr/.reviews/README.md` with canonical findings layout, findings JSON schema, and when-to-review guidance.
 - Edited every ADR (`0001` through `0012`) to add the `ADR-NNNN:` prefix to the H1 title heading. The existing YAML frontmatter (`status`, `date`, `decision-makers`) was already in place and was not changed.
 
 ### Features (bigger reshape)
@@ -60,8 +60,8 @@ The user asked to:
 
 ## Files Created
 
-- `docs/adr/README.md`
-- `docs/adr/.reviews/README.md`
+- `.sdlc/adr/README.md`
+- `.sdlc/adr/.reviews/README.md`
 - `.sdlc/features/README.md`
 - `.sdlc/features/.reviews/README.md`
 - `.sdlc/patches/README.md`
@@ -82,7 +82,7 @@ The user asked to:
 
 - `CLAUDE.md` — added doc taxonomy table, updated Key References
 - `docs/agents.md` — fixed feature filename reference
-- `docs/adr/0001-programming-language.md` through `docs/adr/0012-background-execution-strategy.md` — added `ADR-NNNN:` prefix to H1
+- `.sdlc/adr/0001-programming-language.md` through `.sdlc/adr/0012-background-execution-strategy.md` — added `ADR-NNNN:` prefix to H1
 - `.sdlc/features/0001-knowledge-layer.md` — added YAML frontmatter, `FEAT-0001:` H1 prefix
 - `.sdlc/features/0002-multi-user-support.md` — added YAML frontmatter, `FEAT-0002:` H1 prefix
 - `.sdlc/features/0003-web-dashboard.md` — added YAML frontmatter (replacing bare `status:` line), `FEAT-0003:` H1 prefix

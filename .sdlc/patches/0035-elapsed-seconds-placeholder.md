@@ -12,7 +12,7 @@ branch: "patch/0035-elapsed-seconds-placeholder"
 # PATCH-0035: v0.3.0 placeholder — append elapsed seconds to streaming status
 
 > [!NOTE]
-> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`.sdlc/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
 
 ## Problem
 

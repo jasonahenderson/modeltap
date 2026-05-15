@@ -21,12 +21,12 @@ Keep user-facing and developer-facing product documentation in `docs/`:
 - `docs/sample-config.yaml`
 - other non-lifecycle docs
 
-ADR placement needs an explicit decision before the move:
+ADR placement needed an explicit decision before the move:
 
-- Option A: keep ADRs in `docs/adr/` because they are durable engineering docs.
+- Option A: keep ADRs in their previous docs home because they are durable engineering docs.
 - Option B: move ADRs to `.sdlc/adr/` for complete lifecycle co-location.
 
-Recommended first pass: keep ADRs in `docs/adr/` and revisit after the shared
+Recommended first pass: keep ADRs in their previous docs home and revisit after the shared
 `sdlc` project defines whether ADRs are lifecycle artifacts or architecture
 documentation.
 
@@ -102,7 +102,7 @@ git mv docs/history .sdlc/history
 If ADRs are included in the migration:
 
 ```sh
-git mv docs/adr .sdlc/adr
+git mv <former-adr-directory> .sdlc/adr
 ```
 
 Do not duplicate artifacts between old and new homes.
@@ -117,7 +117,7 @@ Replace live path references across tracked files:
 - `docs/patches/` -> `.sdlc/patches/`
 - `docs/releases/` -> `.sdlc/releases/`
 
-If ADRs stay in `docs/adr/`, do not rewrite `docs/adr/` references.
+If ADRs stay in their previous docs home, do not rewrite ADR path references.
 
 After the sweep, run:
 

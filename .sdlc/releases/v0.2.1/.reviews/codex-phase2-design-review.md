@@ -181,7 +181,7 @@ Standardize on one exported host-native action name and remove
 ## Disposition
 
 Processed 2026-04-26 by the agent team during Phase 2 closure. Severity is
-restated against the project review schema; see `docs/adr/.reviews/README.md`.
+restated against the project review schema; see `.sdlc/adr/.reviews/README.md`.
 
 | Finding | Severity | Disposition | Rationale |
 | --- | --- | --- | --- |

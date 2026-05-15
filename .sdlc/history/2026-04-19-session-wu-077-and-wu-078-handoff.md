@@ -6,7 +6,7 @@ topic: Handoff — v0.2.0 Bundle 7, 3/5 tool WUs complete
 # 2026-04-19 — Session Handoff: Bundle 7 tools, mid-flight
 
 > [!NOTE]
-> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`.sdlc/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
 
 ## Where we are
 

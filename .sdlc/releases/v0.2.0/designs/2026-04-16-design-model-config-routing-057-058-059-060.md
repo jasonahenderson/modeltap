@@ -1,7 +1,7 @@
 # 2026-04-16 — Design: Model Config & Routing Bundle (WU-057 + WU-058 + WU-059 + WU-060)
 
 > [!NOTE]
-> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`.sdlc/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
 
 ## Scope
 

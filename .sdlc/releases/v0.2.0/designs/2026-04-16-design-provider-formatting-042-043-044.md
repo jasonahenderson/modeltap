@@ -1,7 +1,7 @@
 # 2026-04-16 — Design: Provider Formatting Bundle (WU-042 + WU-043 + WU-044)
 
 > [!NOTE]
-> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`.sdlc/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
 
 ## Review Tier
 
@@ -313,11 +313,11 @@ Anthropic has no such quirk — `tool_use.input` is a JSON object directly. Pass
 
 ### D7. ADR-0006 amendment strategy
 
-The repo's ADR schema (`docs/adr/README.md`) does not define an "amendment" lifecycle or front-matter keys — it supports `status: proposed | accepted | superseded by ADR-NNNN | deprecated`. Filename convention is `NNNN-short-title.md`, four-digit sequence only. Rather than inventing a parallel convention, this bundle appends the amendment directly to the existing ADR-0006 file as a new section.
+The repo's ADR schema (`.sdlc/adr/README.md`) does not define an "amendment" lifecycle or front-matter keys — it supports `status: proposed | accepted | superseded by ADR-NNNN | deprecated`. Filename convention is `NNNN-short-title.md`, four-digit sequence only. Rather than inventing a parallel convention, this bundle appends the amendment directly to the existing ADR-0006 file as a new section.
 
 **Decision:** amend in place.
 
-- **File:** `docs/adr/0006-multi-provider-support.md` (existing)
+- **File:** `.sdlc/adr/0006-multi-provider-support.md` (existing)
 - **What changes:** add a new top-level section at the end titled `## Amendment 001 — Outbound Formatting (2026-04-16)`, containing: scope of the change, the two interface method signatures, the canonical Message type sketch, the truncation policy summary, and a reference back to this design doc (`.sdlc/history/2026-04-16-design-provider-formatting-042-043-044.md`) for full detail.
 - **Front-matter:** keep existing `status: accepted` and `decision-makers`; bump `date` to 2026-04-16 to reflect the revision.
 - **No new file.** No `amends:` key invented. No sub-numbered filename.
@@ -368,7 +368,7 @@ Truncation and format functions return these where appropriate.
 - `internal/provider/convert.go` — helpers between `protocol.*` and `provider.*` analogues (consumed by WU-051)
 
 **Modified (WU-042):**
-- `docs/adr/0006-multi-provider-support.md` — append "Amendment 001 — Outbound Formatting (2026-04-16)" section; bump front-matter date.
+- `.sdlc/adr/0006-multi-provider-support.md` — append "Amendment 001 — Outbound Formatting (2026-04-16)" section; bump front-matter date.
 - `internal/provider/provider.go` — extend `Provider` interface, add `FormatMessagesOpts`, add error sentinels
 - `internal/provider/anthropic.go` — stub methods returning `ErrNotImplemented`
 - `internal/provider/openai.go` — stub methods returning `ErrNotImplemented`
@@ -453,7 +453,7 @@ Live in `internal/provider/truncate_test.go`; both adapter tests reuse them impl
 - **Truncation policy is explicit, with reconciliation.** Spec says "Context window truncation (drop oldest turns, preserve system prompt + recent)." Design adds D4 reconciliation pass for tool-pair orphan handling across multi-assistant-turn interleaving. TPM should update spec to include reconciliation.
 - **`provider.*` types (Message, ToolCall, ToolResult, Attachment) are named identically to `protocol.*` analogues and share wire-level byte shape.** WU-042 spec says the canonical Message has fields `(role, content, tool_calls, tool_results, attachments, metadata)` but does not prescribe new types. Design creates explicit `provider.*` types so server-internal metadata (Message.Metadata) has a home. TPM should update spec to reflect this split.
 - **`Message.Metadata` reserves specific keys.** `turn_id`, `branch_id`, `sequence`, `timestamp` are documented as the canonical keys. Spec does not call these out.
-- **ADR-0006 amended in place, not a new file.** Spec wording ("ADR amendment document: `docs/adr/0006-amendment-001-outbound-formatting.md`") implies a standalone file. Design appends to the existing ADR-0006 file because the repo's ADR schema (`docs/adr/README.md`) does not define an amendment lifecycle or filename convention. TPM should update spec to reflect in-place amendment.
+- **ADR-0006 amended in place, not a new file.** Spec wording ("ADR amendment document: `.sdlc/adr/0006-amendment-001-outbound-formatting.md`") implies a standalone file. Design appends to the existing ADR-0006 file because the repo's ADR schema (`.sdlc/adr/README.md`) does not define an amendment lifecycle or filename convention. TPM should update spec to reflect in-place amendment.
 
 ## Pre-Review Lint Disposition (2026-04-16)
 

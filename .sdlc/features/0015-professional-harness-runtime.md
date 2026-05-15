@@ -262,7 +262,7 @@ Workflow contracts are not full agent teams. They are the structured envelope
 that makes a run produce the right artifacts and ask for the right approvals.
 Artifact-oriented workflows such as `exploration`, `feature`, `adr`, and
 `release` produce or revise the existing repository artifact families
-(`.sdlc/explorations/`, `.sdlc/features/`, `docs/adr/`, and
+(`.sdlc/explorations/`, `.sdlc/features/`, `.sdlc/adr/`, and
 `.sdlc/releases/<version>/`). They do not replace the canonical process rules for
 those directories. In particular, the `release` workflow must honor the
 existing release plan/status/track/changelog structure and the strict

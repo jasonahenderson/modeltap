@@ -19,14 +19,14 @@
   - Conclusion: continue modeltap harness as design-reference-only approach
 
 ### 2. ADR-0014 Draft
-- Wrote `docs/adr/0014-harness-base-strategy.md`
+- Wrote `.sdlc/adr/0014-harness-base-strategy.md`
   - 6 options including orchestration-aware client (O1) vs conversation-only (O6)
   - 7 decision drivers with hundredths weights summing to 1.00
   - Scoring matrix with 1-10 scale
   - Initial decision: O1 selected
 
 ### 3. Peer Review Processing
-- Received `docs/adr/.reviews/0014-harness-base-strategy-findings.md` (peer review by Claude)
+- Received `.sdlc/adr/.reviews/0014-harness-base-strategy-findings.md` (peer review by Claude)
 - 10 findings processed and incorporated:
   - F1: Corrected 4 weighted totals
   - F2: Renumbered O7 -> O6
@@ -42,16 +42,16 @@
 - ADR marked `accepted`
 
 ### 4. Review Processing Workflow
-- Updated `docs/adr/.reviews/README.md` with 8-step findings processing procedure
+- Updated `.sdlc/adr/.reviews/README.md` with 8-step findings processing procedure
 
 ## Files Created
 - `.sdlc/explorations/0010-harness-comparative-analysis.md`
-- `docs/adr/0014-harness-base-strategy.md`
-- `docs/adr/.reviews/0014-harness-base-strategy-findings.md`
+- `.sdlc/adr/0014-harness-base-strategy.md`
+- `.sdlc/adr/.reviews/0014-harness-base-strategy-findings.md`
 
 ## Files Modified
-- `docs/adr/README.md` (added ADR-0014 row, updated Current Architecture paragraph)
-- `docs/adr/.reviews/README.md` (added findings processing workflow)
+- `.sdlc/adr/README.md` (added ADR-0014 row, updated Current Architecture paragraph)
+- `.sdlc/adr/.reviews/README.md` (added findings processing workflow)
 
 ## Decisions
 - ADR-0014 accepted: Continue modeltap harness, port OpenHarness subsystems selectively

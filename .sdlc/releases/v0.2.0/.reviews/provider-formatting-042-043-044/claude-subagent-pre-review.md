@@ -89,14 +89,14 @@ The D5 tables are roughly correct at the "shape" level but miss details that FEA
 
 ### A-01. ADR amendment front-matter uses keys (`supersedes`, `amends`) not defined in the repo's ADR schema
 
-- **What:** D7 specifies amendment front-matter `status: accepted, date: 2026-04-16, supersedes: none, amends: 0006-multi-provider-support.md`. But `docs/adr/README.md:54-58` defines the schema as `status: proposed | accepted | superseded by ADR-NNNN | deprecated; date: YYYY-MM-DD; decision-makers: Name, Name (optional)`. The schema does NOT define `amends` as a front-matter key; it handles supersession via `status: superseded by ADR-NNNN` in the body. No existing amendment files exist in `docs/adr/`, so the design is proposing a novel convention.
+- **What:** D7 specifies amendment front-matter `status: accepted, date: 2026-04-16, supersedes: none, amends: 0006-multi-provider-support.md`. But `.sdlc/adr/README.md:54-58` defines the schema as `status: proposed | accepted | superseded by ADR-NNNN | deprecated; date: YYYY-MM-DD; decision-makers: Name, Name (optional)`. The schema does NOT define `amends` as a front-matter key; it handles supersession via `status: superseded by ADR-NNNN` in the body. No existing amendment files exist in `.sdlc/adr/`, so the design is proposing a novel convention.
 - **Evidence:**
   - `.sdlc/history/2026-04-16-design-provider-formatting-042-043-044.md:219-220` — front-matter design.
-  - `docs/adr/README.md:54-58` — schema (no `amends`, no `supersedes` as bare key).
-  - `docs/adr/README.md:41-47` — "Naming: Files: `NNNN-short-title.md` — four-digit zero-padded sequence." Amendment filename `0006-amendment-001-outbound-formatting.md` is non-standard (introduces the suffix `-amendment-NNN-`).
-  - `docs/adr/README.md:80-86` — Lifecycle covers "Propose / Review / Accept / Supersede" — no Amend lifecycle.
+  - `.sdlc/adr/README.md:54-58` — schema (no `amends`, no `supersedes` as bare key).
+  - `.sdlc/adr/README.md:41-47` — "Naming: Files: `NNNN-short-title.md` — four-digit zero-padded sequence." Amendment filename `0006-amendment-001-outbound-formatting.md` is non-standard (introduces the suffix `-amendment-NNN-`).
+  - `.sdlc/adr/README.md:80-86` — Lifecycle covers "Propose / Review / Accept / Supersede" — no Amend lifecycle.
   - `.sdlc/history/2026-04-16-design-protocol-types-040-041-093.md` (protocol bundle design, reviewed separately) did not take a stance on amendment format.
-- **Recommended disposition:** **fix in design now** — either (a) promote this to a full new ADR (ADR-0014) that supersedes ADR-0006, per the lifecycle the README actually defines; (b) add the amendment convention to `docs/adr/README.md` as an `ADMIN:` change, then write the amendment under that new convention (define `amends:` key, the `NNNN-amendment-NNN-title.md` filename, and the relationship to the parent ADR's status); or (c) append the amendment to the existing `0006-multi-provider-support.md` as a new section ("Amendment 001: Outbound formatting, 2026-04-16") and update the parent ADR's front-matter date. Option (b) is the most work but aligns with the doc taxonomy. Option (c) is cheapest. Option (a) is heavy-handed for what is genuinely an extension, not a reversal, of ADR-0006. The design's current proposal is closer to (b) but skips the README update step. Pick one and commit to it.
+- **Recommended disposition:** **fix in design now** — either (a) promote this to a full new ADR (ADR-0014) that supersedes ADR-0006, per the lifecycle the README actually defines; (b) add the amendment convention to `.sdlc/adr/README.md` as an `ADMIN:` change, then write the amendment under that new convention (define `amends:` key, the `NNNN-amendment-NNN-title.md` filename, and the relationship to the parent ADR's status); or (c) append the amendment to the existing `0006-multi-provider-support.md` as a new section ("Amendment 001: Outbound formatting, 2026-04-16") and update the parent ADR's front-matter date. Option (b) is the most work but aligns with the doc taxonomy. Option (c) is cheapest. Option (a) is heavy-handed for what is genuinely an extension, not a reversal, of ADR-0006. The design's current proposal is closer to (b) but skips the README update step. Pick one and commit to it.
 
 ### A-02. `FormatMessagesOpts` is missing fields real dispatch will need
 
@@ -231,7 +231,7 @@ Field comment line 98: "max total tokens for truncation." The unit is tokens, no
 | Multi-Model Roles (line 795-802) | N/A | BFF-level parallelism, not provider-level; correctly out of scope. |
 | Model Transparency (line 808-886) | partial | `model.selected` / capability metadata NOT in `FormatMessagesOpts` (A-02 vision gating). |
 | In-Flight Turn Recovery (line 447-495) | partial | Turn-continuation not considered (A-08). |
-| ADR-0006 amendment shape | blocked | Front-matter schema does not match `docs/adr/README.md` convention; see A-01. |
+| ADR-0006 amendment shape | blocked | Front-matter schema does not match `.sdlc/adr/README.md` convention; see A-01. |
 | Track-0-shared.md WU-042 spec (line 54-66) | complete (with declared deviations) | Three deviations declared; two additional deviations missing from the log (A-05). |
 | Track-0-shared.md WU-043 spec (line 70-83) | complete | All eight DoD sub-items addressed in test plan; wire-table gaps (B-04) affect correctness but not coverage. |
 | Track-0-shared.md WU-044 spec (line 86-98) | complete | Same as WU-043, with the OpenAI-specific quirks. |

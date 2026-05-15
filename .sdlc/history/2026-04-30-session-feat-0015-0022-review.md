@@ -14,7 +14,7 @@
 
 1. **Read feature specs** for FEAT-0015, FEAT-0016, FEAT-0017, FEAT-0018, FEAT-0019, FEAT-0020, FEAT-0021, and FEAT-0022.
 2. **Read `.sdlc/features/README.md`** to confirm format, frontmatter, and lifecycle rules.
-3. **Read `docs/adr/README.md`** to verify ADR-0014 status (accepted) and available ADR numbers.
+3. **Read `.sdlc/adr/README.md`** to verify ADR-0014 status (accepted) and available ADR numbers.
 4. **Wrote review** to `.reviews/kimi-feat-0015-0022-review.md`.
 5. **Moved review to canonical location** at `.sdlc/features/.reviews/syntheses/kimi-feat-0015-0022-review.md` after discovering `.sdlc/features/.reviews/` is the canonical directory per the README.
 

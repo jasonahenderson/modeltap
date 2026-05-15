@@ -1,7 +1,7 @@
 # Handoff — Harness Debug & Review (2026-04-21)
 
 > [!NOTE]
-> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`.sdlc/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
 
 Forward-looking document for the next working session. Purpose: let a fresh Claude context (or a human returning cold) pick up harness debugging and review without re-deriving the layout.
 
@@ -56,8 +56,8 @@ Every production file has a sibling `_test.go`. Tests use the table-driven patte
 
 - **FEAT-0008** (`.sdlc/features/0008-bff-server.md`) — BFF server feature spec, **accepted**. Covers protocol framing, session lifecycle, turn dispatch, streaming, routing, capabilities handshake, cost updates.
 - **FEAT-0009** (`.sdlc/features/0009-terminal-harness.md`) — terminal harness feature spec, **accepted**. Covers Bubbletea UI, tool framework, permission model, MCP client, `@file` context, session commands.
-- **ADR-0013** (`docs/adr/0013-terminal-ui-framework.md`) — Bubbletea chosen over alternatives. Status: proposed (consult before changing framework assumptions).
-- **ADR-0009** (`docs/adr/0009-mcp-server-for-knowledge-access.md`) — MCP stdio transport; constrains the harness MCP client shape.
+- **ADR-0013** (`.sdlc/adr/0013-terminal-ui-framework.md`) — Bubbletea chosen over alternatives. Status: proposed (consult before changing framework assumptions).
+- **ADR-0009** (`.sdlc/adr/0009-mcp-server-for-knowledge-access.md`) — MCP stdio transport; constrains the harness MCP client shape.
 - **PATCH-0003** (`.sdlc/patches/0003-harness-app-conn-mgr-wiring.md`) — `ConnSurface` / `deferredSender` wiring between Bubbletea App and ConnectionManager. Read this before changing how the app talks to the connection.
 - **PATCH-0005** — harness provider traffic routed through the local proxy by default. Cloud providers default to `http://127.0.0.1:<port>` unless `host:` is explicitly set.
 - **Release status:** `.sdlc/releases/v0.2.0/status.md` — Phase 3 (implementation). All blocking and cross-flow findings resolved. See the "Completed" section for what shipped in each bundle (4–11 on BFF side, 5–7 on harness side, Bundle 13 harness UX).

@@ -6,7 +6,7 @@ topic: Session log — Bundles 7 + 13 complete, PATCH-0003, WU-089 CLI launch
 # 2026-04-19 — Session: Bundle 7 finish, PATCH-0003, Bundle 13 complete, WU-089
 
 > [!NOTE]
-> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`.sdlc/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
 
 ## Scope
 

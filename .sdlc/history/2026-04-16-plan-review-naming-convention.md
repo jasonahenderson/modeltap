@@ -1,7 +1,7 @@
 # 2026-04-16 — plan review naming convention update
 
 > [!NOTE]
-> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`.sdlc/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
 
 ## Summary
 
@@ -14,7 +14,7 @@ Updated the repo guidance for non-canonical work-plan review artifact naming.
 - Updated the review-layout READMEs for:
   - `.sdlc/features/.reviews/README.md`
   - `.sdlc/patches/.reviews/README.md`
-  - `docs/adr/.reviews/README.md`
+  - `.sdlc/adr/.reviews/README.md`
   - `.sdlc/releases/README.md`
   - `.sdlc/releases/.reviews/README.md`
 

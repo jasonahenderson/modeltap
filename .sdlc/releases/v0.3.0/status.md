@@ -1,7 +1,7 @@
 # v0.3.0 — Status
 
 > [!NOTE]
-> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`.sdlc/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
 
 **Current phase:** Phase 3 — Implementation complete; pending release close
 
@@ -40,7 +40,7 @@ Manual UI smoke-test instructions are recorded in
 
 | WU | Title | Size | State | Design |
 |---|---|---|---|---|
-| 108 | Run runtime ADR | M | accepted | [designs/2026-05-05-design-run-runtime-adr-108.md](designs/2026-05-05-design-run-runtime-adr-108.md), [ADR-0015](../../../docs/adr/0015-run-runtime.md) |
+| 108 | Run runtime ADR | M | accepted | [designs/2026-05-05-design-run-runtime-adr-108.md](designs/2026-05-05-design-run-runtime-adr-108.md), [ADR-0015](../../adr/0015-run-runtime.md) |
 | 109 | Run schema, storage, and migration design | M | implemented | [designs/2026-05-05-design-run-storage-109.md](designs/2026-05-05-design-run-storage-109.md) |
 | 110 | Run protocol methods and event taxonomy | M | implemented | [designs/2026-05-05-design-run-protocol-110.md](designs/2026-05-05-design-run-protocol-110.md) |
 | 111 | BFF run registry and lifecycle store | L | implemented, hardening pending | [designs/2026-05-05-design-bff-run-runtime-111-113.md](designs/2026-05-05-design-bff-run-runtime-111-113.md) |

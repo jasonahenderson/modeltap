@@ -1,21 +1,21 @@
 # 2026-05-05 - Design: Run Runtime ADR (WU-108)
 
 > [!NOTE]
-> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`.sdlc/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
 
 ## Scope
 
 This design covers WU-108 only: the run-runtime ADR that constrains v0.3.0
 implementation and the downstream v0.3.x release train.
 
-The ADR draft lives at `docs/adr/0015-run-runtime.md`.
+The ADR draft lives at `.sdlc/adr/0015-run-runtime.md`.
 
 ## Inputs
 
 - `.sdlc/features/0015-professional-harness-runtime.md`
 - `.sdlc/features/0016-managed-codegen-run-pipeline.md`
 - `.sdlc/features/0017-durable-runs-and-background-agents.md`
-- `docs/adr/0014-harness-base-strategy.md`
+- `.sdlc/adr/0014-harness-base-strategy.md`
 - `internal/bff/turn.go`
 - `internal/protocol/messages.go`
 - `internal/protocol/events.go`

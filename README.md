@@ -84,7 +84,7 @@ Full install, configuration, and client-integration details — including Claude
 | **Local-first** | Everything — captured traffic, session history, metrics — lives on your disk in a single SQLite database. No cloud account, no telemetry, no vendor lock. |
 | **Provider-agnostic routing** | One proxy address fronts both Anthropic and OpenAI traffic. Point any client that honors `ANTHROPIC_BASE_URL` or `OPENAI_BASE_URL` at modeltap and it just works. |
 | **Real cost and token accounting** | Per-request input/output tokens, latency, and estimated cost — extracted from live responses, including reassembled SSE streams. |
-| **Full record, not samples** | Captures every request and response in full, with retention-based pruning ([ADR-0005](docs/adr/0005-retention-based-pruning.md)). You can always go back and read the bytes. |
+| **Full record, not samples** | Captures every request and response in full, with retention-based pruning ([ADR-0005](.sdlc/adr/0005-retention-based-pruning.md)). You can always go back and read the bytes. |
 | **Built to grow** | v0.2.0 adds a JSON-RPC runtime server and a Bubbletea terminal harness with a tool framework and MCP client. A knowledge layer (sqlite-vec), skills, and agent teams are on the roadmap. |
 
 ---
@@ -96,7 +96,7 @@ Full install, configuration, and client-integration details — including Claude
 | `cmd/modeltap/` | CLI entrypoint |
 | `internal/` | Proxy, storage, providers, harness, runtime server, dashboard |
 | `pkg/` | Public packages |
-| `docs/adr/` | Architecture Decision Records — accepted ones drive the codebase |
+| `.sdlc/adr/` | Architecture Decision Records — accepted ones drive the codebase |
 | `.sdlc/features/` | Feature specs — accepted specs drive work units |
 | `.sdlc/patches/` | Implementation-scoped patches (fixes, plumbing, small additions) |
 | `.sdlc/releases/` | Per-release plan, status, changelog, and track files |
@@ -123,12 +123,12 @@ A few things to know up front:
 
 - **DCO sign-off is required.** Use `git commit -s` on every commit.
 - **ADR-driven.** Non-trivial changes that touch architecture reference an ADR; if your change conflicts with an accepted ADR, open an issue before writing code.
-- **Patches vs features vs ADRs.** Small implementation-scoped work goes through [`.sdlc/patches/`](.sdlc/patches/README.md). Behavior-scoped new capabilities go through [`.sdlc/features/`](.sdlc/features/README.md). Architectural choices go through [`docs/adr/`](docs/adr/README.md). The README for each directory explains when to use which.
+- **Patches vs features vs ADRs.** Small implementation-scoped work goes through [`.sdlc/patches/`](.sdlc/patches/README.md). Behavior-scoped new capabilities go through [`.sdlc/features/`](.sdlc/features/README.md). Architectural choices go through [`.sdlc/adr/`](.sdlc/adr/README.md). The README for each directory explains when to use which.
 - **Contributor tiers** are graduated — contributor → committer → maintainer → BDFL. See `GOVERNANCE.md`.
 
 ## Fork and build on it
 
-modeltap is [Apache-2.0 licensed](LICENSE) (per [ADR-0010](docs/adr/0010-open-source-license.md)). Fork it, remix it, ship something on top of it. If what you're building could be upstream, open a PR — the graduated tier system is there to take new contributors seriously.
+modeltap is [Apache-2.0 licensed](LICENSE) (per [ADR-0010](.sdlc/adr/0010-open-source-license.md)). Fork it, remix it, ship something on top of it. If what you're building could be upstream, open a PR — the graduated tier system is there to take new contributors seriously.
 
 The integrated-harness direction in particular is a good substrate to fork against: the runtime server protocol, the tool framework, and the session schema are all reusable pieces if you want your own AI environment with different choices.
 

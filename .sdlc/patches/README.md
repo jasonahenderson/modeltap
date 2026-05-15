@@ -1,9 +1,9 @@
 # Patches
 
 > [!NOTE]
-> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`.sdlc/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
 
-Implementation-scoped work authorization documents. Patches are the lightweight counterpart to feature specs (`.sdlc/features/`) and ADRs (`docs/adr/`).
+Implementation-scoped work authorization documents. Patches are the lightweight counterpart to feature specs (`.sdlc/features/`) and ADRs (`.sdlc/adr/`).
 
 ## Patch Index
 
@@ -59,7 +59,7 @@ Implementation-scoped work authorization documents. Patches are the lightweight 
 
 - The work is still problem framing or design-space exploration → use an **exploration** in `.sdlc/explorations/`
 - The work is behavior-scoped (new capability surfaced to users, multiple personas, success criteria) → use a **feature spec** in `.sdlc/features/`
-- The work requires an architectural choice with future constraint value → use an **ADR** in `docs/adr/`
+- The work requires an architectural choice with future constraint value → use an **ADR** in `.sdlc/adr/`
 - The change is repo process / workflow / instruction-file only (CLAUDE.md, agents.md, skills, hooks) → commit directly with an `ADMIN:` prefix, no doc needed
 
 Patch classification is about scope, not release semantics:
@@ -155,7 +155,7 @@ Optional fields:
 | Exploration | Upstream problem framing and design-space exploration | `.sdlc/explorations/` |
 | Feature spec | Behavior — new capabilities, user-visible work | `.sdlc/features/` |
 | **Patch** | **Implementation — fixes, missing endpoints, internal work** | **`.sdlc/patches/`** |
-| ADR | Architectural decisions with future constraint value | `docs/adr/` |
+| ADR | Architectural decisions with future constraint value | `.sdlc/adr/` |
 | Work unit (`WU-NNN`) | Planned increments inside a feature, tracked in status.md | `.sdlc/history/` |
 
 Work units (`WU-NNN`) are the existing planning unit for advancing accepted features through `tpm`. Patches are a separate axis for fixes and small implementation-scoped work that doesn't fit a feature's work-unit plan.

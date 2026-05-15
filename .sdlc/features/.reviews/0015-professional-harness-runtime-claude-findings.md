@@ -33,7 +33,7 @@
 
 **Detail:** FEAT-0015:0136-0146 introduces a `release` workflow type. The repo already has a structured release process (`.sdlc/releases/<version>/plan.md`, `status.md`, `track-*.md`, `changelog.md`) plus the three-phase Phase 1/2/3 model in CLAUDE.md. There are now potentially two "release workflow" notions: the existing process model and a runtime workflow contract. The spec does not say whether the `release` workflow drives the existing artifact set, replaces it, or is a separate concept.
 
-**Recommendation:** Add a sentence to §Workflow Contracts explaining whether the `release` workflow type produces or coexists with the existing `.sdlc/releases/<version>/` artifacts. Same clarification likely needed for `feature`, `adr`, and `exploration` workflow types and their relationship to `.sdlc/features/`, `docs/adr/`, `.sdlc/explorations/`.
+**Recommendation:** Add a sentence to §Workflow Contracts explaining whether the `release` workflow type produces or coexists with the existing `.sdlc/releases/<version>/` artifacts. Same clarification likely needed for `feature`, `adr`, and `exploration` workflow types and their relationship to `.sdlc/features/`, `.sdlc/adr/`, `.sdlc/explorations/`.
 
 ### F3 — Significant
 

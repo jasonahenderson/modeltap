@@ -1,7 +1,7 @@
 # v0.2.0 Changelog
 
 > [!NOTE]
-> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`.sdlc/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
 
 **Status:** unreleased (in development on `exploration/integrated-harness`)
 
@@ -56,7 +56,7 @@ SQLite schema migrated to v2 with sessions, turns, command history, session lock
 
 ## Architecture decisions
 
-See `docs/adr/` for the full list; v0.2.0 specifically introduced:
+See `.sdlc/adr/` for the full list; v0.2.0 specifically introduced:
 
 - **ADR-0013** — Bubbletea TUI framework for the harness
 
@@ -98,19 +98,19 @@ The canonical index of every numbered doc that drove, constrains, or informs v0.
 
 | ID | Title | Status | Role in v0.2.0 |
 |----|-------|--------|----------------|
-| [ADR-0001](../../../docs/adr/0001-programming-language.md) | Go as primary language | accepted | Pre-existing constraint. |
-| [ADR-0002](../../../docs/adr/0002-storage-format.md) | SQLite, WAL mode | accepted | Pre-existing constraint. Schema extended via migration v2 (WU-045, WU-091). |
-| [ADR-0003](../../../docs/adr/0003-cli-framework.md) | Cobra CLI | accepted | Pre-existing constraint. |
-| [ADR-0004](../../../docs/adr/0004-configuration-management.md) | Viper configuration | accepted | Pre-existing constraint. |
-| [ADR-0005](../../../docs/adr/0005-capture-mode-strategy.md) | Always full capture | accepted | Pre-existing constraint. |
-| [ADR-0006](../../../docs/adr/0006-multi-provider-support.md) | Multi-provider adapters | accepted | Extended (not formally amended): `FormatMessages` / `FormatToolDefinitions` added to the Provider interface in WU-042. |
-| [ADR-0007](../../../docs/adr/0007-usage-metrics.md) | Pre-computed aggregation tables | accepted | Pre-existing constraint; cost events (WU-056) feed the same tables. |
-| [ADR-0008](../../../docs/adr/0008-knowledge-layer-architecture.md) | sqlite-vec knowledge layer | accepted | Pre-existing constraint; not active in v0.2.0 (see FEAT-0011). |
-| [ADR-0009](../../../docs/adr/0009-mcp-server-for-knowledge-access.md) | MCP stdio transport | accepted | Governs the harness-side MCP client shape (WU-081). |
-| [ADR-0010](../../../docs/adr/0010-open-source-license.md) | Apache 2.0 | accepted | Gates dependency choices — drove the stdlib-only DOCX implementation and the no-UniDoc PDF choice. |
-| [ADR-0011](../../../docs/adr/0011-contribution-model-and-governance.md) | BDFL + contributor tiers | accepted | Pre-existing constraint. |
-| [ADR-0012](../../../docs/adr/0012-background-execution-strategy.md) | Background execution (proxy service) | accepted | Pre-existing (v0.1). The harness auto-start path leverages the same daemonization primitives. |
-| [ADR-0013](../../../docs/adr/0013-terminal-ui-framework.md) | Bubbletea TUI framework | proposed | **New in v0.2.0** — framework selection for the harness. |
+| [ADR-0001](../../adr/0001-programming-language.md) | Go as primary language | accepted | Pre-existing constraint. |
+| [ADR-0002](../../adr/0002-storage-format.md) | SQLite, WAL mode | accepted | Pre-existing constraint. Schema extended via migration v2 (WU-045, WU-091). |
+| [ADR-0003](../../adr/0003-cli-framework.md) | Cobra CLI | accepted | Pre-existing constraint. |
+| [ADR-0004](../../adr/0004-configuration-management.md) | Viper configuration | accepted | Pre-existing constraint. |
+| [ADR-0005](../../adr/0005-capture-mode-strategy.md) | Always full capture | accepted | Pre-existing constraint. |
+| [ADR-0006](../../adr/0006-multi-provider-support.md) | Multi-provider adapters | accepted | Extended (not formally amended): `FormatMessages` / `FormatToolDefinitions` added to the Provider interface in WU-042. |
+| [ADR-0007](../../adr/0007-usage-metrics.md) | Pre-computed aggregation tables | accepted | Pre-existing constraint; cost events (WU-056) feed the same tables. |
+| [ADR-0008](../../adr/0008-knowledge-layer-architecture.md) | sqlite-vec knowledge layer | accepted | Pre-existing constraint; not active in v0.2.0 (see FEAT-0011). |
+| [ADR-0009](../../adr/0009-mcp-server-for-knowledge-access.md) | MCP stdio transport | accepted | Governs the harness-side MCP client shape (WU-081). |
+| [ADR-0010](../../adr/0010-open-source-license.md) | Apache 2.0 | accepted | Gates dependency choices — drove the stdlib-only DOCX implementation and the no-UniDoc PDF choice. |
+| [ADR-0011](../../adr/0011-contribution-model-and-governance.md) | BDFL + contributor tiers | accepted | Pre-existing constraint. |
+| [ADR-0012](../../adr/0012-background-execution-strategy.md) | Background execution (proxy service) | accepted | Pre-existing (v0.1). The harness auto-start path leverages the same daemonization primitives. |
+| [ADR-0013](../../adr/0013-terminal-ui-framework.md) | Bubbletea TUI framework | proposed | **New in v0.2.0** — framework selection for the harness. |
 
 ### Patches
 

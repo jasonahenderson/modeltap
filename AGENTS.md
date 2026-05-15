@@ -15,7 +15,7 @@ Base agent contract: `.agents/contracts/base.md`
 - `.sdlc/explorations/` — upstream explorations that may promote into features, patches, or ADRs
 - `.sdlc/features/` — behavior-scoped feature specs
 - `.sdlc/patches/` — implementation-scoped work authorization docs
-- `docs/adr/` — architectural decision records
+- `.sdlc/adr/` — architectural decision records
 - `.sdlc/releases/` — release-scoped plans, status, changelogs, and release-local reviews
 - `.sdlc/history/` — status, plans, and session/work logs
 - `docs/agents.md` — human-readable agent-team overview

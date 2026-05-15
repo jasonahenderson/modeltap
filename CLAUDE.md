@@ -7,7 +7,7 @@ Reverse proxy for AI/ML clients that captures requests/responses, tracks usage m
 - Canonical process rules: `.agents/process.md`
 - Agent-team contract: `.agents/contracts/agent-team.md`
 - Base agent contract: `.agents/contracts/base.md`
-- Architecture decisions: `docs/adr/` (only `status: accepted` ADRs drive work) — see `docs/adr/README.md` for the index, format, and lifecycle
+- Architecture decisions: `.sdlc/adr/` (only `status: accepted` ADRs drive work) — see `.sdlc/adr/README.md` for the index, format, and lifecycle
 - Explorations: `.sdlc/explorations/` (upstream problem framing; does not by itself authorize implementation) — see `.sdlc/explorations/README.md`
 - Feature specs: `.sdlc/features/` (only `status: accepted` features drive work) — see `.sdlc/features/README.md` for the index, format, and lifecycle
 - Patches: `.sdlc/patches/` (implementation-scoped fixes, missing-endpoint coverage, internal plumbing) — see `.sdlc/patches/README.md` for when to use vs. ADR or feature spec

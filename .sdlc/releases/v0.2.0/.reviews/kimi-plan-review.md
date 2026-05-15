@@ -15,8 +15,8 @@ Reviewed documents:
 Cross-referenced:
 - `.sdlc/features/0008-bff-server.md`
 - `.sdlc/features/0009-terminal-harness.md`
-- `docs/adr/0008-knowledge-layer-architecture.md`
-- `docs/adr/0013-terminal-ui-framework.md`
+- `.sdlc/adr/0008-knowledge-layer-architecture.md`
+- `.sdlc/adr/0013-terminal-ui-framework.md`
 
 ---
 

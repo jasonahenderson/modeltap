@@ -83,7 +83,7 @@ worktree is clean.
 Read .sdlc/history/2026-05-15-admin-sdlc-directory-migration-plan.md, then
 execute the SDLC migration plan.
 
-Keep ADRs in docs/adr/ for this first pass unless instructed otherwise. Move
+Keep ADRs out of the first-pass move unless instructed otherwise. Move
 lifecycle artifacts from docs/{history,features,patches,explorations,releases}
 to .sdlc/{history,features,patches,explorations,releases}. Update canonical
 process docs and references accordingly. Preserve unrelated branches and

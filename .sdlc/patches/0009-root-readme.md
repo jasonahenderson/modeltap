@@ -14,7 +14,7 @@ branch: "exploration/integrated-harness"
 # PATCH-0009: Root `README.md`
 
 > [!NOTE]
-> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`.sdlc/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
 
 ## Problem
 
@@ -28,7 +28,7 @@ This is also the most-visible doc for the reframing in FEAT-0008–0013 — mode
    - **Header** — one-line tagline and a short paragraph positioning modeltap. Must cover both the current v0.1 reality (capture proxy for Anthropic + OpenAI with dashboard, metrics, service management) and the near-term direction (integrated AI environment per FEAT-0008–0013) without overclaiming unshipped features.
    - **Why modeltap** — 3–5 bullets on what the project gives the user that's hard to get elsewhere: local-first capture, cross-provider cost/token accounting, SQLite-backed history, provider-agnostic routing, knowledge layer on the roadmap.
    - **Quick start** — clone → `make build` → `modeltap start` → point a client at `http://localhost:8080` using `ANTHROPIC_BASE_URL` or `OPENAI_BASE_URL`. Short enough to fit on one screen; links to `docs/usage-guide.md` for the full story.
-   - **What's in this repo** — brief map: `cmd/`, `internal/`, `pkg/`, `docs/adr`, `.sdlc/features`, `.sdlc/patches`, `.sdlc/releases`. Keep it a table, not prose.
+   - **What's in this repo** — brief map: `cmd/`, `internal/`, `pkg/`, `.sdlc/adr`, `.sdlc/features`, `.sdlc/patches`, `.sdlc/releases`. Keep it a table, not prose.
    - **Status** — current release (`.sdlc/releases/<current>/`), link to status.md, honest about "v0.x, interfaces may shift."
    - **Contributing** — one paragraph + link to `CONTRIBUTING.md` and `GOVERNANCE.md`. Call out DCO sign-off, contributor tiers, and the ADR-driven workflow so forkers know the bar before they start.
    - **Forking encouragement** — explicit "fork, experiment, send PRs" paragraph. Mention Apache-2.0 license (ADR-0010) so there's no ambiguity about reuse.

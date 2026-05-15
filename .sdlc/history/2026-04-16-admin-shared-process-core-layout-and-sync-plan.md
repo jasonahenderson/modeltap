@@ -47,7 +47,7 @@ Owns the parts that should be identical across repos:
 
 Owns project-specific differences:
 
-- `docs/adr` vs `docs/decisions`
+- `.sdlc/adr` vs `docs/decisions`
 - release execution model
 - release directory conventions
 - project terminology and examples

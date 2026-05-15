@@ -6,21 +6,21 @@ This directory stores review artifacts for architectural decision records.
 
 Canonical per-ADR findings stay at the root:
 
-- `docs/adr/.reviews/{adr-stem}-findings.md`
+- `.sdlc/adr/.reviews/{adr-stem}-findings.md`
 
 The `stem` matches the ADR filename without the `.md` extension (e.g. `0006-multi-provider-support`).
 
 Plan reviews — reviews of implementation plans derived from an ADR or narrower execution reviews tied to a single ADR — live under:
 
-- `docs/adr/.reviews/plan-reviews/`
+- `.sdlc/adr/.reviews/plan-reviews/`
 
 When the reviewing model or harness is known, include it in the plan-review filename:
 
-- `docs/adr/.reviews/plan-reviews/codex-0006-provider-formatting-plan-review.md`
+- `.sdlc/adr/.reviews/plan-reviews/codex-0006-provider-formatting-plan-review.md`
 
 Cross-cutting syntheses (multi-ADR reviews, baseline crosswalks, supersession analyses) live under:
 
-- `docs/adr/.reviews/syntheses/`
+- `.sdlc/adr/.reviews/syntheses/`
 
 ## Canonical File
 
@@ -77,7 +77,7 @@ For straightforward ADRs that pass review without findings, the commit history a
 
 When findings are received for a proposed ADR, the author processes them in this order:
 
-1. **Read the findings file** (`docs/adr/.reviews/{stem}-findings.md`) and understand every finding's severity, detail, and recommendation.
+1. **Read the findings file** (`.sdlc/adr/.reviews/{stem}-findings.md`) and understand every finding's severity, detail, and recommendation.
 2. **Triage each finding** into one of three dispositions:
    - **`accepted`** — the finding is valid and the ADR is revised to address it
    - **`rejected`** — the finding is invalid or the recommendation is declined; rationale must be recorded

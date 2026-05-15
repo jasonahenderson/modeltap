@@ -9,7 +9,7 @@ Aligned `modeltap`'s repo instructions with the exploration-driven structure use
 - Added `.sdlc/explorations/README.md` to define the exploration artifact, lifecycle, statuses, front matter, and promotion rules.
 - Added root `AGENTS.md` as a concise agent-facing contract for artifact usage, commit prefixes, and `ADMIN` tasks.
 - Updated `CLAUDE.md` to include explorations in the taxonomy, clarify when to use each document type, and define commit-prefix/body expectations across `EXP`, `FEAT`, `PATCH`, `ADR`, `WU`, and `ADMIN`.
-- Updated `.sdlc/features/README.md`, `.sdlc/patches/README.md`, and `docs/adr/README.md` so each references explorations as the upstream artifact.
+- Updated `.sdlc/features/README.md`, `.sdlc/patches/README.md`, and `.sdlc/adr/README.md` so each references explorations as the upstream artifact.
 
 ## Files Modified
 
@@ -18,7 +18,7 @@ Aligned `modeltap`'s repo instructions with the exploration-driven structure use
 - `.sdlc/explorations/README.md`
 - `.sdlc/features/README.md`
 - `.sdlc/patches/README.md`
-- `docs/adr/README.md`
+- `.sdlc/adr/README.md`
 - `.sdlc/history/2026-04-10-admin-explorations-and-agent-instructions.md`
 
 ## Notes

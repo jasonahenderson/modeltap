@@ -1,6 +1,6 @@
 # ADR-0014 Findings
 
-- ADR: `docs/adr/0014-harness-base-strategy.md`
+- ADR: `.sdlc/adr/0014-harness-base-strategy.md`
 - Review date: 2026-04-22
 - Reviewer: peer review (Claude)
 - total_findings: 10
@@ -21,7 +21,7 @@
 
 **Summary:** Four of six weighted totals in the scoring matrix are computed incorrectly.
 
-**Detail:** Using the stated formula `weight × score/10` and the scores listed in the matrix (`docs/adr/0014-harness-base-strategy.md:44-53`), the computed totals diverge from the stated totals:
+**Detail:** Using the stated formula `weight × score/10` and the scores listed in the matrix (`.sdlc/adr/0014-harness-base-strategy.md:44-53`), the computed totals diverge from the stated totals:
 
 | Option | Stated | Computed | Δ |
 |---|---|---|---|
@@ -48,7 +48,7 @@ The ordering is unchanged (O1 still wins, O7 still runner-up), so this does not 
 
 **Summary:** Option numbering skips O6. Options are labeled O1, O2, O3, O4, O5, **O7**.
 
-**Detail:** `docs/adr/0014-harness-base-strategy.md:29-34` defines options O1 through O5 and then jumps to O7. The scoring matrix, justifications, and the "Why O1 beats O7" section all reference O7. If an option was dropped during drafting, the remaining options should be renumbered O1–O6 for consistency. Alternatively, restore the missing O6 if it was a genuine candidate. Leaving the gap is confusing to future readers who will assume an option was lost.
+**Detail:** `.sdlc/adr/0014-harness-base-strategy.md:29-34` defines options O1 through O5 and then jumps to O7. The scoring matrix, justifications, and the "Why O1 beats O7" section all reference O7. If an option was dropped during drafting, the remaining options should be renumbered O1–O6 for consistency. Alternatively, restore the missing O6 if it was a genuine candidate. Leaving the gap is confusing to future readers who will assume an option was lost.
 
 **Scoring impact:** None.
 
@@ -62,9 +62,9 @@ The ordering is unchanged (O1 still wins, O7 still runner-up), so this does not 
 
 **Affected options:** N/A
 
-**Summary:** The ADR index (`docs/adr/README.md`) does not list ADR-0014, and its "Current Architecture" paragraph still stops at ADR-0012.
+**Summary:** The ADR index (`.sdlc/adr/README.md`) does not list ADR-0014, and its "Current Architecture" paragraph still stops at ADR-0012.
 
-**Detail:** `docs/adr/README.md:11-25` stops the index at ADR-0013. ADR-0014 must be added as a row with status `Proposed`. Separately, the "Current Architecture (Effective Decisions)" paragraph at `docs/adr/README.md:7` hasn't absorbed ADR-0013 (Bubbletea) or ADR-0014 yet. That drift is broader than this ADR but worth catching here.
+**Detail:** `.sdlc/adr/README.md:11-25` stops the index at ADR-0013. ADR-0014 must be added as a row with status `Proposed`. Separately, the "Current Architecture (Effective Decisions)" paragraph at `.sdlc/adr/README.md:7` hasn't absorbed ADR-0013 (Bubbletea) or ADR-0014 yet. That drift is broader than this ADR but worth catching here.
 
 **Scoring impact:** None on this ADR.
 
@@ -80,11 +80,11 @@ The ordering is unchanged (O1 still wins, O7 still runner-up), so this does not 
 
 **Summary:** The weight-scoring convention departs from the template without amending the template.
 
-**Detail:** `docs/adr/README.md:66` specifies `Weighted criteria (1-5, 5 = critical)`, and ADR-0013 follows that convention. ADR-0014 uses hundredths summing to 1.00 with scores on a 1–10 scale. The new convention is arguably cleaner (forces zero-sum trade-offs and produces a 0–1 utility number), but if it becomes the house style it should replace the template; if it doesn't, ADR-0014 should use the existing convention. Two incompatible scoring idioms in the same ADR set will fragment the review process.
+**Detail:** `.sdlc/adr/README.md:66` specifies `Weighted criteria (1-5, 5 = critical)`, and ADR-0013 follows that convention. ADR-0014 uses hundredths summing to 1.00 with scores on a 1–10 scale. The new convention is arguably cleaner (forces zero-sum trade-offs and produces a 0–1 utility number), but if it becomes the house style it should replace the template; if it doesn't, ADR-0014 should use the existing convention. Two incompatible scoring idioms in the same ADR set will fragment the review process.
 
 **Scoring impact:** None directly — scheme choice is orthogonal to the decision. But matters for long-term consistency.
 
-**Recommendation:** Decide which convention is canonical; update `docs/adr/README.md` template section to match; and either keep or rewrite ADR-0014's drivers to match.
+**Recommendation:** Decide which convention is canonical; update `.sdlc/adr/README.md` template section to match; and either keep or rewrite ADR-0014's drivers to match.
 
 ### F5 — Significant
 
@@ -96,7 +96,7 @@ The ordering is unchanged (O1 still wins, O7 still runner-up), so this does not 
 
 **Summary:** O1's scores on "must be built from scratch" drivers may be too high, and correcting them could flip O1 behind O7.
 
-**Detail:** O1 scores D2=7 and D7=4 (`docs/adr/0014-harness-base-strategy.md:60,65`) despite the justification text explicitly saying "No multi-agent orchestration today" and "MCP only today. Memory, plugins, slash commands, and 43+ tools are missing." Meanwhile O4 (OpenHarness, best-in-class on both) scores D2=8 and D7=9. A one-point gap between "best-in-class already exists" and "must be built from scratch" on D2 compresses the matrix.
+**Detail:** O1 scores D2=7 and D7=4 (`.sdlc/adr/0014-harness-base-strategy.md:60,65`) despite the justification text explicitly saying "No multi-agent orchestration today" and "MCP only today. Memory, plugins, slash commands, and 43+ tools are missing." Meanwhile O4 (OpenHarness, best-in-class on both) scores D2=8 and D7=9. A one-point gap between "best-in-class already exists" and "must be built from scratch" on D2 compresses the matrix.
 
 Quick sensitivity check: if O1's D2 drops to 4 (closer to what "must be built" typically scores), O1's total falls to 0.730, below O7's 0.755. That *would* flip the decision. The prose argues the D2 score is a bet on future orchestration-aware UI; if so, the ADR should say that explicitly rather than encoding the bet as a current-capability score.
 
@@ -114,7 +114,7 @@ Quick sensitivity check: if O1's D2 drops to 4 (closer to what "must be built" t
 
 **Summary:** O7's D2 score of 5 looks high given the justification explicitly calls the harness "orchestration-oblivious."
 
-**Detail:** `docs/adr/0014-harness-base-strategy.md:110` argues that under O7 "users must leave the terminal to a web dashboard or Slack bot to manage teams" and calls this a "UX regression." For a terminal-first product on a multi-agent orchestration driver, that reads closer to a 3 than a 5. Lowering this score widens O1's lead on the decisive driver and makes the "Why O1 beats O7" argument land on numbers that match the prose.
+**Detail:** `.sdlc/adr/0014-harness-base-strategy.md:110` argues that under O7 "users must leave the terminal to a web dashboard or Slack bot to manage teams" and calls this a "UX regression." For a terminal-first product on a multi-agent orchestration driver, that reads closer to a 3 than a 5. Lowering this score widens O1's lead on the decisive driver and makes the "Why O1 beats O7" argument land on numbers that match the prose.
 
 **Scoring impact:** Widens O1's lead over O7 (O1 stays 0.805, O7 drops from 0.755 to ~0.705).
 
@@ -130,7 +130,7 @@ Quick sensitivity check: if O1's D2 drops to 4 (closer to what "must be built" t
 
 **Summary:** The Confirmation criteria require observing orchestration work that the ADR itself says is out of scope.
 
-**Detail:** The Confirmation section (`docs/adr/0014-harness-base-strategy.md:138`) requires "observing a server-orchestrated subagent team's progress and results" — but the same section notes that "Multi-agent orchestration itself is a separate BFF feature (to be planned under FEAT-0013 or a successor) and is not gated by this ADR." That's internally contradictory: the ADR can't confirm until a feature it doesn't gate is shipped.
+**Detail:** The Confirmation section (`.sdlc/adr/0014-harness-base-strategy.md:138`) requires "observing a server-orchestrated subagent team's progress and results" — but the same section notes that "Multi-agent orchestration itself is a separate BFF feature (to be planned under FEAT-0013 or a successor) and is not gated by this ADR." That's internally contradictory: the ADR can't confirm until a feature it doesn't gate is shipped.
 
 **Scoring impact:** None on options.
 
@@ -162,7 +162,7 @@ Quick sensitivity check: if O1's D2 drops to 4 (closer to what "must be built" t
 
 **Summary:** The Open Questions section largely duplicates the exploration's open questions.
 
-**Detail:** Q1, Q2, Q4, Q5 in the ADR (`docs/adr/0014-harness-base-strategy.md:149-153`) are near-verbatim from EXP-0010's Open Questions (`.sdlc/explorations/0010-harness-comparative-analysis.md:263-267`). ADR-tier open questions should be the ones the *decision itself* raises — e.g., "which OpenHarness subsystems port first?", "when does orchestration-aware UI land — v0.2.0 or later?", "how much of the forward bet in F5 must be materialized before this ADR can flip to `accepted`?". The exploration is the proper home for the upstream design-space questions.
+**Detail:** Q1, Q2, Q4, Q5 in the ADR (`.sdlc/adr/0014-harness-base-strategy.md:149-153`) are near-verbatim from EXP-0010's Open Questions (`.sdlc/explorations/0010-harness-comparative-analysis.md:263-267`). ADR-tier open questions should be the ones the *decision itself* raises — e.g., "which OpenHarness subsystems port first?", "when does orchestration-aware UI land — v0.2.0 or later?", "how much of the forward bet in F5 must be materialized before this ADR can flip to `accepted`?". The exploration is the proper home for the upstream design-space questions.
 
 **Scoring impact:** None.
 
@@ -178,7 +178,7 @@ Quick sensitivity check: if O1's D2 drops to 4 (closer to what "must be built" t
 
 **Summary:** The "Why O1 beats O7" section leans on the numerical margin rather than the argument.
 
-**Detail:** The prose (`docs/adr/0014-harness-base-strategy.md:117-124`) frames D2 as "the decisive difference" and cites the 0.805 vs 0.755 margin. That is only true at current scores; if F5 and F6 recommendations are applied, the margin changes materially. A stronger framing would be "O1 is the only option that keeps the terminal as the primary orchestration surface — everything else either forgoes orchestration altogether (O7) or requires architectural inversion to achieve it (O2–O5)." That argument holds independent of exact scores.
+**Detail:** The prose (`.sdlc/adr/0014-harness-base-strategy.md:117-124`) frames D2 as "the decisive difference" and cites the 0.805 vs 0.755 margin. That is only true at current scores; if F5 and F6 recommendations are applied, the margin changes materially. A stronger framing would be "O1 is the only option that keeps the terminal as the primary orchestration surface — everything else either forgoes orchestration altogether (O7) or requires architectural inversion to achieve it (O2–O5)." That argument holds independent of exact scores.
 
 **Scoring impact:** None.
 
@@ -190,8 +190,8 @@ Quick sensitivity check: if O1's D2 drops to 4 (closer to what "must be built" t
 |----|----------|-------------|-----------|
 | F1 | blocking | accepted | Recomputed all weighted totals using `weight × score/10`. Four totals corrected (O2: 0.445, O3: 0.430, O4: 0.505, O5: 0.405). |
 | F2 | blocking | accepted | Renumbered O7 → O6 throughout ADR. |
-| F3 | significant | accepted | Added ADR-0014 row to `docs/adr/README.md` index. |
-| F4 | significant | accepted | ADR-0014 uses hundredths-weighted scoring (user requirement). Template convention updated in `docs/adr/README.md`. |
+| F3 | significant | accepted | Added ADR-0014 row to `.sdlc/adr/README.md` index. |
+| F4 | significant | accepted | ADR-0014 uses hundredths-weighted scoring (user requirement). Template convention updated in `.sdlc/adr/README.md`. |
 | F5 | significant | accepted | Lowered O1 D2 from 7 to 4 to reflect current gap. Added explicit note that the score combines current capability with a forward commitment, and that the strategic claim (not the margin) justifies O1 over O6. |
 | F6 | significant | accepted | Lowered O6 D2 from 5 to 3 to match the "orchestration-oblivious" description. |
 | F7 | significant | accepted | Split Confirmation into two tiers: this-ADR confirmation and future-feature confirmation tracked under FEAT-0013. |

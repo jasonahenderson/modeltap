@@ -102,7 +102,7 @@ cross-artifact work stream. Do not encode hierarchy in the ADR identifier.
 ## Lifecycle
 
 1. **Propose** — Write the ADR with `status: proposed`. Include drivers, options, and a recommended outcome.
-2. **Review** — Findings land in `docs/adr/.reviews/{stem}-findings.md` if formal review is required (see `.reviews/README.md`).
+2. **Review** — Findings land in `.sdlc/adr/.reviews/{stem}-findings.md` if formal review is required (see `.reviews/README.md`).
 3. **Accept** — Status flips to `accepted` once the decision is final. The ADR is now load-bearing for downstream features and patches.
 4. **Supersede** — If a later ADR replaces this one, update the status to `superseded by ADR-NNNN` and add a forward-reference note at the top. Do not delete the original — its history matters.
 
@@ -113,14 +113,14 @@ cross-artifact work stream. Do not encode hierarchy in the ADR identifier.
 
 ## Reviews
 
-Review artifacts (canonical findings, plan reviews, syntheses) live under `docs/adr/.reviews/`. See `.reviews/README.md` for the layout.
+Review artifacts (canonical findings, plan reviews, syntheses) live under `.sdlc/adr/.reviews/`. See `.reviews/README.md` for the layout.
 
 ## Relationship to Other Docs
 
 | Doc Type | Scope | Lives In |
 |----------|-------|----------|
 | Exploration | Upstream problem framing and design-space exploration | `.sdlc/explorations/` |
-| **ADR** | **Architectural decisions with future constraint value** | **`docs/adr/`** |
+| **ADR** | **Architectural decisions with future constraint value** | **`.sdlc/adr/`** |
 | Feature spec | Behavior — user-visible capabilities | `.sdlc/features/` |
 | Patch | Implementation — fixes, missing endpoints, internal work | `.sdlc/patches/` |
 | Work unit (`WU-NNN`) | Planned increments inside a feature, tracked in status.md | `.sdlc/history/` |

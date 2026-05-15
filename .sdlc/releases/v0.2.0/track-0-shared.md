@@ -1,7 +1,7 @@
 # Track 0: Shared Prerequisites
 
 > [!NOTE]
-> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`docs/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`.sdlc/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
 
 **Release:** v0.2.0
 **WU Range:** WU-039 through WU-045, WU-093, WU-096 (9 work units)
@@ -59,7 +59,7 @@ Implements:
 **Size:** Small | **Dependencies:** WU-039 | **Parallelizes with:** WU-040, WU-041
 
 Implements:
-- ADR amendment document: `docs/adr/0006-amendment-001-outbound-formatting.md`
+- ADR amendment document: `.sdlc/adr/0006-amendment-001-outbound-formatting.md`
 - Extend `Provider` interface in `internal/provider/provider.go` with:
   - Canonical `Message` type (role, content, tool_calls, tool_results, attachments, metadata)
   - `FormatMessages(canonical []Message, systemPrompt string, windowSize int) ([]byte, error)`

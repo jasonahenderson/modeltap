@@ -22,8 +22,8 @@ Cross-checked against:
 
 - `.sdlc/features/0008-bff-server.md`
 - `.sdlc/features/0009-terminal-harness.md`
-- `docs/adr/0006-multi-provider-support.md`
-- `docs/adr/0013-terminal-ui-framework.md`
+- `.sdlc/adr/0006-multi-provider-support.md`
+- `.sdlc/adr/0013-terminal-ui-framework.md`
 
 ## Findings Summary
 
