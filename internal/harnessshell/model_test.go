@@ -33,6 +33,9 @@ func TestNewDefaults(t *testing.T) {
 	if m.state.statusKind != StatusReady {
 		t.Fatalf("statusKind = %v, want StatusReady", m.state.statusKind)
 	}
+	if !m.state.mouseCaptureDisabled {
+		t.Fatalf("mouseCaptureDisabled should default true so terminal text selection works")
+	}
 }
 
 func TestInitReturnsBlinkCmd(t *testing.T) {
