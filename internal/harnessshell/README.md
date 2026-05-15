@@ -148,7 +148,7 @@ func main() {
     // dispatches to runtime; runtime tea.Msgs project to HostEvents.
     adapter := harnesshost.New(shell, runtime)
 
-    p := tea.NewProgram(adapter, tea.WithAltScreen(), tea.WithMouseAllMotion())
+    p := tea.NewProgram(adapter, tea.WithAltScreen())
     if _, err := p.Run(); err != nil {
         panic(err)
     }
