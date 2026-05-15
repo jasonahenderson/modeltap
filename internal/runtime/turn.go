@@ -207,7 +207,7 @@ func handleTurnSubmit(ctx context.Context, conn *Connection, params json.RawMess
 		// reconciliation (picking / synthesizing across results) is a
 		// separate concern handled by a synthesizer agent or a
 		// harness-side picker UI. See WU-060 in
-		// docs/releases/v0.2.0/track-a-runtime-server.md for the deferral
+		// .sdlc/releases/v0.2.0/track-a-runtime-server.md for the deferral
 		// rationale.
 		return nil, &TransportError{
 			Code:    CodeProviderError,

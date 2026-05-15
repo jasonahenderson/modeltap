@@ -7,7 +7,7 @@ related:
   - FEAT-0016
   - FEAT-0017
   - ADR-0014
-  - docs/releases/v0.3.0/plan.md
+  - .sdlc/releases/v0.3.0/plan.md
 ---
 
 # ADR-0015: Run Runtime Ownership and Semantics

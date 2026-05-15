@@ -10,13 +10,13 @@ This document defines the agent team responsible for designing, building, testin
 1. **Incremental work units** — Work is broken into tasks small enough to complete in a single session. No task should require multi-session continuity to be useful.
 2. **Status-based resumption** — A living status file tracks what's done, in progress, and remaining. Any new session can read it and continue.
 3. **ADR/Feature driven** — Only accepted ADRs and accepted features drive work. Other statuses are ignored.
-4. **History logging** — Every action is logged to `docs/history/` with a plan before starting and a summary after completion.
+4. **History logging** — Every action is logged to `.sdlc/history/` with a plan before starting and a summary after completion.
 
 ## Artifact Boundaries
 
-- `docs/explorations/` holds upstream problem framing and design-space exploration. Explorations can promote into features, patches, or ADRs, but do not authorize implementation by themselves.
-- `docs/features/` holds behavior-scoped work that can drive `WU-NNN` implementation once accepted.
-- `docs/patches/` holds implementation-scoped work authorization for fixes, tooling, infra, and internal plumbing.
+- `.sdlc/explorations/` holds upstream problem framing and design-space exploration. Explorations can promote into features, patches, or ADRs, but do not authorize implementation by themselves.
+- `.sdlc/features/` holds behavior-scoped work that can drive `WU-NNN` implementation once accepted.
+- `.sdlc/patches/` holds implementation-scoped work authorization for fixes, tooling, infra, and internal plumbing.
 - `docs/adr/` holds architectural decisions with future constraint value.
 - `ADMIN:` work covers repo process and instruction changes such as `CLAUDE.md`, `AGENTS.md`, prompts, hooks, or documentation structure.
 
@@ -36,10 +36,10 @@ This document defines the agent team responsible for designing, building, testin
 **Role:** Coordinates the team. Reads accepted ADRs and features, breaks work into incremental tasks, assigns to agents, tracks progress.
 
 **Responsibilities:**
-- Read accepted ADRs (`docs/adr/`) and features (`docs/features/`) to determine project scope
+- Read accepted ADRs (`docs/adr/`) and features (`.sdlc/features/`) to determine project scope
 - Break scope into ordered, independently completable work units
-- Write and maintain the plan in the current release directory (`docs/releases/<version>/plan.md` and per-track files)
-- Update the status file (`docs/releases/<version>/status.md`) after each unit completes
+- Write and maintain the plan in the current release directory (`.sdlc/releases/<version>/plan.md` and per-track files)
+- Update the status file (`.sdlc/releases/<version>/status.md`) after each unit completes
 - Determine what to do next when resuming from a prior session
 - Ensure agents work in the right order (design before implementation, tests before code, security review after code, docs after all)
 
@@ -58,7 +58,7 @@ This document defines the agent team responsible for designing, building, testin
 - Write design docs that are specific enough for the Implementation Engineer to code from
 
 **Inputs:** Accepted ADRs, feature docs, TPM task assignment
-**Outputs:** Design document in `docs/releases/<version>/designs/<date>-design-<component>.md`
+**Outputs:** Design document in `.sdlc/releases/<version>/designs/<date>-design-<component>.md`
 
 ### Test Engineer
 
@@ -102,7 +102,7 @@ This document defines the agent team responsible for designing, building, testin
 - Ensure responsive design and accessible markup
 - Respect user isolation when multi-user is enabled (users see only their data)
 
-**Inputs:** Design document, feature spec (`docs/features/0003-web-dashboard.md`), failing test files
+**Inputs:** Design document, feature spec (`.sdlc/features/0003-web-dashboard.md`), failing test files
 **Outputs:** Frontend assets, Go API handlers, logged to history
 
 ### Infrastructure Engineer
@@ -149,7 +149,7 @@ This document defines the agent team responsible for designing, building, testin
 - Flag issues with specific file:line references and severity
 
 **Inputs:** Production code from Backend/UI Implementers
-**Outputs:** Security review document in `docs/history/<timestamp>-security-<component>.md`, with pass/fail and any required fixes
+**Outputs:** Security review document in `.sdlc/history/<timestamp>-security-<component>.md`, with pass/fail and any required fixes
 
 ### Documentation Specialist
 
@@ -173,7 +173,7 @@ This document defines the agent team responsible for designing, building, testin
 2. **Phase 1 = design ALL WUs across ALL tracks.** No coding. No reviews. Just design docs (with optional pre-review lint). Phase 1 is not complete until every track (0, A, B, Integration) has design docs for every WU. Completing one track's designs does not authorize advancing to Phase 2 or 3.
 3. **Phase 2 = review.** User decides what to review and how. No new designs. No coding. Phase 2 begins only after the user confirms Phase 1 is complete.
 4. **Phase 3 = implement ALL WUs.** No new designs. If implementation reveals a design flaw, revise the design doc explicitly — don't silently improvise. Phase 3 begins only after Phase 2 findings are processed.
-5. **Current phase lives in `docs/releases/<version>/plan.md`.** Any action outside the current phase is wrong. Phase transitions are explicit ADMIN commits — never implicit.
+5. **Current phase lives in `.sdlc/releases/<version>/plan.md`.** Any action outside the current phase is wrong. Phase transitions are explicit ADMIN commits — never implicit.
 
 If any instruction elsewhere contradicts these, the prime directives win.
 
@@ -293,7 +293,7 @@ Before publication, the tag may move when final commits are added. Recreate it
 with `git tag -f -a vX.Y.Z -m "modeltap vX.Y.Z" <new-release-commit>` and, if it
 was already pushed, update it with
 `git push --force-with-lease origin refs/tags/vX.Y.Z`. Log the old SHA, new SHA,
-and reason in `docs/history/`.
+and reason in `.sdlc/history/`.
 
 After publication, tags are immutable by default. New commits ship as a new
 version, usually the next patch release, unless a maintainer explicitly approves
@@ -314,7 +314,7 @@ The user decides what to review, how to review it, and when it's sufficient:
 
 There is no tiering system. There are no mandatory review gates. The user owns the risk judgment.
 
-Review artifacts committed at `docs/releases/<version>/.reviews/<wu-or-bundle>/<reviewer>-review.md` using the reviewer-first naming convention.
+Review artifacts committed at `.sdlc/releases/<version>/.reviews/<wu-or-bundle>/<reviewer>-review.md` using the reviewer-first naming convention.
 
 #### Pre-review lint (optional designer tool)
 
@@ -322,7 +322,7 @@ A **pre-review lint** is a Claude subagent with fresh context that reads a desig
 
 The lint catches spec-drift and mechanical issues. It does **not** catch reasoning blind spots specific to the Designer's model family — only a different model or human reviewer can do that.
 
-Artifact: `docs/releases/<version>/.reviews/<wu-or-bundle>/claude-subagent-pre-review.md`.
+Artifact: `.sdlc/releases/<version>/.reviews/<wu-or-bundle>/claude-subagent-pre-review.md`.
 
 #### Finding severity (for any review)
 
@@ -396,10 +396,10 @@ Examples of bad work units (too large):
 
 ## History & Status Files
 
-### `docs/releases/<version>/plan.md`
+### `.sdlc/releases/<version>/plan.md`
 The release plan. Created by TPM at the start of each release cycle. Contains the ordered list of work units with their tracks and dependencies. Per-track detail files (`track-*.md`) accompany the plan.
 
-### `docs/releases/<version>/status.md`
+### `.sdlc/releases/<version>/status.md`
 Living status file for the active release. Updated after every work unit completes. Structure:
 
 ```markdown
@@ -424,7 +424,7 @@ Living status file for the active release. Updated after every work unit complet
 - [ ] Work unit description — <reason>
 ```
 
-### `docs/history/<timestamp>-<agent>-<component>.md`
+### `.sdlc/history/<timestamp>-<agent>-<component>.md`
 Individual work logs. Each agent writes one per task with:
 - What was planned
 - What was done
@@ -435,7 +435,7 @@ Individual work logs. Each agent writes one per task with:
 ### Session Resumption
 
 When starting a new session:
-1. TPM reads `docs/releases/<current-version>/status.md`
+1. TPM reads `.sdlc/releases/<current-version>/status.md`
 2. If a task is marked "In Progress", TPM checks if the work was actually completed (files exist, tests pass) and updates accordingly
 3. TPM picks the next task from "Up Next" and assigns it
 4. Work continues normally

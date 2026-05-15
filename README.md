@@ -97,10 +97,10 @@ Full install, configuration, and client-integration details — including Claude
 | `internal/` | Proxy, storage, providers, harness, runtime server, dashboard |
 | `pkg/` | Public packages |
 | `docs/adr/` | Architecture Decision Records — accepted ones drive the codebase |
-| `docs/features/` | Feature specs — accepted specs drive work units |
-| `docs/patches/` | Implementation-scoped patches (fixes, plumbing, small additions) |
-| `docs/releases/` | Per-release plan, status, changelog, and track files |
-| `docs/history/` | Session logs — continuity across working sessions |
+| `.sdlc/features/` | Feature specs — accepted specs drive work units |
+| `.sdlc/patches/` | Implementation-scoped patches (fixes, plumbing, small additions) |
+| `.sdlc/releases/` | Per-release plan, status, changelog, and track files |
+| `.sdlc/history/` | Session logs — continuity across working sessions |
 | `docs/usage-guide.md` | User-facing install, config, and command reference |
 
 ---
@@ -110,8 +110,8 @@ Full install, configuration, and client-integration details — including Claude
 modeltap is pre-1.0. Interfaces may shift between minor versions.
 
 - **v0.1** — shipped. Reverse proxy, capture, metrics, dashboard, service management, Anthropic + OpenAI adapters.
-- **v0.2.0** — in development on branch `exploration/integrated-harness`. Adds a JSON-RPC runtime server, a Bubbletea terminal harness, a 13-tool built-in framework, an MCP client, and an Ollama adapter. See [`docs/releases/v0.2.0/`](docs/releases/v0.2.0/) for plan, status, and changelog.
-- **Direction** — enterprise auth and multi-user ([FEAT-0010](docs/features/0010-enterprise-auth.md)), knowledge integration ([FEAT-0011](docs/features/0011-knowledge-integration.md)), skills ([FEAT-0012](docs/features/0012-skills-and-agent-teams.md)), agent teams ([FEAT-0013](docs/features/0013-agent-teams.md)). Proposed, not yet accepted.
+- **v0.2.0** — in development on branch `exploration/integrated-harness`. Adds a JSON-RPC runtime server, a Bubbletea terminal harness, a 13-tool built-in framework, an MCP client, and an Ollama adapter. See [`.sdlc/releases/v0.2.0/`](.sdlc/releases/v0.2.0/) for plan, status, and changelog.
+- **Direction** — enterprise auth and multi-user ([FEAT-0010](.sdlc/features/0010-enterprise-auth.md)), knowledge integration ([FEAT-0011](.sdlc/features/0011-knowledge-integration.md)), skills ([FEAT-0012](.sdlc/features/0012-skills-and-agent-teams.md)), agent teams ([FEAT-0013](.sdlc/features/0013-agent-teams.md)). Proposed, not yet accepted.
 
 ---
 
@@ -123,7 +123,7 @@ A few things to know up front:
 
 - **DCO sign-off is required.** Use `git commit -s` on every commit.
 - **ADR-driven.** Non-trivial changes that touch architecture reference an ADR; if your change conflicts with an accepted ADR, open an issue before writing code.
-- **Patches vs features vs ADRs.** Small implementation-scoped work goes through [`docs/patches/`](docs/patches/README.md). Behavior-scoped new capabilities go through [`docs/features/`](docs/features/README.md). Architectural choices go through [`docs/adr/`](docs/adr/README.md). The README for each directory explains when to use which.
+- **Patches vs features vs ADRs.** Small implementation-scoped work goes through [`.sdlc/patches/`](.sdlc/patches/README.md). Behavior-scoped new capabilities go through [`.sdlc/features/`](.sdlc/features/README.md). Architectural choices go through [`docs/adr/`](docs/adr/README.md). The README for each directory explains when to use which.
 - **Contributor tiers** are graduated — contributor → committer → maintainer → BDFL. See `GOVERNANCE.md`.
 
 ## Fork and build on it

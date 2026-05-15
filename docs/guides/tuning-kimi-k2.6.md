@@ -214,4 +214,4 @@ Instant mode (temperature=0.6) scores slightly lower on reasoning benchmarks but
 - [Moonshot API Docs](https://platform.moonshot.cn/docs)
 - [Kimi K2 Paper (arXiv:2507.20534)](https://arxiv.org/abs/2507.20534)
 - [HuggingFace Model Card](https://huggingface.co/moonshotai/Kimi-K2.6)
-- `docs/patches/0008-moonshot-provider-adapter.md` — implementation details
+- `.sdlc/patches/0008-moonshot-provider-adapter.md` — implementation details

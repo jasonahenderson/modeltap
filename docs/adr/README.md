@@ -36,9 +36,9 @@ modeltap is a single-binary **Go** reverse proxy (ADR-0001) that captures AI/ML 
 
 ## When NOT to Write an ADR
 
-- The topic is still being framed and the solution space is open → use an **exploration** in `docs/explorations/`
-- The work is behavior-scoped (user-facing capability) → use a **feature spec** in `docs/features/`
-- The work is implementation-scoped (bug fix, missing endpoint, internal plumbing) → use a **patch** in `docs/patches/`
+- The topic is still being framed and the solution space is open → use an **exploration** in `.sdlc/explorations/`
+- The work is behavior-scoped (user-facing capability) → use a **feature spec** in `.sdlc/features/`
+- The work is implementation-scoped (bug fix, missing endpoint, internal plumbing) → use a **patch** in `.sdlc/patches/`
 - The change is process / workflow / instruction-file only → commit with an `ADMIN:` prefix, no doc needed
 
 ## Naming
@@ -119,8 +119,8 @@ Review artifacts (canonical findings, plan reviews, syntheses) live under `docs/
 
 | Doc Type | Scope | Lives In |
 |----------|-------|----------|
-| Exploration | Upstream problem framing and design-space exploration | `docs/explorations/` |
+| Exploration | Upstream problem framing and design-space exploration | `.sdlc/explorations/` |
 | **ADR** | **Architectural decisions with future constraint value** | **`docs/adr/`** |
-| Feature spec | Behavior — user-visible capabilities | `docs/features/` |
-| Patch | Implementation — fixes, missing endpoints, internal work | `docs/patches/` |
-| Work unit (`WU-NNN`) | Planned increments inside a feature, tracked in status.md | `docs/history/` |
+| Feature spec | Behavior — user-visible capabilities | `.sdlc/features/` |
+| Patch | Implementation — fixes, missing endpoints, internal work | `.sdlc/patches/` |
+| Work unit (`WU-NNN`) | Planned increments inside a feature, tracked in status.md | `.sdlc/history/` |

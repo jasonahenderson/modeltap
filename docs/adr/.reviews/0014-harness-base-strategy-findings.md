@@ -146,7 +146,7 @@ Quick sensitivity check: if O1's D2 drops to 4 (closer to what "must be built" t
 
 **Summary:** Frontmatter lacks a `related:` block that links the inputs to this decision.
 
-**Detail:** The ADR references EXP-0010, FEAT-0009, and ADR-0013 throughout the prose but has no machine-readable `related:` field in frontmatter. EXP-0010's frontmatter (`docs/explorations/0010-harness-comparative-analysis.md:6-14`) demonstrates the shape. ADR-0013 also lacks this, so the omission is not unique — but ADR-0014 is a chance to start the convention in the ADR tier.
+**Detail:** The ADR references EXP-0010, FEAT-0009, and ADR-0013 throughout the prose but has no machine-readable `related:` field in frontmatter. EXP-0010's frontmatter (`.sdlc/explorations/0010-harness-comparative-analysis.md:6-14`) demonstrates the shape. ADR-0013 also lacks this, so the omission is not unique — but ADR-0014 is a chance to start the convention in the ADR tier.
 
 **Scoring impact:** None.
 
@@ -162,7 +162,7 @@ Quick sensitivity check: if O1's D2 drops to 4 (closer to what "must be built" t
 
 **Summary:** The Open Questions section largely duplicates the exploration's open questions.
 
-**Detail:** Q1, Q2, Q4, Q5 in the ADR (`docs/adr/0014-harness-base-strategy.md:149-153`) are near-verbatim from EXP-0010's Open Questions (`docs/explorations/0010-harness-comparative-analysis.md:263-267`). ADR-tier open questions should be the ones the *decision itself* raises — e.g., "which OpenHarness subsystems port first?", "when does orchestration-aware UI land — v0.2.0 or later?", "how much of the forward bet in F5 must be materialized before this ADR can flip to `accepted`?". The exploration is the proper home for the upstream design-space questions.
+**Detail:** Q1, Q2, Q4, Q5 in the ADR (`docs/adr/0014-harness-base-strategy.md:149-153`) are near-verbatim from EXP-0010's Open Questions (`.sdlc/explorations/0010-harness-comparative-analysis.md:263-267`). ADR-tier open questions should be the ones the *decision itself* raises — e.g., "which OpenHarness subsystems port first?", "when does orchestration-aware UI land — v0.2.0 or later?", "how much of the forward bet in F5 must be materialized before this ADR can flip to `accepted`?". The exploration is the proper home for the upstream design-space questions.
 
 **Scoring impact:** None.
 
