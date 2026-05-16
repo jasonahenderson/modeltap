@@ -1,0 +1,29 @@
+# 2026-04-16 — plan review naming convention update
+
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`.sdlc/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
+## Summary
+
+Updated the repo guidance for non-canonical work-plan review artifact naming.
+
+## Changes
+
+- Clarified in `AGENTS.md` that non-canonical work-plan reviews should include the reviewing model or harness name in the filename when known.
+- Added the same convention to `docs/agents.md`.
+- Updated the review-layout READMEs for:
+  - `.sdlc/features/.reviews/README.md`
+  - `.sdlc/patches/.reviews/README.md`
+  - `.sdlc/adr/.reviews/README.md`
+  - `.sdlc/releases/README.md`
+  - `.sdlc/releases/.reviews/README.md`
+
+## Convention
+
+- Keep canonical per-doc findings filenames unchanged:
+  - `{stem}-findings.md`
+  - `{stem}-findings.json`
+- For non-canonical work-plan reviews, prefer reviewer-first filenames when the reviewer identity is known:
+  - `codex-plan-review.md`
+  - `codex-0008-bff-server-connectivity-review.md`
+  - `gpt5-0001-openai-responses-api-support-plan-review.md`

@@ -595,8 +595,8 @@ typed string constants (`SubmissionSource`, `PermissionDecision`,
 
 - [`internal/harnessshell/README.md`](../../internal/harnessshell/README.md) — reusable shell package doc.
 - [`internal/harnesshost/README.md`](../../internal/harnesshost/README.md) — modeltap host adapter doc.
-- [`docs/features/0014-harness-conversation-shell.md`](../features/0014-harness-conversation-shell.md) — FEAT-0014 behavior contract.
-- [`docs/patches/0015-harness-shell-component-api.md`](../patches/0015-harness-shell-component-api.md) — PATCH-0015 API-shape policy.
-- [`docs/releases/v0.2.1/designs/2026-04-25-design-shell-component-api-098.md`](../releases/v0.2.1/designs/2026-04-25-design-shell-component-api-098.md) — WU-098 shell-side API design.
-- [`docs/releases/v0.2.1/designs/2026-04-25-design-host-adapter-integration-099.md`](../releases/v0.2.1/designs/2026-04-25-design-host-adapter-integration-099.md) — WU-099 host adapter design.
-- [`docs/releases/v0.2.1/designs/2026-04-25-design-docs-embedding-101.md`](../releases/v0.2.1/designs/2026-04-25-design-docs-embedding-101.md) — WU-101 docs design (this guide implements it).
+- [`.sdlc/features/0014-harness-conversation-shell.md`](../features/0014-harness-conversation-shell.md) — FEAT-0014 behavior contract.
+- [`.sdlc/patches/0015-harness-shell-component-api.md`](../patches/0015-harness-shell-component-api.md) — PATCH-0015 API-shape policy.
+- [`.sdlc/releases/v0.2.1/designs/2026-04-25-design-shell-component-api-098.md`](../releases/v0.2.1/designs/2026-04-25-design-shell-component-api-098.md) — WU-098 shell-side API design.
+- [`.sdlc/releases/v0.2.1/designs/2026-04-25-design-host-adapter-integration-099.md`](../releases/v0.2.1/designs/2026-04-25-design-host-adapter-integration-099.md) — WU-099 host adapter design.
+- [`.sdlc/releases/v0.2.1/designs/2026-04-25-design-docs-embedding-101.md`](../releases/v0.2.1/designs/2026-04-25-design-docs-embedding-101.md) — WU-101 docs design (this guide implements it).

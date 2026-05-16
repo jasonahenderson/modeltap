@@ -37,12 +37,12 @@
 // form onto the wire.
 //
 // References:
-//   - Feature spec: docs/features/0008-runtime-server.md (Protocol Specification,
+//   - Feature spec: .sdlc/features/0008-runtime-server.md (Protocol Specification,
 //     Protocol Messages, Protocol Payload Schemas, Canonical Field Names).
 //   - JSON-RPC 2.0: https://www.jsonrpc.org/specification
 //   - Cross-track conformance (golden fixtures, round-trip tests against
 //     frozen wire samples): see WU-093 deliverables in
-//     docs/releases/v0.2.0/track-0-shared.md.
+//     .sdlc/releases/v0.2.0/track-0-shared.md.
 package protocol
 
 import (
