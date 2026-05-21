@@ -4,184 +4,249 @@ title: Desktop GUI Client
 status: draft
 date: 2026-05-07
 depends-on:
-  - FEAT-0008: Runtime Server, including planned Amendment 001 for session-scoped project context
-  - FEAT-0009: Terminal Harness, as the reference harness-role implementation
+  - FEAT-0008: BFF Server (incl. Amendment 001 — session-scoped project context)
+  - FEAT-0009: Terminal Harness (reference for harness-role responsibilities)
 related:
-  - FEAT-0014: Harness Conversation Shell
-  - PATCH-0017: Session-scoped project context
+  - FEAT-0014: Harness Conversation Shell (UX patterns to mirror across surfaces)
+  - PATCH-0017: Session-scoped project context refactor
 adr-constraints:
-  - ADR-0001: Go as primary language for the runtime server and harness-side core
-  - ADR-0014: Harness Base Strategy
-  - ADR-0016: Runtime server and client surfaces
+  - ADR-0001: Go as primary language (BFF and any sidecar harness stay Go)
+  - ADR-0014: Harness Base Strategy (universal orchestration client; the GUI is a second surface, not a replacement)
 ---
 
 # FEAT-0023: Desktop GUI Client
 
 ## Problem
 
-Modeltap's only interactive client today is the terminal harness. The TUI is
-the right interface for terminal-native users, but it limits modeltap to a
-single active chat surface and to users who are comfortable making a terminal
-their daily AI workspace.
+Modeltap's only client today is a terminal harness (FEAT-0009). The TUI is the
+right interface for terminal-native users, but it forecloses an audience that
+otherwise fits the product: people doing professional knowledge work who want
+project-rooted, multi-model, audited AI assistance, but who will not adopt a
+terminal as their daily interface. The TUI also enforces a single active chat
+at a time, which is acceptable for a developer focused on one task but does
+not match how non-terminal users actually work — multiple ongoing
+conversations, each scoped to a different project or document set.
 
-The runtime server, harness protocol, audit trail, cost visibility, and future
-memory layer are not terminal-specific. They are facilities for agentic
-workflows. A GUI client should be able to use the same runtime server and the
-same harness-role responsibilities without inventing a parallel orchestration
-stack.
-
-The current connection-scoped project context also forecloses a natural GUI
-workflow: multiple concurrent chats, each bound to a different project or
-document set, over one runtime-server connection.
+Without a desktop GUI, modeltap's reach stops at the terminal. The BFF, the
+cross-model memory, the audit trail, and the cost visibility — all of which
+are domain-neutral — are gated behind a Bubbletea TUI. ADR-0014 explicitly
+chose the harness as the **universal orchestration client**, and a desktop GUI
+is the natural second surface that extends "universal" beyond the terminal.
 
 ## Solution
 
-Ship a native desktop GUI for macOS and Windows that connects to the runtime
-server over the same harness protocol used by the terminal harness. The GUI is
-a second client surface, not a replacement for the TUI.
+Ship a native desktop GUI for macOS and Windows that connects to the BFF over
+the same harness protocol the TUI uses (FEAT-0008, post Amendment 001). The
+GUI runs **multiple concurrent chats** ("tabs"), each bound to its own
+project root and session. The TUI continues to be the single-active-session
+specialization of the same protocol; the GUI is the multi-active-session
+generalization.
 
-The GUI runs multiple concurrent chats. Each tab is bound to its own session,
-project root, capabilities snapshot, model override, and permission state. The
-runtime server remains the orchestration authority for conversation state,
-routing, provider calls, cost tracking, and run persistence. The GUI owns the
-harness role for local tool execution, permissions, project context discovery,
-and MCP integration.
-
-PATCH-0017 is the protocol-internal prerequisite: project context must become a
-session attribute, not a connection attribute, before a multi-chat client can
-avoid cross-tab project-context collisions.
+The desktop client takes on the **harness role** as defined by the BFF
+protocol: it executes tools locally, enforces permissions, hosts MCP servers,
+and supplies project context per session. How that harness role is *embodied*
+inside the desktop process is the central architectural question this spec
+opens (see Open Questions and the dedicated ADR called for below).
 
 ## Key Capabilities
 
 ### Multi-Chat Workspace
 
-- Tabbed chat interface. Each tab maps to one `(session_id, project_root)`.
-- Tabs are concurrent over one runtime-server connection.
-- Switching tabs does not re-handshake or re-register the full tool catalog.
-- Per-tab project root, selected at tab creation and editable later.
-- Per-tab model override, defaulting to runtime-server routing policy.
-- Per-tab unread and streaming indicators.
-- Tab persistence across app restarts via `session.resume`.
+- Tabbed chat interface. Each tab is one chat = (session_id, project_root,
+  capabilities snapshot, model override, permission state).
+- Tabs are concurrent over a single BFF connection. Switching tabs does not
+  re-handshake or re-register capabilities.
+- Per-tab project root, picked at tab creation (folder picker) and editable
+  later.
+- Per-tab model override (defaults to the BFF's routing policy).
+- Per-tab unread / streaming-in-progress indicators.
+- Tab persistence across app restarts. Reopening the app restores the prior
+  tab set, each via `session.resume`.
 
 ### Conversation Surface
 
-- Streaming markdown rendering.
-- Inline file references, paste expansion, and image previews.
-- Per-message cost, token, provider, and model metadata.
-- Scrollback, search, copy, and session history navigation.
-- Clear connection state when the runtime server is starting, reconnecting,
-  degraded, or unavailable.
+- Streaming markdown rendering (parity with the TUI's content surface, not
+  necessarily the same renderer).
+- Inline file references, paste expansion, image previews.
+- Per-message cost / token / model badges, consistent with FEAT-0008's
+  cost.update events.
+- Scrollback, search, copy.
 
 ### Tool Execution and Permissions
 
-- The desktop client owns local tool execution end-to-end, matching the
-  harness role defined by ADR-0014.
-- Built-in file, shell, Git, search, and MCP tools use the same risk and
-  permission model as the terminal harness.
-- Permission prompts are graphical sheets or modals.
-- Permission state is per-tab, so autonomous work in one tab does not loosen
-  policy in another.
-- File-write previews use a graphical diff viewer.
+- The desktop client owns tool execution end-to-end (Read, Edit, Write, Bash,
+  Glob, Grep, Git, WebFetch, WebSearch, MCP-discovered tools), matching
+  FEAT-0009's harness role.
+- Permission prompts are graphical (modal or sheet) rather than terminal
+  inline forms. The decision model — default / accept-edits / autonomous — is
+  the same.
+- Permission state is per-tab, not global. The user can run an autonomous
+  agent in one tab while a default-permission chat is open in another.
+- File-write previews use a native diff viewer.
 
 ### Project Context Per Tab
 
-- Each tab carries its own project context: `root`, `config_file`, and
-  `config_content`.
-- New sessions bind project context on open; resumed sessions refresh project
-  context on resume.
-- Changing a tab's project root updates that tab only.
-- Recent projects are available for fast tab creation.
+- Each tab carries its own project context blob (root, config_file,
+  config_content), sent on `session.open` / `session.resume` per Amendment
+  001 of FEAT-0008.
+- Changing the project root on an existing tab is allowed; the GUI re-sends
+  project context on the next turn or via an explicit `project.update` if
+  one is added to the protocol.
+- "Recent projects" shortcut for fast tab creation.
 
-### Simple Mode
+### Simple Mode for Non-Technical Users
 
-- Optional user preference that hides developer-oriented controls such as raw
-  tool catalogs, MCP server details, slash commands, and advanced permission
-  tuning.
-- Simple mode does not change the protocol or harness role. It only changes
-  what the GUI chooses to expose.
+- An optional UI mode that hides the developer surface (MCP server panel, raw
+  tool catalog, `/` slash commands, advanced permission tuning) and exposes
+  only: chat, file uploads, project picker, model selector, cost. The
+  underlying harness role is identical; only the UI surface changes.
+- Simple mode is a per-user preference, not a per-tab toggle.
+- Simple mode does not change the BFF protocol or the harness contract. It is
+  purely a frontend concern.
 
 ### Distribution
 
-- macOS signed and notarized app bundle.
-- Windows signed installer.
-- Stable and beta update channels.
-- Runtime-server distribution model is a design question: the desktop app may
-  bundle a compatible local `modeltap` runtime server, discover an installed
-  one, or support both modes.
+- macOS: signed and notarized `.app` bundle, distributed as a `.dmg` or via
+  Homebrew cask. Apple Silicon native; Intel build optional.
+- Windows: signed `.exe` installer (`.msi` or NSIS), x64 + ARM64.
+- Auto-update channel (stable / beta), with the BFF version pinned per app
+  release to avoid protocol drift.
+- The desktop client either bundles a local BFF binary (single-process
+  install) or auto-discovers an existing modeltap service installation. See
+  Open Questions.
 
 ## CLI / UI / API Integration
 
-- New desktop UI artifact.
-- The GUI speaks the same harness protocol as the terminal harness.
-- No GUI-specific runtime-server endpoint should be added unless a future ADR
-  explains why the shared protocol is insufficient.
-- Existing CLI commands continue to operate on the same local config and
-  SQLite store when the desktop app uses a local runtime server.
+- New top-level UI artifact, not a CLI command. The BFF gains no new
+  surface beyond what Amendment 001 (PATCH-0017) introduces.
+- The existing CLI (`modeltap serve`, `modeltap session list`, etc.)
+  continues to work and operates on the same SQLite store the desktop
+  client uses.
+- The desktop client speaks the same harness protocol as the TUI. The
+  protocol is the integration contract; no GUI-specific endpoints.
 
 ## Configuration
 
-- App preferences live in platform-native locations:
+- App-level preferences live in a platform-native location:
   - macOS: `~/Library/Application Support/Modeltap/`
   - Windows: `%APPDATA%\Modeltap\`
-- Runtime-server connection config is shared with the CLI where practical.
-- Per-tab UI state lives in the desktop app store, not in the runtime server.
-- Session, run, and conversation state remain runtime-server owned.
+- Server connection config (socket path, TLS endpoint, auth) is shared
+  with the modeltap CLI when the user runs both on the same machine. The
+  desktop client reads the existing `~/.modeltap/config.yaml` if present.
+- Per-tab state (project root, model override, permission mode) is
+  persisted in the desktop client's app store, not in the BFF.
 
 ## Non-Goals
 
-- Replacing the terminal harness.
-- Browser or web deployment.
-- Mobile clients.
-- Cloud-hosted modeltap.
-- Redesigning the runtime-server protocol outside the session-scoped project
-  context prerequisite.
-- Linux desktop in the first release.
+- Replacing the terminal harness. The TUI remains a first-class surface
+  for terminal-native users; the GUI is additive.
+- Web/browser deployment. This feature is scoped to native desktop only.
+  A future browser surface (e.g., for collaborative review) is out of
+  scope.
+- Mobile clients (iOS, Android). Out of scope.
+- A cloud-hosted modeltap. The desktop client connects to a local or
+  on-network BFF.
+- Replacing the FEAT-0003 web dashboard. The dashboard remains the
+  observability surface; the desktop client is the conversation surface.
+- Linux desktop. May be added later but is not in scope for the first
+  release; the priority audiences are macOS and Windows.
 
 ## Success Criteria
 
-1. A user can install the desktop client on macOS and Windows with no terminal
-   interaction.
-2. A user can open at least three concurrent tabs, each with a different
-   project root, and submit turns without project, session, model, or
-   permission state collision.
-3. Tool execution, permissions, and MCP integration work with the same safety
-   guarantees as the terminal harness.
-4. The terminal harness continues to work against the same runtime server.
-5. Runtime-server connection loss and recovery are isolated per tab; one stuck
-   session does not block other tabs.
-6. Simple mode lets a non-terminal user complete a project-scoped task without
-   seeing developer-only controls.
+1. A user can install the desktop client on macOS and on Windows from a
+   signed installer in under five minutes, with no terminal interaction
+   required.
+2. The user can create at least three concurrent tabs, each bound to a
+   different project root, and submit turns in each tab without state
+   collision (project root, session id, model override, permission state).
+3. Tool execution, permission prompts, and MCP integration work in the
+   GUI with the same correctness guarantees the TUI offers.
+4. The TUI continues to operate against the same BFF without behavioral
+   regression.
+5. Simple mode hides the developer surface and exposes a chat-first UI
+   that a non-technical productivity user can complete a project-scoped
+   task in without reading documentation.
+6. The desktop client survives BFF connection loss and recovery (per the
+   FEAT-0008 lifecycle) on a per-tab basis: a single tab whose session is
+   stuck does not block the others.
+7. Auto-update lands a new desktop release without breaking the protocol
+   handshake against a previous-version BFF in the supported version
+   range.
 
 ## Relationship to ADRs
 
-| ADR | Relationship |
-|-----|-------------|
-| ADR-0001 | The runtime server and reusable harness core stay Go. A native UI shell may use another platform UI technology if a future ADR accepts that choice. |
-| ADR-0014 | The GUI is another embodiment of the harness role, not a separate orchestration model. |
-| ADR-0016 | Confirms the naming: runtime server is the shared orchestration service; TUI and GUI are client surfaces. |
+- **ADR-0014 (Harness Base Strategy):** the GUI extends the universal
+  orchestration client surface beyond the terminal. It does not contradict
+  ADR-0014's choice of the modeltap harness over a fork; it adds a second
+  embodiment of the harness role.
+- **ADR-0001 (Go primary language):** the BFF and any sidecar harness
+  stay Go. The desktop UI shell is *not* required to be Go (see Open
+  Questions); ADR-0001 does not prohibit a non-Go UI shell that calls into
+  a Go harness sidecar.
+- A new ADR is required to settle the **harness-role embodiment** (native
+  in-process vs. Go sidecar service). See Open Questions.
 
 ## Open Questions
 
-1. **Harness-role embodiment.** Does the GUI implement the harness role in a
-   native UI runtime, run the Go harness core as a sidecar, or use a hybrid
-   app shell that embeds/reuses Go? This is ADR-grade before implementation.
-2. **UI toolkit.** Candidate directions include SwiftUI + WinUI/WPF, Wails,
-   Tauri, Electron, and Flutter Desktop. This depends on the embodiment ADR.
-3. **Runtime-server distribution.** Should the installer bundle a compatible
-   runtime server, discover an existing installation, or support both?
-4. **MCP management.** The GUI needs a graphical MCP configuration and status
-   surface. Its relationship to `~/.modeltap/config.yaml` needs design.
-5. **Simple mode boundaries.** The default hidden/exposed tool set needs
-   product design before acceptance.
-6. **Release sequencing.** PATCH-0017 is planned for v0.3.1 as enabling
-   runtime/project-context work, but the GUI itself is release TBD.
+1. **Harness-role embodiment.** Does the desktop client implement the
+   harness role natively in the UI runtime (Swift on macOS, .NET on
+   Windows), or does it run the existing Go harness as a sidecar service
+   and act as a thin frontend? Trade-offs:
+   - **Native:** best UX integration; duplicates tool execution,
+     permissions, MCP hosting in two languages; long-term maintenance tax.
+   - **Sidecar:** reuses the Go harness verbatim; one tool/permission/MCP
+     codebase; introduces a local IPC hop and a second process to manage.
+   - **Hybrid (Wails / Tauri-style):** Go harness compiled into the same
+     process as a webview-based UI. Single binary; UI built in
+     web technology; cross-platform. May undercut "native" feel but
+     dramatically reduces duplication.
+   This is an ADR-grade decision and should be drafted before
+   implementation begins.
 
-## Implementation Sequencing
+2. **UI toolkit.** SwiftUI + WinUI/WPF (native), Wails (Go + webview),
+   Tauri (Rust + webview), Electron (rejected by default for memory
+   footprint), Flutter Desktop. Downstream of question 1.
 
-1. **PATCH-0017 (v0.3.1):** move project context to session scope so
-   multiple tabs can safely share one runtime-server connection.
-2. **ADR-NNNN (release TBD):** decide desktop harness-role embodiment.
-3. **FEAT-0023 v1 (release TBD):** desktop shell, multi-tab workspace, tool
-   execution, permission prompts, and terminal-harness parity across N tabs.
-4. **FEAT-0023 v2 (release TBD):** simple mode, graphical MCP management,
-   auto-update, and deeper polish.
+3. **BFF distribution model.** Does the desktop installer bundle a local
+   BFF binary (single-process install, GUI launches BFF as needed), or
+   does it require the user to install `modeltap` separately? Bundling is
+   smoother for non-technical users; separate install matches the existing
+   CLI mental model.
+
+4. **MCP servers in a GUI world.** The TUI inherits MCP servers from
+   `~/.modeltap/config.yaml`. The GUI needs a graphical MCP management
+   surface — when does that ship, and does it share config with the CLI?
+
+5. **Multi-user / shared host.** Out of scope for v1, but the protocol
+   already supports it (FEAT-0010). When does the desktop client gain a
+   user-switcher?
+
+6. **Release sequencing.** No committed target. PATCH-0017 lands in
+   v0.3.5 regardless, as architectural insurance against multi-chat
+   foreclosure. The GUI itself sequences after the harness-role ADR is
+   accepted and after the GUI becomes a forcing priority — that may be
+   v0.4.0, v0.6.0, or much later. This spec is a forward marker; it does
+   not claim a release.
+
+7. **Simple mode boundaries.** Where exactly does the developer surface
+   end? File system tools (Read/Edit/Write/Bash) are the obvious
+   gating set, but project-rooted chat without file tools is a degraded
+   experience. The default tool set for simple mode needs design work.
+
+## Implementation Sequencing (provisional)
+
+This sequencing is a planning sketch, not a commitment. Only PATCH-0017
+has a concrete release target; everything below is **release TBD** and
+contingent on the GUI becoming a deliberate priority.
+
+1. **PATCH-0017 (v0.3.5):** session-scoped project context. Removes
+   the connection-scope foreclosure on multi-chat. Lands regardless of
+   when (or whether) the GUI itself ships, as architectural insurance.
+2. **ADR-NNNN (release TBD):** harness-role embodiment decision (native
+   vs. sidecar vs. hybrid). Required before this feature leaves
+   `draft`. Drafted when the GUI moves up the roadmap.
+3. **FEAT-0023 v1 (release TBD):** desktop shell + multi-tab workspace
+   + tool execution + permissions, parity with the TUI's single-chat
+   behavior multiplied by N.
+4. **FEAT-0023 v2 (release TBD, post-v1):** simple mode, MCP graphical
+   management, auto-update, polish.

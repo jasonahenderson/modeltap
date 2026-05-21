@@ -17,6 +17,8 @@ func newRequestsListCommand() *cobra.Command {
 	var (
 		provider string
 		model    string
+		runID    string
+		traceID  string
 		since    string
 		until    string
 		status   int
@@ -43,6 +45,9 @@ to now (e.g. "24h", "7d", "30m") or an RFC3339 timestamp.`,
   # Filter by model and limit results
   modeltap requests list --model gpt-4 --limit 10
 
+  # Filter by durable run
+  modeltap requests list --run run-123
+
   # Show only failed captures from the last hour
   modeltap requests list --status 500 --since 1h
 
@@ -62,6 +67,8 @@ to now (e.g. "24h", "7d", "30m") or an RFC3339 timestamp.`,
 			filter := storage.ListFilter{
 				Provider: provider,
 				Model:    model,
+				RunID:    runID,
+				TraceID:  traceID,
 				Limit:    limit,
 			}
 
@@ -125,6 +132,8 @@ to now (e.g. "24h", "7d", "30m") or an RFC3339 timestamp.`,
 
 	cmd.Flags().StringVar(&provider, "provider", "", "Filter by provider name")
 	cmd.Flags().StringVar(&model, "model", "", "Filter by model name")
+	cmd.Flags().StringVar(&runID, "run", "", "Filter by durable run id")
+	cmd.Flags().StringVar(&traceID, "trace", "", "Filter by trace id")
 	cmd.Flags().StringVar(&since, "since", "", "Filter captures after this time (duration like 24h/7d or RFC3339)")
 	cmd.Flags().StringVar(&until, "until", "", "Filter captures before this time (duration like 24h/7d or RFC3339)")
 	cmd.Flags().IntVar(&status, "status", 0, "Filter by HTTP response status code")

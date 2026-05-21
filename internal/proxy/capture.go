@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jasonahenderson/modeltap/internal/config"
+	"github.com/jasonahenderson/modeltap/internal/correlation"
 	"github.com/jasonahenderson/modeltap/internal/provider"
 	"github.com/jasonahenderson/modeltap/internal/storage"
 )
@@ -71,6 +72,11 @@ func (m *CaptureMiddleware) Wrap(next http.Handler) http.Handler {
 			prov = m.registry.Detect(r)
 		}
 
+		runID := strings.TrimSpace(r.Header.Get(correlation.HeaderRunID))
+		traceID := strings.TrimSpace(r.Header.Get(correlation.HeaderTraceID))
+		r.Header.Del(correlation.HeaderRunID)
+		r.Header.Del(correlation.HeaderTraceID)
+
 		// 3. Wrap the ResponseWriter to capture the response.
 		rec := newResponseRecorder(w)
 
@@ -86,6 +92,8 @@ func (m *CaptureMiddleware) Wrap(next http.Handler) http.Handler {
 
 		record := &storage.Request{
 			Timestamp:       start.UTC(),
+			RunID:           runID,
+			TraceID:         traceID,
 			Method:          r.Method,
 			URL:             r.URL.String(),
 			RequestHeaders:  string(reqHeaders),

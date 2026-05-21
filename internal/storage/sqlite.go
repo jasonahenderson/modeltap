@@ -122,6 +122,11 @@ func (s *SQLiteStore) migrate() error {
 			return err
 		}
 	}
+	if version < 4 {
+		if err := s.migrateToV4(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -432,6 +437,71 @@ CREATE INDEX idx_run_tool_results_run ON run_tool_results(run_id);
 	return nil
 }
 
+// migrateToV4 adds run/trace correlation fields to raw proxy captures.
+func (s *SQLiteStore) migrateToV4() error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("beginning v4 migration transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := addColumnIfMissing(tx, "requests", "run_id", "TEXT NOT NULL DEFAULT ''"); err != nil {
+		return fmt.Errorf("adding requests.run_id: %w", err)
+	}
+	if err := addColumnIfMissing(tx, "requests", "trace_id", "TEXT NOT NULL DEFAULT ''"); err != nil {
+		return fmt.Errorf("adding requests.trace_id: %w", err)
+	}
+
+	const indexes = `
+CREATE INDEX IF NOT EXISTS idx_requests_run_id ON requests(run_id);
+CREATE INDEX IF NOT EXISTS idx_requests_trace_id ON requests(trace_id);
+`
+	if _, err := tx.Exec(indexes); err != nil {
+		return fmt.Errorf("creating v4 request correlation indexes: %w", err)
+	}
+	if _, err := tx.Exec("PRAGMA user_version = 4"); err != nil {
+		return fmt.Errorf("setting user_version to 4: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("committing v4 migration: %w", err)
+	}
+	return nil
+}
+
+func addColumnIfMissing(tx *sql.Tx, table, column, definition string) error {
+	rows, err := tx.Query("PRAGMA table_info(" + table + ")")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notNull int
+		var defaultValue any
+		var pk int
+		if err := rows.Scan(&cid, &name, &typ, &notNull, &defaultValue, &pk); err != nil {
+			return err
+		}
+		if name == column {
+			return nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	_, err = tx.Exec("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition)
+	return err
+}
+
+const requestSelectColumns = `
+id, timestamp, run_id, trace_id, provider, model, method, url,
+request_headers, request_body,
+response_status, response_headers, response_body,
+input_tokens, output_tokens, latency_ms, estimated_cost_usd`
+
 // SaveRequest inserts a request record and atomically updates the hourly and
 // daily aggregation tables. If req.ID is empty, a new UUID is generated.
 func (s *SQLiteStore) SaveRequest(ctx context.Context, req *Request) error {
@@ -450,15 +520,17 @@ func (s *SQLiteStore) SaveRequest(ctx context.Context, req *Request) error {
 
 	const insertRequest = `
 INSERT INTO requests (
-	id, timestamp, provider, model, method, url,
+	id, timestamp, run_id, trace_id, provider, model, method, url,
 	request_headers, request_body,
 	response_status, response_headers, response_body,
 	input_tokens, output_tokens, latency_ms, estimated_cost_usd
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 	_, err = tx.ExecContext(ctx, insertRequest,
 		req.ID,
 		req.Timestamp.Format(time.RFC3339Nano),
+		req.RunID,
+		req.TraceID,
 		req.Provider,
 		req.Model,
 		req.Method,
@@ -538,11 +610,7 @@ ON CONFLICT (day, provider, model) DO UPDATE SET
 // matches more than one row, GetRequest returns nil with an
 // "ambiguous prefix" error so the caller can ask for a longer id.
 func (s *SQLiteStore) GetRequest(ctx context.Context, id string) (*Request, error) {
-	const exactQuery = `
-SELECT id, timestamp, provider, model, method, url,
-       request_headers, request_body,
-       response_status, response_headers, response_body,
-       input_tokens, output_tokens, latency_ms, estimated_cost_usd
+	const exactQuery = `SELECT ` + requestSelectColumns + `
 FROM requests WHERE id = ?`
 
 	r, err := scanSingleRequest(s.db.QueryRowContext(ctx, exactQuery, id))
@@ -555,11 +623,7 @@ FROM requests WHERE id = ?`
 
 	// Exact match missed; try prefix match. LIMIT 2 lets us detect
 	// ambiguity without scanning the whole table.
-	const prefixQuery = `
-SELECT id, timestamp, provider, model, method, url,
-       request_headers, request_body,
-       response_status, response_headers, response_body,
-       input_tokens, output_tokens, latency_ms, estimated_cost_usd
+	const prefixQuery = `SELECT ` + requestSelectColumns + `
 FROM requests WHERE id LIKE ? || '%' LIMIT 2`
 
 	rows, err := s.db.QueryContext(ctx, prefixQuery, id)
@@ -604,7 +668,7 @@ func scanSingleRequest(scanner requestRowScanner) (*Request, error) {
 	var r Request
 	var ts string
 	if err := scanner.Scan(
-		&r.ID, &ts, &r.Provider, &r.Model, &r.Method, &r.URL,
+		&r.ID, &ts, &r.RunID, &r.TraceID, &r.Provider, &r.Model, &r.Method, &r.URL,
 		&r.RequestHeaders, &r.RequestBody,
 		&r.ResponseStatus, &r.ResponseHeaders, &r.ResponseBody,
 		&r.InputTokens, &r.OutputTokens, &r.LatencyMs, &r.EstimatedCostUSD,
@@ -632,6 +696,14 @@ func buildFilterQuery(filter ListFilter) (string, []any) {
 		conditions = append(conditions, "model = ?")
 		args = append(args, filter.Model)
 	}
+	if filter.RunID != "" {
+		conditions = append(conditions, "run_id = ?")
+		args = append(args, filter.RunID)
+	}
+	if filter.TraceID != "" {
+		conditions = append(conditions, "trace_id = ?")
+		args = append(args, filter.TraceID)
+	}
 	if filter.Since != nil {
 		conditions = append(conditions, "timestamp >= ?")
 		args = append(args, filter.Since.Format(time.RFC3339Nano))
@@ -657,11 +729,7 @@ func buildFilterQuery(filter ListFilter) (string, []any) {
 func (s *SQLiteStore) ListRequests(ctx context.Context, filter ListFilter) ([]Request, error) {
 	where, args := buildFilterQuery(filter)
 
-	query := `
-SELECT id, timestamp, provider, model, method, url,
-       request_headers, request_body,
-       response_status, response_headers, response_body,
-       input_tokens, output_tokens, latency_ms, estimated_cost_usd
+	query := `SELECT ` + requestSelectColumns + `
 FROM requests` + where + ` ORDER BY timestamp DESC`
 
 	if filter.Limit > 0 {
@@ -684,7 +752,7 @@ FROM requests` + where + ` ORDER BY timestamp DESC`
 		var r Request
 		var ts string
 		if err := rows.Scan(
-			&r.ID, &ts, &r.Provider, &r.Model, &r.Method, &r.URL,
+			&r.ID, &ts, &r.RunID, &r.TraceID, &r.Provider, &r.Model, &r.Method, &r.URL,
 			&r.RequestHeaders, &r.RequestBody,
 			&r.ResponseStatus, &r.ResponseHeaders, &r.ResponseBody,
 			&r.InputTokens, &r.OutputTokens, &r.LatencyMs, &r.EstimatedCostUSD,

@@ -61,6 +61,12 @@ shown in the list table output.`,
 			fmt.Fprintln(w, "=== Request Detail ===")
 			fmt.Fprintf(w, "ID:        %s\n", req.ID)
 			fmt.Fprintf(w, "Timestamp: %s\n", req.Timestamp.Format(time.RFC3339))
+			if req.RunID != "" {
+				fmt.Fprintf(w, "Run ID:    %s\n", req.RunID)
+			}
+			if req.TraceID != "" {
+				fmt.Fprintf(w, "Trace ID:  %s\n", req.TraceID)
+			}
 			fmt.Fprintf(w, "Provider:  %s\n", req.Provider)
 			fmt.Fprintf(w, "Model:     %s\n", req.Model)
 			fmt.Fprintf(w, "Status:    %d\n", req.ResponseStatus)

@@ -8,9 +8,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
+	"github.com/jasonahenderson/modeltap/internal/correlation"
 	"github.com/jasonahenderson/modeltap/internal/protocol"
 	"github.com/jasonahenderson/modeltap/internal/provider"
+	"github.com/jasonahenderson/modeltap/internal/proxy"
+	"github.com/jasonahenderson/modeltap/internal/storage"
 )
 
 // stubAdapter satisfies provider.Provider for dispatch tests. It emits
@@ -101,6 +105,137 @@ func TestTurnDispatcher_Dispatch_Success(t *testing.T) {
 	}
 	if gotHeaders.Get("Content-Type") != "application/json" {
 		t.Errorf("Content-Type = %q", gotHeaders.Get("Content-Type"))
+	}
+}
+
+func TestTurnDispatcher_Dispatch_StampsCorrelationForProxyEndpoint(t *testing.T) {
+	var gotHeaders http.Header
+	d, ep, _ := newDispatchServer(t, func(w http.ResponseWriter, r *http.Request) {
+		gotHeaders = r.Header
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
+	ep.Upstream = "https://api.anthropic.com"
+
+	resp, err := d.Dispatch(context.Background(), DispatchOpts{
+		Conversation: NewConversation("sess"),
+		EndpointName: "ant",
+		Model:        "claude-sonnet-4-6",
+		RunID:        "run-dispatch-1",
+		TraceID:      "trace-dispatch-1",
+	})
+	if err != nil {
+		t.Fatalf("Dispatch: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if gotHeaders.Get(correlation.HeaderRunID) != "run-dispatch-1" {
+		t.Errorf("run correlation header = %q", gotHeaders.Get(correlation.HeaderRunID))
+	}
+	if gotHeaders.Get(correlation.HeaderTraceID) != "trace-dispatch-1" {
+		t.Errorf("trace correlation header = %q", gotHeaders.Get(correlation.HeaderTraceID))
+	}
+}
+
+func TestTurnDispatcher_Dispatch_DoesNotStampCorrelationForDirectEndpoint(t *testing.T) {
+	var gotHeaders http.Header
+	d, _, _ := newDispatchServer(t, func(w http.ResponseWriter, r *http.Request) {
+		gotHeaders = r.Header
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
+
+	resp, err := d.Dispatch(context.Background(), DispatchOpts{
+		Conversation: NewConversation("sess"),
+		EndpointName: "ant",
+		Model:        "claude-sonnet-4-6",
+		RunID:        "run-direct-1",
+		TraceID:      "trace-direct-1",
+	})
+	if err != nil {
+		t.Fatalf("Dispatch: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if gotHeaders.Get(correlation.HeaderRunID) != "" || gotHeaders.Get(correlation.HeaderTraceID) != "" {
+		t.Errorf("correlation headers should not be sent to direct endpoint: %v", gotHeaders)
+	}
+}
+
+func TestTurnDispatcher_DispatchThroughProxySavesRunCorrelation(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"id":"msg_1","type":"message","model":"claude-sonnet-4-6","content":[{"type":"text","text":"ok"}],"usage":{"input_tokens":1,"output_tokens":2}}`))
+	}))
+	t.Cleanup(upstream.Close)
+
+	store, err := storage.NewSQLiteStore(":memory:")
+	if err != nil {
+		t.Fatalf("NewSQLiteStore: %v", err)
+	}
+	t.Cleanup(func() { store.Close() })
+
+	captureRegistry := provider.NewRegistry()
+	captureRegistry.Register(provider.NewAnthropicProvider())
+	saved := make(chan struct{}, 1)
+	proxyServer, err := proxy.NewServer(proxy.ServerConfig{
+		Port:        9999,
+		UpstreamURL: upstream.URL,
+		Store:       store,
+		Registry:    captureRegistry,
+		OnSaved:     func() { saved <- struct{}{} },
+	})
+	if err != nil {
+		t.Fatalf("proxy.NewServer: %v", err)
+	}
+	proxyHTTP := httptest.NewServer(proxyServer.Handler())
+	t.Cleanup(proxyHTTP.Close)
+
+	endpoints := NewProviderRegistry()
+	if err := endpoints.Add(&ProviderEndpoint{
+		Name:     "ant",
+		Type:     ProviderTypeAnthropic,
+		APIKey:   "sk-test",
+		Host:     proxyHTTP.URL,
+		Upstream: "https://api.anthropic.com",
+	}); err != nil {
+		t.Fatalf("Add endpoint: %v", err)
+	}
+	adapters := provider.NewRegistry()
+	adapters.Register(&stubAdapter{name: ProviderTypeAnthropic, format: []byte(`{"model":"claude-sonnet-4-6","messages":[]}`)})
+
+	d := NewTurnDispatcher(endpoints, adapters)
+	d.SetHTTPClient(proxyHTTP.Client())
+
+	resp, err := d.Dispatch(context.Background(), DispatchOpts{
+		Conversation: NewConversation("sess"),
+		EndpointName: "ant",
+		Model:        "claude-sonnet-4-6",
+		RunID:        "run-proxy-1",
+		TraceID:      "trace-proxy-1",
+	})
+	if err != nil {
+		t.Fatalf("Dispatch: %v", err)
+	}
+	_, _ = io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+
+	select {
+	case <-saved:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for proxy capture")
+	}
+
+	reqs, err := store.ListRequests(context.Background(), storage.ListFilter{RunID: "run-proxy-1"})
+	if err != nil {
+		t.Fatalf("ListRequests: %v", err)
+	}
+	if len(reqs) != 1 {
+		t.Fatalf("got %d captures for run, want 1", len(reqs))
+	}
+	if reqs[0].TraceID != "trace-proxy-1" {
+		t.Errorf("TraceID = %q, want trace-proxy-1", reqs[0].TraceID)
 	}
 }
 

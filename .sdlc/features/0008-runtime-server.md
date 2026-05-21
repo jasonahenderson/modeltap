@@ -156,7 +156,7 @@ Or error:
 
 The server uses the project root for: session scoping (sessions are per-project), project instruction loading (Layer 4 system prompt — the server receives the config content from the harness rather than reading the filesystem directly, since the server may be remote), path normalization in session details, and knowledge layer project scoping. File paths in tool calls and results are relative to the project root.
 
-> **Planned amendment (Amendment 001, v0.3.1):** project context is logically a session attribute, not a connection attribute. A multi-chat client such as FEAT-0023 needs concurrent sessions on one connection, each scoped to a different project root. Today's implementation keeps project context on connection capabilities because the terminal harness is single-active-session. Amendment 001 moves project context into session create/resume payloads as canonical session state and treats any `capabilities.register.project` value as a legacy default for compatibility. Implementation is tracked by PATCH-0017.
+> **Planned amendment (Amendment 001, target v0.3.5):** project context is logically a *session* attribute, not a *connection* attribute. A multi-chat client (e.g., the desktop GUI in FEAT-0023) needs concurrent sessions on one connection, each scoped to a different project root. Today's implementation hoists project context to the connection because the only client (the TUI) is single-active-session at a time. The amendment moves project into the `session.open` / `session.resume` payload exclusively and removes it from `capabilities.register`. Wire-protocol back-compat is preserved: a single-session client that sends project on every resume continues to work unchanged. See "Planned Amendments" below.
 
 **Protocol versioning**: the harness and server exchange protocol versions during `capabilities.register`. The server declares its supported version range. If the harness's version is outside the range, the connection is rejected with a version-mismatch error. Within a compatible range, the server uses the highest mutually supported version.
 
@@ -1364,35 +1364,27 @@ type Diagnostic struct {
 
 ## Planned Amendments
 
-### Amendment 001: Session-scoped project context
+### Amendment 001 — Session-Scoped Project Context (target v0.3.5)
 
-**Status:** planned for v0.3.1. Implementation is tracked under PATCH-0017
-(`.sdlc/patches/0017-session-scoped-project-context.md`) and is an enabling
-prerequisite for FEAT-0023 (Desktop GUI Client).
+**Status:** planned. Implementation tracked under `PATCH-0017` (`.sdlc/patches/0017-session-scoped-project-context.md`). Driven by `FEAT-0023` (Desktop GUI Client), which is the first client to require multiple concurrent chats on one connection.
 
-**Change.** Project context (`root`, `config_file`, `config_content`) moves
-from connection scope to session scope.
+**Change.** Project context (`{ root, config_file, config_content }`) is moved from the connection scope to the session scope.
 
 | Where today | Where after Amendment 001 |
 |-------------|---------------------------|
-| Sent in `capabilities.register` as connection-scoped state | Optional legacy default only |
-| Sent on `session.create` and `session.resume`, then copied through connection capabilities | Stored directly on the session / active-session record |
-| Read by prompt assembly, history, and run controls through `Capabilities().ProjectContext()` | Read from the active session's project context |
+| Sent in `capabilities.register` (connection scope) | Removed from `capabilities.register` |
+| Re-sent on `session.resume`, overwrites connection-level value | Sent on `session.open` and `session.resume`, stored on the session row |
+| Read by prompt assembly via the connection's `CapabilityManager` | Read from the active session record |
 
-**Why.** The runtime server already supports multiple active session records,
-but connection-scoped project context is overwritten whenever the client
-switches sessions. A multi-chat client cannot safely run two tabs against
-different project roots until project context is session-owned.
+`capabilities.register` continues to carry tools, protocol version, and harness metadata — but no longer carries `project`. A new `session.open` method establishes a fresh session and binds project context to it. `session.resume` continues to carry project so config edits are picked up.
 
-**Compatibility.** Existing single-session clients may continue sending project
-context in `capabilities.register`; the runtime server should treat that value
-as a default for subsequent session creation/resume when no per-session project
-is provided. New clients should omit project from registration and always send
-project context per session.
+**Why.** The data model already supports multiple concurrent `ActiveSession` rows per connection, but project context lives on the connection and is overwritten on every resume. A multi-chat client cannot run two tabs against different project roots without race conditions. Promoting project context to the session is the smallest change that unblocks multi-chat clients without protocol-incompatible churn.
 
-**Out of scope.** GUI tab management, per-tab model controls, and multi-chat UI
-state belong to FEAT-0023. Amendment 001 only removes the protocol and runtime
-state collision.
+**Wire-protocol back-compat.** A single-session client (today's TUI) that continues to include project in `capabilities.register` is accepted by a tolerant server: the server stores it as a default to apply on the *next* `session.open`/`session.resume` if no per-session project is provided. New clients SHOULD omit project from `capabilities.register` and always send it per session.
+
+**Reinterpretation of MT-CONN-008 (`session_locked`).** This error already means "another client owns this session id." The amendment clarifies the wording (current docs imply "this connection is busy") but does not change behavior. `session_locked` is per-session, not per-connection.
+
+**Out of scope for the amendment.** Multi-chat UI primitives (tab management, per-tab status, per-tab model overrides) are scoped to FEAT-0023 and its harness role, not the BFF protocol. The BFF only needs to support N concurrent sessions per connection without state collision.
 
 ## Resolved Questions
 

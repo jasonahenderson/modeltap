@@ -23,6 +23,8 @@ func seedShowTestStore(t *testing.T) storage.Store {
 	req := &storage.Request{
 		ID:               "show-req-1",
 		Timestamp:        time.Date(2026, 3, 8, 12, 0, 0, 0, time.UTC),
+		RunID:            "run-show-1",
+		TraceID:          "trace-show-1",
 		Provider:         "openai",
 		Model:            "gpt-4",
 		Method:           "POST",
@@ -71,6 +73,8 @@ func TestShowDisplaysFullDetail(t *testing.T) {
 	// Verify header section fields.
 	expected := []string{
 		"show-req-1",
+		"run-show-1",
+		"trace-show-1",
 		"openai",
 		"gpt-4",
 		"200",

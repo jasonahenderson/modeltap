@@ -51,9 +51,31 @@ seven commits:
 Local validation: `go test -race -count=1 ./...` green across all packages
 (macOS arm64). golangci-lint not installed locally — deferred to CI.
 
-## What's Next
+## Push, PR, and Merge
 
-- Push `patch/0016-pr1-ci-test-failures` and open a PR against `main`.
-- Watch CI on Linux (race + golangci-lint v2.12.x) for green.
-- After CI green: flip patch status `approved` → `done` in a follow-up commit
-  and update the index/changelog rows accordingly.
+Pushed `patch/0016-pr1-ci-test-failures` via one-shot HTTPS (SSH still
+unconfigured for this account on this machine; remote config left untouched).
+
+PR #2 opened against `main`:
+https://github.com/jasonahenderson/modeltap/pull/2
+
+CI on the PR (run 25402221619) — all four checks pass:
+- Build: pass
+- DCO Sign-off: pass
+- Lint (golangci-lint v2.12.1): pass
+- Test (`go test -race ./...` on Linux ubuntu-latest): pass
+
+PR #2 merged into `main` (merge commit `39c85cd`). Note: the merge did
+not include the very last branch commit (the session-log update recording
+push/PR state) — that update is being folded into the finalize PR below.
+
+## Finalize
+
+Branched `patch/0016-finalize` off the merged `main` to:
+- Flip patch status `approved` → `done` in `docs/patches/0016-...md`,
+  `docs/patches/README.md`, and the v0.2.0 changelog
+- Record PR #2 URL in the patch frontmatter (`pr:` field)
+- Tick the last two checklist items (lint + CI)
+- Bring the session log up to date through merge and finalize
+
+This is the closing PR for PATCH-0016.

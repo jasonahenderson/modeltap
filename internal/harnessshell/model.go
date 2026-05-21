@@ -284,10 +284,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (bool, Model, tea.Cmd) {
 	if msg.Alt {
 		switch msg.Type {
 		case tea.KeyUp:
-			m.state.transcript.LineUp(1)
+			m.state.transcript.ScrollUp(1)
 			return true, m, nil
 		case tea.KeyDown:
-			m.state.transcript.LineDown(1)
+			m.state.transcript.ScrollDown(1)
 			return true, m, nil
 		}
 	}

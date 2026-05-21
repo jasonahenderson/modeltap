@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jasonahenderson/modeltap/internal/correlation"
 	"github.com/jasonahenderson/modeltap/internal/provider"
 	"github.com/jasonahenderson/modeltap/internal/proxy"
 	"github.com/jasonahenderson/modeltap/internal/storage"
@@ -260,6 +261,81 @@ func TestCaptureMiddleware_UnknownProvider(t *testing.T) {
 	}
 	if saved.ResponseBody != respBody {
 		t.Errorf("response body = %q, want %q", saved.ResponseBody, respBody)
+	}
+}
+
+func TestCaptureMiddleware_StoresCorrelationAndStripsInternalHeaders(t *testing.T) {
+	var upstreamRunID, upstreamTraceID string
+
+	env := newCaptureTestEnv(t, func(w http.ResponseWriter, r *http.Request) {
+		upstreamRunID = r.Header.Get(correlation.HeaderRunID)
+		upstreamTraceID = r.Header.Get(correlation.HeaderTraceID)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	})
+
+	reqBody := `{"model":"gpt-4","messages":[{"role":"user","content":"Test"}]}`
+	req, _ := http.NewRequest("POST", env.proxyServer.URL+"/v1/chat/completions", strings.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer sk-test")
+	req.Header.Set(correlation.HeaderRunID, "run-capture-1")
+	req.Header.Set(correlation.HeaderTraceID, "trace-capture-1")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	_, _ = io.ReadAll(resp.Body)
+
+	if upstreamRunID != "" || upstreamTraceID != "" {
+		t.Fatalf("internal correlation headers leaked upstream: run=%q trace=%q", upstreamRunID, upstreamTraceID)
+	}
+
+	env.waitForSave(t, 2*time.Second)
+
+	reqs, err := env.store.ListRequests(context.Background(), storage.ListFilter{RunID: "run-capture-1"})
+	if err != nil {
+		t.Fatalf("ListRequests: %v", err)
+	}
+	if len(reqs) != 1 {
+		t.Fatalf("got %d correlated captures, want 1", len(reqs))
+	}
+	if reqs[0].RunID != "run-capture-1" || reqs[0].TraceID != "trace-capture-1" {
+		t.Errorf("correlation = (%q, %q), want run-capture-1/trace-capture-1", reqs[0].RunID, reqs[0].TraceID)
+	}
+}
+
+func TestCaptureMiddleware_UncorrelatedTrafficStoresEmptyCorrelation(t *testing.T) {
+	env := newCaptureTestEnv(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	})
+
+	req, _ := http.NewRequest("POST", env.proxyServer.URL+"/v1/chat/completions", strings.NewReader(`{"model":"gpt-4","messages":[]}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer sk-test")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	_, _ = io.ReadAll(resp.Body)
+
+	env.waitForSave(t, 2*time.Second)
+
+	reqs, err := env.store.ListRequests(context.Background(), storage.ListFilter{Limit: 1})
+	if err != nil {
+		t.Fatalf("ListRequests: %v", err)
+	}
+	if len(reqs) != 1 {
+		t.Fatalf("got %d captures, want 1", len(reqs))
+	}
+	if reqs[0].RunID != "" || reqs[0].TraceID != "" {
+		t.Errorf("uncorrelated capture = (%q, %q), want empty strings", reqs[0].RunID, reqs[0].TraceID)
 	}
 }
 

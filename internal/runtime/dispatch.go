@@ -7,10 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
+	"github.com/jasonahenderson/modeltap/internal/correlation"
 	"github.com/jasonahenderson/modeltap/internal/protocol"
 	"github.com/jasonahenderson/modeltap/internal/provider"
 )
@@ -23,6 +26,8 @@ type DispatchOpts struct {
 	SystemPrompt string
 	Model        string
 	EndpointName string // which ProviderRegistry entry to use
+	RunID        string
+	TraceID      string
 	MaxTokens    int
 	Temperature  *float64
 	Tools        []protocol.ToolDefinition
@@ -92,6 +97,12 @@ func (d *TurnDispatcher) Dispatch(ctx context.Context, opts DispatchOpts) (*http
 	}
 	setAuthHeaders(req, ep)
 	req.Header.Set("Content-Type", "application/json")
+	if opts.RunID != "" && shouldStampCorrelationHeaders(ep) {
+		req.Header.Set(correlation.HeaderRunID, opts.RunID)
+	}
+	if opts.TraceID != "" && shouldStampCorrelationHeaders(ep) {
+		req.Header.Set(correlation.HeaderTraceID, opts.TraceID)
+	}
 
 	resp, err := d.httpClient.Do(req)
 	if err != nil {
@@ -158,6 +169,19 @@ func setAuthHeaders(req *http.Request, ep *ProviderEndpoint) {
 	case ProviderTypeOllama:
 		// Local Ollama typically doesn't require auth.
 	}
+}
+
+func shouldStampCorrelationHeaders(ep *ProviderEndpoint) bool {
+	if ep == nil || ep.Upstream == "" {
+		return false
+	}
+	u, err := url.Parse(ep.Host)
+	if err != nil {
+		return false
+	}
+	host := u.Hostname()
+	ip := net.ParseIP(host)
+	return host == "localhost" || (ip != nil && ip.IsLoopback())
 }
 
 // dispatchError wraps a transport-layer error (endpoint missing,

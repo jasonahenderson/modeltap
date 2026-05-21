@@ -1,12 +1,13 @@
 ---
 patch: "PATCH-0016"
 title: "Fix v0.2.x test suite failures and lint regressions surfaced by PR #1 CI"
-status: "approved"
+status: "done"
 date: "2026-05-05"
 related:
   - "FEAT-0008 (BFF server)"
   - "FEAT-0015 (Harness)"
 branch: "patch/0016-pr1-ci-test-failures"
+pr: "https://github.com/jasonahenderson/modeltap/pull/2"
 ---
 
 # PATCH-0016: Fix v0.2.x test suite failures and lint regressions surfaced by PR #1 CI
@@ -130,8 +131,8 @@ One fix per failure, one commit per fix. All commits prefixed `PATCH-0016:` and 
 - [x] `internal/harness/tools/bash_test.go:117`: replace bash brace expansion with portable equivalent
 - [x] `internal/protocol/protocol_test.go:691,694`: `reflect.Ptr` → `reflect.Pointer`
 - [x] `go test -race ./...` passes locally on macOS
-- [ ] `golangci-lint run ./...` passes locally (with `latest` matching CI) — golangci-lint not installed locally; deferred to CI
-- [ ] CI passes on the patch branch (Linux + race + golangci-lint)
+- [x] `golangci-lint run ./...` passes locally (with `latest` matching CI) — golangci-lint not installed locally; verified in CI
+- [x] CI passes on the patch branch (Linux + race + golangci-lint) — Build, DCO, Lint, Test all pass on PR #2 (run 25402221619)
 - [x] One commit per fix, all prefixed `PATCH-0016:`, all DCO-signed
 - [x] `.sdlc/patches/README.md` index updated
 - [x] `.sdlc/releases/v0.2.0/changelog.md` entry added
