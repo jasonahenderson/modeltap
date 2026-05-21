@@ -15,12 +15,23 @@ adds recent run summaries from `run.list`.
   - added a compact session detail formatter
   - added recent run summaries and run-native drill-down hints
   - updated `/help` to include `show [id]`
+  - added explicit session-switch sequencing so resume/bootstrap resume seed
+    the next `turn.submit` sequence and `/clear` resets it for a fresh session
 - `internal/harnesshost/testutil/runtime_stub.go`
   - added `session.details`, `session.list`, and `run.list` support
   - added request recording helpers for host-command tests
+  - added `session.resume` support for resumed-session sequencing tests
 - `internal/harnesshost/production_runtime_test.go`
   - covered explicit ID, active-session fallback, singular alias, missing
     active session, formatter sections, recent runs, and run-list failure
+  - covered resumed and cleared sessions seeding the next submit sequence
+- `internal/runtime/session.go`
+  - added `next_sequence` to `session.resume` responses, computed from the
+    restored user-turn sequence
+- `internal/protocol/sessions.go`
+  - added the optional `SessionResumeResponse.NextSequence` field
+- `internal/runtime/session_test.go`
+  - covered restored sessions returning the next user-turn sequence
 - `.sdlc/patches/0041-session-details-command.md`
   - marked the patch done
 - `.sdlc/patches/README.md`
@@ -54,6 +65,7 @@ scope:
 
 ## Verification
 
+- `go test ./internal/runtime ./internal/harnesshost ./internal/protocol`
 - `go test ./internal/harnesshost`
 - `go test ./...`
 - `go build ./...`

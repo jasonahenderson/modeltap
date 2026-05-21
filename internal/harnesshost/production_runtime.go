@@ -118,6 +118,21 @@ func (s *runtimeState) SetSessionID(id string) {
 	s.sessionID = id
 }
 
+// SwitchSession records an intentional session boundary change. Unlike
+// SetSessionID, it also resets/seeds the local user-turn sequence so the
+// next turn.submit matches the target session's restored conversation.
+func (s *runtimeState) SwitchSession(id string, nextSequence int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.sessionID = id
+	if nextSequence <= 1 {
+		s.sequence = 0
+	} else {
+		s.sequence = nextSequence - 1
+	}
+	s.activeRunID = ""
+}
+
 func (s *runtimeState) ActiveRunID() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -571,8 +586,7 @@ func (r *ProductionRuntime) handleClearCommand(ctx context.Context) error {
 	}, &resp); err != nil {
 		return r.statusError("clear", err)
 	}
-	r.mode.SetSessionID(resp.SessionID)
-	r.mode.SetActiveRunID("")
+	r.mode.SwitchSession(resp.SessionID, 1)
 	r.sender.Send(harnessshell.TranscriptClearEvent{})
 	r.sender.Send(harnessshell.HostStatusEvent{
 		Status: "Started new conversation: " + resp.SessionID,
@@ -620,7 +634,7 @@ func (r *ProductionRuntime) handleSessionResume(ctx context.Context, id string) 
 	}, &resp); err != nil {
 		return r.statusError("session.resume", err)
 	}
-	r.mode.SetSessionID(resp.SessionID)
+	r.mode.SwitchSession(resp.SessionID, resp.NextSequence)
 	r.resumeKnownRuns(ctx)
 	r.sender.Send(harnessshell.HostStatusEvent{
 		Status: "Resumed session: " + resp.SessionID,
@@ -706,7 +720,7 @@ func (r *ProductionRuntime) bootstrapSession(ctx context.Context) {
 			if r.mode.SessionID() != "" {
 				return
 			}
-			r.mode.SetSessionID(resumeResp.SessionID)
+			r.mode.SwitchSession(resumeResp.SessionID, resumeResp.NextSequence)
 			r.sender.Send(harnessshell.HostInfoEvent{
 				Text: "Resumed session " + resumeResp.SessionID + ". Type /clear to start a new conversation, /sessions list to see all sessions.",
 			})
@@ -726,7 +740,7 @@ func (r *ProductionRuntime) bootstrapSession(ctx context.Context) {
 	if r.mode.SessionID() != "" {
 		return
 	}
-	r.mode.SetSessionID(createResp.SessionID)
+	r.mode.SwitchSession(createResp.SessionID, 1)
 	r.sender.Send(harnessshell.HostInfoEvent{
 		Text: "New session " + createResp.SessionID + ". Type /help for commands.",
 	})

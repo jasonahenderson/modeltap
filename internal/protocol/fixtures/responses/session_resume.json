@@ -5,5 +5,6 @@
     "root": "/Users/dev/myproject",
     "config_file": ".modeltap.yaml",
     "config_content": "model: claude-opus-4-6"
-  }
+  },
+  "next_sequence": 4
 }

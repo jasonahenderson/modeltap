@@ -262,6 +262,10 @@ func handleSessionResume(ctx context.Context, conn *Connection, params json.RawM
 		SessionID: req.SessionID,
 		Model:     sess.ActiveModel,
 		Project:   conn.Capabilities().ProjectContext(),
+		// The harness owns the next turn.submit sequence value. When
+		// resuming a session, return the restored user-turn sequence so
+		// the next foreground turn continues instead of restarting at 1.
+		NextSequence: active.Conversation.Sequence() + 1,
 	}
 	if sess.ModelOverride != nil {
 		resp.ModelOverride = *sess.ModelOverride

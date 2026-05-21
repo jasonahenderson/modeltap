@@ -57,6 +57,12 @@ from inside the TUI.
 6. **Update help text.** Mention `/sessions show [id]` or `/sessions details
    [id]` in the session command row.
 
+7. **Preserve turn sequencing across session switches.** `/sessions resume`,
+   bootstrap resume, and `/clear` must seed/reset the host's next
+   `turn.submit` sequence so newly submitted turns continue the selected
+   session instead of making the history appear stuck at the first persisted
+   turn/run.
+
 ## Out of Scope
 
 - **Transcript rehydration on session resume.** This patch inspects persisted
@@ -95,6 +101,7 @@ from inside the TUI.
   - `/sessions show` uses the active session ID
   - missing ID with no active session returns a status error
   - detail formatter includes turns, files, events, and recent runs
+  - resumed and cleared sessions seed the next submit sequence correctly
 - [x] `go build ./...`, `go vet ./...`, `go test ./...` pass
 - [x] `.sdlc/patches/README.md` index updated
 
@@ -115,3 +122,11 @@ The run section is deliberately a summary only. The user should drill into each
 run with `/run <run-id>` or `/attach <run-id>` because a session can contain
 multiple foreground and background runs, and those run transcripts are separate
 durable streams under FEAT-0017.
+
+Session switching also needs to preserve the runtime/user-turn sequence
+contract. `session.resume` now returns `next_sequence`, computed from the
+restored conversation's user-turn sequence. The host uses that value when
+adopting a resumed session, and resets to sequence 1 when `/clear` creates a new
+session. A plain `turn.submit` acknowledgement still records the returned
+session ID without resetting sequence, so the first-turn auto-create path keeps
+working.

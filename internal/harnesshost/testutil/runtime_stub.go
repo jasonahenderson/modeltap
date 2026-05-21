@@ -52,6 +52,7 @@ type RuntimeStub struct {
 	cancels       []json.RawMessage
 	calls         []RuntimeCall
 	sessionDetail protocol.SessionDetail
+	sessionResume protocol.SessionResumeResponse
 	runs          []protocol.RunSummary
 	runListError  string
 
@@ -132,6 +133,13 @@ func (s *RuntimeStub) SetSessionDetail(detail protocol.SessionDetail) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.sessionDetail = detail
+}
+
+// SetSessionResume sets the response for session.resume.
+func (s *RuntimeStub) SetSessionResume(resp protocol.SessionResumeResponse) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.sessionResume = resp
 }
 
 // SetRuns sets the response for run.list.
@@ -220,6 +228,9 @@ func (s *RuntimeStub) handleConn(conn net.Conn) {
 			s.respond(w, req.ID, map[string]any{
 				"sessions": []any{},
 			}, nil)
+		case "session.resume":
+			resume := s.currentSessionResume(req.Params)
+			s.respond(w, req.ID, resume, nil)
 		case "session.details":
 			detail := s.currentSessionDetail(req.Params)
 			s.respond(w, req.ID, detail, nil)
@@ -281,6 +292,22 @@ func (s *RuntimeStub) currentSessionDetail(params json.RawMessage) protocol.Sess
 		Summary:    "Stub session",
 		CreatedAt:  "2026-05-21T00:00:00Z",
 		LastActive: "2026-05-21T00:01:00Z",
+	}
+}
+
+func (s *RuntimeStub) currentSessionResume(params json.RawMessage) protocol.SessionResumeResponse {
+	s.mu.Lock()
+	resume := s.sessionResume
+	s.mu.Unlock()
+	if resume.SessionID != "" {
+		return resume
+	}
+	var req protocol.SessionResume
+	_ = json.Unmarshal(params, &req)
+	return protocol.SessionResumeResponse{
+		SessionID:    req.SessionID,
+		Project:      protocol.ProjectContext{Root: "/tmp"},
+		NextSequence: 1,
 	}
 }
 

@@ -149,6 +149,94 @@ func TestProductionRuntimeSubmitTurnRecordsServerSession(t *testing.T) {
 	}
 }
 
+func TestProductionRuntimeSessionResumeSeedsNextSubmitSequence(t *testing.T) {
+	stub, err := testutil.NewRuntimeStub()
+	if err != nil {
+		t.Fatalf("NewRuntimeStub: %v", err)
+	}
+	defer stub.Close()
+	stub.SetSessionResume(protocol.SessionResumeResponse{
+		SessionID:    "sess-resumed",
+		Project:      protocol.ProjectContext{Root: "/tmp"},
+		NextSequence: 4,
+	})
+
+	r := newProductionRuntimeForTest(t, stub)
+	r.sender.onSend = func(tea.Msg) {}
+	r.mode.SwitchSession("sess-old", 9)
+
+	if err := r.DispatchCommand(context.Background(), HostCommand{Name: "sessions", Args: "resume sess-resumed"}); err != nil {
+		t.Fatalf("DispatchCommand(sessions resume): %v", err)
+	}
+	if got := r.mode.SessionID(); got != "sess-resumed" {
+		t.Fatalf("SessionID after resume = %q, want sess-resumed", got)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if _, err := r.SubmitTurn(ctx, SubmitRequest{Text: "after resume"}); err != nil {
+		t.Fatalf("SubmitTurn after resume: %v", err)
+	}
+
+	submits := stub.Submits()
+	if len(submits) == 0 {
+		t.Fatalf("expected submit after resume")
+	}
+	var got struct {
+		SessionID string `json:"session_id"`
+		Sequence  int    `json:"sequence"`
+	}
+	if err := json.Unmarshal(submits[len(submits)-1], &got); err != nil {
+		t.Fatalf("unmarshal submit: %v", err)
+	}
+	if got.SessionID != "sess-resumed" {
+		t.Fatalf("submit session_id = %q, want sess-resumed", got.SessionID)
+	}
+	if got.Sequence != 4 {
+		t.Fatalf("submit sequence = %d, want 4", got.Sequence)
+	}
+}
+
+func TestProductionRuntimeClearResetsNextSubmitSequence(t *testing.T) {
+	stub, err := testutil.NewRuntimeStub()
+	if err != nil {
+		t.Fatalf("NewRuntimeStub: %v", err)
+	}
+	defer stub.Close()
+
+	r := newProductionRuntimeForTest(t, stub)
+	r.sender.onSend = func(tea.Msg) {}
+	r.mode.SwitchSession("sess-old", 7)
+
+	if err := r.DispatchCommand(context.Background(), HostCommand{Name: "clear"}); err != nil {
+		t.Fatalf("DispatchCommand(clear): %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if _, err := r.SubmitTurn(ctx, SubmitRequest{Text: "fresh session"}); err != nil {
+		t.Fatalf("SubmitTurn after clear: %v", err)
+	}
+
+	submits := stub.Submits()
+	if len(submits) == 0 {
+		t.Fatalf("expected submit after clear")
+	}
+	var got struct {
+		SessionID string `json:"session_id"`
+		Sequence  int    `json:"sequence"`
+	}
+	if err := json.Unmarshal(submits[len(submits)-1], &got); err != nil {
+		t.Fatalf("unmarshal submit: %v", err)
+	}
+	if got.SessionID != "stub-session" {
+		t.Fatalf("submit session_id = %q, want stub-session", got.SessionID)
+	}
+	if got.Sequence != 1 {
+		t.Fatalf("submit sequence = %d, want 1", got.Sequence)
+	}
+}
+
 func TestProductionRuntimeSubmitTurnFailsWithoutClient(t *testing.T) {
 	// Construct without starting — Client() returns nil.
 	cfg := ProductionRuntimeConfig{

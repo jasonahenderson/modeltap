@@ -166,6 +166,65 @@ func TestSessionResume_Success(t *testing.T) {
 	}
 }
 
+func TestSessionResume_ReturnsNextUserSequence(t *testing.T) {
+	srv := newServerWithRealStore(t)
+	sid := seedSession(t, srv.store, SoloUserID, "/tmp/proj", "sequence resume")
+	now := time.Now().UTC()
+	for _, turn := range []storage.Turn{
+		{
+			ID:        "turn-user-1",
+			SessionID: sid,
+			Sequence:  1,
+			Role:      "user",
+			Content:   json.RawMessage(`{"role":"user","content":"first"}`),
+			CreatedAt: now,
+		},
+		{
+			ID:        "turn-assistant-1",
+			SessionID: sid,
+			Sequence:  2,
+			Role:      "assistant",
+			Content:   json.RawMessage(`{"role":"assistant","content":"reply"}`),
+			CreatedAt: now,
+		},
+		{
+			ID:        "turn-user-2",
+			SessionID: sid,
+			Sequence:  3,
+			Role:      "user",
+			Content:   json.RawMessage(`{"role":"user","content":"second"}`),
+			CreatedAt: now,
+		},
+	} {
+		turn := turn
+		if err := srv.store.CreateTurn(context.Background(), &turn); err != nil {
+			t.Fatalf("CreateTurn(%s): %v", turn.ID, err)
+		}
+	}
+
+	c := newReadyConnection(t, srv)
+	params, _ := json.Marshal(&protocol.SessionResume{
+		SessionID: sid,
+		Project:   protocol.ProjectContext{Root: "/tmp/proj"},
+	})
+
+	raw, err := handleSessionResume(context.Background(), c, params)
+	if err != nil {
+		t.Fatalf("handleSessionResume: %v", err)
+	}
+	resp := raw.(*protocol.SessionResumeResponse)
+	if resp.NextSequence != 3 {
+		t.Fatalf("NextSequence = %d, want 3", resp.NextSequence)
+	}
+	active := srv.sessions.GetActiveSession(sid)
+	if active == nil {
+		t.Fatalf("active session missing")
+	}
+	if got := active.Conversation.Sequence(); got != 2 {
+		t.Fatalf("restored user sequence = %d, want 2", got)
+	}
+}
+
 func TestSessionResume_NotFound(t *testing.T) {
 	srv := newServerWithRealStore(t)
 	c := newReadyConnection(t, srv)
