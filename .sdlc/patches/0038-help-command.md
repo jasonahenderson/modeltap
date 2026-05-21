@@ -1,15 +1,15 @@
 ---
-patch: "PATCH-0037"
+patch: "PATCH-0038"
 title: "Add /help command listing the host slash-command surface"
 status: "proposed"
 date: "2026-05-12"
 related:
   - "PATCH-0023 (host-command dispatch)"
   - ".sdlc/releases/v0.3.0/retrospective.md (Finding F22)"
-branch: "patch/0037-help-command"
+branch: "patch/0038-help-command"
 ---
 
-# PATCH-0037: Add /help command listing the host slash-command surface
+# PATCH-0038: Add /help command listing the host slash-command surface
 
 ## Problem
 
@@ -60,8 +60,8 @@ Recorded as Finding F22 in `.sdlc/releases/v0.3.0/retrospective.md`.
 - **Sidebar / command palette / autocomplete.** Larger UX surfaces
   tracked under FEAT-0024.
 - **Updating `/sessions clear` / `/clear` semantics** — that is
-  PATCH-0038's territory; the help text written here pre-emptively
-  reflects PATCH-0038's `/sessions clear` subcommand naming.
+  PATCH-0039's territory; the help text written here pre-emptively
+  reflects PATCH-0039's `/sessions clear` subcommand naming.
 
 ## Checklist
 

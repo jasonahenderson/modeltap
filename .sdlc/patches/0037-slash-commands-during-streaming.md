@@ -1,15 +1,15 @@
 ---
-patch: "PATCH-0036"
+patch: "PATCH-0037"
 title: "Dispatch slash commands before queue check so /cancel works during streaming"
 status: "proposed"
 date: "2026-05-12"
 related:
   - "PATCH-0023 (host-command dispatch)"
   - ".sdlc/releases/v0.3.0/retrospective.md (Finding F20)"
-branch: "patch/0036-slash-commands-during-streaming"
+branch: "patch/0037-slash-commands-during-streaming"
 ---
 
-# PATCH-0036: Dispatch slash commands before queue check
+# PATCH-0037: Dispatch slash commands before queue check
 
 ## Problem
 
@@ -51,7 +51,7 @@ Recorded as Finding F20 in `.sdlc/releases/v0.3.0/retrospective.md`.
 
 ## Out of Scope
 
-- **Mid-stream `/clear` behavior.** That depends on PATCH-0038's
+- **Mid-stream `/clear` behavior.** That depends on PATCH-0039's
   redefinition; handled there.
 - **Permission-pending blocking.** A pending permission can still
   intercept Enter at the permission-resolve branch (line 126); that
@@ -81,7 +81,7 @@ if content == "" && len(s.inputTokens) == 0 { ... }
 
 s.pushHistory(content)
 
-// PATCH-0036: slash commands dispatch immediately regardless of
+// PATCH-0037: slash commands dispatch immediately regardless of
 // streaming state, so /cancel, /run, /detach, etc. can take effect
 // in-flight. /clear is the shell-native exception below.
 if content == shellNativeClearCommand && len(s.inputTokens) == 0 {

@@ -43,9 +43,10 @@ Implementation-scoped work authorization documents. Patches are the lightweight 
 | [PATCH-0033](0033-rpc-error-formatting.md) | Unwrap RPCError framing in shell statusError; friendlier terminal-run reject | proposed |
 | [PATCH-0034](0034-focus-agnostic-scroll.md) | Focus-agnostic transcript scroll hotkeys | proposed |
 | [PATCH-0035](0035-elapsed-seconds-placeholder.md) | v0.3.0 placeholder: append elapsed seconds to streaming status | proposed |
-| [PATCH-0036](0036-slash-commands-during-streaming.md) | Dispatch slash commands before queue check so /cancel works during streaming | proposed |
-| [PATCH-0037](0037-help-command.md) | Add /help command listing the host slash-command surface | proposed |
-| [PATCH-0038](0038-session-semantics-redefine.md) | Redefine /clear as new-session; auto-resume most-recent session on launch; /sessions current | proposed |
+| [PATCH-0036](0036-run-proxy-correlation.md) | Correlate proxy captures with durable runs | done |
+| [PATCH-0037](0037-slash-commands-during-streaming.md) | Dispatch slash commands before queue check so /cancel works during streaming | proposed |
+| [PATCH-0038](0038-help-command.md) | Add /help command listing the host slash-command surface | proposed |
+| [PATCH-0039](0039-session-semantics-redefine.md) | Redefine /clear as new-session; auto-resume most-recent session on launch; /sessions current | proposed |
 
 ## When to Use a Patch
 

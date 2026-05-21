@@ -1,17 +1,17 @@
 ---
-patch: "PATCH-0038"
+patch: "PATCH-0039"
 title: "Redefine /clear as new-session; auto-resume most-recent session on launch; /sessions current"
 status: "proposed"
 date: "2026-05-12"
 related:
   - "PATCH-0028 (session.create RPC + harness bootstrap)"
   - "PATCH-0029 (bootstrap race fix)"
-  - "PATCH-0039 (session.delete / session.prune; follow-up)"
+  - "PATCH-0040 (session.delete / session.prune; follow-up)"
   - ".sdlc/releases/v0.3.0/retrospective.md (Findings F21, F23)"
-branch: "patch/0038-session-semantics-redefine"
+branch: "patch/0039-session-semantics-redefine"
 ---
 
-# PATCH-0038: Redefine /clear; auto-resume on launch; /sessions current
+# PATCH-0039: Redefine /clear; auto-resume on launch; /sessions current
 
 > [!NOTE]
 > Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`.sdlc/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
@@ -78,7 +78,7 @@ Recorded as Findings F21, F23 in
    via `HostInfoEvent`. Useful for cross-referencing with `/run` /
    `/runs` output.
 
-### Out of scope (PATCH-0039)
+### Out of scope (PATCH-0040)
 
 - `session.delete` RPC and `/sessions delete <id>` command
 - `session.prune` RPC and `/sessions prune` command
