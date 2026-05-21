@@ -64,7 +64,7 @@ type ToolDispatcher struct {
 	executedCount    int
 
 	// seen tracks tool_call_ids that have been dispatched — WU-094
-	// H-3 idempotency. A misbehaving or malicious BFF that re-emits
+	// H-3 idempotency. A misbehaving or malicious Runtime that re-emits
 	// the same tool.call would otherwise drive the tool N times.
 	// Capped to avoid unbounded growth across long sessions; the
 	// cap evicts LRU via a ring of timestamped entries.
@@ -125,7 +125,7 @@ func (d *ToolDispatcher) HandleToolCall(call protocol.ToolCall) error {
 	}
 
 	// Idempotency — reject duplicate tool_call_ids (WU-094 H-3). A
-	// malicious or buggy BFF that re-emits the same call would
+	// malicious or buggy Runtime that re-emits the same call would
 	// otherwise drive the tool N times.
 	if call.ToolCallID != "" {
 		d.mu.Lock()

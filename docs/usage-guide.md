@@ -174,7 +174,7 @@ If the row is present but the model and tokens are empty, the request is reachin
 
 In the production harness shell, every foreground `turn.submit` is also stored
 as a durable run. Existing chat behavior still works, and newer harness builds
-can inspect and control the BFF-owned run record.
+can inspect and control the runtime-owned run record.
 
 Available commands:
 
@@ -186,14 +186,14 @@ Available commands:
 - `/detach [run-id]` detaches from the named run, or the active run when no ID
   is supplied.
 - `/cancel <run-id>` cooperatively cancels a run. Interrupting the active run
-  uses the same run cancellation path when the BFF supports it.
+  uses the same run cancellation path when the runtime server supports it.
 - `/retry <run-id>`, `/continue <run-id>`, and `/fork <run-id>` are present as
   checkpoint-aware controls. In v0.3.0 retry and continue return conservative
   "not enabled yet" responses for unsupported stages; fork creates a queued
   sibling run record without cloning workspace or artifact state.
 
 Run rows distinguish `waiting_permission` from `waiting_user`. The list output
-also shows BFF-computed input-required and stuck markers so clients do not need
+also shows runtime-computed input-required and stuck markers so clients do not need
 to make independent wall-clock decisions.
 
 Planning subcommands are reserved for later v0.3.x releases:

@@ -10,7 +10,7 @@
 // harnesshost.Adapter, and runs the resulting tea.Model. The Driver
 // tea.Model wrapper in driver.go orchestrates fake stream emission so
 // the shell sees realistic stream/complete lifecycle events without
-// needing a real BFF.
+// needing a real runtime server.
 package harnessdemo
 
 import (

@@ -230,7 +230,7 @@ func TestToolDispatcher_NilMode_NoIntercept(t *testing.T) {
 }
 
 // TestToolDispatcher_DuplicateToolCallID pins WU-094 H-3: a malicious
-// or buggy BFF re-emitting the same tool.call must be rejected after
+// or buggy Runtime re-emitting the same tool.call must be rejected after
 // the first dispatch. Previously every re-emission drove the tool
 // again — trivial amplification of file writes, Bash runs, cost.
 func TestToolDispatcher_DuplicateToolCallID(t *testing.T) {

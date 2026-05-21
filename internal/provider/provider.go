@@ -48,7 +48,7 @@ type Provider interface {
 	// a single SSE line, with no trailing newline. Returns (nil, nil)
 	// for events that should be skipped (heartbeats, no-op deltas).
 	//
-	// Used by the BFF streaming relay (WU-053) to translate streamed
+	// Used by the Runtime streaming relay (WU-053) to translate streamed
 	// tokens / tool calls / usage stats into protocol notifications in
 	// real time. Distinct from ReassembleStream, which buffers a full
 	// response for the v0.1 capture path; ParseStreamEvent is the

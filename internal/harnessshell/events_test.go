@@ -149,7 +149,12 @@ func TestEnterSubmitDirectEmitsAction(t *testing.T) {
 	}
 }
 
-func TestEnterSubmitShellNativeClearDoesNotEmit(t *testing.T) {
+// PATCH-0038: /clear is now host-routed. Pressing Enter on /clear
+// emits RunHostCommandAction{Name: "clear"} (just like any other host
+// command); the shell does NOT wipe the transcript locally. The wipe
+// happens later on receipt of TranscriptClearEvent (covered by
+// TestTranscriptClearEventWipesTranscript below).
+func TestEnterSlashClearDispatchesHostCommand(t *testing.T) {
 	m := newWithFixedClock()
 	m.state.transcriptItems = []TranscriptItem{
 		{Role: RoleUser, Text: "old"},
@@ -158,14 +163,40 @@ func TestEnterSubmitShellNativeClearDoesNotEmit(t *testing.T) {
 	m.state.input.SetValue("/clear")
 
 	m, actions := drainActions(t, m, enterKey())
-	if len(actions) != 0 {
-		t.Fatalf("/clear should not emit actions, got %d", len(actions))
+	if len(actions) != 1 {
+		t.Fatalf("/clear should emit one RunHostCommandAction, got %d", len(actions))
 	}
+	run, ok := actions[0].(RunHostCommandAction)
+	if !ok {
+		t.Fatalf("action[0] = %T, want RunHostCommandAction", actions[0])
+	}
+	if run.Invocation.Name != "clear" {
+		t.Fatalf("invocation name = %q, want %q", run.Invocation.Name, "clear")
+	}
+	// Transcript untouched until host emits TranscriptClearEvent.
+	if len(m.state.transcriptItems) != 2 {
+		t.Fatalf("transcript should be untouched until TranscriptClearEvent, got %d items", len(m.state.transcriptItems))
+	}
+}
+
+// PATCH-0038: TranscriptClearEvent is what actually wipes the visible
+// transcript. The host emits it after a successful Runtime session.create
+// triggered by /clear.
+func TestTranscriptClearEventWipesTranscript(t *testing.T) {
+	m := newWithFixedClock()
+	m.state.transcriptItems = []TranscriptItem{
+		{Role: RoleUser, Text: "old"},
+		{Role: RoleAssistant, Text: "older"},
+	}
+	m.state.queuedSubmissions = []QueuedSubmission{{ID: "q-1", Text: "queued"}}
+
+	updated, _ := m.Update(TranscriptClearEvent{})
+	m = updated.(Model)
 	if len(m.state.transcriptItems) != 0 {
-		t.Fatalf("transcript should be empty after /clear, got %d items", len(m.state.transcriptItems))
+		t.Errorf("transcript not wiped: %d items", len(m.state.transcriptItems))
 	}
-	if m.state.statusKind != StatusReady {
-		t.Fatalf("statusKind = %v, want StatusReady", m.state.statusKind)
+	if len(m.state.queuedSubmissions) != 0 {
+		t.Errorf("queue not wiped: %d items", len(m.state.queuedSubmissions))
 	}
 }
 
@@ -313,6 +344,49 @@ func TestEnterWhileStreamingEnqueues(t *testing.T) {
 	}
 	if got := m.state.queuedSubmissions[0].Text; got != "follow up" {
 		t.Fatalf("queued text = %q, want %q", got, "follow up")
+	}
+}
+
+// PATCH-0036: slash commands typed during a streaming run must
+// dispatch as RunHostCommandAction immediately, not get enqueued
+// as user content. Before this fix, /cancel during streaming was
+// queued and the in-flight run continued to completion.
+func TestEnterSlashCommandDuringStreamingDispatches(t *testing.T) {
+	cases := []struct {
+		input    string
+		wantName string
+		wantArgs string
+	}{
+		{"/cancel run-abc", "cancel", "run-abc"},
+		{"/run", "run", ""},
+		{"/runs", "runs", ""},
+		{"/detach", "detach", ""},
+		{"/sessions clear", "sessions", "clear"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.input, func(t *testing.T) {
+			m := newWithFixedClock()
+			m.state.streaming = true
+			m.state.input.SetValue(tc.input)
+
+			m, actions := drainActions(t, m, enterKey())
+			if len(actions) != 1 {
+				t.Fatalf("expected 1 action, got %d (%+v)", len(actions), actions)
+			}
+			run, ok := actions[0].(RunHostCommandAction)
+			if !ok {
+				t.Fatalf("action[0] = %T, want RunHostCommandAction (slash should not enqueue during streaming)", actions[0])
+			}
+			if run.Invocation.Name != tc.wantName {
+				t.Errorf("name = %q, want %q", run.Invocation.Name, tc.wantName)
+			}
+			if run.Invocation.Args != tc.wantArgs {
+				t.Errorf("args = %q, want %q", run.Invocation.Args, tc.wantArgs)
+			}
+			if len(m.state.queuedSubmissions) != 0 {
+				t.Errorf("slash command should not enqueue during streaming, got %d queued", len(m.state.queuedSubmissions))
+			}
+		})
 	}
 }
 

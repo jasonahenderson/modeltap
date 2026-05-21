@@ -93,7 +93,7 @@ typed events back into the shell.
 
 ### Host-owned
 
-- turn submission to the runtime / BFF
+- turn submission to the runtime / runtime server
 - stream lifecycle and result delivery
 - host-native command execution
 - preview / file inspection loading
@@ -140,7 +140,7 @@ func main() {
     var runtime harnesshost.Runtime = newMyRuntime() // your impl
     adapter := harnesshost.New(shell, runtime)
 
-    p := tea.NewProgram(adapter, tea.WithAltScreen(), tea.WithMouseAllMotion())
+    p := tea.NewProgram(adapter, tea.WithAltScreen())
     if _, err := p.Run(); err != nil {
         panic(err)
     }
@@ -184,7 +184,7 @@ func (m model) View() string { return m.shell.View() }
 A submit followed by a streaming response runs as follows.
 
 Starting in v0.3.0, the `RunID` that crosses the host/shell boundary is the
-BFF-owned durable run ID when the server returns one. Older BFFs may still echo
+runtime-owned durable run ID when the server returns one. Older BFFs may still echo
 the turn ID; production runtime code keeps that fallback for compatibility.
 Host integrations should treat `RunID` as opaque and should call `run.*`
 methods for run-native inspection and control.
@@ -309,9 +309,9 @@ Embedding hosts should preserve these rules:
 - Do not append detached-run deltas to the active foreground transcript.
 - Keep per-run replay state keyed by run ID, including the last observed run
   sequence.
-- Prefer `run.cancel` for BFF-owned run IDs and fall back to `turn.cancel` only
+- Prefer `run.cancel` for runtime-owned run IDs and fall back to `turn.cancel` only
   when speaking to older BFFs.
-- Render BFF-provided `input_required`, `stuck`, and replay-fidelity fields
+- Render runtime-provided `input_required`, `stuck`, and replay-fidelity fields
   directly instead of recomputing them in the shell.
 
 The shell package itself remains protocol-free. Protocol payloads are converted
@@ -527,7 +527,7 @@ architecture. It composes `harnessshell` + `harnesshost.Adapter` +
 `harnessdemo.FakeRuntime` (via `harnessdemo.Driver`) to drive the shell
 end-to-end against a synthetic backend. Useful for evaluating shell
 layout, streaming behavior, queue follow-ups, and the `/perm`
-permission demo without a real BFF.
+permission demo without a real runtime server.
 
 The legacy `modeltap harness-spike` command was removed in WU-100
 Stage E.
@@ -595,8 +595,8 @@ typed string constants (`SubmissionSource`, `PermissionDecision`,
 
 - [`internal/harnessshell/README.md`](../../internal/harnessshell/README.md) — reusable shell package doc.
 - [`internal/harnesshost/README.md`](../../internal/harnesshost/README.md) — modeltap host adapter doc.
-- [`docs/features/0014-harness-conversation-shell.md`](../features/0014-harness-conversation-shell.md) — FEAT-0014 behavior contract.
-- [`docs/patches/0015-harness-shell-component-api.md`](../patches/0015-harness-shell-component-api.md) — PATCH-0015 API-shape policy.
-- [`docs/releases/v0.2.1/designs/2026-04-25-design-shell-component-api-098.md`](../releases/v0.2.1/designs/2026-04-25-design-shell-component-api-098.md) — WU-098 shell-side API design.
-- [`docs/releases/v0.2.1/designs/2026-04-25-design-host-adapter-integration-099.md`](../releases/v0.2.1/designs/2026-04-25-design-host-adapter-integration-099.md) — WU-099 host adapter design.
-- [`docs/releases/v0.2.1/designs/2026-04-25-design-docs-embedding-101.md`](../releases/v0.2.1/designs/2026-04-25-design-docs-embedding-101.md) — WU-101 docs design (this guide implements it).
+- [`.sdlc/features/0014-harness-conversation-shell.md`](../features/0014-harness-conversation-shell.md) — FEAT-0014 behavior contract.
+- [`.sdlc/patches/0015-harness-shell-component-api.md`](../patches/0015-harness-shell-component-api.md) — PATCH-0015 API-shape policy.
+- [`.sdlc/releases/v0.2.1/designs/2026-04-25-design-shell-component-api-098.md`](../releases/v0.2.1/designs/2026-04-25-design-shell-component-api-098.md) — WU-098 shell-side API design.
+- [`.sdlc/releases/v0.2.1/designs/2026-04-25-design-host-adapter-integration-099.md`](../releases/v0.2.1/designs/2026-04-25-design-host-adapter-integration-099.md) — WU-099 host adapter design.
+- [`.sdlc/releases/v0.2.1/designs/2026-04-25-design-docs-embedding-101.md`](../releases/v0.2.1/designs/2026-04-25-design-docs-embedding-101.md) — WU-101 docs design (this guide implements it).

@@ -27,7 +27,7 @@ Use a descriptive branch name. Prefixes like `feature/`, `fix/`, or `docs/` help
 
 ### 3. Make Your Changes
 
-Follow the project's Architecture Decision Records (ADRs) in `docs/adr/` when making changes. If your change conflicts with an existing ADR, open an issue to discuss it before submitting a PR.
+Follow the project's Architecture Decision Records (ADRs) in `.sdlc/adr/` when making changes. If your change conflicts with an existing ADR, open an issue to discuss it before submitting a PR.
 
 ### 4. Sign Off Your Commits (DCO)
 

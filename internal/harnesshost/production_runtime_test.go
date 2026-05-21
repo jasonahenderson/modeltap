@@ -16,10 +16,10 @@ import (
 )
 
 // WU-104a integration tests for ProductionRuntime.SubmitTurn against
-// the testutil BFF stub. Verifies the live ConnectionManager →
+// the testutil Runtime stub. Verifies the live ConnectionManager →
 // ProtocolClient → SubmitTurn → ack pipeline end-to-end.
 
-func newProductionRuntimeForTest(t *testing.T, stub *testutil.BFFStub) *ProductionRuntime {
+func newProductionRuntimeForTest(t *testing.T, stub *testutil.RuntimeStub) *ProductionRuntime {
 	t.Helper()
 	cfg := ProductionRuntimeConfig{
 		ConnConfig: harness.ConnectionConfig{
@@ -56,9 +56,9 @@ func newProductionRuntimeForTest(t *testing.T, stub *testutil.BFFStub) *Producti
 }
 
 func TestProductionRuntimeSubmitTurnReachesStub(t *testing.T) {
-	stub, err := testutil.NewBFFStub()
+	stub, err := testutil.NewRuntimeStub()
 	if err != nil {
-		t.Fatalf("NewBFFStub: %v", err)
+		t.Fatalf("NewRuntimeStub: %v", err)
 	}
 	defer stub.Close()
 
@@ -85,7 +85,7 @@ func TestProductionRuntimeSubmitTurnReachesStub(t *testing.T) {
 
 	submits := stub.Submits()
 	if len(submits) != 1 {
-		t.Fatalf("BFF stub received %d submits, want 1", len(submits))
+		t.Fatalf("Runtime stub received %d submits, want 1", len(submits))
 	}
 	var got struct {
 		TurnID    string `json:"turn_id"`
@@ -109,9 +109,9 @@ func TestProductionRuntimeSubmitTurnReachesStub(t *testing.T) {
 }
 
 func TestProductionRuntimeSubmitTurnRecordsServerSession(t *testing.T) {
-	stub, err := testutil.NewBFFStub()
+	stub, err := testutil.NewRuntimeStub()
 	if err != nil {
-		t.Fatalf("NewBFFStub: %v", err)
+		t.Fatalf("NewRuntimeStub: %v", err)
 	}
 	defer stub.Close()
 
@@ -164,8 +164,8 @@ func TestProductionRuntimeSubmitTurnFailsWithoutClient(t *testing.T) {
 	if err == nil {
 		t.Fatalf("SubmitTurn before connect should error")
 	}
-	if !strings.Contains(err.Error(), "no live BFF client") {
-		t.Fatalf("error = %v, want 'no live BFF client'", err)
+	if !strings.Contains(err.Error(), "no live runtime client") {
+		t.Fatalf("error = %v, want 'no live runtime client'", err)
 	}
 }
 
@@ -217,9 +217,9 @@ func TestProductionRuntimeWU104bWU104cStubs(t *testing.T) {
 }
 
 func TestProductionRuntimeLoadPreviewReadsFile(t *testing.T) {
-	stub, err := testutil.NewBFFStub()
+	stub, err := testutil.NewRuntimeStub()
 	if err != nil {
-		t.Fatalf("NewBFFStub: %v", err)
+		t.Fatalf("NewRuntimeStub: %v", err)
 	}
 	defer stub.Close()
 
@@ -297,13 +297,13 @@ func TestProductionRuntimeResolvePermissionUnblocksCallback(t *testing.T) {
 // a racing turn.submit already wrote. The race shape: ConnStateReady
 // fires; bootstrapSession is goroutine'd; turn.submit runs first
 // because the user typed fast, auto-creates session "stub-session"
-// on the BFF, and stores it via SetSessionID. session.create then
+// on the Runtime, and stores it via SetSessionID. session.create then
 // returns later with a different id; bootstrapSession must observe
 // the existing id and skip the Set.
 func TestProductionRuntimeBootstrapSessionDoesNotOverwrite(t *testing.T) {
-	stub, err := testutil.NewBFFStub()
+	stub, err := testutil.NewRuntimeStub()
 	if err != nil {
-		t.Fatalf("NewBFFStub: %v", err)
+		t.Fatalf("NewRuntimeStub: %v", err)
 	}
 	defer stub.Close()
 
@@ -326,9 +326,9 @@ func TestProductionRuntimeBootstrapSessionDoesNotOverwrite(t *testing.T) {
 // PATCH-0028 + PATCH-0029: when no turn raced ahead, bootstrapSession
 // adopts the session id returned by session.create.
 func TestProductionRuntimeBootstrapSessionAdoptsWhenEmpty(t *testing.T) {
-	stub, err := testutil.NewBFFStub()
+	stub, err := testutil.NewRuntimeStub()
 	if err != nil {
-		t.Fatalf("NewBFFStub: %v", err)
+		t.Fatalf("NewRuntimeStub: %v", err)
 	}
 	defer stub.Close()
 
@@ -344,6 +344,164 @@ func TestProductionRuntimeBootstrapSessionAdoptsWhenEmpty(t *testing.T) {
 	if got := r.mode.SessionID(); got != "stub-session" {
 		t.Errorf("bootstrapSession did not adopt session.create id: got %q, want %q",
 			got, "stub-session")
+	}
+}
+
+// PATCH-0038: bootstrapSession falls through to session.create when
+// session.list fails (e.g. unsupported by the Runtime stub) or returns
+// zero sessions. The harness ends up with a session id and emits a
+// welcome HostInfoEvent.
+func TestProductionRuntimeBootstrapFallsBackToCreateWhenListUnavailable(t *testing.T) {
+	stub, err := testutil.NewRuntimeStub()
+	if err != nil {
+		t.Fatalf("NewRuntimeStub: %v", err)
+	}
+	defer stub.Close()
+
+	r := newProductionRuntimeForTest(t, stub)
+
+	var msgs []any
+	r.sender.onSend = func(msg tea.Msg) { msgs = append(msgs, msg) }
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	r.bootstrapSession(ctx)
+
+	if got := r.mode.SessionID(); got != "stub-session" {
+		t.Fatalf("SessionID = %q, want stub-session (fallback create)", got)
+	}
+	// Welcome message names the new session.
+	var welcomed bool
+	for _, m := range msgs {
+		if info, ok := m.(harnessshell.HostInfoEvent); ok && strings.Contains(info.Text, "New session stub-session") {
+			welcomed = true
+			break
+		}
+	}
+	if !welcomed {
+		t.Errorf("expected welcome HostInfoEvent for new session, msgs = %+v", msgs)
+	}
+}
+
+// PATCH-0038: /clear refuses while a run is streaming. Mid-stream
+// clear would require cancelling the active run first; surface a
+// clear error instead of trying to redefine "new conversation"
+// semantics while content is still arriving.
+func TestProductionRuntimeClearCommandRejectsActiveRun(t *testing.T) {
+	r, err := NewProductionRuntime(ProductionRuntimeConfig{
+		ConnConfig: harness.ConnectionConfig{SocketPath: "/nonexistent.sock"},
+	})
+	if err != nil {
+		t.Fatalf("NewProductionRuntime: %v", err)
+	}
+	defer r.Close()
+
+	var msgs []any
+	r.sender.onSend = func(msg tea.Msg) { msgs = append(msgs, msg) }
+
+	r.mode.SetActiveRunID("run-streaming")
+	if err := r.DispatchCommand(context.Background(), HostCommand{Name: "clear"}); err != nil {
+		t.Fatalf("DispatchCommand(clear) returned non-nil: %v", err)
+	}
+
+	if len(msgs) != 1 {
+		t.Fatalf("expected 1 status event, got %d (%+v)", len(msgs), msgs)
+	}
+	se, ok := msgs[0].(harnessshell.HostStatusEvent)
+	if !ok {
+		t.Fatalf("msgs[0] = %T, want HostStatusEvent", msgs[0])
+	}
+	if se.Kind != harnessshell.StatusError {
+		t.Errorf("kind = %v, want StatusError", se.Kind)
+	}
+	if !strings.Contains(se.Status, "cannot start new conversation") {
+		t.Errorf("status missing reject text: %q", se.Status)
+	}
+}
+
+// PATCH-0038: /sessions current prints the active session id when
+// one exists; prints "No active session" when not bootstrapped.
+func TestProductionRuntimeSessionsCurrent(t *testing.T) {
+	r, err := NewProductionRuntime(ProductionRuntimeConfig{
+		ConnConfig: harness.ConnectionConfig{SocketPath: "/nonexistent.sock"},
+	})
+	if err != nil {
+		t.Fatalf("NewProductionRuntime: %v", err)
+	}
+	defer r.Close()
+
+	var msgs []any
+	r.sender.onSend = func(msg tea.Msg) { msgs = append(msgs, msg) }
+
+	// No active session yet — surfaces a status, not an info row.
+	if err := r.DispatchCommand(context.Background(), HostCommand{Name: "sessions", Args: "current"}); err != nil {
+		t.Fatalf("DispatchCommand(sessions current): %v", err)
+	}
+	if len(msgs) != 1 {
+		t.Fatalf("expected 1 event, got %d", len(msgs))
+	}
+	if se, ok := msgs[0].(harnessshell.HostStatusEvent); !ok || !strings.Contains(se.Status, "No active session") {
+		t.Errorf("msgs[0] = %#v, want HostStatusEvent containing 'No active session'", msgs[0])
+	}
+
+	msgs = nil
+	r.mode.SetSessionID("sess-abc-123")
+	if err := r.DispatchCommand(context.Background(), HostCommand{Name: "sessions", Args: "current"}); err != nil {
+		t.Fatalf("DispatchCommand(sessions current): %v", err)
+	}
+	if len(msgs) != 1 {
+		t.Fatalf("expected 1 event, got %d", len(msgs))
+	}
+	info, ok := msgs[0].(harnessshell.HostInfoEvent)
+	if !ok {
+		t.Fatalf("msgs[0] = %T, want HostInfoEvent", msgs[0])
+	}
+	if !strings.Contains(info.Text, "sess-abc-123") {
+		t.Errorf("info text missing session id: %q", info.Text)
+	}
+}
+
+// PATCH-0037: /help emits a HostInfoEvent that names each top-level
+// host command. The text is rendered into the transcript via the
+// PATCH-0018 HostInfo path; users who type /help should see the full
+// surface without leaving the shell.
+func TestProductionRuntimeHelpCommandListsCommands(t *testing.T) {
+	r, err := NewProductionRuntime(ProductionRuntimeConfig{
+		ConnConfig: harness.ConnectionConfig{SocketPath: "/nonexistent.sock"},
+	})
+	if err != nil {
+		t.Fatalf("NewProductionRuntime: %v", err)
+	}
+	defer r.Close()
+
+	var msgs []any
+	r.sender.onSend = func(msg tea.Msg) { msgs = append(msgs, msg) }
+
+	if err := r.DispatchCommand(context.Background(), HostCommand{Name: "help"}); err != nil {
+		t.Fatalf("DispatchCommand(help): %v", err)
+	}
+	if len(msgs) != 1 {
+		t.Fatalf("expected 1 HostInfoEvent, got %d (%+v)", len(msgs), msgs)
+	}
+	info, ok := msgs[0].(harnessshell.HostInfoEvent)
+	if !ok {
+		t.Fatalf("msg[0] = %T, want HostInfoEvent", msgs[0])
+	}
+	wantNames := []string{
+		"/plan", "/build", "/auto",
+		"/model", "/models",
+		"/sessions",
+		"/context", "/compact",
+		"/history",
+		"/mcp",
+		"/run", "/runs", "/jobs",
+		"/attach", "/detach", "/cancel", "/retry", "/continue", "/fork",
+		"/clear", "/select", "/help", "/quit", "/exit",
+	}
+	for _, name := range wantNames {
+		if !strings.Contains(info.Text, name) {
+			t.Errorf("help text missing %q in:\n%s", name, info.Text)
+		}
 	}
 }
 

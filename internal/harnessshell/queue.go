@@ -12,11 +12,10 @@ import (
 	"time"
 )
 
-// shellNativeClearCommand is the buffer text the shell handles locally
-// without crossing the boundary as an action. Per WU-100 §"Definite scope
-// rule for the reusable package", /clear is shell-native; host-native
-// commands cross via [RunHostCommandAction] (added in a later commit).
-const shellNativeClearCommand = "/clear"
+// PATCH-0038: shellNativeClearCommand removed. /clear is now
+// host-routed because starting a fresh conversation requires a Runtime
+// session.create RPC. The host's handleClearCommand owns the path;
+// the shell wipes its transcript on receipt of TranscriptClearEvent.
 
 func isShellNativeQuitCommand(content string) bool {
 	switch strings.TrimSpace(content) {
@@ -29,8 +28,8 @@ func isShellNativeQuitCommand(content string) bool {
 
 // isShellNativeSelectCommand reports whether content is the
 // /select shell-native command (PATCH-0030). /select toggles mouse
-// capture so the user can let the terminal handle native click-drag
-// text selection (e.g., to copy a run id from /runs output).
+// capture between default terminal-native selection and app-owned
+// mouse-wheel scrolling.
 func isShellNativeSelectCommand(content string) bool {
 	return strings.TrimSpace(content) == "/select"
 }
@@ -138,6 +137,22 @@ func (s *state) emitSubmitOnEnter() bool {
 
 	s.pushHistory(content)
 
+	// PATCH-0036: slash commands dispatch immediately regardless of
+	// streaming state so /cancel, /run, /detach, etc. can take effect
+	// in-flight. Previously this check sat AFTER the streaming-queue
+	// branch, so /cancel got enqueued and the run continued.
+	//
+	// PATCH-0038: /clear is no longer shell-native. Starting a fresh
+	// conversation requires a Runtime session.create RPC, so /clear
+	// dispatches through the host like any other slash command. The
+	// host's handleClearCommand emits a TranscriptClearEvent on
+	// success, which is what actually wipes the shell transcript.
+	if strings.HasPrefix(content, "/") && len(content) > 1 && len(s.inputTokens) == 0 {
+		s.dispatchHostCommand(content)
+		return true
+	}
+
+	// Non-slash content: queue while streaming, otherwise begin.
 	if s.streaming || len(s.queuedSubmissions) > 0 || len(s.pendingSubmissions) > 0 {
 		s.enqueueSubmission(content, s.inputTokens)
 		s.input.Reset()
@@ -147,28 +162,6 @@ func (s *state) emitSubmitOnEnter() bool {
 		if !s.streaming {
 			s.releaseQueuedSubmission()
 		}
-		return true
-	}
-
-	if content == shellNativeClearCommand && len(s.inputTokens) == 0 {
-		s.transcriptItems = nil
-		s.transcriptRefs = nil
-		s.selectedTranscriptRef = -1
-		s.input.Reset()
-		s.syncInputHeight()
-		s.status = "Transcript cleared"
-		s.statusKind = StatusReady
-		return true
-	}
-
-	// PATCH-0023: dispatch host-native slash commands. /quit and
-	// /exit are intercepted earlier in model.go; /clear is handled
-	// just above. Any other leading-slash input with no attached
-	// tokens is a host-native command. The shell does not pre-validate
-	// the name; the host runtime's DispatchCommand emits an "Unknown
-	// command" status for anything it does not recognize.
-	if strings.HasPrefix(content, "/") && len(content) > 1 && len(s.inputTokens) == 0 {
-		s.dispatchHostCommand(content)
 		return true
 	}
 

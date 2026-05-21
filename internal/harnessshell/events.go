@@ -59,7 +59,22 @@ func (s *state) applyHostEvent(evt HostEvent) {
 		s.applyHostStatus(e)
 	case HostInfoEvent:
 		s.applyHostInfo(e)
+	case TranscriptClearEvent:
+		s.applyTranscriptClear()
 	}
+}
+
+// applyTranscriptClear wipes the visible transcript. Used by the
+// host-routed /clear path (PATCH-0038) so the shell's visible
+// transcript zeroes out only on a successful Runtime session.create. The
+// status text (e.g. "Started new conversation") rides on a sibling
+// HostStatusEvent emitted by the host alongside.
+func (s *state) applyTranscriptClear() {
+	s.transcriptItems = nil
+	s.transcriptRefs = nil
+	s.selectedTranscriptRef = -1
+	s.queuedSubmissions = nil
+	s.pendingSubmissions = nil
 }
 
 // applyPreviewLoaded paints the host-supplied preview payload into the

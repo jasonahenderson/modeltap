@@ -341,6 +341,16 @@ type HostInfoEvent struct {
 
 func (HostInfoEvent) isHostEvent() {}
 
+// TranscriptClearEvent wipes the shell's visible transcript. Emitted by
+// the host when a new conversation begins (PATCH-0038's `/clear`
+// redefinition: clearing requires a Runtime session.create RPC, so the
+// wipe is host-driven rather than shell-native). Status text and
+// follow-up state (the new session id) ride on a sibling
+// [HostStatusEvent] / [HostInfoEvent] emitted alongside.
+type TranscriptClearEvent struct{}
+
+func (TranscriptClearEvent) isHostEvent() {}
+
 // ActionMsg is the [tea.Msg] envelope used to forward outbound shell actions
 // to the host program. Per WU-098 §"Concrete forwarding shape", the exact
 // envelope shape was deferred to WU-100. The reusable shell uses a single

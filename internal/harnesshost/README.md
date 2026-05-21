@@ -157,7 +157,7 @@ receive deltas during the pause window.
 
 Fake / demo runtime behavior — synthetic stream lifecycle events,
 example permission requests, queue/preview exercise without a real
-BFF — lives in [`internal/harnessdemo`](../harnessdemo), **not** in this
+runtime server — lives in [`internal/harnessdemo`](../harnessdemo), **not** in this
 package.
 
 The reusable shell has two valid host packages plus inline test fakes:
@@ -174,5 +174,5 @@ package was deleted in WU-100 Stage E.
 - [`internal/harnessshell/README.md`](../harnessshell/README.md) — reusable conversation-shell component this adapter drives.
 - [`internal/harnessdemo`](../harnessdemo) — fake-runtime adapter for examples and tests.
 - [`docs/guides/harness-shell-embedding.md`](../../docs/guides/harness-shell-embedding.md) — canonical embedding guide; includes the full submit / stream / permission / preview integration walkthroughs.
-- [`docs/features/0014-harness-conversation-shell.md`](../../docs/features/0014-harness-conversation-shell.md) — behavior contract.
-- [`docs/releases/v0.2.1/designs/2026-04-25-design-host-adapter-integration-099.md`](../../docs/releases/v0.2.1/designs/2026-04-25-design-host-adapter-integration-099.md) — full host-adapter integration design (WU-099).
+- [`.sdlc/features/0014-harness-conversation-shell.md`](../../.sdlc/features/0014-harness-conversation-shell.md) — behavior contract.
+- [`.sdlc/releases/v0.2.1/designs/2026-04-25-design-host-adapter-integration-099.md`](../../.sdlc/releases/v0.2.1/designs/2026-04-25-design-host-adapter-integration-099.md) — full host-adapter integration design (WU-099).
