@@ -7,7 +7,7 @@
 #                                                deprecation warning for one
 #                                                release cycle)
 #
-# All other modeltap state (SQLite DB, BFF socket, service log) also
+# All other modeltap state (SQLite DB, runtime server socket, service log) also
 # lives under ~/.modeltap/ by default, or $XDG_DATA_HOME/modeltap/ when
 # that env var is set.
 #
@@ -16,7 +16,7 @@
 # Everything else has sane defaults.
 #
 # Environment variables can override any value — prefix MODELTAP_ and
-# uppercase the key (e.g. MODELTAP_BFF_SOCKET_PATH).
+# uppercase the key (e.g. MODELTAP_RUNTIME_SOCKET_PATH).
 #
 # dotenv (PATCH-0007): modeltap auto-loads ./.env then ~/.modeltap/.env
 # at startup. Variables already in the process environment win; the
@@ -29,7 +29,7 @@
 
 # ---------------------------------------------------------------------
 # v0.1 proxy config (modeltap start) — optional, unchanged from v0.1.
-# The harness auto-starts `modeltap start` when the BFF socket is
+# The harness auto-starts `modeltap start` when the runtime server socket is
 # absent, so if you only run the harness you can ignore this section.
 # ---------------------------------------------------------------------
 
@@ -45,7 +45,7 @@ dashboard:
   bind: 127.0.0.1
 
 # ---------------------------------------------------------------------
-# Providers — used by BOTH the proxy (when Upstream is set) AND the BFF
+# Providers — used by BOTH the proxy (when Upstream is set) AND the runtime server
 # (when Type is set). For the harness, you want Type + APIKey.
 # ---------------------------------------------------------------------
 
@@ -54,13 +54,13 @@ providers:
   # resolves to a Claude model.
   #
   # About host routing (PATCH-0005): when the v0.1 proxy is running
-  # alongside the harness (the default via auto-start), BFF provider
+  # alongside the harness (the default via auto-start), runtime server provider
   # traffic is routed through http://127.0.0.1:<port> so your
   # conversations land in the proxy's capture tables (modeltap logs,
   # modeltap dashboard). To skip the proxy and dial the provider
   # directly, uncomment `host:` below.
   anthropic:
-    type: anthropic                    # BFF endpoint type
+    type: anthropic                    # runtime server endpoint type
     # api_key supports three forms (PATCH-0004):
     #   env:VAR         — read from environment (recommended)
     #   file:/abs/path  — read from a file (Docker secrets, CI)
@@ -74,7 +74,7 @@ providers:
   #   api_key: env:OPENAI_API_KEY
   #   # host: https://api.openai.com   # uncomment to skip the proxy
 
-  # Local Ollama. Discover lets the BFF auto-enumerate installed
+  # Local Ollama. Discover lets the runtime server auto-enumerate installed
   # models via /api/tags on startup. Always routed direct (local
   # already — proxy interposition would be a no-op).
   # ollama-local:
@@ -83,16 +83,16 @@ providers:
   #   discover: true
 
 # ---------------------------------------------------------------------
-# BFF (terminal harness backend) config.
+# runtime server (terminal harness backend) config.
 # ---------------------------------------------------------------------
 
-bff:
+runtime:
   # Unix-domain socket the harness dials. Default: ~/.modeltap/server.sock
   # (or $XDG_DATA_HOME/modeltap/server.sock when XDG_DATA_HOME is set).
   socket_path: ~/.modeltap/server.sock
   # socket_mode: 0o600  # default already; tighten if your home is shared.
 
-  # Team / enterprise profile. Leaving these unset keeps the BFF
+  # Team / enterprise profile. Leaving these unset keeps the runtime server
   # socket-only. TLS REFUSES to bind without tls_client_ca_file
   # (mTLS required — see WU-094 security review).
   # tls_address: 0.0.0.0:9443

@@ -25,11 +25,11 @@ intuition.
 
 | Type | Scope | Canonical Home |
 |---|---|---|
-| `EXP` | upstream problem framing and design-space exploration | `docs/explorations/` |
-| `FEAT` | behavior-scoped product definition | `docs/features/` |
-| `PATCH` | implementation-scoped product or engineering-system work | `docs/patches/` |
-| `ADR` | architectural decision with future constraint value | `docs/adr/` |
-| `WU` | implementation work unit under an accepted feature | `docs/releases/<version>/` |
+| `EXP` | upstream problem framing and design-space exploration | `.sdlc/explorations/` |
+| `FEAT` | behavior-scoped product definition | `.sdlc/features/` |
+| `PATCH` | implementation-scoped product or engineering-system work | `.sdlc/patches/` |
+| `ADR` | architectural decision with future constraint value | `.sdlc/adr/` |
+| `WU` | implementation work unit under an accepted feature | `.sdlc/releases/<version>/` |
 | `ADMIN` | repo process / workflow / instruction changes | no numbered doc required by default |
 
 Crystal-clear rules:
@@ -81,7 +81,7 @@ Prime directives:
 3. Phase 2 contains no new design work and no implementation.
 4. Phase 3 contains no silent design improvisation; if implementation reveals a
    flaw, revise the design explicitly.
-5. The current phase lives in `docs/releases/<version>/plan.md`.
+5. The current phase lives in `.sdlc/releases/<version>/plan.md`.
 6. Phase transitions are explicit `ADMIN:` commits, never implicit.
 
 ## Per-Release Branching
@@ -91,7 +91,7 @@ Each release implements on its own dedicated branch.
 - **Naming**: `release/vX.Y.Z`, one per release.
 - **Creation**: cut **just in time** when the release opens Phase 1, in the
   same `ADMIN:` commit that opens the release. Do not pre-create branches
-  for unstarted releases; their plans live in `docs/releases/<version>/`
+  for unstarted releases; their plans live in `.sdlc/releases/<version>/`
   until the gate opens.
 - **Base**: cut from `main` at the point all predecessor releases are merged
   and any cross-release lockdown anchor (for example a series-level
@@ -115,10 +115,10 @@ commits.
 ## Design Artifact Placement
 
 - Design docs live under the active release directory's `designs/`
-  subdirectory: `docs/releases/<version>/designs/`.
+  subdirectory: `.sdlc/releases/<version>/designs/`.
 - One file per design bundle. Bundle related WUs that share a contract surface.
 - File naming: `<date>-design-<short-name>-<wu-range>.md`.
-- Design docs are release deliverables, not session history. `docs/history/`
+- Design docs are release deliverables, not session history. `.sdlc/history/`
   records sessions and work logs; `designs/` holds the designs themselves.
 
 ## Review Artifact Placement
@@ -129,7 +129,7 @@ commits.
   Dispositions live in a table at the bottom of that file; no sidecar JSON.
 - Non-canonical review artifacts should include the reviewer identity when
   known, for example `codex-plan-review.md`.
-- `docs/history/` should record that the review happened and point to the
+- `.sdlc/history/` should record that the review happened and point to the
   canonical review artifact path.
 
 ## Implementation Review
@@ -161,11 +161,11 @@ changelog, readiness review, and any final release notes are complete.
 
 Release close sequence:
 
-1. Finish all release-scoped work and update `docs/releases/<version>/status.md`
+1. Finish all release-scoped work and update `.sdlc/releases/<version>/status.md`
    to shipped/complete.
-2. Finalize `docs/releases/<version>/changelog.md`.
+2. Finalize `.sdlc/releases/<version>/changelog.md`.
 3. Record or link the release-readiness review under
-   `docs/releases/<version>/.reviews/`.
+   `.sdlc/releases/<version>/.reviews/`.
 4. Commit those final release artifacts with an `ADMIN:` commit.
 5. Create an annotated tag:
    `git tag -a vX.Y.Z -m "modeltap vX.Y.Z"`.
@@ -181,7 +181,7 @@ Tag update policy:
   `git tag -f -a vX.Y.Z -m "modeltap vX.Y.Z" <new-release-commit>`.
 - If the tag was pushed but the release is still unpublished, update the remote
   tag explicitly: `git push --force-with-lease origin refs/tags/vX.Y.Z`.
-- Any tag move must be logged in `docs/history/` with the old SHA, new SHA, and
+- Any tag move must be logged in `.sdlc/history/` with the old SHA, new SHA, and
   reason.
 - After a release is published or announced, the tag is immutable by default.
   New commits must ship as a new version, usually the next patch release. Moving
@@ -207,7 +207,7 @@ Commit body requirements:
 
 ## Logging
 
-Significant work should be logged to `docs/history/` before stopping.
+Significant work should be logged to `.sdlc/history/` before stopping.
 
 At minimum, log:
 

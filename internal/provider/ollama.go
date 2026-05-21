@@ -108,7 +108,7 @@ func (o *OllamaProvider) ReassembleStream(chunks []StreamChunk) (*ResponseMetada
 }
 
 // ParseStreamEvent decodes one NDJSON object from /api/chat. Ollama
-// doesn't use SSE framing; the BFF's SSEParser will still split on
+// doesn't use SSE framing; the Runtime's SSEParser will still split on
 // blank lines, but Ollama emits one JSON per newline-delimited line —
 // the relay loops over these without intermediate framing.
 func (o *OllamaProvider) ParseStreamEvent(data []byte) (*StreamEvent, error) {

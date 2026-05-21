@@ -5,11 +5,11 @@ the modeltap harness. It owns the single scrolling transcript surface, the
 tail-mounted composer, the queued follow-up lifecycle, the composer-hosted
 permission UI, and inline token rendering for paste and file references —
 the behavior contract defined in
-[`docs/features/0014-harness-conversation-shell.md`](../../docs/features/0014-harness-conversation-shell.md)
+[`.sdlc/features/0014-harness-conversation-shell.md`](../../.sdlc/features/0014-harness-conversation-shell.md)
 (FEAT-0014). It does not own provider transport, filesystem access, or
 production permission persistence; those remain host responsibilities and
 cross the package boundary as typed actions and events per
-[`docs/patches/0015-harness-shell-component-api.md`](../../docs/patches/0015-harness-shell-component-api.md)
+[`.sdlc/patches/0015-harness-shell-component-api.md`](../../.sdlc/patches/0015-harness-shell-component-api.md)
 (PATCH-0015).
 
 ## Status
@@ -37,7 +37,7 @@ the shell.
 | Token display and inline paste expansion | shell |
 | Shell-local key handling | shell |
 | Shell-native commands (`/clear`, transcript-local view actions) | shell |
-| Turn submission to runtime / BFF | host |
+| Turn submission to runtime server | host |
 | Stream lifecycle and result delivery | host |
 | Host-native command execution | host |
 | Preview / file inspection loading | host |
@@ -148,7 +148,7 @@ func main() {
     // dispatches to runtime; runtime tea.Msgs project to HostEvents.
     adapter := harnesshost.New(shell, runtime)
 
-    p := tea.NewProgram(adapter, tea.WithAltScreen(), tea.WithMouseAllMotion())
+    p := tea.NewProgram(adapter, tea.WithAltScreen())
     if _, err := p.Run(); err != nil {
         panic(err)
     }
@@ -176,5 +176,5 @@ and preview flows — see
 - [`internal/harnesshost/README.md`](../harnesshost/README.md) — modeltap-specific host adapter that consumes actions and produces events.
 - [`internal/harnessdemo`](../harnessdemo) — fake/demo runtime adapter used by the `modeltap shell-demo` CLI and integration fixtures. Lives outside this package per WU-099.
 - [`docs/guides/harness-shell-embedding.md`](../../docs/guides/harness-shell-embedding.md) — canonical embedding guide.
-- [`docs/features/0014-harness-conversation-shell.md`](../../docs/features/0014-harness-conversation-shell.md) — behavior contract.
-- [`docs/patches/0015-harness-shell-component-api.md`](../../docs/patches/0015-harness-shell-component-api.md) — extraction policy and API-shape rules.
+- [`.sdlc/features/0014-harness-conversation-shell.md`](../../.sdlc/features/0014-harness-conversation-shell.md) — behavior contract.
+- [`.sdlc/patches/0015-harness-shell-component-api.md`](../../.sdlc/patches/0015-harness-shell-component-api.md) — extraction policy and API-shape rules.

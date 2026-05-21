@@ -130,9 +130,9 @@ Scale: 1 (poor) → 5 (excellent). Weighted total = sum of (weight × score).
 
 ## File Naming and Location
 
-- Store ADRs in `docs/adr/`
+- Store ADRs in `.sdlc/adr/`
 - Name files as `NNNN-short-kebab-case-title.md` (e.g., `0001-programming-language.md`)
-- Number sequentially; check the directory for the next available number using: !`ls docs/adr/ 2>/dev/null | sort -r | head -1`
+- Number sequentially; check the directory for the next available number using: !`ls .sdlc/adr/ 2>/dev/null | sort -r | head -1`
 - Set status to `accepted` when writing a final decision, `proposed` when the user wants to review further
 
 ## Decision Title

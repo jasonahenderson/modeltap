@@ -17,7 +17,7 @@ import (
 
 // shellFlags captures the production shell's CLI flags. Defaults
 // follow the table in the WU-105 design (production-wiring §"Flag
-// defaults"): --socket → viper bff.socket_path → built-in default;
+// defaults"): --socket → viper runtime.socket_path → built-in default;
 // --project → cwd; --model → viper default_model; --resume → empty.
 type shellFlags struct {
 	socketPath     string
@@ -28,7 +28,7 @@ type shellFlags struct {
 }
 
 func bindShellFlags(cmd *cobra.Command, f *shellFlags) {
-	cmd.Flags().StringVar(&f.socketPath, "socket", "", "override the BFF socket path (defaults to config.bff.socket_path)")
+	cmd.Flags().StringVar(&f.socketPath, "socket", "", "override the runtime server socket path (defaults to config.runtime.socket_path)")
 	cmd.Flags().StringVar(&f.resumeID, "resume", "", "resume the given session id at startup")
 	cmd.Flags().StringVar(&f.project, "project", "", "project directory (defaults to $PWD)")
 	cmd.Flags().StringVar(&f.modelName, "model", "", "initial model override for the session")
@@ -38,7 +38,7 @@ func bindShellFlags(cmd *cobra.Command, f *shellFlags) {
 // newShellCommand registers the `modeltap shell` subcommand. It is
 // the production conversation-shell entrypoint that wraps
 // harnessshell.Model + harnesshost.Adapter + harnesshost.ProductionRuntime
-// and runs as a tea.Program against a real BFF.
+// and runs as a tea.Program against a real runtime server.
 //
 // Replaces the legacy `modeltap harness` command (deleted in v0.2.1
 // when the legacy TUI App was scrapped).
@@ -47,16 +47,17 @@ func newShellCommand() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "shell",
-		Short: "Launch the modeltap conversation shell against the BFF",
+		Short: "Launch the modeltap conversation shell against the runtime server",
 		Long: `Start the modeltap conversation shell — a Bubble Tea TUI built on
 the reusable internal/harnessshell component plus the modeltap host
-adapter (internal/harnesshost). Connects to the BFF over a local
-unix socket (auto-starting the BFF when the socket is absent) and
+adapter (internal/harnesshost). Connects to the runtime server over a local
+unix socket (auto-starting the runtime server when the socket is absent) and
 drives sessions, tools, attachments, and routing commands.
 
 Slash commands:
   /exit, /quit            exit the shell
   /clear                  clear the transcript (shell-local)
+  /select                 toggle terminal selection vs mouse scroll mode
   /plan, /build, /auto    switch execution mode
   /model                  show current model
   /model <name>           switch model
@@ -119,10 +120,10 @@ func runShell(cmd *cobra.Command, flags *shellFlags) error {
 
 	effectiveSocket := flags.socketPath
 	if effectiveSocket == "" {
-		effectiveSocket = cfg.BFF.SocketPath
+		effectiveSocket = cfg.Runtime.SocketPath
 	}
 	if effectiveSocket == "" {
-		effectiveSocket = config.DefaultBFFSocketPath()
+		effectiveSocket = config.DefaultRuntimeSocketPath()
 	}
 
 	effectiveProject := flags.project
@@ -173,7 +174,7 @@ func runShell(cmd *cobra.Command, flags *shellFlags) error {
 	)
 	adapter := harnesshost.New(shell, runtime)
 
-	p := tea.NewProgram(adapter, tea.WithAltScreen(), tea.WithMouseAllMotion())
+	p := tea.NewProgram(adapter, tea.WithAltScreen())
 
 	// Ordering rule: AttachProgram BEFORE Start.
 	runtime.AttachProgram(p)

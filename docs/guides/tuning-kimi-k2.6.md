@@ -16,7 +16,7 @@ providers:
     type: moonshot
     api_key: env:MOONSHOT_API_KEY
     host: https://api.moonshot.cn
-bff:
+runtime:
   models:
     kimi-k2-6:
       provider: moonshot
@@ -68,7 +68,7 @@ providers:
     type: moonshot
     api_key: env:MOONSHOT_API_KEY
     host: https://api.moonshot.cn              # override for vLLM/SGLang local deploy
-bff:
+runtime:
   models:
     kimi-k2-6:
       provider: moonshot
@@ -85,10 +85,10 @@ bff:
 | `type` | required | Must be `moonshot` |
 | `host` | `https://api.moonshot.cn` | Set to local endpoint host for vLLM/SGLang |
 | `api_key` | required | Use `env:` prefix (PATCH-0004) |
-| `bff.models.<name>.provider` | required | Routes the harness model to the `moonshot` provider endpoint |
-| `bff.models.<name>.upstream_model` | `kimi-k2-6` | Also valid: `kimi-k2-5` |
-| `bff.models.<name>.context_tokens` | `262144` | Kimi K2.6's 256k-token context window |
-| `bff.routing` | required | Maps the requested harness model name to the BFF model entry |
+| `runtime.models.<name>.provider` | required | Routes the harness model to the `moonshot` provider endpoint |
+| `runtime.models.<name>.upstream_model` | `kimi-k2-6` | Also valid: `kimi-k2-5` |
+| `runtime.models.<name>.context_tokens` | `262144` | Kimi K2.6's 256k-token context window |
+| `runtime.routing` | required | Maps the requested harness model name to the runtime server model entry |
 
 ## Context Window Strategy
 
@@ -114,7 +114,7 @@ The Thinking temperature (1.0) lets K2.6 explore cross-file relationships that I
 
 ### 3. Compaction thresholds
 
-The BFF sends `EventCompactSuggest` when context pressure hits a threshold. For K2.6:
+The runtime server sends `EventCompactSuggest` when context pressure hits a threshold. For K2.6:
 - **Raise the threshold** — 256k means you can tolerate 80–100% context before compacting
 - **Prefer `/compact` manually** over auto-compaction to preserve reasoning chains
 
@@ -214,4 +214,4 @@ Instant mode (temperature=0.6) scores slightly lower on reasoning benchmarks but
 - [Moonshot API Docs](https://platform.moonshot.cn/docs)
 - [Kimi K2 Paper (arXiv:2507.20534)](https://arxiv.org/abs/2507.20534)
 - [HuggingFace Model Card](https://huggingface.co/moonshotai/Kimi-K2.6)
-- `docs/patches/0008-moonshot-provider-adapter.md` — implementation details
+- `.sdlc/patches/0008-moonshot-provider-adapter.md` — implementation details

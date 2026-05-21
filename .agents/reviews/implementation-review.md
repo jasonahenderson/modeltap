@@ -120,7 +120,7 @@ the risk and documents the exception.
 
 Implementation reviews for release work live under:
 
-`docs/releases/<version>/.reviews/`
+`.sdlc/releases/<version>/.reviews/`
 
 Use a descriptive reviewer-first or release-first filename, for example:
 

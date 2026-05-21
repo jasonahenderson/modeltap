@@ -19,7 +19,7 @@ import (
 )
 
 // RiskLevel is one of the four wire-legal risk classifications. The
-// values are exactly the strings the BFF expects in
+// values are exactly the strings the runtime server expects in
 // capabilities.register / ToolDefinition.RiskLevel.
 type RiskLevel string
 
@@ -72,7 +72,7 @@ const (
 )
 
 // ToProtocol converts the result into the wire shape the harness sends
-// back to the BFF as tool.result. The caller supplies the
+// back to the runtime server as tool.result. The caller supplies the
 // tool_call_id from the original tool.call event.
 func (r *ToolExecResult) ToProtocol(toolCallID string) protocol.ToolResult {
 	return protocol.ToolResult{

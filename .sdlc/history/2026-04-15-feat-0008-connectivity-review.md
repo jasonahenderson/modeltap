@@ -1,0 +1,27 @@
+# 2026-04-15 — FEAT-0008 connectivity re-review
+
+> [!NOTE]
+> Historical terminology: this artifact uses the former `BFF` name. The live architecture renamed that component to the `runtime server` in ADR-0016 (`.sdlc/adr/0016-runtime-server-and-client-surfaces.md`); live source now uses `internal/runtime` and the `runtime` config namespace.
+
+## Summary
+
+Re-reviewed `.sdlc/features/0008-bff-server.md` specifically for harness-to-BFF/proxy connectivity reliability, self-recovery, and user-facing diagnostics after the feature changed again.
+
+Overwrote the targeted review artifacts:
+
+- `.sdlc/features/.reviews/plan-reviews/0008-bff-server-connectivity-review.md`
+- `.sdlc/features/.reviews/plan-reviews/0008-bff-server-connectivity-review.json`
+
+## Findings Summary
+
+- 5 findings total
+- 4 blocking
+- 1 significant
+
+## Main Issues Raised
+
+- FEAT-0008 is stronger as a BFF/server spec, but still needs a first-class connection lifecycle state machine.
+- Heartbeat timeout is mentioned, but heartbeat/readiness/dependency-health protocol primitives are not specified.
+- Reconnect behavior still needs idempotent in-flight turn, tool-result, and multi-model stream semantics.
+- User-facing connection failures need stable diagnostic codes and concrete remediation commands.
+- Local service bootstrap and session unlock behavior should be tied explicitly to CLI/configuration semantics and FEAT-0004/ADR-0012.

@@ -272,7 +272,7 @@ func (r *ProductionRuntime) Close() error {
 func (r *ProductionRuntime) SubmitTurn(ctx context.Context, req SubmitRequest) (SubmitAccepted, error) {
 	client := r.cm.Client()
 	if client == nil {
-		return SubmitAccepted{}, errors.New("no live BFF client")
+		return SubmitAccepted{}, errors.New("no live runtime client")
 	}
 
 	content, attachments, err := r.buildSubmitContent(ctx, req)
@@ -319,7 +319,7 @@ func (r *ProductionRuntime) SubmitTurn(ctx context.Context, req SubmitRequest) (
 //
 // On error the runtime synthesizes harnessshell.RunStoppedEvent
 // (per Kimi #7) so the shell's transcript shows a clean stop instead
-// of a red error when the BFF doesn't support cancellation.
+// of a red error when the Runtime doesn't support cancellation.
 func (r *ProductionRuntime) InterruptRun(ctx context.Context, runID string) error {
 	client := r.cm.Client()
 	if client == nil {
@@ -329,7 +329,7 @@ func (r *ProductionRuntime) InterruptRun(ctx context.Context, runID string) erro
 		r.sender.Send(harnessshell.RunStoppedEvent{
 			RunID:   runID,
 			Reason:  harnessshell.StopReasonInterrupt,
-			Message: "stopped — no live BFF client",
+			Message: "stopped — no live runtime client",
 		})
 		return nil
 	}
@@ -343,7 +343,7 @@ func (r *ProductionRuntime) InterruptRun(ctx context.Context, runID string) erro
 			return nil
 		}
 	}
-	// Success: the BFF accepted the cancel. Synthesize the stop
+	// Success: the Runtime accepted the cancel. Synthesize the stop
 	// event ourselves; the existing harness streaming layer doesn't
 	// emit a terminal Run* message on cancel, so we surface one
 	// directly to keep the shell's chrome consistent.
@@ -411,6 +411,10 @@ func (r *ProductionRuntime) DispatchCommand(ctx context.Context, cmd HostCommand
 		return r.handleRunControlCommand(ctx, protocol.MethodRunContinue, cmd.Args)
 	case "fork":
 		return r.handleRunControlCommand(ctx, protocol.MethodRunFork, cmd.Args)
+	case "help":
+		return r.handleHelpCommand()
+	case "clear":
+		return r.handleClearCommand(ctx)
 	default:
 		r.sender.Send(harnessshell.HostStatusEvent{
 			Status: "Unknown command: /" + cmd.Name,
@@ -497,7 +501,11 @@ func (r *ProductionRuntime) handleModelsCommand(ctx context.Context) error {
 
 func (r *ProductionRuntime) handleSessionCommand(ctx context.Context, name, args string) error {
 	args = strings.TrimSpace(args)
-	if name == "sessions" || args == "list" || args == "" {
+	// `/sessions` (alias-form, no args) or `/sessions list` or
+	// `/session list` route to list. Sub-commands like `current` and
+	// `resume <id>` reach the switch below. PATCH-0038 added
+	// `current`; PATCH-0039 will add `delete <id>` / `prune`.
+	if args == "" || args == "list" {
 		return r.handleSessionList(ctx)
 	}
 	parts := strings.Fields(args)
@@ -511,8 +519,60 @@ func (r *ProductionRuntime) handleSessionCommand(ctx context.Context, name, args
 		return r.handleSessionMutation(ctx, protocol.MethodSessionClear)
 	case "fork":
 		return r.handleSessionMutation(ctx, protocol.MethodSessionFork)
+	case "current":
+		return r.handleSessionCurrent()
 	}
 	return r.statusError("session", errors.New("unknown session subcommand: "+parts[0]))
+}
+
+// handleSessionCurrent prints the active session id. PATCH-0038.
+// Helpful for cross-referencing with /run / /runs output when
+// multiple sessions exist for the project.
+func (r *ProductionRuntime) handleSessionCurrent() error {
+	id := r.mode.SessionID()
+	if id == "" {
+		r.sender.Send(harnessshell.HostStatusEvent{
+			Status: "No active session",
+			Kind:   harnessshell.StatusReady,
+		})
+		return nil
+	}
+	r.sender.Send(harnessshell.HostInfoEvent{
+		Text: "Current session: " + id,
+	})
+	return nil
+}
+
+// handleClearCommand implements /clear's PATCH-0038 redefinition:
+// /clear starts a fresh conversation. Calls session.create to mint a
+// new session id, switches the harness's active session to it, and
+// emits TranscriptClearEvent so the shell wipes its visible
+// transcript only on success.
+//
+// Refuses while a run is streaming — mid-stream clear would require
+// cancelling the active run first; surface a clear error instead.
+func (r *ProductionRuntime) handleClearCommand(ctx context.Context) error {
+	if r.mode.ActiveRunID() != "" {
+		return r.statusError("clear", errors.New("cannot start new conversation while a run is in flight; press Esc twice to cancel first"))
+	}
+	client := r.cm.Client()
+	if client == nil {
+		return r.statusError("clear", errNoLiveClient)
+	}
+	var resp protocol.SessionCreateResponse
+	if err := client.CallInto(ctx, protocol.MethodSessionCreate, &protocol.SessionCreate{
+		Project: protocol.ProjectContext{Root: r.cfg.ProjectRoot},
+	}, &resp); err != nil {
+		return r.statusError("clear", err)
+	}
+	r.mode.SetSessionID(resp.SessionID)
+	r.mode.SetActiveRunID("")
+	r.sender.Send(harnessshell.TranscriptClearEvent{})
+	r.sender.Send(harnessshell.HostStatusEvent{
+		Status: "Started new conversation: " + resp.SessionID,
+		Kind:   harnessshell.StatusReady,
+	})
+	return nil
 }
 
 func (r *ProductionRuntime) handleSessionList(ctx context.Context) error {
@@ -572,19 +632,24 @@ func (r *ProductionRuntime) observeRuntimeMessage(msg tea.Msg) {
 	go r.resumeKnownRuns(context.Background())
 }
 
-// bootstrapSession requests a fresh session from the BFF on
-// ConnStateReady so that session-scoped RPCs (model.switch,
-// context.list, session.clear, etc.) work before the user has
-// submitted any turn. Failures are best-effort: turn.submit will
-// still create a session implicitly if this call fails. PATCH-0028.
+// bootstrapSession ensures the harness has an active session id on
+// ConnStateReady so session-scoped RPCs (model.switch, context.list,
+// session.clear, etc.) work before the user has submitted any turn.
+// PATCH-0028 added the bootstrap; PATCH-0029 fixed a race against a
+// fast turn.submit; PATCH-0038 changes the policy from "always create
+// new" to "auto-resume the most-recent session, or create one only
+// when none exist for this user/project."
 //
-// PATCH-0029: re-check r.mode.SessionID() after the RPC returns. The
-// goroutine and a fast user turn race: if turn.submit auto-creates a
-// session (B) and stores its id while session.create is still in
-// flight, bootstrapSession's response (carrying session A) must not
-// overwrite B. Otherwise subsequent turns target A (conversation
-// sequence 0) while the harness's sequence counter advanced from B's
-// turn, producing "sequence X does not follow current 0".
+// Net effect for the user: shell launches pick up where the previous
+// launch left off (Claude Code-style); `/clear` is the way to start a
+// fresh conversation, not relaunching the shell. Cuts down on
+// orphan-session accumulation (Finding F23).
+//
+// Failures of session.list fall back to the original create path so
+// users on a broken list endpoint still get a usable shell.
+//
+// Emits a HostInfoEvent welcome message naming the active session id
+// and how to start fresh.
 func (r *ProductionRuntime) bootstrapSession(ctx context.Context) {
 	if r.mode.SessionID() != "" {
 		return
@@ -593,20 +658,47 @@ func (r *ProductionRuntime) bootstrapSession(ctx context.Context) {
 	if client == nil {
 		return
 	}
-	var resp protocol.SessionCreateResponse
+
+	// Try resume-most-recent first.
+	var list protocol.SessionListResponse
+	listErr := client.CallInto(ctx, protocol.MethodSessionList, &protocol.SessionList{}, &list)
+	if listErr == nil && len(list.Sessions) > 0 {
+		// Sessions are returned newest-first per storage's
+		// updated_at DESC ordering.
+		mostRecent := list.Sessions[0]
+		var resumeResp protocol.SessionResumeResponse
+		if err := client.CallInto(ctx, protocol.MethodSessionResume, &protocol.SessionResume{
+			SessionID: mostRecent.ID,
+			Project:   protocol.ProjectContext{Root: r.cfg.ProjectRoot},
+		}, &resumeResp); err == nil {
+			// PATCH-0029 race re-check.
+			if r.mode.SessionID() != "" {
+				return
+			}
+			r.mode.SetSessionID(resumeResp.SessionID)
+			r.sender.Send(harnessshell.HostInfoEvent{
+				Text: "Resumed session " + resumeResp.SessionID + ". Type /clear to start a new conversation, /sessions list to see all sessions.",
+			})
+			return
+		}
+		// Resume failed — fall through to create.
+	}
+
+	// No sessions to resume, or list/resume failed: create fresh.
+	var createResp protocol.SessionCreateResponse
 	if err := client.CallInto(ctx, protocol.MethodSessionCreate, &protocol.SessionCreate{
 		Project: protocol.ProjectContext{Root: r.cfg.ProjectRoot},
-	}, &resp); err != nil {
+	}, &createResp); err != nil {
 		return
 	}
-	// Re-check after the RPC: a turn.submit may have raced ahead of
-	// us and stored a session id from its auto-create response. If
-	// so, prefer that id — the conversation state lives there. The
-	// session we just created is orphaned but harmless.
+	// PATCH-0029 race re-check.
 	if r.mode.SessionID() != "" {
 		return
 	}
-	r.mode.SetSessionID(resp.SessionID)
+	r.mode.SetSessionID(createResp.SessionID)
+	r.sender.Send(harnessshell.HostInfoEvent{
+		Text: "New session " + createResp.SessionID + ". Type /help for commands.",
+	})
 }
 
 func (r *ProductionRuntime) resumeKnownRuns(ctx context.Context) {
@@ -808,7 +900,7 @@ func (r *ProductionRuntime) handleRunAttachCommand(ctx context.Context, args str
 	}
 	var resp protocol.RunAttachResponse
 	if err := client.CallInto(ctx, protocol.MethodRunAttach, &protocol.RunAttach{RunID: runID}, &resp); err != nil {
-		// PATCH-0033: the BFF rejects attaching to terminal runs by
+		// PATCH-0033: the Runtime rejects attaching to terminal runs by
 		// design. Surface a friendlier hint pointing at /run for
 		// read-only inspection instead of leaking the JSON-RPC error.
 		var rpcErr *harness.RPCError
@@ -892,6 +984,26 @@ func (r *ProductionRuntime) handleRunControlCommand(ctx context.Context, method,
 	return nil
 }
 
+// handleHelpCommand prints the host slash-command surface to the
+// transcript. Per-command argument detail (`/help <name>`) is out of
+// scope for v0.3.0 and tracked under FEAT-0024. PATCH-0037.
+func (r *ProductionRuntime) handleHelpCommand() error {
+	r.sender.Send(harnessshell.HostInfoEvent{Text: helpText})
+	return nil
+}
+
+const helpText = `Available commands:
+
+  modes:     /plan  /build  /auto
+  model:     /model <name>  /models
+  session:   /sessions [list|resume <id>|clear|fork|current]
+  context:   /context  /compact
+  history:   /history
+  mcp:       /mcp
+  runs:      /run [<id>]  /runs  /jobs
+  lifecycle: /attach <id>  /detach  /cancel  /retry  /continue  /fork
+  shell:     /clear (new conversation)  /select  /help  /quit  /exit`
+
 // handleMCPCommand is the MCP lazy-start integration point. v0.2.2
 // ships with MCP wiring deferred to a follow-up release; the command
 // returns a clear "not yet configured" status rather than crashing.
@@ -949,9 +1061,9 @@ func (r *ProductionRuntime) statusError(op string, err error) error {
 	return nil
 }
 
-// errNoLiveClient is the canonical "no live BFF client" error; helper
+// errNoLiveClient is the canonical "no live runtime client" error; helper
 // constants reuse it to keep the user-visible message stable.
-var errNoLiveClient = errors.New("no live BFF client")
+var errNoLiveClient = errors.New("no live runtime client")
 
 // nonEmpty returns s if non-empty, else fallback.
 func nonEmpty(s, fallback string) string {
@@ -1070,7 +1182,7 @@ func lastSlash(s string) int {
 // SummarizePaste implements [harnesshost.Runtime] via the existing
 // content.transform RPC. Per Kimi #17 the fallback on RPC error is
 // a passthrough — the shell already has its own built-in paste
-// summarizer, so a missing/failing BFF transform doesn't break
+// summarizer, so a missing/failing Runtime transform doesn't break
 // paste capture.
 func (r *ProductionRuntime) SummarizePaste(ctx context.Context, raw string) (string, error) {
 	client := r.cm.Client()
@@ -1104,7 +1216,7 @@ func (r *ProductionRuntime) SummarizePaste(ctx context.Context, raw string) (str
 //
 // WU-104a stub: the channel is registered but ResolvePermission can't
 // fulfill it yet (returns not-implemented). WU-104b completes the
-// loop. For WU-104a's BFF stub Layer 3 tests, no permission prompts
+// loop. For WU-104a's Runtime stub Layer 3 tests, no permission prompts
 // fire so this stub is exercised only by WU-104b's tests.
 func (r *ProductionRuntime) permissionPromptCallback(ctx context.Context, tool tools.Tool, input json.RawMessage) bool {
 	requestID := fmt.Sprintf("perm-%d", r.permCounter.Add(1))
@@ -1204,7 +1316,7 @@ func newToolResultSender(cm *harness.ConnectionManager) *toolResultSender {
 func (t *toolResultSender) SendToolResult(ctx context.Context, result *protocol.ToolResult) error {
 	client := t.cm.Client()
 	if client == nil {
-		return errors.New("tool result dropped: no live BFF client")
+		return errors.New("tool result dropped: no live runtime client")
 	}
 	return client.SendToolResult(ctx, result)
 }

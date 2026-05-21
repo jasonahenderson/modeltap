@@ -1,6 +1,6 @@
 # modeltap Governance
 
-This document describes how modeltap is governed, who makes decisions, and how contributors can grow their role in the project. The governance model is defined in [ADR-0011](docs/adr/0011-contribution-model-and-governance.md).
+This document describes how modeltap is governed, who makes decisions, and how contributors can grow their role in the project. The governance model is defined in [ADR-0011](.sdlc/adr/0011-contribution-model-and-governance.md).
 
 ## Governance Model: BDFL with Graduated Contributor Tiers
 
@@ -62,7 +62,7 @@ The BDFL has final decision authority on all matters, including architectural di
 
 ### Architectural Decisions
 
-Architectural decisions are made through Architecture Decision Records (ADRs), stored in `docs/adr/`. ADRs follow a structured format that includes context, decision drivers, considered options, a scoring matrix, and consequences.
+Architectural decisions are made through Architecture Decision Records (ADRs), stored in `.sdlc/adr/`. ADRs follow a structured format that includes context, decision drivers, considered options, a scoring matrix, and consequences.
 
 - **Contributors and Committers** can propose ADRs by opening a PR with a draft ADR.
 - **Maintainers** can propose and champion ADRs through discussion and review.

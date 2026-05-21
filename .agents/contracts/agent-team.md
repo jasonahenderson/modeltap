@@ -10,7 +10,7 @@ All agents inherit from `.agents/contracts/base.md`.
    reading release status and recent history.
 3. Accepted ADRs, accepted features, approved patches, and the active release
    plan constrain work.
-4. Significant actions should be logged to `docs/history/`.
+4. Significant actions should be logged to `.sdlc/history/`.
 
 ## Team Roles
 
@@ -39,8 +39,8 @@ No phase interleaving is allowed.
 
 When resuming release work:
 
-1. Read `docs/releases/<current-version>/status.md`
-2. Read `docs/releases/<current-version>/plan.md`
+1. Read `.sdlc/releases/<current-version>/status.md`
+2. Read `.sdlc/releases/<current-version>/plan.md`
 3. Confirm the current phase
-4. Check `docs/history/` for recent session logs
+4. Check `.sdlc/history/` for recent session logs
 5. Continue only with work allowed in the current phase
