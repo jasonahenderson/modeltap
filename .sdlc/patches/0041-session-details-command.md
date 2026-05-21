@@ -1,7 +1,7 @@
 ---
 patch: "PATCH-0041"
 title: "Wire /sessions show to session.details and recent session runs"
-status: "proposed"
+status: "done"
 date: "2026-05-20"
 related:
   - "PATCH-0039 (session semantics redefine)"
@@ -84,19 +84,19 @@ from inside the TUI.
 
 ## Checklist
 
-- [ ] `handleSessionCommand` accepts `show` and `details` subcommands
-- [ ] New host helper resolves omitted session ID to `r.mode.SessionID()`
-- [ ] Host helper calls `session.details` and formats a compact detail view
-- [ ] Host helper calls `run.list` for the target session and appends recent
+- [x] `handleSessionCommand` accepts `show` and `details` subcommands
+- [x] New host helper resolves omitted session ID to `r.mode.SessionID()`
+- [x] Host helper calls `session.details` and formats a compact detail view
+- [x] Host helper calls `run.list` for the target session and appends recent
   run summaries when available
-- [ ] `/help` session row includes the new detail command
-- [ ] Tests:
+- [x] `/help` session row includes the new detail command
+- [x] Tests:
   - `/sessions show <id>` calls `session.details` for that ID
   - `/sessions show` uses the active session ID
   - missing ID with no active session returns a status error
   - detail formatter includes turns, files, events, and recent runs
-- [ ] `go build ./...`, `go vet ./...`, `go test ./...` pass
-- [ ] `.sdlc/patches/README.md` index updated
+- [x] `go build ./...`, `go vet ./...`, `go test ./...` pass
+- [x] `.sdlc/patches/README.md` index updated
 
 ## Fix Detail
 

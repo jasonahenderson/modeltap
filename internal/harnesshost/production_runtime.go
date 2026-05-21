@@ -515,6 +515,12 @@ func (r *ProductionRuntime) handleSessionCommand(ctx context.Context, name, args
 			return r.statusError("session.resume", errors.New("session resume requires <id>"))
 		}
 		return r.handleSessionResume(ctx, parts[1])
+	case "show", "details":
+		var id string
+		if len(parts) >= 2 {
+			id = parts[1]
+		}
+		return r.handleSessionDetails(ctx, id)
 	case "clear":
 		return r.handleSessionMutation(ctx, protocol.MethodSessionClear)
 	case "fork":
@@ -619,6 +625,31 @@ func (r *ProductionRuntime) handleSessionResume(ctx context.Context, id string) 
 	r.sender.Send(harnessshell.HostStatusEvent{
 		Status: "Resumed session: " + resp.SessionID,
 		Kind:   harnessshell.StatusReady,
+	})
+	return nil
+}
+
+func (r *ProductionRuntime) handleSessionDetails(ctx context.Context, id string) error {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		id = r.mode.SessionID()
+	}
+	if id == "" {
+		return r.statusError("session.details", errors.New("requires <id> or an active session"))
+	}
+	client := r.cm.Client()
+	if client == nil {
+		return r.statusError("session.details", errNoLiveClient)
+	}
+	var detail protocol.SessionDetail
+	if err := client.CallInto(ctx, protocol.MethodSessionDetails, &protocol.SessionDetails{SessionID: id}, &detail); err != nil {
+		return r.statusError("session.details", err)
+	}
+
+	var runs protocol.RunListResponse
+	runListErr := client.CallInto(ctx, protocol.MethodRunList, &protocol.RunList{SessionID: id, Limit: 10}, &runs)
+	r.sender.Send(harnessshell.HostInfoEvent{
+		Text: formatSessionDetails(detail, runs.Runs, runListErr),
 	})
 	return nil
 }
@@ -996,7 +1027,7 @@ const helpText = `Available commands:
 
   modes:     /plan  /build  /auto
   model:     /model <name>  /models
-  session:   /sessions [list|resume <id>|clear|fork|current]
+  session:   /sessions [list|show [id]|resume <id>|clear|fork|current]
   context:   /context  /compact
   history:   /history
   mcp:       /mcp
@@ -1039,6 +1070,126 @@ func formatRunDetails(run protocol.RunSummary) string {
 		b.WriteString(run.Summary)
 	}
 	return b.String()
+}
+
+func formatSessionDetails(detail protocol.SessionDetail, runs []protocol.RunSummary, runListErr error) string {
+	var b strings.Builder
+	b.WriteString("Session ")
+	b.WriteString(detail.ID)
+	if detail.Summary != "" {
+		b.WriteString(": ")
+		b.WriteString(detail.Summary)
+	}
+	if detail.CreatedAt != "" {
+		b.WriteString("\nCreated: ")
+		b.WriteString(detail.CreatedAt)
+	}
+	if detail.LastActive != "" {
+		b.WriteString("\nLast active: ")
+		b.WriteString(detail.LastActive)
+	}
+	if detail.Model != "" || detail.ModelOverride != "" {
+		b.WriteString("\nModel: ")
+		b.WriteString(nonEmpty(detail.Model, "unknown"))
+		if detail.ModelOverride != "" {
+			b.WriteString(" (override: ")
+			b.WriteString(detail.ModelOverride)
+			b.WriteString(")")
+		}
+	}
+	if detail.ContextPct > 0 {
+		fmt.Fprintf(&b, "\nContext: %.1f%%", detail.ContextPct)
+	}
+	if detail.TotalCost > 0 {
+		fmt.Fprintf(&b, "\nCost: $%.4f", detail.TotalCost)
+	}
+	if len(detail.Turns) > 0 {
+		b.WriteString("\n\nTurns:")
+		for _, turn := range detail.Turns {
+			fmt.Fprintf(&b, "\n  #%d", turn.Sequence)
+			if turn.Compacted {
+				b.WriteString(" compacted")
+			}
+			if turn.Model != "" {
+				b.WriteString(" ")
+				b.WriteString(turn.Model)
+			}
+			if turn.Cost > 0 {
+				fmt.Fprintf(&b, " $%.4f", turn.Cost)
+			}
+			if turn.Summary != "" {
+				b.WriteString(" — ")
+				b.WriteString(truncate(turn.Summary, 100))
+			}
+		}
+	}
+	appendStringList(&b, "Files touched", detail.FilesTouched)
+	appendStringList(&b, "Files modified", detail.FilesModified)
+	if len(detail.ServerEvents) > 0 {
+		b.WriteString("\n\nServer events:")
+		for _, ev := range detail.ServerEvents {
+			b.WriteString("\n  ")
+			b.WriteString(ev.Type)
+			if ev.At != "" {
+				b.WriteString(" ")
+				b.WriteString(ev.At)
+			}
+			if ev.FreedTokens > 0 {
+				fmt.Fprintf(&b, " freed=%d", ev.FreedTokens)
+			}
+			if ev.Detail != "" {
+				b.WriteString(" — ")
+				b.WriteString(truncate(ev.Detail, 100))
+			}
+		}
+	}
+	b.WriteString("\n\nRuns:")
+	if runListErr != nil {
+		b.WriteString("\n  unavailable: ")
+		b.WriteString(runListErr.Error())
+	} else if len(runs) == 0 {
+		b.WriteString("\n  none")
+	} else {
+		for _, run := range runs {
+			b.WriteString("\n  ")
+			b.WriteString(run.RunID)
+			b.WriteString(" ")
+			b.WriteString(run.Status)
+			if run.Stage != "" {
+				b.WriteString("/")
+				b.WriteString(run.Stage)
+			}
+			if run.AttachmentState != "" {
+				b.WriteString(" ")
+				b.WriteString(run.AttachmentState)
+			}
+			if run.InputRequired {
+				b.WriteString(" input-required")
+			}
+			if run.Stuck {
+				b.WriteString(" stuck")
+			}
+			if run.Title != "" {
+				b.WriteString(" — ")
+				b.WriteString(truncate(run.Title, 80))
+			}
+		}
+	}
+	b.WriteString("\n\nDrill down with /run <id> or /attach <id>.")
+	return b.String()
+}
+
+func appendStringList(b *strings.Builder, label string, values []string) {
+	if len(values) == 0 {
+		return
+	}
+	b.WriteString("\n\n")
+	b.WriteString(label)
+	b.WriteString(":")
+	for _, value := range values {
+		b.WriteString("\n  ")
+		b.WriteString(value)
+	}
 }
 
 // statusError emits a HostStatusEvent{Kind: StatusError} with the

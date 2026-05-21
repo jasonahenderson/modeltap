@@ -20,6 +20,8 @@ import (
 	"path/filepath"
 	"sync"
 	"sync/atomic"
+
+	"github.com/jasonahenderson/modeltap/internal/protocol"
 )
 
 // RuntimeStub is a unix-socket JSON-RPC server that handles enough of the
@@ -45,12 +47,22 @@ type RuntimeStub struct {
 	socketPath string
 	listener   net.Listener
 
-	mu      sync.Mutex
-	submits []json.RawMessage
-	cancels []json.RawMessage
+	mu            sync.Mutex
+	submits       []json.RawMessage
+	cancels       []json.RawMessage
+	calls         []RuntimeCall
+	sessionDetail protocol.SessionDetail
+	runs          []protocol.RunSummary
+	runListError  string
 
 	nextTurnID atomic.Uint64
 	closed     atomic.Bool
+}
+
+// RuntimeCall records one JSON-RPC request observed by RuntimeStub.
+type RuntimeCall struct {
+	Method string
+	Params json.RawMessage
 }
 
 // NewRuntimeStub starts a unix-socket Runtime stub on a temp path. The caller
@@ -98,6 +110,42 @@ func (s *RuntimeStub) Cancels() []json.RawMessage {
 		out[i] = c
 	}
 	return out
+}
+
+// Calls returns a snapshot of every JSON-RPC method and params payload
+// received by the stub.
+func (s *RuntimeStub) Calls() []RuntimeCall {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]RuntimeCall, len(s.calls))
+	for i, c := range s.calls {
+		out[i] = RuntimeCall{Method: c.Method}
+		if c.Params != nil {
+			out[i].Params = append(json.RawMessage(nil), c.Params...)
+		}
+	}
+	return out
+}
+
+// SetSessionDetail sets the response for session.details.
+func (s *RuntimeStub) SetSessionDetail(detail protocol.SessionDetail) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.sessionDetail = detail
+}
+
+// SetRuns sets the response for run.list.
+func (s *RuntimeStub) SetRuns(runs []protocol.RunSummary) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.runs = append([]protocol.RunSummary(nil), runs...)
+}
+
+// SetRunListError makes run.list return a JSON-RPC error with message.
+func (s *RuntimeStub) SetRunListError(message string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.runListError = message
 }
 
 // Close stops the listener and removes the socket dir.
@@ -152,6 +200,7 @@ func (s *RuntimeStub) handleConn(conn net.Conn) {
 		if err := json.Unmarshal(line, &req); err != nil {
 			continue
 		}
+		s.recordCall(req.Method, req.Params)
 		switch req.Method {
 		case "capabilities.register":
 			s.respond(w, req.ID, map[string]any{
@@ -167,6 +216,20 @@ func (s *RuntimeStub) handleConn(conn net.Conn) {
 				"session_id": "stub-session",
 				"project":    map[string]any{"root": "/tmp"},
 			}, nil)
+		case "session.list":
+			s.respond(w, req.ID, map[string]any{
+				"sessions": []any{},
+			}, nil)
+		case "session.details":
+			detail := s.currentSessionDetail(req.Params)
+			s.respond(w, req.ID, detail, nil)
+		case "run.list":
+			runs, errMessage := s.currentRuns()
+			if errMessage != "" {
+				s.respond(w, req.ID, nil, &rpcError{Code: -32000, Message: errMessage})
+			} else {
+				s.respond(w, req.ID, protocol.RunListResponse{Runs: runs}, nil)
+			}
 		case "turn.submit":
 			s.mu.Lock()
 			s.submits = append(s.submits, append(json.RawMessage(nil), req.Params...))
@@ -192,6 +255,39 @@ func (s *RuntimeStub) handleConn(conn net.Conn) {
 		}
 		_ = w.Flush()
 	}
+}
+
+func (s *RuntimeStub) recordCall(method string, params json.RawMessage) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	c := RuntimeCall{Method: method}
+	if params != nil {
+		c.Params = append(json.RawMessage(nil), params...)
+	}
+	s.calls = append(s.calls, c)
+}
+
+func (s *RuntimeStub) currentSessionDetail(params json.RawMessage) protocol.SessionDetail {
+	s.mu.Lock()
+	detail := s.sessionDetail
+	s.mu.Unlock()
+	if detail.ID != "" {
+		return detail
+	}
+	var req protocol.SessionDetails
+	_ = json.Unmarshal(params, &req)
+	return protocol.SessionDetail{
+		ID:         req.SessionID,
+		Summary:    "Stub session",
+		CreatedAt:  "2026-05-21T00:00:00Z",
+		LastActive: "2026-05-21T00:01:00Z",
+	}
+}
+
+func (s *RuntimeStub) currentRuns() ([]protocol.RunSummary, string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]protocol.RunSummary(nil), s.runs...), s.runListError
 }
 
 type rpcError struct {
