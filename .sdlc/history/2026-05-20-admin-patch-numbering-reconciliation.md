@@ -32,9 +32,14 @@ current SDLC migration branch.
 
 ## PR Queue
 
-- No open PRs currently exist on GitHub.
-- Candidate PRs before next implementation:
-  - `admin/sdlc-directory-migration-plan` -> `main` for SDLC migration and
-    numbering reconciliation.
-  - `release/v0.3.0` -> `main` once the release branch is reconciled with the
-    updated main and the remaining v0.3.0 patch/release-close work is decided.
+- Opened PR #15 from `admin/sdlc-directory-migration-plan-clean` to `main` for
+  the SDLC migration, patch-numbering reconciliation, and proposed
+  `PATCH-0041` session-details command patch doc.
+- Closed PR #14 as superseded because its historical merge commits failed DCO;
+  PR #15 carries the same resolved tree on current `main` as a clean signed
+  branch.
+- Current outstanding PRs before next implementation:
+  - PR #15: `admin/sdlc-directory-migration-plan-clean` -> `main`.
+  - Future candidate: `release/v0.3.0` -> `main` once the release branch is
+    reconciled with the updated main and the remaining v0.3.0 patch/release
+    close work is decided.
