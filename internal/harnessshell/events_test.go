@@ -974,6 +974,10 @@ func TestToolActivityEventAppendsAndUpdatesTranscriptRow(t *testing.T) {
 	if m.state.statusKind != StatusReady {
 		t.Fatalf("status kind = %q, want ready", m.state.statusKind)
 	}
+	renderMsg := transcriptItemToRender(row)
+	if renderMsg.EventKind != "tool" {
+		t.Fatalf("render event kind = %q, want tool", renderMsg.EventKind)
+	}
 }
 
 func TestToolActivityEventWithoutIDAppendsRows(t *testing.T) {

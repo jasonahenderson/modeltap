@@ -108,6 +108,19 @@ var (
 				Padding(0, 1).
 				Foreground(lipgloss.Color("#F85149")).
 				Bold(true)
+	toolEventInfoStyle = lipgloss.NewStyle().
+				PaddingLeft(3).
+				Foreground(lipgloss.Color("#8EA2BC"))
+	toolEventRunningStyle = lipgloss.NewStyle().
+				PaddingLeft(3).
+				Foreground(lipgloss.Color("#C8D1DC"))
+	toolEventDoneStyle = lipgloss.NewStyle().
+				PaddingLeft(3).
+				Foreground(lipgloss.Color("#7EE787"))
+	toolEventErrorStyle = lipgloss.NewStyle().
+				PaddingLeft(3).
+				Foreground(lipgloss.Color("#F85149")).
+				Bold(true)
 	permissionActionsStyle = lipgloss.NewStyle().
 				Padding(0, 1)
 	permissionPromptStyle = lipgloss.NewStyle().

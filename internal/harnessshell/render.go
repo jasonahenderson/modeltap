@@ -57,6 +57,7 @@ type RenderMessage struct {
 	Expanded   map[int]bool
 	Entries    []string
 	EventState string
+	EventKind  string
 }
 
 // RenderToken is the per-token data the renderer consumes for transcript
@@ -353,6 +354,9 @@ func renderHostInfoRow(msg RenderMessage, width int) string {
 // renderEventRow renders a non-conversational event row (permission,
 // tool-result, etc.) with a status-driven style.
 func renderEventRow(msg RenderMessage, width int) string {
+	if msg.EventKind == "tool" {
+		return renderToolEventRow(msg, width)
+	}
 	style := eventInfoStyle
 	switch msg.EventState {
 	case "requested":
@@ -369,6 +373,22 @@ func renderEventRow(msg RenderMessage, width int) string {
 		style = eventDeniedStyle
 	case "error":
 		style = eventDeniedStyle
+	}
+	return style.Width(width).Render(msg.Content)
+}
+
+// renderToolEventRow gives tool calls OpenCode-style inline delineation:
+// indentation, a phase glyph, and state-specific foreground color. Block
+// backgrounds/borders are reserved for future rich tool renderers.
+func renderToolEventRow(msg RenderMessage, width int) string {
+	style := toolEventInfoStyle
+	switch msg.EventState {
+	case "running":
+		style = toolEventRunningStyle
+	case "done":
+		style = toolEventDoneStyle
+	case "denied", "error":
+		style = toolEventErrorStyle
 	}
 	return style.Width(width).Render(msg.Content)
 }

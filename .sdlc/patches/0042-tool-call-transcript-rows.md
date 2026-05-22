@@ -33,9 +33,14 @@ activity so users can distinguish calls in the output.
    - success: `✓ <tool> — <summary>`
    - error: `✗ <tool> — <summary>`
    - rejected: `⊘ <tool> — <summary>`
-5. Keep the footer/status signal for active tool activity so existing chrome
+5. Visually delineate inline tool rows using OpenCode's lightweight pattern:
+   indentation, state-specific foreground color, and existing transcript row
+   spacing. Do not add full-width divider lines. Do not add panel backgrounds
+   for simple inline tool rows; reserve backgrounds/left borders for future
+   block-style renderers for shell/edit/write/apply_patch.
+6. Keep the footer/status signal for active tool activity so existing chrome
    remains informative.
-6. Add focused tests for projection, state updates, and rendering.
+7. Add focused tests for projection, state updates, and rendering.
 
 ## Out of Scope
 
@@ -53,6 +58,8 @@ activity so users can distinguish calls in the output.
 - [x] Projection emits durable tool activity event
 - [x] Transcript rows append/update by tool call id
 - [x] Tool rows render with outcome glyphs and summary text
+- [x] Tool rows use distinct inline rendering with indentation and
+  state-specific foreground styling
 - [x] Existing status footer remains useful during active tool activity
 - [x] Tests added or updated
 - [x] `go test ./internal/harnessshell ./internal/harnesshost` passes
@@ -69,3 +76,9 @@ summary.
 
 This makes every call visible in transcript order now, while leaving richer
 inline/block per-tool rendering for FEAT-0024.
+
+OpenCode's visual model is intentionally selective: inline tool calls use
+indentation, icons/spinners, and foreground colors; heavier tool calls such as
+shell/edit/write use bordered or panel-like block renderers with backgrounds.
+PATCH-0042 implements only the inline half so the transcript is clearer without
+turning every tool call into a heavy card.

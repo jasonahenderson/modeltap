@@ -18,7 +18,13 @@ adjacent calls visibly distinct while preserving the active footer/status signal
   - added transcript append/update handling keyed by tool call id
   - mirrored latest tool activity into status chrome
 - `internal/harnessshell/render.go`
+  - mapped tool event rows to distinct inline rendering with indentation and
+    state-specific foreground styling
   - mapped `error` event rows to the existing denied/error visual style
+- `internal/harnessshell/styles.go`
+  - added tool-event styles for running, done, and error/rejected states
+- `internal/harnessshell/model.go`
+  - tagged tool-correlated event rows for renderer-specific treatment
 - `internal/harnessshell/state.go`
   - added tool-call correlation to event row state
 - `internal/harnesshost/projection.go`
