@@ -48,6 +48,7 @@ Implementation-scoped work authorization documents. Patches are the lightweight 
 | [PATCH-0038](0038-help-command.md) | Add /help command listing the host slash-command surface | proposed |
 | [PATCH-0039](0039-session-semantics-redefine.md) | Redefine /clear as new-session; auto-resume most-recent session on launch; /sessions current | proposed |
 | [PATCH-0041](0041-session-details-command.md) | Wire /sessions show to session.details and recent session runs | done |
+| [PATCH-0042](0042-tool-call-transcript-rows.md) | Render tool activity as durable transcript rows | done |
 
 ## When to Use a Patch
 

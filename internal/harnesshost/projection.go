@@ -111,33 +111,30 @@ func branchRunID(turnID, branchID string) string {
 	return turnID + ":" + branchID
 }
 
-// projectToolActivity projects a runtime ToolActivityMsg into a
-// HostStatusEvent describing the current tool state. Per FEAT-0014 the
-// transcript event row chrome for tool calls is the host's
-// responsibility (the shell only renders permission events as
-// transcript rows); a HostStatusEvent surfaces the activity in the
-// status footer without spawning a transcript row.
+// projectToolActivity projects a runtime ToolActivityMsg into a durable shell
+// transcript event row. PATCH-0042 keeps the existing compact glyph semantics
+// but lets the shell persist the row instead of flashing it only through the
+// status footer.
 func projectToolActivity(m harness.ToolActivityMsg) harnessshell.HostEvent {
-	prefix := "⚙ "
+	state := harnessshell.ToolActivityRunning
 	if m.Phase == harness.ToolActivityEnd {
 		switch m.Status {
 		case "success":
-			prefix = "✓ "
+			state = harnessshell.ToolActivitySuccess
 		case "error":
-			prefix = "✗ "
+			state = harnessshell.ToolActivityError
 		case "rejected":
-			prefix = "⊘ "
+			state = harnessshell.ToolActivityRejected
 		default:
-			prefix = "• "
+			state = harnessshell.ToolActivityDone
 		}
 	}
-	status := prefix + m.ToolName
-	if m.Summary != "" {
-		status += " — " + m.Summary
-	}
-	return harnessshell.HostStatusEvent{
-		Status: status,
-		Kind:   harnessshell.StatusStreaming,
+	return harnessshell.ToolActivityEvent{
+		ID:        m.ToolCallID,
+		ToolLabel: m.ToolName,
+		Summary:   m.Summary,
+		State:     state,
+		Duration:  m.Duration,
 	}
 }
 

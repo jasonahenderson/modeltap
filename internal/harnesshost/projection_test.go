@@ -105,15 +105,18 @@ func TestProjectBranchMessagesFlattenIntoRunEvents(t *testing.T) {
 	}
 }
 
-func TestProjectToolActivityStartIsHostStatus(t *testing.T) {
+func TestProjectToolActivityStartIsTranscriptEvent(t *testing.T) {
 	got := projectRuntimeMessage(harness.ToolActivityMsg{
-		Phase: harness.ToolActivityStart, ToolName: "Read", Summary: "foo.txt",
-	}).(harnessshell.HostStatusEvent)
-	if !strings.Contains(got.Status, "Read") || !strings.Contains(got.Status, "foo.txt") {
-		t.Fatalf("status = %q", got.Status)
+		Phase:      harness.ToolActivityStart,
+		ToolName:   "Read",
+		ToolCallID: "tc-1",
+		Summary:    "foo.txt",
+	}).(harnessshell.ToolActivityEvent)
+	if got.ID != "tc-1" || got.ToolLabel != "Read" || got.Summary != "foo.txt" {
+		t.Fatalf("event = %+v", got)
 	}
-	if !strings.HasPrefix(got.Status, "⚙ ") {
-		t.Fatalf("expected gear prefix; got %q", got.Status)
+	if got.State != harnessshell.ToolActivityRunning {
+		t.Fatalf("state = %q, want running", got.State)
 	}
 }
 
@@ -131,11 +134,27 @@ func TestProjectToolActivityEndUsesOutcomeGlyph(t *testing.T) {
 		t.Run(tc.status, func(t *testing.T) {
 			got := projectRuntimeMessage(harness.ToolActivityMsg{
 				Phase: harness.ToolActivityEnd, ToolName: "Read", Status: tc.status,
-			}).(harnessshell.HostStatusEvent)
-			if !strings.HasPrefix(got.Status, tc.prefix) {
-				t.Fatalf("status = %q, want prefix %q", got.Status, tc.prefix)
+			}).(harnessshell.ToolActivityEvent)
+			if got.State == "" {
+				t.Fatalf("empty state for status %q", tc.status)
+			}
+			if !strings.HasPrefix(toolActivityPrefixForTest(got.State), tc.prefix) {
+				t.Fatalf("state = %q, want prefix %q", got.State, tc.prefix)
 			}
 		})
+	}
+}
+
+func toolActivityPrefixForTest(state harnessshell.ToolActivityState) string {
+	switch state {
+	case harnessshell.ToolActivitySuccess:
+		return "✓ "
+	case harnessshell.ToolActivityError:
+		return "✗ "
+	case harnessshell.ToolActivityRejected:
+		return "⊘ "
+	default:
+		return "• "
 	}
 }
 

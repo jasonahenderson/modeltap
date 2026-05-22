@@ -367,6 +367,8 @@ func renderEventRow(msg RenderMessage, width int) string {
 		style = eventGrantedStyle
 	case "denied":
 		style = eventDeniedStyle
+	case "error":
+		style = eventDeniedStyle
 	}
 	return style.Width(width).Render(msg.Content)
 }

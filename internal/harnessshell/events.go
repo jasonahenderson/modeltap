@@ -1,6 +1,7 @@
 package harnessshell
 
 import (
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -49,6 +50,8 @@ func (s *state) applyHostEvent(evt HostEvent) {
 		s.applyRunStopped(e)
 	case RunFailedEvent:
 		s.applyRunFailed(e)
+	case ToolActivityEvent:
+		s.applyToolActivity(e)
 	case PermissionRequestedEvent:
 		s.applyPermissionRequested(e)
 	case PermissionResolvedEvent:
@@ -61,6 +64,117 @@ func (s *state) applyHostEvent(evt HostEvent) {
 		s.applyHostInfo(e)
 	case TranscriptClearEvent:
 		s.applyTranscriptClear()
+	}
+}
+
+// applyToolActivity appends or updates a durable transcript event row for a
+// tool call. It mirrors OpenCode's scannable tool-call delineation at a narrow
+// event-row level: one visible line per call, updated in place when the host
+// supplies a stable tool call id.
+func (s *state) applyToolActivity(e ToolActivityEvent) {
+	if e.ToolLabel == "" && e.Summary == "" {
+		return
+	}
+	if e.State == "" {
+		e.State = ToolActivityDone
+	}
+
+	text := formatToolActivityText(e)
+	status := eventStatusForToolActivity(e.State)
+	if e.ID != "" {
+		for i := range s.transcriptItems {
+			item := &s.transcriptItems[i]
+			if item.Event != nil && item.Event.ToolCallID == e.ID {
+				item.Text = text
+				item.Event.Status = status
+				s.status = text
+				s.statusKind = statusKindForToolActivity(e.State, s.streaming)
+				return
+			}
+		}
+	}
+
+	s.transcriptItems = append(s.transcriptItems, TranscriptItem{
+		ID:    toolTranscriptID(e),
+		Kind:  TranscriptItemKindEvent,
+		Role:  RoleEvent,
+		Text:  text,
+		Event: &EventState{Status: status, ToolCallID: e.ID},
+	})
+	s.status = text
+	s.statusKind = statusKindForToolActivity(e.State, s.streaming)
+}
+
+func toolTranscriptID(e ToolActivityEvent) string {
+	if e.ID != "" {
+		return "tool-" + e.ID
+	}
+	key := strings.TrimSpace(e.ToolLabel + "-" + e.Summary)
+	if key == "" {
+		key = "unknown"
+	}
+	return "tool-" + key
+}
+
+func formatToolActivityText(e ToolActivityEvent) string {
+	text := toolActivityGlyph(e.State)
+	if e.ToolLabel != "" {
+		text += " " + e.ToolLabel
+	}
+	if e.Summary != "" {
+		if e.ToolLabel == "" {
+			text += " " + e.Summary
+		} else {
+			text += " — " + e.Summary
+		}
+	}
+	if e.Duration > 0 && e.State != ToolActivityRunning {
+		text += " (" + e.Duration.Round(time.Millisecond).String() + ")"
+	}
+	return text
+}
+
+func toolActivityGlyph(state ToolActivityState) string {
+	switch state {
+	case ToolActivityRunning:
+		return "⚙"
+	case ToolActivitySuccess:
+		return "✓"
+	case ToolActivityError:
+		return "✗"
+	case ToolActivityRejected:
+		return "⊘"
+	default:
+		return "•"
+	}
+}
+
+func eventStatusForToolActivity(state ToolActivityState) string {
+	switch state {
+	case ToolActivityRunning:
+		return "running"
+	case ToolActivitySuccess:
+		return "done"
+	case ToolActivityError:
+		return "error"
+	case ToolActivityRejected:
+		return "denied"
+	default:
+		return "done"
+	}
+}
+
+func statusKindForToolActivity(state ToolActivityState, streaming bool) StatusKind {
+	switch state {
+	case ToolActivityError, ToolActivityRejected:
+		return StatusError
+	case ToolActivityRunning:
+		return StatusStreaming
+	default:
+		if streaming {
+			return StatusStreaming
+		}
+		return StatusReady
 	}
 }
 
