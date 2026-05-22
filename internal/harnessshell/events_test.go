@@ -925,6 +925,113 @@ func TestHostInfoEventEmptyTextIsNoop(t *testing.T) {
 	}
 }
 
+func TestToolActivityEventAppendsAndUpdatesTranscriptRow(t *testing.T) {
+	m := newWithFixedClock()
+	m, _ = drainActions(t, m, ToolActivityEvent{
+		ID:        "tc-1",
+		ToolLabel: "Read",
+		Summary:   "internal/harnessshell/events.go",
+		State:     ToolActivityRunning,
+	})
+
+	if got := len(m.state.transcriptItems); got != 1 {
+		t.Fatalf("transcript rows = %d, want 1", got)
+	}
+	row := m.state.transcriptItems[0]
+	if row.Kind != TranscriptItemKindEvent || row.Role != RoleEvent {
+		t.Fatalf("row kind/role = %v/%q, want event/event", row.Kind, row.Role)
+	}
+	if row.Event == nil || row.Event.ToolCallID != "tc-1" || row.Event.Status != "running" {
+		t.Fatalf("event state = %+v", row.Event)
+	}
+	if !strings.Contains(row.Text, "⚙ Read") || !strings.Contains(row.Text, "events.go") {
+		t.Fatalf("row text = %q", row.Text)
+	}
+	if m.state.statusKind != StatusStreaming {
+		t.Fatalf("status kind = %q, want streaming", m.state.statusKind)
+	}
+
+	m, _ = drainActions(t, m, ToolActivityEvent{
+		ID:        "tc-1",
+		ToolLabel: "Read",
+		Summary:   "loaded 42 lines",
+		State:     ToolActivitySuccess,
+		Duration:  1234 * time.Millisecond,
+	})
+
+	if got := len(m.state.transcriptItems); got != 1 {
+		t.Fatalf("update should keep one row, got %d", got)
+	}
+	row = m.state.transcriptItems[0]
+	if row.Event == nil || row.Event.Status != "done" {
+		t.Fatalf("updated event state = %+v", row.Event)
+	}
+	for _, want := range []string{"✓ Read", "loaded 42 lines", "1.234s"} {
+		if !strings.Contains(row.Text, want) {
+			t.Fatalf("updated row missing %q: %q", want, row.Text)
+		}
+	}
+	if m.state.statusKind != StatusReady {
+		t.Fatalf("status kind = %q, want ready", m.state.statusKind)
+	}
+	renderMsg := transcriptItemToRender(row)
+	if renderMsg.EventKind != "tool" {
+		t.Fatalf("render event kind = %q, want tool", renderMsg.EventKind)
+	}
+}
+
+func TestToolActivityEventWithoutIDAppendsRows(t *testing.T) {
+	m := newWithFixedClock()
+	m, _ = drainActions(t, m, ToolActivityEvent{ToolLabel: "Grep", Summary: "pattern", State: ToolActivityRunning})
+	m, _ = drainActions(t, m, ToolActivityEvent{ToolLabel: "Read", Summary: "file", State: ToolActivityRunning})
+
+	if got := len(m.state.transcriptItems); got != 2 {
+		t.Fatalf("transcript rows = %d, want 2", got)
+	}
+	if !strings.Contains(m.state.transcriptItems[0].Text, "Grep") {
+		t.Fatalf("first row = %q", m.state.transcriptItems[0].Text)
+	}
+	if !strings.Contains(m.state.transcriptItems[1].Text, "Read") {
+		t.Fatalf("second row = %q", m.state.transcriptItems[1].Text)
+	}
+}
+
+func TestToolActivitySuccessKeepsStreamingStatusDuringRun(t *testing.T) {
+	m := newWithFixedClock()
+	m.state.streaming = true
+
+	m, _ = drainActions(t, m, ToolActivityEvent{
+		ID:        "tc-1",
+		ToolLabel: "Read",
+		Summary:   "done",
+		State:     ToolActivitySuccess,
+	})
+
+	if m.state.statusKind != StatusStreaming {
+		t.Fatalf("status kind = %q, want streaming while run active", m.state.statusKind)
+	}
+}
+
+func TestToolActivityRowRendersInTranscript(t *testing.T) {
+	m := newWithFixedClock()
+	m, _ = drainActions(t, m, ToolActivityEvent{
+		ID:        "tc-1",
+		ToolLabel: "Grep",
+		Summary:   `"SessionID" in internal/runtime`,
+		State:     ToolActivityRunning,
+	})
+
+	in := m.toRenderInput()
+	in.Width = 80
+	out := Render(in)
+
+	for _, want := range []string{"⚙ Grep", "SessionID", "internal/runtime"} {
+		if !strings.Contains(out.Content, want) {
+			t.Fatalf("rendered output missing %q:\n%s", want, out.Content)
+		}
+	}
+}
+
 func TestHostInfoRowRendersInTranscript(t *testing.T) {
 	m := newWithFixedClock()
 	m, _ = drainActions(t, m, HostInfoEvent{Text: "Available models:\n  claude-sonnet-4-6"})
@@ -938,6 +1045,9 @@ func TestHostInfoRowRendersInTranscript(t *testing.T) {
 	}
 	if !strings.Contains(out.Content, "claude-sonnet-4-6") {
 		t.Fatalf("rendered output missing host-info detail line:\n%s", out.Content)
+	}
+	if !strings.Contains(out.Content, "│") {
+		t.Fatalf("rendered output missing visible host-info boundary:\n%s", out.Content)
 	}
 }
 

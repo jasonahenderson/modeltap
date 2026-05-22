@@ -667,6 +667,9 @@ func transcriptItemToRender(item TranscriptItem) RenderMessage {
 	}
 	if item.Event != nil {
 		out.EventState = item.Event.Status
+		if item.Event.ToolCallID != "" {
+			out.EventKind = "tool"
+		}
 	}
 	if len(item.Tokens) > 0 {
 		out.Tokens = inputTokensToRender(item.Tokens)

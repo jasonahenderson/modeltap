@@ -114,7 +114,7 @@ lists the boundary-crossing event delivered into the shell.
 | `StreamCompleteMsg` | `RunCompletedEvent` |
 | `StatusUpdateMsg` | `HostStatusEvent{Kind: StatusStreaming}` |
 | `BranchStartedMsg` / `BranchCompleteMsg` / `BranchErrorMsg` | flattened into the single-transcript model per FEAT-0014 (each branch projects to a `Run*Event` with `RunID = "<TurnID>:<BranchID>"`) |
-| `ToolActivityMsg` | `HostStatusEvent` with phase-aware glyph (⚙ start, ✓/✗/⊘/• end) |
+| `ToolActivityMsg` | `ToolActivityEvent` with phase-aware glyph (⚙ start, ✓/✗/⊘/• end) |
 | `PermissionPromptMsg` | `PermissionRequestedEvent` |
 | `ConnStateMsg` / `ModelUpdateMsg` / `ContextUpdateMsg` / `CostUpdateMsg` | `HostStatusEvent` with appropriate `StatusKind` |
 
