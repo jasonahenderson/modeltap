@@ -1046,6 +1046,9 @@ func TestHostInfoRowRendersInTranscript(t *testing.T) {
 	if !strings.Contains(out.Content, "claude-sonnet-4-6") {
 		t.Fatalf("rendered output missing host-info detail line:\n%s", out.Content)
 	}
+	if !strings.Contains(out.Content, "│") {
+		t.Fatalf("rendered output missing visible host-info boundary:\n%s", out.Content)
+	}
 }
 
 func TestRenderChromeStatusVisibleAcrossKinds(t *testing.T) {

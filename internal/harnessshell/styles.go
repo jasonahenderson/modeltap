@@ -54,7 +54,10 @@ var (
 			Foreground(lipgloss.Color("#8EA2BC"))
 
 	hostInfoStyle = lipgloss.NewStyle().
-			Padding(0, 1).
+			Padding(1, 1, 1, 2).
+			Border(lipgloss.Border{Left: "│"}, false, false, false, true).
+			BorderForeground(lipgloss.Color("#324154")).
+			Background(lipgloss.Color("#111821")).
 			Foreground(lipgloss.Color("#C8D1DC"))
 
 	chromeStatusReadyStyle = lipgloss.NewStyle().

@@ -38,9 +38,13 @@ activity so users can distinguish calls in the output.
    spacing. Do not add full-width divider lines. Do not add panel backgrounds
    for simple inline tool rows; reserve backgrounds/left borders for future
    block-style renderers for shell/edit/write/apply_patch.
-6. Keep the footer/status signal for active tool activity so existing chrome
+6. Visibly delineate host-info command output rows. Slash-command output such
+   as `/sessions`, `/models`, and `/help` should render as a subtle block with
+   a left border and panel background so consecutive command outputs do not
+   visually run together.
+7. Keep the footer/status signal for active tool activity so existing chrome
    remains informative.
-7. Add focused tests for projection, state updates, and rendering.
+8. Add focused tests for projection, state updates, and rendering.
 
 ## Out of Scope
 
@@ -60,6 +64,7 @@ activity so users can distinguish calls in the output.
 - [x] Tool rows render with outcome glyphs and summary text
 - [x] Tool rows use distinct inline rendering with indentation and
   state-specific foreground styling
+- [x] Host-info command output uses a visible left-border block treatment
 - [x] Existing status footer remains useful during active tool activity
 - [x] Tests added or updated
 - [x] `go test ./internal/harnessshell ./internal/harnesshost` passes
@@ -82,3 +87,8 @@ indentation, icons/spinners, and foreground colors; heavier tool calls such as
 shell/edit/write use bordered or panel-like block renderers with backgrounds.
 PATCH-0042 implements only the inline half so the transcript is clearer without
 turning every tool call into a heavy card.
+
+Slash-command output is separate from tool activity: it flows through
+`HostInfoEvent`. PATCH-0042 gives those rows a subtle left-border block with a
+panel background so repeated command outputs are visibly separated even when the
+text itself is long and list-like.

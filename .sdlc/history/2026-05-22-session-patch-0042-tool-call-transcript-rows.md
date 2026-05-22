@@ -23,6 +23,7 @@ adjacent calls visibly distinct while preserving the active footer/status signal
   - mapped `error` event rows to the existing denied/error visual style
 - `internal/harnessshell/styles.go`
   - added tool-event styles for running, done, and error/rejected states
+  - added a left-border/panel treatment for host-info command output rows
 - `internal/harnessshell/model.go`
   - tagged tool-correlated event rows for renderer-specific treatment
 - `internal/harnessshell/state.go`
