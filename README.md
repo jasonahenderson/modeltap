@@ -46,7 +46,10 @@ export ANTHROPIC_API_KEY=sk-ant-...   # or OPENAI_API_KEY, or both
 ./bin/modeltap --resume <session-id>   # pick up a prior session
 ```
 
-Inside the harness: `/help` for slash commands, `/sessions` to browse history, `/models` for the model catalog, `/mcp status` for MCP servers. `Ctrl+C` to exit.
+Inside the harness: `/help` for slash commands, `/session` for the current
+session, `/session show` for turn summaries and recent runs, `/sessions` to
+browse history, `/run` for current-run status, `/run show` for run
+lifecycle/debug details, and `/models` for the model catalog. `Ctrl+C` to exit.
 
 > The harness theme system is ported from [OpenCode](https://github.com/sst/opencode) (MIT) — see [`NOTICE`](NOTICE) for attribution.
 
