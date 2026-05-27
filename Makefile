@@ -2,7 +2,8 @@ VERSION ?= dev
 GO ?= go
 GO_FMT ?= gofmt
 GOLANGCI_LINT ?= $(shell command -v golangci-lint 2>/dev/null || printf '%s/bin/golangci-lint' "$$($(GO) env GOPATH)")
-BINARY = bin/modeltap
+OUT_DIR ?= .tmp
+BINARY = $(OUT_DIR)/modeltap
 LDFLAGS = -X main.version=$(VERSION)
 
 .PHONY: all build test lint fmt fmt-check vet clean
@@ -34,4 +35,4 @@ vet:
 	$(GO) vet ./...
 
 clean:
-	rm -rf bin/
+	rm -rf $(OUT_DIR)/modeltap
