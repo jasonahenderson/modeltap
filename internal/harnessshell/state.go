@@ -63,6 +63,8 @@ type EventState struct {
 	Status string
 	// RequestID, when non-empty, links the row to a [PermissionRequest].
 	RequestID string
+	// ToolCallID, when non-empty, links the row to a [ToolActivityEvent].
+	ToolCallID string
 }
 
 // TranscriptItem is the exported transcript-row model defined by WU-098.

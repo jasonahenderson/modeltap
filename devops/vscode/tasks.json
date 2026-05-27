@@ -1,0 +1,104 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build modeltap",
+            "type": "shell",
+            "command": "make",
+            "args": ["build"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": true
+            }
+        },
+        {
+            "label": "modeltap server",
+            "type": "shell",
+            "command": "./.tmp/modeltap",
+            "args": ["start"],
+            "presentation": {
+                "panel": "dedicated",
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": {
+                    "PATH": "/usr/local/bin:/usr/bin:/bin:${env:PATH}"
+                }
+            }
+        },
+        {
+            "label": "modeltap shell",
+            "type": "shell",
+            "command": "./.tmp/modeltap",
+            "args": ["shell"],
+            "presentation": {
+                "panel": "dedicated",
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": {
+                    "PATH": "/usr/local/bin:/usr/bin:/bin:${env:PATH}"
+                }
+            }
+        },
+        {
+            "label": "modeltap start",
+            "detail": "Single terminal: build, run server in background (log -> .tmp/modeltap-server.log), then shell in foreground. Server stops when shell exits.",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "-lc",
+                "make build && mkdir -p .tmp && echo \"Starting server (logging to .tmp/modeltap-server.log)...\" && (./.tmp/modeltap start > .tmp/modeltap-server.log 2>&1 & pid=\"$!\"; echo \"$pid\" > .tmp/modeltap-server.pid; sleep 1; echo \"Starting shell...\"; ./.tmp/modeltap shell; status=\"$?\"; echo \"Shutting down server...\"; kill \"$pid\" 2>/dev/null || true; rm -f .tmp/modeltap-server.pid; exit \"$status\")"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "presentation": {
+                "panel": "dedicated",
+                "showReuseMessage": false,
+                "clear": true
+            }
+        },
+        {
+            "label": "Rebuild & Restart",
+            "type": "shell",
+            "command": "./rebuild.sh",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "presentation": {
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "modeltap stop all",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "-lc",
+                "pids=$(pgrep -x modeltap 2>/dev/null || true); if [ -z \"$pids\" ]; then echo 'No modeltap processes running.'; exit 0; fi; echo \"Stopping: $pids\"; kill $pids 2>/dev/null || true; for i in $(seq 1 30); do pgrep -x modeltap >/dev/null 2>&1 || exit 0; sleep 0.1; done; echo 'Force killing leftover processes.'; pkill -9 -x modeltap 2>/dev/null || true"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "presentation": {
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "problemMatcher": []
+        }
+    ]
+}

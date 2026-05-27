@@ -501,9 +501,10 @@ func TestReviewerState_OmitEmpty(t *testing.T) {
 
 func TestSessionResumeResponse_RoundTrip(t *testing.T) {
 	v := SessionResumeResponse{
-		SessionID: "s1",
-		Model:     "claude",
-		Project:   ProjectContext{Root: "/tmp", ConfigFile: "config.yaml", ConfigContent: "{}"},
+		SessionID:    "s1",
+		Model:        "claude",
+		Project:      ProjectContext{Root: "/tmp", ConfigFile: "config.yaml", ConfigContent: "{}"},
+		NextSequence: 4,
 	}
 	b, err := json.Marshal(v)
 	if err != nil {
@@ -513,7 +514,7 @@ func TestSessionResumeResponse_RoundTrip(t *testing.T) {
 	if err := json.Unmarshal(b, &got); err != nil {
 		t.Fatal(err)
 	}
-	if got.SessionID != v.SessionID || got.Model != v.Model {
+	if got.SessionID != v.SessionID || got.Model != v.Model || got.NextSequence != v.NextSequence {
 		t.Errorf("round-trip mismatch")
 	}
 }

@@ -168,6 +168,32 @@ func TestConversation_RestoreFromTurns(t *testing.T) {
 	}
 }
 
+func TestConversation_RestoreFromTurns_SkipsCommandTurns(t *testing.T) {
+	c := NewConversation("sess-1")
+	cmdMsg := provider.Message{Role: "user", Content: "/models"}
+	cmdRaw, _ := json.Marshal(cmdMsg)
+	userMsg := provider.Message{Role: "user", Content: "real work"}
+	userRaw, _ := json.Marshal(userMsg)
+
+	turns := []storage.Turn{
+		{ID: "cmd", SessionID: "sess-1", Sequence: 1, Role: "user", Content: cmdRaw},
+		{ID: "real", SessionID: "sess-1", Sequence: 2, Role: "user", Content: userRaw},
+	}
+	if err := c.RestoreFromTurns(turns); err != nil {
+		t.Fatalf("RestoreFromTurns: %v", err)
+	}
+	if c.TurnCount() != 1 || c.Sequence() != 1 {
+		t.Fatalf("state = (n=%d, userSeq=%d), want (1,1)", c.TurnCount(), c.Sequence())
+	}
+	if c.StorageSequence() != 2 {
+		t.Fatalf("storage sequence = %d, want 2", c.StorageSequence())
+	}
+	msgs := c.Messages()
+	if msgs[0].Content != "real work" {
+		t.Fatalf("restored content = %q, want real work", msgs[0].Content)
+	}
+}
+
 func TestConversation_Reset(t *testing.T) {
 	c := NewConversation("sess-1")
 	c.appendMessageForTest("user", "a")

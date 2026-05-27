@@ -170,16 +170,40 @@ You should see a row for the tool's request with the correct provider label, mod
 
 If the row is present but the model and tokens are empty, the request is reaching modeltap but using an endpoint the v1 adapters don't yet parse (for example, OpenAI's Responses API). The raw request and response are still captured in full and can be inspected with `modeltap show <id>`.
 
-## Harness Run Commands
+## Harness Session And Run Commands
 
-In the production harness shell, every foreground `turn.submit` is also stored
-as a durable run. Existing chat behavior still works, and newer harness builds
-can inspect and control the runtime-owned run record.
+The production harness shell stores conversation history as sessions. Each
+foreground `turn.submit` is also stored as a durable run so the runtime can
+track execution lifecycle, attachment, cancellation, replay, and future
+checkpoint controls.
 
-Available commands:
+Use `/help` inside the shell for the live command surface.
 
-- `/run` shows the active attached run.
-- `/run <run-id>` shows a specific run without attaching it.
+### Sessions
+
+- `/session` shows compact status for the current session.
+- `/session show [id]` and `/session details [id]` show session metadata, turn
+  summaries, files touched/modified, server events, and recent runs for the
+  session. The turn list is a summary list; full turn-content inspection is not
+  exposed as a shell command yet.
+- `/sessions` and `/sessions list` list known sessions.
+- `/sessions resume <id>` switches the shell to an existing session.
+- `/session current` prints the active session ID.
+- `/session clear` clears only the live in-memory conversation context for the
+  active session. Stored turns remain in SQLite and remain visible in session
+  details.
+- `/session fork` creates a new session copied from the active session history.
+- `/clear` starts a new conversation by creating a new session and clearing the
+  visible transcript. It does not delete stored history.
+
+Turn numbers shown in `/session show` are scoped to that session.
+
+### Runs
+
+- `/run` shows compact status for the current run.
+- `/run show [id]`, `/run details [id]`, and `/run <run-id>` show run
+  lifecycle/debug details. This includes status, stage, linked turn summaries,
+  the latest checkpoint, and recent run events.
 - `/runs` lists recent runs for the active session. `/jobs` is an alias.
 - `/attach <run-id>` attaches the shell to a non-terminal run and replays
   retained run events.
@@ -192,9 +216,14 @@ Available commands:
   "not enabled yet" responses for unsupported stages; fork creates a queued
   sibling run record without cloning workspace or artifact state.
 
+Run details are operational state, not conversation history. Recent run events
+help debug whether a run started, attached, detached, blocked, progressed,
+failed, completed, or was cancelled. To read conversation history, start with
+`/session show`.
+
 Run rows distinguish `waiting_permission` from `waiting_user`. The list output
-also shows runtime-computed input-required and stuck markers so clients do not need
-to make independent wall-clock decisions.
+also shows runtime-computed input-required and stuck markers so clients do not
+need to make independent wall-clock decisions.
 
 Planning subcommands are reserved for later v0.3.x releases:
 

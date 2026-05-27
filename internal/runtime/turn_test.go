@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jasonahenderson/modeltap/internal/protocol"
 	"github.com/jasonahenderson/modeltap/internal/provider"
@@ -133,6 +134,46 @@ func TestHandleTurnSubmit_HappyPath(t *testing.T) {
 	}
 }
 
+func TestHandleTurnSubmit_SequentialTurnsPersistToSameSession(t *testing.T) {
+	srv, _ := setupTurnSubmitServer(t)
+
+	c, frames := newRelayConnection(t, srv)
+	c.SetSessionID("sess-seq")
+	srv.sessions.EnsureActive("sess-seq", c)
+
+	for seq, content := range []string{"first", "second"} {
+		submit := &protocol.TurnSubmit{
+			TurnID:    "turn-seq-" + content,
+			SessionID: "sess-seq",
+			Sequence:  seq + 1,
+			Mode:      protocol.ModeBuild,
+			Content:   content,
+		}
+		params, _ := json.Marshal(submit)
+		if _, err := handleTurnSubmit(context.Background(), c, params); err != nil {
+			t.Fatalf("handleTurnSubmit %s: %v", content, err)
+		}
+		waitForFrameCount(t, frames, protocol.EventRunCompleted, seq+1)
+	}
+
+	turns, err := srv.store.ListTurns(context.Background(), "sess-seq")
+	if err != nil {
+		t.Fatalf("ListTurns: %v", err)
+	}
+	if len(turns) != 4 {
+		t.Fatalf("persisted turns = %d, want 4; turns = %+v", len(turns), turns)
+	}
+	userTurns := 0
+	for _, turn := range turns {
+		if turn.Role == "user" {
+			userTurns++
+		}
+	}
+	if userTurns != 2 {
+		t.Fatalf("persisted user turns = %d, want 2; turns = %+v", userTurns, turns)
+	}
+}
+
 func TestHandleTurnSubmit_DuplicateIdempotencyReturnsExistingRun(t *testing.T) {
 	srv, _ := setupTurnSubmitServer(t)
 
@@ -184,6 +225,18 @@ func TestHandleTurnSubmit_DuplicateIdempotencyReturnsExistingRun(t *testing.T) {
 	if userTurns != 1 {
 		t.Fatalf("user turns = %d, want 1", userTurns)
 	}
+}
+
+func waitForFrameCount(t *testing.T, frames *capturedFrames, method string, want int) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if got := len(frames.byMethod(method)); got >= want {
+			return
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
+	t.Fatalf("waitForFrameCount(%q): got %d, want at least %d", method, len(frames.byMethod(method)), want)
 }
 
 func TestHandleTurnSubmit_MissingSession(t *testing.T) {

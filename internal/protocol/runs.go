@@ -148,6 +148,7 @@ type RunCheckpointSummary struct {
 type RunDetailsResponse struct {
 	Run        RunSummary            `json:"run"`
 	TurnIDs    []string              `json:"turn_ids"`
+	Turns      []TurnSummary         `json:"turns,omitempty"`
 	Checkpoint *RunCheckpointSummary `json:"checkpoint,omitempty"`
 	Events     []RunEventPayload     `json:"events"`
 }

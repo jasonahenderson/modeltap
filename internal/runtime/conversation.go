@@ -222,10 +222,13 @@ func (c *Conversation) RestoreFromTurns(turns []storage.Turn) error {
 		if err != nil {
 			return fmt.Errorf("turn %s: %w", t.ID, err)
 		}
-		c.turns = append(c.turns, msg)
 		if t.Sequence > c.storageSequence {
 			c.storageSequence = t.Sequence
 		}
+		if isCommandTurn(t) {
+			continue
+		}
+		c.turns = append(c.turns, msg)
 		if msg.Role == "user" {
 			c.userSequence++
 		}

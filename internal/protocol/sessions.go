@@ -120,6 +120,7 @@ type SessionResumeResponse struct {
 	Model         string         `json:"model"`
 	ModelOverride string         `json:"model_override,omitempty"`
 	Project       ProjectContext `json:"project"`
+	NextSequence  int            `json:"next_sequence,omitempty"`
 }
 
 // SessionClearResponse is the response to session.clear.

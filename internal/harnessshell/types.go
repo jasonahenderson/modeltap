@@ -180,6 +180,23 @@ const (
 	StatusError StatusKind = "error"
 )
 
+// ToolActivityState is the compact state set the shell uses for durable
+// transcript rows describing host-side tool execution.
+type ToolActivityState string
+
+const (
+	// ToolActivityRunning indicates a tool call is in progress.
+	ToolActivityRunning ToolActivityState = "running"
+	// ToolActivitySuccess indicates a tool call completed successfully.
+	ToolActivitySuccess ToolActivityState = "success"
+	// ToolActivityError indicates a tool call failed.
+	ToolActivityError ToolActivityState = "error"
+	// ToolActivityRejected indicates a tool call was rejected by policy/user.
+	ToolActivityRejected ToolActivityState = "rejected"
+	// ToolActivityDone is a fallback terminal state for unknown outcomes.
+	ToolActivityDone ToolActivityState = "done"
+)
+
 // SubmitTurnAction is emitted when the user submits the composer or queued
 // work is released. The host correlates lifecycle events back via
 // [Submission.ID].
@@ -286,6 +303,18 @@ type RunFailedEvent struct {
 }
 
 func (RunFailedEvent) isHostEvent() {}
+
+// ToolActivityEvent appends or updates a durable transcript event row for a
+// tool call. The shell also mirrors the latest activity into status chrome.
+type ToolActivityEvent struct {
+	ID        string
+	ToolLabel string
+	Summary   string
+	State     ToolActivityState
+	Duration  time.Duration
+}
+
+func (ToolActivityEvent) isHostEvent() {}
 
 // PermissionRequestedEvent appends a durable transcript event row and
 // activates composer permission controls.

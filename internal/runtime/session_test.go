@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jasonahenderson/modeltap/internal/protocol"
+	"github.com/jasonahenderson/modeltap/internal/provider"
 	"github.com/jasonahenderson/modeltap/internal/storage"
 )
 
@@ -166,6 +167,65 @@ func TestSessionResume_Success(t *testing.T) {
 	}
 }
 
+func TestSessionResume_ReturnsNextUserSequence(t *testing.T) {
+	srv := newServerWithRealStore(t)
+	sid := seedSession(t, srv.store, SoloUserID, "/tmp/proj", "sequence resume")
+	now := time.Now().UTC()
+	for _, turn := range []storage.Turn{
+		{
+			ID:        "turn-user-1",
+			SessionID: sid,
+			Sequence:  1,
+			Role:      "user",
+			Content:   json.RawMessage(`{"role":"user","content":"first"}`),
+			CreatedAt: now,
+		},
+		{
+			ID:        "turn-assistant-1",
+			SessionID: sid,
+			Sequence:  2,
+			Role:      "assistant",
+			Content:   json.RawMessage(`{"role":"assistant","content":"reply"}`),
+			CreatedAt: now,
+		},
+		{
+			ID:        "turn-user-2",
+			SessionID: sid,
+			Sequence:  3,
+			Role:      "user",
+			Content:   json.RawMessage(`{"role":"user","content":"second"}`),
+			CreatedAt: now,
+		},
+	} {
+		turn := turn
+		if err := srv.store.CreateTurn(context.Background(), &turn); err != nil {
+			t.Fatalf("CreateTurn(%s): %v", turn.ID, err)
+		}
+	}
+
+	c := newReadyConnection(t, srv)
+	params, _ := json.Marshal(&protocol.SessionResume{
+		SessionID: sid,
+		Project:   protocol.ProjectContext{Root: "/tmp/proj"},
+	})
+
+	raw, err := handleSessionResume(context.Background(), c, params)
+	if err != nil {
+		t.Fatalf("handleSessionResume: %v", err)
+	}
+	resp := raw.(*protocol.SessionResumeResponse)
+	if resp.NextSequence != 3 {
+		t.Fatalf("NextSequence = %d, want 3", resp.NextSequence)
+	}
+	active := srv.sessions.GetActiveSession(sid)
+	if active == nil {
+		t.Fatalf("active session missing")
+	}
+	if got := active.Conversation.Sequence(); got != 2 {
+		t.Fatalf("restored user sequence = %d, want 2", got)
+	}
+}
+
 func TestSessionResume_NotFound(t *testing.T) {
 	srv := newServerWithRealStore(t)
 	c := newReadyConnection(t, srv)
@@ -254,6 +314,35 @@ func TestSessionDetails_Basic(t *testing.T) {
 	}
 	if len(detail.ServerEvents) != 1 {
 		t.Errorf("ServerEvents = %d, want 1", len(detail.ServerEvents))
+	}
+}
+
+func TestSessionDetails_SkipsCommandTurns(t *testing.T) {
+	srv := newServerWithRealStore(t)
+	sid := seedSession(t, srv.store, SoloUserID, "/tmp/proj", "command filter")
+	cmdRaw, _ := json.Marshal(provider.Message{Role: "user", Content: "/models"})
+	realRaw, _ := json.Marshal(provider.Message{Role: "user", Content: "actual request"})
+	for _, turn := range []storage.Turn{
+		{ID: "cmd", SessionID: sid, Sequence: 1, Role: "user", Content: cmdRaw, CreatedAt: time.Now().UTC()},
+		{ID: "real", SessionID: sid, Sequence: 2, Role: "user", Content: realRaw, CreatedAt: time.Now().UTC()},
+	} {
+		if err := srv.store.CreateTurn(context.Background(), &turn); err != nil {
+			t.Fatalf("CreateTurn(%s): %v", turn.ID, err)
+		}
+	}
+
+	c := newReadyConnection(t, srv)
+	params, _ := json.Marshal(&protocol.SessionDetails{SessionID: sid})
+	raw, err := handleSessionDetails(context.Background(), c, params)
+	if err != nil {
+		t.Fatalf("handleSessionDetails: %v", err)
+	}
+	detail := raw.(*protocol.SessionDetail)
+	if len(detail.Turns) != 1 {
+		t.Fatalf("Turns = %d, want 1: %+v", len(detail.Turns), detail.Turns)
+	}
+	if detail.Turns[0].Summary != "actual request" {
+		t.Fatalf("summary = %q, want actual request", detail.Turns[0].Summary)
 	}
 }
 

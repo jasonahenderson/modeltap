@@ -54,7 +54,10 @@ var (
 			Foreground(lipgloss.Color("#8EA2BC"))
 
 	hostInfoStyle = lipgloss.NewStyle().
-			Padding(0, 1).
+			Padding(1, 1, 1, 2).
+			Border(lipgloss.Border{Left: "│"}, false, false, false, true).
+			BorderForeground(lipgloss.Color("#324154")).
+			Background(lipgloss.Color("#111821")).
 			Foreground(lipgloss.Color("#C8D1DC"))
 
 	chromeStatusReadyStyle = lipgloss.NewStyle().
@@ -106,6 +109,19 @@ var (
 				Bold(true)
 	eventDeniedStyle = lipgloss.NewStyle().
 				Padding(0, 1).
+				Foreground(lipgloss.Color("#F85149")).
+				Bold(true)
+	toolEventInfoStyle = lipgloss.NewStyle().
+				PaddingLeft(3).
+				Foreground(lipgloss.Color("#8EA2BC"))
+	toolEventRunningStyle = lipgloss.NewStyle().
+				PaddingLeft(3).
+				Foreground(lipgloss.Color("#C8D1DC"))
+	toolEventDoneStyle = lipgloss.NewStyle().
+				PaddingLeft(3).
+				Foreground(lipgloss.Color("#7EE787"))
+	toolEventErrorStyle = lipgloss.NewStyle().
+				PaddingLeft(3).
 				Foreground(lipgloss.Color("#F85149")).
 				Bold(true)
 	permissionActionsStyle = lipgloss.NewStyle().
