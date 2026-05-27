@@ -197,6 +197,25 @@ func TestProductionRuntimeSessionResumeSeedsNextSubmitSequence(t *testing.T) {
 	}
 }
 
+func TestProductionRuntimeClearsActiveRunOnTerminalRuntimeEvents(t *testing.T) {
+	r, err := NewProductionRuntime(ProductionRuntimeConfig{ProjectRoot: "/tmp"})
+	if err != nil {
+		t.Fatalf("NewProductionRuntime: %v", err)
+	}
+
+	r.mode.SetActiveRunID("run-1")
+	r.observeRuntimeMessage(harness.StreamCompleteMsg{TurnID: "run-1"})
+	if got := r.mode.ActiveRunID(); got != "" {
+		t.Fatalf("ActiveRunID after StreamComplete = %q, want empty", got)
+	}
+
+	r.mode.SetActiveRunID("run-2")
+	r.observeRuntimeMessage(harnessshell.RunFailedEvent{RunID: "run-2"})
+	if got := r.mode.ActiveRunID(); got != "" {
+		t.Fatalf("ActiveRunID after RunFailed = %q, want empty", got)
+	}
+}
+
 func TestProductionRuntimeClearResetsNextSubmitSequence(t *testing.T) {
 	stub, err := testutil.NewRuntimeStub()
 	if err != nil {
@@ -507,6 +526,59 @@ func TestProductionRuntimeClearCommandRejectsActiveRun(t *testing.T) {
 	}
 }
 
+func TestProductionRuntimeModelCommandUsesPersistedOverride(t *testing.T) {
+	stub, err := testutil.NewRuntimeStub()
+	if err != nil {
+		t.Fatalf("NewRuntimeStub: %v", err)
+	}
+	defer stub.Close()
+	stub.SetSessionDetail(protocol.SessionDetail{
+		ID:            "sess-model",
+		ModelOverride: "claude-sonnet-4-6",
+	})
+	r := newProductionRuntimeForTest(t, stub)
+	r.mode.SetSessionID("sess-model")
+	var msgs []any
+	r.sender.onSend = func(msg tea.Msg) { msgs = append(msgs, msg) }
+
+	if err := r.DispatchCommand(context.Background(), HostCommand{Name: "model"}); err != nil {
+		t.Fatalf("DispatchCommand(model): %v", err)
+	}
+	req := lastCallParams[protocol.SessionDetails](t, stub, protocol.MethodSessionDetails)
+	if req.SessionID != "sess-model" {
+		t.Fatalf("session.details session_id = %q, want sess-model", req.SessionID)
+	}
+	status, ok := msgs[len(msgs)-1].(harnessshell.HostStatusEvent)
+	if !ok {
+		t.Fatalf("last msg = %T, want HostStatusEvent", msgs[len(msgs)-1])
+	}
+	if !strings.Contains(status.Status, "claude-sonnet-4-6") {
+		t.Fatalf("status = %q, want persisted override", status.Status)
+	}
+}
+
+func TestProductionRuntimeModelSwitchSendsActiveSession(t *testing.T) {
+	stub, err := testutil.NewRuntimeStub()
+	if err != nil {
+		t.Fatalf("NewRuntimeStub: %v", err)
+	}
+	defer stub.Close()
+	r := newProductionRuntimeForTest(t, stub)
+	r.mode.SetSessionID("sess-model")
+	r.sender.onSend = func(tea.Msg) {}
+
+	if err := r.DispatchCommand(context.Background(), HostCommand{Name: "model", Args: "claude-sonnet-4-6"}); err != nil {
+		t.Fatalf("DispatchCommand(model set): %v", err)
+	}
+	req := lastCallParams[protocol.ModelSwitch](t, stub, protocol.MethodModelSwitch)
+	if req.SessionID != "sess-model" {
+		t.Fatalf("model.switch session_id = %q, want sess-model", req.SessionID)
+	}
+	if req.Model != "claude-sonnet-4-6" {
+		t.Fatalf("model.switch model = %q, want claude-sonnet-4-6", req.Model)
+	}
+}
+
 // PATCH-0038: /sessions current prints the active session id when
 // one exists; prints "No active session" when not bootstrapped.
 func TestProductionRuntimeSessionsCurrent(t *testing.T) {
@@ -654,6 +726,83 @@ func TestProductionRuntimeSessionDetailsAlias(t *testing.T) {
 	}
 }
 
+func TestProductionRuntimeSessionWithoutArgsShowsActiveSession(t *testing.T) {
+	stub, err := testutil.NewRuntimeStub()
+	if err != nil {
+		t.Fatalf("NewRuntimeStub: %v", err)
+	}
+	defer stub.Close()
+	stub.SetSessionDetail(protocol.SessionDetail{
+		ID:         "sess-active",
+		Summary:    "current session",
+		LastActive: "2026-05-21T00:10:00Z",
+		Turns:      []protocol.TurnSummary{{Sequence: 1, Summary: "detailed turn text"}},
+	})
+	r := newProductionRuntimeForTest(t, stub)
+	var msgs []any
+	r.sender.onSend = func(msg tea.Msg) { msgs = append(msgs, msg) }
+	r.mode.SetSessionID("sess-active")
+
+	if err := r.DispatchCommand(context.Background(), HostCommand{Name: "session"}); err != nil {
+		t.Fatalf("DispatchCommand(session): %v", err)
+	}
+	req := lastCallParams[protocol.SessionDetails](t, stub, protocol.MethodSessionDetails)
+	if req.SessionID != "sess-active" {
+		t.Fatalf("session.details session_id = %q, want sess-active", req.SessionID)
+	}
+	info := lastHostInfo(t, msgs)
+	if !strings.Contains(info.Text, "Session sess-active: current session") {
+		t.Fatalf("session status missing header:\n%s", info.Text)
+	}
+	if strings.Contains(info.Text, "#1") || strings.Contains(info.Text, "detailed turn text") {
+		t.Fatalf("bare /session should not render detailed turns:\n%s", info.Text)
+	}
+}
+
+func TestFormatSessionStatusOverrideOnlyDoesNotSayUnknown(t *testing.T) {
+	got := formatSessionStatus(protocol.SessionDetail{
+		ID:            "sess-model",
+		ModelOverride: "qwen3.5:27b",
+	})
+	if !strings.Contains(got, "Model: qwen3.5:27b (override)") {
+		t.Fatalf("status = %q, want override model line", got)
+	}
+	if strings.Contains(got, "unknown") {
+		t.Fatalf("status should not say unknown when override is set: %q", got)
+	}
+
+	detail := formatSessionDetails(protocol.SessionDetail{
+		ID:            "sess-model",
+		ModelOverride: "qwen3.5:27b",
+	}, nil, nil)
+	if !strings.Contains(detail, "Model: qwen3.5:27b (override)") {
+		t.Fatalf("detail = %q, want override model line", detail)
+	}
+	if strings.Contains(detail, "unknown") {
+		t.Fatalf("detail should not say unknown when override is set: %q", detail)
+	}
+}
+
+func TestProductionRuntimeSessionsWithoutArgsStillLists(t *testing.T) {
+	stub, err := testutil.NewRuntimeStub()
+	if err != nil {
+		t.Fatalf("NewRuntimeStub: %v", err)
+	}
+	defer stub.Close()
+	r := newProductionRuntimeForTest(t, stub)
+	r.sender.onSend = func(tea.Msg) {}
+
+	if err := r.DispatchCommand(context.Background(), HostCommand{Name: "sessions"}); err != nil {
+		t.Fatalf("DispatchCommand(sessions): %v", err)
+	}
+	if len(methodCalls(stub, protocol.MethodSessionList)) == 0 {
+		t.Fatalf("expected session.list call")
+	}
+	if len(methodCalls(stub, protocol.MethodSessionDetails)) != 0 {
+		t.Fatalf("unexpected session.details call")
+	}
+}
+
 // PATCH-0041: omitted ID defaults to the active session.
 func TestProductionRuntimeSessionsShowUsesActiveSession(t *testing.T) {
 	stub, err := testutil.NewRuntimeStub()
@@ -728,6 +877,100 @@ func TestProductionRuntimeSessionsShowToleratesRunListFailure(t *testing.T) {
 	}
 	if !strings.Contains(info.Text, "Runs:\n  unavailable:") || !strings.Contains(info.Text, "run list unavailable") {
 		t.Fatalf("run-list failure note missing:\n%s", info.Text)
+	}
+}
+
+func TestProductionRuntimeRunWithoutArgsUsesCurrentRunAfterTerminal(t *testing.T) {
+	stub, err := testutil.NewRuntimeStub()
+	if err != nil {
+		t.Fatalf("NewRuntimeStub: %v", err)
+	}
+	defer stub.Close()
+	stub.SetRunDetail(protocol.RunDetailsResponse{
+		Run: protocol.RunSummary{
+			RunID:           "run-current",
+			Status:          protocol.RunStatusCompleted,
+			Stage:           protocol.RunStageCompletion,
+			AttachmentState: protocol.RunAttachmentDetached,
+			Summary:         "finished work",
+		},
+	})
+	r := newProductionRuntimeForTest(t, stub)
+	var msgs []any
+	r.sender.onSend = func(msg tea.Msg) { msgs = append(msgs, msg) }
+
+	r.mode.SetActiveRunID("run-current")
+	r.observeRuntimeMessage(harness.StreamCompleteMsg{TurnID: "run-current"})
+	if got := r.mode.ActiveRunID(); got != "" {
+		t.Fatalf("ActiveRunID after terminal event = %q, want empty", got)
+	}
+	if got := r.mode.CurrentRunID(); got != "run-current" {
+		t.Fatalf("CurrentRunID after terminal event = %q, want run-current", got)
+	}
+
+	if err := r.DispatchCommand(context.Background(), HostCommand{Name: "run"}); err != nil {
+		t.Fatalf("DispatchCommand(run): %v", err)
+	}
+	req := lastCallParams[protocol.RunDetails](t, stub, protocol.MethodRunDetails)
+	if req.RunID != "run-current" {
+		t.Fatalf("run.details run_id = %q, want run-current", req.RunID)
+	}
+	info := lastHostInfo(t, msgs)
+	if !strings.Contains(info.Text, "Run run-current: completed/completion detached") {
+		t.Fatalf("run status missing header:\n%s", info.Text)
+	}
+}
+
+func TestProductionRuntimeRunShowUsesCurrentRunAndRendersDetails(t *testing.T) {
+	stub, err := testutil.NewRuntimeStub()
+	if err != nil {
+		t.Fatalf("NewRuntimeStub: %v", err)
+	}
+	defer stub.Close()
+	stub.SetRunDetail(protocol.RunDetailsResponse{
+		Run: protocol.RunSummary{
+			RunID:           "run-current",
+			Status:          protocol.RunStatusRunning,
+			Stage:           protocol.RunStageModelCall,
+			AttachmentState: protocol.RunAttachmentAttached,
+		},
+		TurnIDs: []string{"turn-1", "turn-2"},
+		Turns: []protocol.TurnSummary{
+			{Sequence: 1, Summary: "implement the session browser", Model: "qwen3.5:27b", Cost: 0.0123},
+			{Sequence: 2, Summary: "done"},
+		},
+		Checkpoint: &protocol.RunCheckpointSummary{
+			Stage:   protocol.RunStageModelCall,
+			Status:  protocol.RunStatusRunning,
+			Summary: "calling model",
+		},
+		Events: []protocol.RunEventPayload{
+			{Seq: 1, Type: protocol.EventRunStarted, Stage: protocol.RunStagePreflight, Status: protocol.RunStatusRunning},
+			{Seq: 2, Type: protocol.EventRunProgress, Stage: protocol.RunStageModelCall, Status: protocol.RunStatusRunning, Payload: json.RawMessage(`{"text":"thinking"}`)},
+		},
+	})
+	r := newProductionRuntimeForTest(t, stub)
+	var msgs []any
+	r.sender.onSend = func(msg tea.Msg) { msgs = append(msgs, msg) }
+	r.mode.SetCurrentRunID("run-current")
+
+	if err := r.DispatchCommand(context.Background(), HostCommand{Name: "run", Args: "show"}); err != nil {
+		t.Fatalf("DispatchCommand(run show): %v", err)
+	}
+	info := lastHostInfo(t, msgs)
+	for _, want := range []string{
+		"Run run-current: running/model_call attached",
+		"Turns:",
+		"#1 qwen3.5:27b $0.0123 — implement the session browser",
+		"#2 — done",
+		"Checkpoint: model_call/running — calling model",
+		"Recent events:",
+		"#1 started [preflight/running]",
+		"#2 progress [model_call/running] — thinking",
+	} {
+		if !strings.Contains(info.Text, want) {
+			t.Fatalf("run details missing %q in:\n%s", want, info.Text)
+		}
 	}
 }
 
@@ -854,6 +1097,16 @@ func lastCallParams[T any](t *testing.T, stub *testutil.RuntimeStub, method stri
 	t.Fatalf("method %s not called; calls = %+v", method, calls)
 	var zero T
 	return zero
+}
+
+func methodCalls(stub *testutil.RuntimeStub, method string) []testutil.RuntimeCall {
+	var out []testutil.RuntimeCall
+	for _, call := range stub.Calls() {
+		if call.Method == method {
+			out = append(out, call)
+		}
+	}
+	return out
 }
 
 func TestProductionRuntimeProjectRunReplay(t *testing.T) {

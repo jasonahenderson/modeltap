@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -333,6 +334,9 @@ func handleSessionDetails(ctx context.Context, conn *Connection, params json.Raw
 	}
 	turnSummaries := make([]protocol.TurnSummary, 0, len(turns))
 	for _, t := range turns {
+		if isCommandTurn(t) {
+			continue
+		}
 		turnSummaries = append(turnSummaries, protocol.TurnSummary{
 			Sequence:      t.Sequence,
 			Summary:       turnSummary(t),
@@ -486,6 +490,18 @@ func handleSessionFork(ctx context.Context, conn *Connection, params json.RawMes
 		NewSessionID:      newID,
 		OriginalSessionID: src.ID,
 	}, nil
+}
+
+func isCommandTurn(t storage.Turn) bool {
+	if t.Role != "user" {
+		return false
+	}
+	msg, err := turnToMessage(&t)
+	if err != nil {
+		return false
+	}
+	content := strings.TrimSpace(msg.Content)
+	return strings.HasPrefix(content, "/") && len(content) > 1
 }
 
 // turnSummary derives the short label shown in SessionDetail.Turns.

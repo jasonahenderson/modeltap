@@ -127,6 +127,31 @@ func TestHandleModelList_WithProvidersAndRouting(t *testing.T) {
 	}
 }
 
+func TestHandleModelList_CurrentOverrideFallsBackToStorage(t *testing.T) {
+	srv := newServerWithRealStore(t)
+	sid := seedSession(t, srv.store, SoloUserID, "/tmp/proj", "stored override")
+	sess, err := srv.store.GetSession(context.Background(), sid)
+	if err != nil {
+		t.Fatalf("GetSession: %v", err)
+	}
+	override := "qwen3.5:27b"
+	sess.ModelOverride = &override
+	if err := srv.store.UpdateSession(context.Background(), sess); err != nil {
+		t.Fatalf("UpdateSession: %v", err)
+	}
+
+	c := newReadyConnection(t, srv)
+	c.SetSessionID(sid)
+	raw, err := handleModelList(context.Background(), c, nil)
+	if err != nil {
+		t.Fatalf("handleModelList: %v", err)
+	}
+	resp := raw.(*protocol.ModelListResponse)
+	if resp.CurrentOverride != override {
+		t.Fatalf("CurrentOverride = %q, want %q", resp.CurrentOverride, override)
+	}
+}
+
 func TestHandleModelSwitch_Apply(t *testing.T) {
 	srv := newServerWithRealStore(t)
 	_ = srv.providers.Add(&ProviderEndpoint{Name: "a1", Type: ProviderTypeAnthropic, APIKey: "k"})

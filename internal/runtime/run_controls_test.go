@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jasonahenderson/modeltap/internal/protocol"
+	"github.com/jasonahenderson/modeltap/internal/provider"
 	"github.com/jasonahenderson/modeltap/internal/storage"
 )
 
@@ -106,6 +107,41 @@ func TestRunDetachClearsAttachedConnectionID(t *testing.T) {
 	}
 	if got.AttachmentState != storage.RunAttachmentDetached || got.AttachedConnectionID != "" {
 		t.Fatalf("attachment = %q/%q, want detached/empty", got.AttachmentState, got.AttachedConnectionID)
+	}
+}
+
+func TestRunDetailsIncludesTurnSummaries(t *testing.T) {
+	srv := newServerWithRealStore(t)
+	run := seedRunForControls(t, srv, "")
+	c, _ := newRelayConnection(t, srv)
+
+	userRaw, _ := json.Marshal(provider.Message{Role: "user", Content: "please inspect the session turns"})
+	turn := &storage.Turn{
+		ID:        "turn-run-detail",
+		SessionID: run.SessionID,
+		Sequence:  1,
+		Role:      "user",
+		Content:   userRaw,
+		CreatedAt: time.Now().UTC(),
+	}
+	if err := srv.store.CreateTurn(context.Background(), turn); err != nil {
+		t.Fatalf("CreateTurn: %v", err)
+	}
+	if err := srv.store.LinkTurnToRun(context.Background(), run.ID, turn.ID, turn.Role, turn.Sequence); err != nil {
+		t.Fatalf("LinkTurnToRun: %v", err)
+	}
+
+	params, _ := json.Marshal(protocol.RunDetails{RunID: run.ID})
+	raw, err := handleRunDetails(context.Background(), c, params)
+	if err != nil {
+		t.Fatalf("handleRunDetails: %v", err)
+	}
+	details := raw.(protocol.RunDetailsResponse)
+	if len(details.Turns) != 1 {
+		t.Fatalf("Turns = %d, want 1: %+v", len(details.Turns), details.Turns)
+	}
+	if details.Turns[0].Summary != "please inspect the session turns" {
+		t.Fatalf("turn summary = %q", details.Turns[0].Summary)
 	}
 }
 

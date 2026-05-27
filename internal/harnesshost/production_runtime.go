@@ -76,12 +76,13 @@ func (d *deferredSender) Send(msg tea.Msg) {
 // harness.ModeReader so harness.ToolDispatcher can read the current
 // execution mode.
 type runtimeState struct {
-	mu          sync.Mutex
-	mode        protocol.Mode
-	sessionID   string
-	activeRunID string
-	sequence    int
-	label       string // current model label
+	mu           sync.Mutex
+	mode         protocol.Mode
+	sessionID    string
+	activeRunID  string
+	currentRunID string
+	sequence     int
+	label        string // current model label
 }
 
 func newRuntimeState() *runtimeState {
@@ -131,6 +132,7 @@ func (s *runtimeState) SwitchSession(id string, nextSequence int) {
 		s.sequence = nextSequence - 1
 	}
 	s.activeRunID = ""
+	s.currentRunID = ""
 }
 
 func (s *runtimeState) ActiveRunID() string {
@@ -143,6 +145,29 @@ func (s *runtimeState) SetActiveRunID(id string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.activeRunID = id
+	if id != "" {
+		s.currentRunID = id
+	}
+}
+
+func (s *runtimeState) ClearActiveRunID(id string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if id == "" || s.activeRunID == id {
+		s.activeRunID = ""
+	}
+}
+
+func (s *runtimeState) CurrentRunID() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.currentRunID
+}
+
+func (s *runtimeState) SetCurrentRunID(id string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.currentRunID = id
 }
 
 // NextSequence returns the next sequence counter for this session.
@@ -453,12 +478,7 @@ func (r *ProductionRuntime) handleModeCommand(mode protocol.Mode) error {
 func (r *ProductionRuntime) handleModelCommand(ctx context.Context, args string) error {
 	args = strings.TrimSpace(args)
 	if args == "" {
-		// Show current model.
-		r.sender.Send(harnessshell.HostStatusEvent{
-			Status: "Current model: " + nonEmpty(r.mode.Label(), "(unset)"),
-			Kind:   harnessshell.StatusReady,
-		})
-		return nil
+		return r.handleCurrentModelCommand(ctx)
 	}
 	client := r.cm.Client()
 	if client == nil {
@@ -476,6 +496,38 @@ func (r *ProductionRuntime) handleModelCommand(ctx context.Context, args string)
 	}
 	r.sender.Send(harnessshell.HostStatusEvent{
 		Status: "Model switch: " + nonEmpty(resp.Model, args) + " — " + resp.Reason,
+		Kind:   harnessshell.StatusReady,
+	})
+	return nil
+}
+
+func (r *ProductionRuntime) handleCurrentModelCommand(ctx context.Context) error {
+	client := r.cm.Client()
+	if client == nil {
+		return r.statusError("model", errNoLiveClient)
+	}
+	current := ""
+	if sessionID := r.mode.SessionID(); sessionID != "" {
+		var detail protocol.SessionDetail
+		if err := client.CallInto(ctx, protocol.MethodSessionDetails, &protocol.SessionDetails{SessionID: sessionID}, &detail); err == nil {
+			current = detail.ModelOverride
+			if current == "" {
+				current = detail.Model
+			}
+		}
+	}
+	if current == "" {
+		var resp protocol.ModelListResponse
+		if err := client.CallInto(ctx, protocol.MethodModelList, &protocol.ModelList{}, &resp); err != nil {
+			return r.statusError("model.list", err)
+		}
+		current = resp.CurrentOverride
+		if current == "" {
+			current = r.mode.Label()
+		}
+	}
+	r.sender.Send(harnessshell.HostStatusEvent{
+		Status: "Current model: " + nonEmpty(current, "(auto)"),
 		Kind:   harnessshell.StatusReady,
 	})
 	return nil
@@ -516,11 +568,16 @@ func (r *ProductionRuntime) handleModelsCommand(ctx context.Context) error {
 
 func (r *ProductionRuntime) handleSessionCommand(ctx context.Context, name, args string) error {
 	args = strings.TrimSpace(args)
-	// `/sessions` (alias-form, no args) or `/sessions list` or
-	// `/session list` route to list. Sub-commands like `current` and
-	// `resume <id>` reach the switch below. PATCH-0038 added
-	// `current`; PATCH-0039 will add `delete <id>` / `prune`.
-	if args == "" || args == "list" {
+	// `/sessions` (plural, no args) lists sessions. `/session`
+	// (singular, no args) shows the current session status. Explicit
+	// `/sessions list` and `/session list` still route to list.
+	if args == "" {
+		if name == "session" {
+			return r.handleSessionStatus(ctx)
+		}
+		return r.handleSessionList(ctx)
+	}
+	if args == "list" {
 		return r.handleSessionList(ctx)
 	}
 	parts := strings.Fields(args)
@@ -544,6 +601,25 @@ func (r *ProductionRuntime) handleSessionCommand(ctx context.Context, name, args
 		return r.handleSessionCurrent()
 	}
 	return r.statusError("session", errors.New("unknown session subcommand: "+parts[0]))
+}
+
+func (r *ProductionRuntime) handleSessionStatus(ctx context.Context) error {
+	id := r.mode.SessionID()
+	if id == "" {
+		return r.statusError("session", errors.New("no active session"))
+	}
+	client := r.cm.Client()
+	if client == nil {
+		return r.statusError("session", errNoLiveClient)
+	}
+	var detail protocol.SessionDetail
+	if err := client.CallInto(ctx, protocol.MethodSessionDetails, &protocol.SessionDetails{SessionID: id}, &detail); err != nil {
+		return r.statusError("session", err)
+	}
+	r.sender.Send(harnessshell.HostInfoEvent{
+		Text: formatSessionStatus(detail),
+	})
+	return nil
 }
 
 // handleSessionCurrent prints the active session id. PATCH-0038.
@@ -634,6 +710,11 @@ func (r *ProductionRuntime) handleSessionResume(ctx context.Context, id string) 
 	}, &resp); err != nil {
 		return r.statusError("session.resume", err)
 	}
+	if resp.ModelOverride != "" {
+		r.mode.SetLabel(resp.ModelOverride)
+	} else if resp.Model != "" {
+		r.mode.SetLabel(resp.Model)
+	}
 	r.mode.SwitchSession(resp.SessionID, resp.NextSequence)
 	r.resumeKnownRuns(ctx)
 	r.sender.Send(harnessshell.HostStatusEvent{
@@ -669,12 +750,28 @@ func (r *ProductionRuntime) handleSessionDetails(ctx context.Context, id string)
 }
 
 func (r *ProductionRuntime) observeRuntimeMessage(msg tea.Msg) {
-	m, ok := msg.(harness.ConnStateMsg)
-	if !ok || m.Info.State != harness.ConnStateReady {
+	switch m := msg.(type) {
+	case harness.ConnStateMsg:
+		if m.Info.State != harness.ConnStateReady {
+			return
+		}
+		go r.bootstrapSession(context.Background())
+		go r.resumeKnownRuns(context.Background())
+	case harness.StreamCompleteMsg:
+		r.mode.ClearActiveRunID(m.TurnID)
+	case harness.BranchCompleteMsg:
+		r.mode.ClearActiveRunID(branchRunID(m.TurnID, m.BranchID))
+	case harness.BranchErrorMsg:
+		r.mode.ClearActiveRunID(branchRunID(m.TurnID, m.BranchID))
+	case harnessshell.RunCompletedEvent:
+		r.mode.ClearActiveRunID(m.RunID)
+	case harnessshell.RunStoppedEvent:
+		r.mode.ClearActiveRunID(m.RunID)
+	case harnessshell.RunFailedEvent:
+		r.mode.ClearActiveRunID(m.RunID)
+	default:
 		return
 	}
-	go r.bootstrapSession(context.Background())
-	go r.resumeKnownRuns(context.Background())
 }
 
 // bootstrapSession ensures the harness has an active session id on
@@ -719,6 +816,11 @@ func (r *ProductionRuntime) bootstrapSession(ctx context.Context) {
 			// PATCH-0029 race re-check.
 			if r.mode.SessionID() != "" {
 				return
+			}
+			if resumeResp.ModelOverride != "" {
+				r.mode.SetLabel(resumeResp.ModelOverride)
+			} else if resumeResp.Model != "" {
+				r.mode.SetLabel(resumeResp.Model)
 			}
 			r.mode.SwitchSession(resumeResp.SessionID, resumeResp.NextSequence)
 			r.sender.Send(harnessshell.HostInfoEvent{
@@ -772,6 +874,7 @@ func (r *ProductionRuntime) resumeKnownRuns(ctx context.Context) {
 		}
 	}
 	if len(list.Runs) > 0 {
+		r.mode.SetCurrentRunID(list.Runs[0].RunID)
 		r.sender.Send(harnessshell.HostStatusEvent{
 			Status: fmt.Sprintf("Recovered %d recent run(s)", len(list.Runs)),
 			Kind:   harnessshell.StatusReady,
@@ -863,6 +966,8 @@ func (r *ProductionRuntime) handleHistoryCommand(ctx context.Context, args strin
 func (r *ProductionRuntime) handleRunCommand(ctx context.Context, args string) error {
 	args = strings.TrimSpace(args)
 	switch args {
+	case "":
+		return r.handleRunStatus(ctx)
 	case "context", "prompt":
 		r.sender.Send(harnessshell.HostStatusEvent{
 			Status: "/run " + args + ": not enabled in v0.3.0 (planned for v0.3.1)",
@@ -876,12 +981,44 @@ func (r *ProductionRuntime) handleRunCommand(ctx context.Context, args string) e
 		})
 		return nil
 	}
-	runID := args
+	parts := strings.Fields(args)
+	if len(parts) > 0 && (parts[0] == "show" || parts[0] == "details") {
+		runID := ""
+		if len(parts) > 1 {
+			runID = parts[1]
+		}
+		return r.handleRunDetails(ctx, runID)
+	}
+	return r.handleRunDetails(ctx, args)
+}
+
+func (r *ProductionRuntime) handleRunStatus(ctx context.Context) error {
+	runID := r.mode.CurrentRunID()
 	if runID == "" {
-		runID = r.mode.ActiveRunID()
+		return r.statusError("run", errors.New("no current run"))
+	}
+	client := r.cm.Client()
+	if client == nil {
+		return r.statusError("run", errNoLiveClient)
+	}
+	var resp protocol.RunDetailsResponse
+	if err := client.CallInto(ctx, protocol.MethodRunDetails, &protocol.RunDetails{RunID: runID}, &resp); err != nil {
+		return r.statusError("run", err)
+	}
+	r.mode.SetCurrentRunID(runID)
+	r.sender.Send(harnessshell.HostInfoEvent{
+		Text: formatRunStatus(resp.Run),
+	})
+	return nil
+}
+
+func (r *ProductionRuntime) handleRunDetails(ctx context.Context, runID string) error {
+	runID = strings.TrimSpace(runID)
+	if runID == "" {
+		runID = r.mode.CurrentRunID()
 	}
 	if runID == "" {
-		return r.statusError("run.details", errors.New("no active run"))
+		return r.statusError("run.details", errors.New("requires <id> or a current run"))
 	}
 	client := r.cm.Client()
 	if client == nil {
@@ -891,8 +1028,9 @@ func (r *ProductionRuntime) handleRunCommand(ctx context.Context, args string) e
 	if err := client.CallInto(ctx, protocol.MethodRunDetails, &protocol.RunDetails{RunID: runID}, &resp); err != nil {
 		return r.statusError("run.details", err)
 	}
+	r.mode.SetCurrentRunID(runID)
 	r.sender.Send(harnessshell.HostInfoEvent{
-		Text: formatRunDetails(resp.Run),
+		Text: formatRunDetails(resp),
 	})
 	return nil
 }
@@ -910,6 +1048,7 @@ func (r *ProductionRuntime) handleRunsCommand(ctx context.Context) error {
 		r.sender.Send(harnessshell.HostInfoEvent{Text: "No runs"})
 		return nil
 	}
+	r.mode.SetCurrentRunID(resp.Runs[0].RunID)
 	var b strings.Builder
 	b.WriteString("Runs:")
 	for _, run := range resp.Runs {
@@ -1039,15 +1178,25 @@ func (r *ProductionRuntime) handleHelpCommand() error {
 
 const helpText = `Available commands:
 
-  modes:     /plan  /build  /auto
-  model:     /model <name>  /models
-  session:   /sessions [list|show [id]|resume <id>|clear|fork|current]
-  context:   /context  /compact
-  history:   /history
-  mcp:       /mcp
-  runs:      /run [<id>]  /runs  /jobs
-  lifecycle: /attach <id>  /detach  /cancel  /retry  /continue  /fork
-  shell:     /clear (new conversation)  /select  /help  /quit  /exit`
+  modes:      /plan  /build  /auto
+  model:      /model [name]  /models
+  session:    /session  /session show [id]
+              /sessions [list|resume <id>|clear|fork|current]
+  context:    /context  /compact
+  history:    /history
+  mcp:        /mcp
+  runs:       /run  /run show [id]  /runs  /jobs
+  lifecycle:  /attach <id>  /detach [id]  /cancel <id>  /retry <id>  /continue <id>  /fork <id>
+  shell:      /clear  /select  /help  /quit  /exit
+
+Notes:
+  /session shows current-session status.
+  /session show [id] shows session metadata, turn summaries, files, and recent runs.
+  /session clear clears live context only; stored history remains inspectable.
+  /clear starts a new conversation/session.
+  /run shows current-run status.
+  /run show [id] shows run lifecycle/debug details and linked turn summaries.
+  Full turn-content inspection is not exposed yet.`
 
 // handleMCPCommand is the MCP lazy-start integration point. v0.2.2
 // ships with MCP wiring deferred to a follow-up release; the command
@@ -1060,7 +1209,7 @@ func (r *ProductionRuntime) handleMCPCommand(ctx context.Context, args string) e
 	return nil
 }
 
-func formatRunDetails(run protocol.RunSummary) string {
+func formatRunStatus(run protocol.RunSummary) string {
 	var b strings.Builder
 	b.WriteString("Run ")
 	b.WriteString(run.RunID)
@@ -1086,6 +1235,163 @@ func formatRunDetails(run protocol.RunSummary) string {
 	return b.String()
 }
 
+func formatRunDetails(detail protocol.RunDetailsResponse) string {
+	var b strings.Builder
+	b.WriteString(formatRunStatus(detail.Run))
+	if len(detail.Turns) > 0 {
+		b.WriteString("\n\nTurns:")
+		for _, turn := range detail.Turns {
+			fmt.Fprintf(&b, "\n  #%d", turn.Sequence)
+			if turn.Compacted {
+				b.WriteString(" compacted")
+			}
+			if turn.Model != "" {
+				b.WriteString(" ")
+				b.WriteString(turn.Model)
+			}
+			if turn.Cost > 0 {
+				fmt.Fprintf(&b, " $%.4f", turn.Cost)
+			}
+			if turn.Summary != "" {
+				b.WriteString(" — ")
+				b.WriteString(truncate(turn.Summary, 140))
+			}
+		}
+	} else if len(detail.TurnIDs) > 0 {
+		b.WriteString("\n\nTurns:")
+		for _, id := range detail.TurnIDs {
+			b.WriteString("\n  ")
+			b.WriteString(id)
+		}
+	}
+	if detail.Checkpoint != nil {
+		b.WriteString("\n\nCheckpoint: ")
+		b.WriteString(detail.Checkpoint.Stage)
+		if detail.Checkpoint.Status != "" {
+			b.WriteString("/")
+			b.WriteString(detail.Checkpoint.Status)
+		}
+		if detail.Checkpoint.Summary != "" {
+			b.WriteString(" — ")
+			b.WriteString(truncate(detail.Checkpoint.Summary, 100))
+		}
+	}
+	if len(detail.Events) > 0 {
+		b.WriteString("\n\nRecent events:")
+		for _, ev := range detail.Events {
+			b.WriteString("\n  ")
+			b.WriteString(formatRunEvent(ev))
+		}
+	}
+	return b.String()
+}
+
+func formatRunEvent(ev protocol.RunEventPayload) string {
+	var b strings.Builder
+	if ev.Seq > 0 {
+		fmt.Fprintf(&b, "#%d ", ev.Seq)
+	}
+	b.WriteString(runEventLabel(ev.Type))
+	if ev.Stage != "" || ev.Status != "" {
+		b.WriteString(" [")
+		b.WriteString(nonEmpty(ev.Stage, "-"))
+		b.WriteString("/")
+		b.WriteString(nonEmpty(ev.Status, "-"))
+		b.WriteString("]")
+	}
+	if ev.Reason != "" {
+		b.WriteString(" — ")
+		b.WriteString(ev.Reason)
+	}
+	if detail := runEventPayloadSummary(ev.Payload); detail != "" {
+		b.WriteString(" — ")
+		b.WriteString(detail)
+	}
+	return b.String()
+}
+
+func runEventLabel(typ string) string {
+	switch typ {
+	case protocol.EventRunStarted:
+		return "started"
+	case protocol.EventRunStageChanged:
+		return "stage changed"
+	case protocol.EventRunStatusChanged:
+		return "status changed"
+	case protocol.EventRunProgress:
+		return "progress"
+	case protocol.EventRunToolCallRequested:
+		return "tool requested"
+	case protocol.EventRunToolResultRecorded:
+		return "tool result"
+	case protocol.EventRunBlocked:
+		return "blocked"
+	case protocol.EventRunUnblocked:
+		return "unblocked"
+	case protocol.EventRunCheckpointRecorded:
+		return "checkpoint"
+	case protocol.EventRunAttached:
+		return "attached"
+	case protocol.EventRunDetached:
+		return "detached"
+	case protocol.EventRunCompleted:
+		return "completed"
+	case protocol.EventRunFailed:
+		return "failed"
+	case protocol.EventRunCancelled:
+		return "cancelled"
+	default:
+		return nonEmpty(typ, "event")
+	}
+}
+
+func runEventPayloadSummary(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return ""
+	}
+	for _, key := range []string{"text", "summary", "tool", "tool_name", "model", "provider", "error"} {
+		if v, ok := payload[key].(string); ok && v != "" {
+			return truncate(v, 120)
+		}
+	}
+	if typ, ok := payload["type"].(string); ok && typ != "" {
+		return typ
+	}
+	return ""
+}
+
+func formatSessionStatus(detail protocol.SessionDetail) string {
+	var b strings.Builder
+	b.WriteString("Session ")
+	b.WriteString(detail.ID)
+	if detail.Summary != "" {
+		b.WriteString(": ")
+		b.WriteString(detail.Summary)
+	}
+	if detail.LastActive != "" {
+		b.WriteString("\nLast active: ")
+		b.WriteString(detail.LastActive)
+	}
+	if modelLine := formatSessionModel(detail.Model, detail.ModelOverride); modelLine != "" {
+		b.WriteString("\nModel: ")
+		b.WriteString(modelLine)
+	}
+	if detail.ContextPct > 0 {
+		fmt.Fprintf(&b, "\nContext: %.1f%%", detail.ContextPct)
+	}
+	if detail.TotalCost > 0 {
+		fmt.Fprintf(&b, "\nCost: $%.4f", detail.TotalCost)
+	}
+	if len(detail.Turns) > 0 {
+		fmt.Fprintf(&b, "\nTurns: %d", len(detail.Turns))
+	}
+	return b.String()
+}
+
 func formatSessionDetails(detail protocol.SessionDetail, runs []protocol.RunSummary, runListErr error) string {
 	var b strings.Builder
 	b.WriteString("Session ")
@@ -1102,14 +1408,9 @@ func formatSessionDetails(detail protocol.SessionDetail, runs []protocol.RunSumm
 		b.WriteString("\nLast active: ")
 		b.WriteString(detail.LastActive)
 	}
-	if detail.Model != "" || detail.ModelOverride != "" {
+	if modelLine := formatSessionModel(detail.Model, detail.ModelOverride); modelLine != "" {
 		b.WriteString("\nModel: ")
-		b.WriteString(nonEmpty(detail.Model, "unknown"))
-		if detail.ModelOverride != "" {
-			b.WriteString(" (override: ")
-			b.WriteString(detail.ModelOverride)
-			b.WriteString(")")
-		}
+		b.WriteString(modelLine)
 	}
 	if detail.ContextPct > 0 {
 		fmt.Fprintf(&b, "\nContext: %.1f%%", detail.ContextPct)
@@ -1191,6 +1492,19 @@ func formatSessionDetails(detail protocol.SessionDetail, runs []protocol.RunSumm
 	}
 	b.WriteString("\n\nDrill down with /run <id> or /attach <id>.")
 	return b.String()
+}
+
+func formatSessionModel(model, override string) string {
+	switch {
+	case model != "" && override != "":
+		return model + " (override: " + override + ")"
+	case override != "":
+		return override + " (override)"
+	case model != "":
+		return model
+	default:
+		return ""
+	}
 }
 
 func appendStringList(b *strings.Builder, label string, values []string) {

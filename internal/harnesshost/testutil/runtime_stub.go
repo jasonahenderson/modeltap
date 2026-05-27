@@ -54,7 +54,9 @@ type RuntimeStub struct {
 	sessionDetail protocol.SessionDetail
 	sessionResume protocol.SessionResumeResponse
 	runs          []protocol.RunSummary
+	runDetail     protocol.RunDetailsResponse
 	runListError  string
+	modelList     protocol.ModelListResponse
 
 	nextTurnID atomic.Uint64
 	closed     atomic.Bool
@@ -149,6 +151,20 @@ func (s *RuntimeStub) SetRuns(runs []protocol.RunSummary) {
 	s.runs = append([]protocol.RunSummary(nil), runs...)
 }
 
+// SetRunDetail sets the response for run.details.
+func (s *RuntimeStub) SetRunDetail(detail protocol.RunDetailsResponse) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.runDetail = detail
+}
+
+// SetModelList sets the response for model.list.
+func (s *RuntimeStub) SetModelList(resp protocol.ModelListResponse) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.modelList = resp
+}
+
 // SetRunListError makes run.list return a JSON-RPC error with message.
 func (s *RuntimeStub) SetRunListError(message string) {
 	s.mu.Lock()
@@ -216,6 +232,16 @@ func (s *RuntimeStub) handleConn(conn net.Conn) {
 				"max_frame_size":      1 << 20,
 				"server_capabilities": map[string]any{},
 			}, nil)
+		case "model.list":
+			s.respond(w, req.ID, s.currentModelList(), nil)
+		case "model.switch":
+			var sw protocol.ModelSwitch
+			_ = json.Unmarshal(req.Params, &sw)
+			s.respond(w, req.ID, protocol.ModelSwitchResponse{
+				OverrideSet: sw.Model != "auto",
+				Model:       sw.Model,
+				Reason:      "override applied",
+			}, nil)
 		case "session.create":
 			// PATCH-0028: harness auto-calls session.create on
 			// ConnStateReady. Return a stub session id so the
@@ -241,6 +267,9 @@ func (s *RuntimeStub) handleConn(conn net.Conn) {
 			} else {
 				s.respond(w, req.ID, protocol.RunListResponse{Runs: runs}, nil)
 			}
+		case "run.details":
+			detail := s.currentRunDetail(req.Params)
+			s.respond(w, req.ID, detail, nil)
 		case "turn.submit":
 			s.mu.Lock()
 			s.submits = append(s.submits, append(json.RawMessage(nil), req.Params...))
@@ -315,6 +344,34 @@ func (s *RuntimeStub) currentRuns() ([]protocol.RunSummary, string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return append([]protocol.RunSummary(nil), s.runs...), s.runListError
+}
+
+func (s *RuntimeStub) currentRunDetail(params json.RawMessage) protocol.RunDetailsResponse {
+	s.mu.Lock()
+	detail := s.runDetail
+	s.mu.Unlock()
+	if detail.Run.RunID != "" {
+		return detail
+	}
+	var req protocol.RunDetails
+	_ = json.Unmarshal(params, &req)
+	return protocol.RunDetailsResponse{
+		Run: protocol.RunSummary{
+			RunID:           req.RunID,
+			Status:          protocol.RunStatusRunning,
+			Stage:           protocol.RunStageModelCall,
+			AttachmentState: protocol.RunAttachmentAttached,
+		},
+	}
+}
+
+func (s *RuntimeStub) currentModelList() protocol.ModelListResponse {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.modelList.RoutingPolicy == nil {
+		s.modelList.RoutingPolicy = protocol.RoutingPolicy{}
+	}
+	return s.modelList
 }
 
 type rpcError struct {

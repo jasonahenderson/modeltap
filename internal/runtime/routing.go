@@ -146,6 +146,8 @@ func handleModelList(_ context.Context, conn *Connection, _ json.RawMessage) (an
 	if sid := conn.SessionID(); sid != "" {
 		if active := srv.sessions.GetActiveSession(sid); active != nil {
 			resp.CurrentOverride = active.ModelOverride
+		} else if sess, err := srv.store.GetSession(context.Background(), sid); err == nil && sess != nil && sess.ModelOverride != nil {
+			resp.CurrentOverride = *sess.ModelOverride
 		}
 	}
 	return resp, nil

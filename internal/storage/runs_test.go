@@ -83,7 +83,7 @@ func TestRunStorage_CreateRunWithTurnPersistsForegroundTransaction(t *testing.T)
 	store := newTestStore(t)
 	seedRunSession(t, store)
 	ctx := context.Background()
-	now := time.Now().UTC()
+	now := time.Now().UTC().Add(time.Second)
 	sessionID := "sess-runs"
 
 	run := &Run{
@@ -134,6 +134,13 @@ func TestRunStorage_CreateRunWithTurnPersistsForegroundTransaction(t *testing.T)
 	}
 	if len(historyRows) != 1 || historyRows[0].Content != "hello" {
 		t.Fatalf("history = %+v, want one hello entry", historyRows)
+	}
+	sess, err := store.GetSession(ctx, sessionID)
+	if err != nil {
+		t.Fatalf("GetSession: %v", err)
+	}
+	if !sess.UpdatedAt.Equal(run.UpdatedAt) {
+		t.Fatalf("session UpdatedAt = %s, want run UpdatedAt %s", sess.UpdatedAt.Format(time.RFC3339Nano), run.UpdatedAt.Format(time.RFC3339Nano))
 	}
 }
 

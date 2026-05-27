@@ -177,6 +177,12 @@ VALUES (?, ?, ?, ?, ?)`,
 	if err := insertTurn(ctx, tx, turn); err != nil {
 		return err
 	}
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE sessions SET updated_at = ? WHERE id = ?`,
+		run.UpdatedAt.UTC().Format(time.RFC3339Nano), run.SessionID,
+	); err != nil {
+		return fmt.Errorf("updating session activity: %w", err)
+	}
 	if _, err := tx.ExecContext(ctx, `
 INSERT INTO run_turns (run_id, turn_id, sequence, role, created_at)
 VALUES (?, ?, ?, ?, ?)`, run.ID, turn.ID, linkSeq, linkRole, time.Now().UTC().Format(time.RFC3339Nano)); err != nil {

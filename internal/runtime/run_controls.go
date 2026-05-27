@@ -78,6 +78,21 @@ func handleRunDetails(ctx context.Context, conn *Connection, params json.RawMess
 		return nil, err
 	}
 	turnIDs, _ := conn.server.store.ListRunTurnIDs(ctx, run.ID)
+	turnSummaries := make([]protocol.TurnSummary, 0, len(turnIDs))
+	for _, turnID := range turnIDs {
+		turn, err := conn.server.store.GetTurn(ctx, turnID)
+		if err != nil || turn == nil || isCommandTurn(*turn) {
+			continue
+		}
+		turnSummaries = append(turnSummaries, protocol.TurnSummary{
+			Sequence:      turn.Sequence,
+			Summary:       turnSummary(*turn),
+			Compacted:     turn.Compacted,
+			OriginalTurns: turn.OriginalTurns,
+			Model:         turn.Model,
+			Cost:          turn.Cost,
+		})
+	}
 	cp, _ := conn.server.store.GetLatestRunCheckpoint(ctx, run.ID)
 	events, err := conn.server.store.ListRunEvents(ctx, run.ID, maxInt64(0, run.LastEventSeq-25), 25)
 	if err != nil {
@@ -86,6 +101,7 @@ func handleRunDetails(ctx context.Context, conn *Connection, params json.RawMess
 	out := protocol.RunDetailsResponse{
 		Run:        runSummary(*run),
 		TurnIDs:    turnIDs,
+		Turns:      turnSummaries,
 		Checkpoint: checkpointSummary(cp),
 		Events:     make([]protocol.RunEventPayload, 0, len(events)),
 	}
